@@ -1,7 +1,7 @@
 ---
 id: "MEMORY-008-handoff-resume"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-09-25"
 issue: "mlorentedev/dotfiles#1689"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -48,7 +48,7 @@ Every session ends with the same manual ritual: /handoff, ask for a paste-ready 
 - [ ] **AC1** — `resume` output is a pure function of the thread file (golden test); two runs are identical.
 - [ ] **AC2** — a thread with `Verify:` and `Awaiting Manu:` renders both, and an ambiguous working directory lists the candidate threads instead of choosing one.
 - [ ] **AC3** — `SessionStart` output begins with the resume block for `source=compact` and `source=clear` (golden fixture per source), and `resume` and `fork` get one line.
-- [ ] **AC4** — no `MEMORY.md` in a fixture copy of the real dotfiles file exceeds 25,000 B after the new fields are added, and a write that would cross the budget fails instead of truncating.
+- [ ] **AC4** — a fixture shaped like the real dotfiles `MEMORY.md` (its measured prefix and thread sizes; the file itself is probed, not committed, because this repository is public) stays at or under 25,000 B after the new fields are added, and a write that would cross the budget fails instead of truncating.
 - [ ] **AC5** — the handoff skill points the next session at `dotf mem resume` instead of a hand-typed prompt, and catchup step 1 is `dotf mem resume`.
 - [ ] **AC6** — the fallback sentence is in the compiled doctrine, `compile-harness.sh --check` passes, and the doctrine stays under the 8,000-character budget.
 

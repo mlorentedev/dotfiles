@@ -237,3 +237,90 @@ func TestTheRealRegistryDeclaresTheReleaseSignature(t *testing.T) {
 		t.Fatalf("the queue reads exempt.signatures from the registry, and found none: %+v", r.Exempt)
 	}
 }
+
+// TOOL-017 AC3: a finding's class comes from a declared marker line, and
+// anything short of exactly one agreeing line is unclassified. The prose rows
+// are the shapes measured on #2832 and #2833: each states a class a reader can
+// see, and each must still come back unclassified, because prose drifts with
+// the model and the prompt while a declared line is a contract.
+func TestClassify(t *testing.T) {
+	r := reg()
+	r.Classification.Prefix = "Class: "
+	r.Classification.Classes = []string{"REAL", "THEORETICAL", "SPECULATIVE"}
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"declared line", "**Race Window**\n\nClass: REAL\nTwo lands race.", "REAL"},
+		{"declared line, indented", "**Header**\n  Class: SPECULATIVE  \nbody", "SPECULATIVE"},
+		{"the same class twice", "Class: THEORETICAL\nbody\nClass: THEORETICAL", "THEORETICAL"},
+		{"two classes disagree", "Class: REAL\nbody\nClass: SPECULATIVE", Unclassified},
+		{"header suffix only", "**Race Window (REAL)**\n\nTwo lands race.", Unclassified},
+		{"first word of the body only", "**Vacuous Test**\n\nREAL. The new test passes either way.", Unclassified},
+		{"marker inside prose", "This is not `Class: REAL` but a quote.", Unclassified},
+		{"an undeclared class", "Class: CRITICAL\nbody", Unclassified},
+		{"lower case", "class: real\nbody", Unclassified},
+		{"no marker at all", "**Check cannot fail**\n\nThe table is shared.", Unclassified},
+		{"empty body", "", Unclassified},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Classify(tc.body, r); got != tc.want {
+				t.Errorf("Classify(%q) = %q, want %q", tc.body, got, tc.want)
+			}
+		})
+	}
+}
+
+// A registry that declares no classification classifies nothing. An empty
+// prefix would otherwise make a bare "REAL" line a marker, which is prose.
+func TestClassify_WithoutADeclarationEverythingIsUnclassified(t *testing.T) {
+	for _, body := range []string{"Class: REAL", "REAL", ""} {
+		if got := Classify(body, reg()); got != Unclassified {
+			t.Errorf("Classify(%q) with no declaration = %q, want %q", body, got, Unclassified)
+		}
+	}
+}
+
+func TestTheRealRegistryDeclaresTheClassificationMarker(t *testing.T) {
+	r, err := LoadRegistry(filepath.Join("..", "..", "..", "harness", "review-attestation.json"))
+	if err != nil {
+		t.Fatalf("the shipped registry does not load: %v", err)
+	}
+	if got := Classify("Class: REAL", r); got != "REAL" {
+		t.Fatalf("the shipped registry does not classify its own REAL line: got %q", got)
+	}
+}
+
+// TOOL-017 AC3, the consumer: a finding the registry's classifying reviewers
+// left without a declared class is reported, so a human sees it. Only findings
+// newer than the last triage count, because older ones were already disposed.
+func TestUnclassifiedFindings(t *testing.T) {
+	r := reg()
+	r.Classification.Prefix = "Class: "
+	r.Classification.Classes = []string{"REAL", "THEORETICAL", "SPECULATIVE"}
+	r.Classification.Reviewers = []string{"github-actions"}
+	triage := Comment{Author: "mlorentedev", Body: "## Review triage\n| ... |", CreatedAt: at(10)}
+	inline := []Comment{
+		{Author: "github-actions[bot]", Body: "**A**\n\nClass: REAL\nx", Path: "a.go", Line: 1, CreatedAt: at(20)},
+		{Author: "github-actions[bot]", Body: "**B**\n\nREAL: prose only", Path: "b.go", Line: 2, CreatedAt: at(20)},
+		{Author: "github-actions[bot]", Body: "**C**\n\nno class", Path: "c.go", Line: 3, CreatedAt: at(5)},
+		{Author: "coderabbitai[bot]", Body: "🟠 Major", Path: "d.go", Line: 4, CreatedAt: at(20)},
+	}
+
+	got := UnclassifiedFindings(PR{Comments: []Comment{triage}}, inline, r)
+	if len(got) != 1 || got[0].Path != "b.go" {
+		t.Fatalf("got %+v, want only b.go: a.go is classified, c.go predates the triage, "+
+			"and coderabbitai is not a reviewer the registry asks for a class", got)
+	}
+
+	if got := UnclassifiedFindings(PR{}, inline, r); len(got) != 2 {
+		t.Errorf("with no triage recorded, every unclassified finding counts: got %d, want 2 (b.go, c.go)", len(got))
+	}
+
+	r.Classification.Reviewers = nil
+	if got := UnclassifiedFindings(PR{}, inline, r); got != nil {
+		t.Errorf("a registry that asks no reviewer for a class reports nothing: got %+v", got)
+	}
+}

@@ -5,64 +5,64 @@ created: "2026-06-21"
 
 # Tasks - CLI-026-dotf-harness-engine
 
-> TDD order. One task = one focused commit. Tick as you go. Reorder freely while spec is in `draft` state; freeze once you start `implementing`.
+> Re-planned 2026-10-20 against `origin/main` `856f49fc`. One slice = one PR under the ~300 executable-line cap. TDD order inside each slice.
 
 ## Setup
 
 - [x] `proposal.md` is complete and acceptance criteria are testable
-- [x] No open questions left in `proposal.md` "Risks / open questions" (line-endings, cutover, sequencing resolved 2026-06-21)
-- [ ] Branch created from main for PR-A: `feat/CLI-026-dotf-harness-engine`
+- [x] Open questions resolved (line endings, cutover, sequencing 2026-06-21; verb shape, oracle, declared divergences 2026-10-20)
+- [x] Branch: `chore/spec-triage-cli-026` (slice 1)
+- [x] `dotf harness` noun wired in `cli/internal/cmd/harness.go` (landed before this re-plan)
 
-> **Status:** spec resolved, held for roadmap order (PR10) per the sequencing decision. Implementation begins when the slot arrives; the steps below are the planned breakdown, not a frozen list.
+## Slice 1 — `dotf harness skills` (AC1, AC2)
 
-## Implementation
+- [x] Parity oracle: `tests/harness-skills-parity.bats` deploys with bash and Go into two HOMEs over the committed records and diffs them
+- [x] Tests: render per kind, awk line semantics, CRLF → LF bytes, `targets:` forms, deploy/converge/dry-run/symlink/prune/unmanaged/bad record
+- [x] `cli/internal/harness/skills.go` (manifest, targets, render) and `skills_deploy.go` (deploy, aux files, prune)
+- [x] `cli/internal/cmd/harness_skills.go`
+- [x] Lesson 504: the prompt render's fence counter
 
-> Phased cutover (resolved): PR-A adds the Go engine alongside bash; PR-B removes bash and rewires callers. TDD order, one commit each.
+## Slice 2 — the copilot skill catalog (AC3)
 
-### PR-A — add `dotf harness` alongside bash (no deletion, no caller rewiring)
+- [x] Failing test: catalog region rendered and replaced in place, sha over the bullets, byte-order record walk
+- [x] Implement in `skills` (`skills_catalog.go`, the `regions.go` marker constants); extend the oracle with a seeded `.copilot/copilot-instructions.md` on both sides
+- [x] Lesson 505: a directory glob sorts by the slash
 
-- [ ] Golden-file fixture: capture current `compile-harness.sh` output over the live vault + records as the parity oracle
-- [ ] Write failing test: `harness refresh` output diffs empty vs the golden fixture (marker sha, slugify, section extraction, line caps)
-- [ ] Implement `cli/internal/harness/` refresh, modeled on `cli/internal/spec/` (embedded-asset + cobra wiring)
-- [ ] Write failing test: CRLF input → LF output, byte-identical on Windows and Linux
-- [ ] Implement CRLF→LF normalization on read; emit LF unconditionally
-- [ ] Implement `harness deploy` (offline render to per-agent `$HOME`) + `harness check` (offline drift)
-- [ ] Write failing test: `check --against-vault` mutates a vault skill → non-zero exit
-- [ ] Implement `check --against-vault` (sha(vault skill) != committed record)
-- [ ] Refactor for clarity; wire `dotf harness` noun in `cli/internal/cmd/`
+## Slice 3 — rewire skills (part of AC8; needs a release carrying slices 1–2)
 
-### PR-B — strangle bash (gated on PR-A parity proven)
+- [ ] `deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`
+- [ ] `setup-windows.ps1` calls `dotf harness skills`; delete `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their Pester/bats parity tests
+- [ ] Note the skills half fixed on #1733
+- [ ] `doctor`'s `recordTargets` (`checks_agent_tiers.go`) mirrors the shell's substring match on purpose (`TestRecordTargetsAgreesWithTheRender`); switch it and its test to `harness.SkillTargetsAgent` in the slice that moves the agent render to Go (slice 4), so the check keeps predicting the render
 
-- [ ] Rewire `setup-windows.ps1` to call `dotf harness deploy`; delete the `Deploy-SkillRecord` block
-- [ ] `git rm scripts/compile-harness.sh`; repoint `setup-*.sh` / `ci.yml` / profile
-- [ ] Guard-grep: no remaining references to the old block or script
+## Slice 4 — agents and doctrine (AC4)
+
+- [x] `dotf harness agents`: agent-md render with resolved model and capability lines; parity oracle (`tests/harness-agents-parity.bats`)
+- [x] `dotf harness doctrine`: compact payload, ASCII fold, char cap, shadow warning; parity oracle (`tests/harness-doctrine-parity.bats`)
+- [ ] Windows gains `agents.deploy` (#1387)
+
+## Slice 5 — `dotf harness deploy` (AC4, AC8)
+
+- [x] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell (`dotf harness deploy`, `tests/harness-deploy-parity.bats`)
+- [ ] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
+  - [ ] `converge/harness.go` `CompileHarnessDeploy` runs `dotf harness deploy` in process instead of `bash scripts/compile-harness.sh --deploy`; on Windows this gives the step agents and doctrine for the first time
+  - [ ] `setup-windows.ps1`: the `Deploy-SkillRecord` block and its helpers are deleted, replaced by the one `dotf harness deploy` call
+  - [ ] `setup-linux.sh`: whatever still calls the script for a deploy calls the verb
+
+## Slice 6 — `dotf harness check` (AC5, AC6)
+
+- [x] Offline drift check in Go (`dotf harness check`, `tests/harness-check-parity.bats`)
+- [ ] `ci.yml` and `dotf doctor`'s harness drift check call it on every OS (after a release carries the verb)
+- [ ] `--against-vault` with a regression test (#1545)
+
+## Slice 7 — `refresh` in Go and deletion (AC7, AC9)
+
+- [ ] Render half of `--refresh` in Go behind the existing gate
+- [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
+- [ ] Every acceptance criterion is covered by at least one test
+- [ ] `go build`, `go vet`, `go test`, `golangci-lint`, `GOOS=windows go vet` pass
 - [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-
-## Machine-readable features
-
-This spec emits a sibling `features.json` (alongside this file) following [[pattern-feature-list-as-primitive]]. The JSON is the harness-facing contract: each acceptance criterion maps to ≥1 feature with `id`, `behavior`, `verification` (executable command), `state` (lifecycle), and `evidence` (harness-captured output).
-
-**Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
-
-Minimal `features.json` skeleton (drop into `<repo>/specs/CLI-026-dotf-harness-engine/features.json`):
-
-```json
-[
-  {
-    "id": "CLI-026-dotf-harness-engine-f1",
-    "behavior": "<one-line copy of an acceptance criterion>",
-    "verification": "<single shell command; exit 0 means pass>",
-    "state": "pending",
-    "evidence": ""
-  }
-]
-```
+- [ ] Independent review (`dotf spec review CLI-026-dotf-harness-engine`) before archive

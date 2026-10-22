@@ -32,7 +32,24 @@ type Registry struct {
 	Exempt struct {
 		Signatures []Signature `json:"signatures"`
 	} `json:"exempt"`
+	Classification Classification `json:"classification"`
 }
+
+// Classification declares the line a reviewer writes to state a finding's
+// class (TOOL-017 AC3): Prefix followed by one of Classes, alone on its line.
+// .pr_agent.toml asks the reviewer for exactly these lines; the registry, not
+// this package, is where they are declared.
+type Classification struct {
+	Prefix  string   `json:"prefix"`
+	Classes []string `json:"classes"`
+	// Reviewers are the logins asked for the marker. A finding from anyone
+	// else carries no class by design and is not reported for lacking one.
+	Reviewers []string `json:"reviewers"`
+}
+
+// Unclassified is the class of a finding that carries no declared marker, or
+// two that disagree. It goes to a human; it never decays into a skip.
+const Unclassified = "unclassified"
 
 // Signature is a diff that carries nothing a review could act on, declared in
 // the registry and honoured by both consumers: the attestation gate reports it
@@ -59,6 +76,10 @@ type Comment struct {
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	// Path and Line locate an inline review comment; both are zero for a
+	// conversation comment or a review.
+	Path string `json:"path,omitempty"`
+	Line int    `json:"line,omitempty"`
 }
 
 // Spoken is when this comment last said something new.
@@ -103,6 +124,14 @@ type Status struct {
 	Reviewer string    // who produced the untriaged output
 	At       time.Time // when they produced it
 	Reason   string    // human-readable, always set
+
+	// Unclassified are the inline findings, newer than the last triage, that a
+	// classifying reviewer left without a declared class (TOOL-017 AC3). They
+	// are reported for a human and never change Pending.
+	Unclassified []Comment
+	// FindingsUnread is set when the inline findings could not be read, so an
+	// empty Unclassified does not read as "every finding is classified".
+	FindingsUnread bool
 }
 
 // RegistryPath is where a repository keeps its reviewer registry.
@@ -239,6 +268,57 @@ func Evaluate(pr PR, reg Registry) Status {
 			Reason: fmt.Sprintf("%s reviewed again after the last triage", by)}
 	}
 	return Status{PR: pr, Reviewer: by, At: out.Spoken(), Reason: "triaged"}
+}
+
+// Classify returns the class body declares through reg's classification
+// marker: a line equal, after trimming, to Prefix + one of Classes. The class
+// is never read out of prose, so a body that only says "(REAL)" or opens with
+// "REAL." is Unclassified however plain it looks.
+func Classify(body string, reg Registry) string {
+	decl := reg.Classification
+	if strings.TrimSpace(decl.Prefix) == "" {
+		return Unclassified
+	}
+	found := ""
+	for line := range strings.SplitSeq(body, "\n") {
+		line = strings.TrimSpace(line)
+		for _, class := range decl.Classes {
+			if line != decl.Prefix+class {
+				continue
+			}
+			// Two classes that disagree are a conflict, not a choice: picking
+			// the first would let the order of the reviewer's blocks decide.
+			if found != "" && found != class {
+				return Unclassified
+			}
+			found = class
+		}
+	}
+	if found == "" {
+		return Unclassified
+	}
+	return found
+}
+
+// UnclassifiedFindings returns the inline findings on pr that need a human
+// because their class is not declared: written by a reviewer the registry asks
+// for the marker, newer than the last triage, and unclassified by Classify.
+func UnclassifiedFindings(pr PR, inline []Comment, reg Registry) []Comment {
+	asked := map[string]bool{}
+	for _, login := range reg.Classification.Reviewers {
+		asked[normaliseLogin(login)] = true
+	}
+	triaged, any := lastTriage(pr, reg.Triage.Marker)
+	var out []Comment
+	for _, c := range inline {
+		if !asked[normaliseLogin(c.Author)] || (any && !c.Spoken().After(triaged)) {
+			continue
+		}
+		if Classify(c.Body, reg) == Unclassified {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // exemptAs returns the signature whose files are exactly the diff's: set

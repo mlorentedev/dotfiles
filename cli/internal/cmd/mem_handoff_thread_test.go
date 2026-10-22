@@ -30,7 +30,8 @@ func TestMemHandoffWriteNamesWhatTheBodyLacksAndStillWrites(t *testing.T) {
 			t.Errorf("stderr does not name %s:\n%s", want, errOut.String())
 		}
 	}
-	if after, _ := os.ReadFile(memory); !strings.Contains(string(after), "**Trap:** the vault auto-commits.") {
+	file := filepath.Join(filepath.Dir(memory), "threads", "feat-x.md")
+	if after, _ := os.ReadFile(file); !strings.Contains(string(after), "**Trap:** the vault auto-commits.") {
 		t.Errorf("the body was not written:\n%s", after)
 	}
 }

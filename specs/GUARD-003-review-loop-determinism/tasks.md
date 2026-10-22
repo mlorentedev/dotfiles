@@ -27,10 +27,10 @@ was disjoint from both and shipped first.
 
 What genuinely blocks:
 
-- [ ] B1. **#1047 merges** — the classifier learns to count comment-shaped review
+- [x] B1. **#1047 merges** (merged 2026-08-18) — the classifier learns to count comment-shaped review
       output. Until then there is no verdict worth re-evaluating. Held by another
       session.
-- [ ] B2. **#1041 ships** — the verdict lives on the revisable commit status
+- [x] B2. **#1041 ships** (closed 2026-08-18; the check-run half finished in #1185) — the verdict lives on the revisable commit status
       rather than a check-run frozen at creation. Making the gate required before
       this blocks every PR.
 
@@ -44,13 +44,13 @@ What genuinely blocks:
       from the run payload. A trigger that re-evaluates the wrong PR is worse
       than no trigger, so the recovery is the substance of this task, not the
       trigger line.
-- [ ] T3. [AC2] Confirm the re-evaluation writes the commit status and that the
+- [x] T3. [AC2] Confirm the re-evaluation writes the commit status and that the
       status carries the latest verdict. Depends on B2 having landed the status
       as the authoritative channel.
-- [ ] T4. [AC3] A declined or absent review still ends red after the trigger
+- [x] T4. [AC3] A declined or absent review still ends red after the trigger
       fires. Verified by fixture, not by reasoning — the trigger must not become
       a path to green.
-- [ ] T5. [AC1] Verify on a **live** PR: a PR-Agent run completing flips the gate
+- [x] T5. [AC1] Verify on a **live** PR: a PR-Agent run completing flips the gate
       with no human action and no manual re-run. Inspection does not satisfy AC1.
 - [x] T6. [AC6] Document the required-check adoption with its ordering
       constraint, in the gate's own workflow, so it travels with the thing it
@@ -77,23 +77,40 @@ What genuinely blocks:
       on #2168 in one night). Live, 2026-10-09: the released `dotf` lists #2168
       and this build clears it.
 
+- [x] T11. [AC1] [AC4] (#1128) A review asked for with `/review` re-evaluates
+      the PR it ran on. Its `workflow_run` carries the default branch's SHA, so
+      `pr-agent`'s `issue_comment` path uploads the PR number as the
+      `reviewed-pr` artifact and the gate reads it for that event only. Its
+      re-evaluations are grouped by run id, not by main's SHA.
+- [x] T12. [AC1] [AC4] Verify T11 live after merge: `/review` on an open PR, and
+      the gate's `workflow_run` log says `re-evaluating PR #<that PR>`.
+- [ ] T13. [AC8] (#2870, review F1) Count a triage record only when its author
+      has standing to write it. Regression test
+      `TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue`, observed red before
+      the fix, with a checksum-verified mutation in `verification.md`.
+- [ ] T14. [AC9] (#2870, review F2) Guard the writer side: the heading in
+      `harness/skills/pr-review-triage/SKILL.md` equals
+      `harness/review-attestation.json` `triage.marker`.
+
 ## Closing
 
-- [ ] Every acceptance criterion covered by a verification command whose failure
+- [x] Every acceptance criterion covered by a verification command whose failure
       mode has been observed
-- [ ] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
-- [ ] Tests pass (`bats tests/check-review-attestation.bats`)
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in with output produced in the session, not recalled
-- [ ] PR opened referencing this spec folder
+- [x] Lint passes (`shellcheck scripts/check-review-attestation.sh`, `bash -n`)
+- [x] Tests pass (`bats tests/check-review-attestation.bats`)
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in with output produced in the session, not recalled
+- [x] PR opened referencing this spec folder
 - [ ] Adversarial review passes before archive (`dotf spec review GUARD-003-review-loop-determinism`)
 
 ## A note on this spec's own surface
 
 The trigger lands in `.github/workflows/review-attestation.yml`, which is
-GUARD-002's surface and currently unheld. It does **not** touch
-`.github/workflows/pr-agent.yml` — that is TOOL-013's, held elsewhere. The
-`workflow_run` trigger names the pr-agent workflow but is declared in the gate's
-own file, so the two lanes stay separate and no coordination is required beyond
-the workflow's name remaining stable. If that name changes, T1's guard fails,
-which is the intended behaviour.
+GUARD-002's surface. T11 also changes `.github/workflows/pr-agent.yml`
+(TOOL-013's surface, archived and unheld since): its `issue_comment` path uploads
+the `reviewed-pr` artifact with the member `pr-number`. The two files therefore
+share three names, not one: the workflow name the `workflow_run` trigger lists,
+the artifact name and the member. Renaming any of them makes the gate skip every
+`/review` silently, so each is guarded in `tests/review-attestation-workflow.bats`:
+T1's guard holds the workflow name, and the producer case holds the artifact name
+and the member against the resolve step that reads them.
