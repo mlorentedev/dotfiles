@@ -3,6 +3,7 @@ package cmd
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"debug/pe"
 	"encoding/binary"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -143,6 +145,29 @@ func TestArchiveRef_TarGzForTheLinuxGuest(t *testing.T) {
 func noGuest(t *testing.T) {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
+}
+
+// The verbs' narration is progress, so it goes to stderr and stdout stays the
+// guest's own output (ADR-055 D9, D10): a caller that captures stdout must not
+// have to filter `==> ` lines out of it.
+func TestVMProgressGoesToStderr(t *testing.T) {
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		t.Skip("the Windows guest runs on a macOS Arm64 host only")
+	}
+	noGuest(t)
+	var stdout, stderr bytes.Buffer
+	c := newVMWindowsStopCmd()
+	c.SetOut(&stdout)
+	c.SetErr(&stderr)
+	if err := c.Execute(); err != nil {
+		t.Fatalf("stop with no guest: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want it empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "==> no Windows guest is running") {
+		t.Errorf("stderr = %q, want the progress line", stderr.String())
+	}
 }
 
 // A --dotf that names no file is a usage error, refused before any guest
