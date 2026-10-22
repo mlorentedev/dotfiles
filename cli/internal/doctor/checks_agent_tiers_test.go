@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -127,20 +124,35 @@ func TestAgentTiersResolve(t *testing.T) {
 			wantSubs:     []string{"top", "opencode"},
 		},
 		{
-			// The render reads only the `targets:` line, which names nobody in
-			// the block form, so the record deploys nowhere and cannot fail a
-			// render. A FAIL here would be the false positive on correct data.
-			name:         "a block-style targets list is judged as the render reads it",
+			// The Go render parses the list as YAML, so the block form targets
+			// the harnesses it names (#1733); the shell's read it as nobody.
+			name:         "a block-style targets list targets the harnesses it names",
 			deployAgents: []string{"claude"},
 			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: ultra\ntargets:\n  - claude\n---",
-			wantNot:      []string{"checked"},
+			wantFail:     true,
+			wantSubs:     []string{"ultra", "claude"},
 		},
 		{
-			// The render's awk stops at the first `targets:` line.
-			name:         "the first of two targets lines is the one judged",
+			// Matched by name, not by substring: copilot does not target pi.
+			name:         "a harness name inside another is not a target",
+			deployAgents: []string{"pi"},
+			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\ntargets: [copilot]\n---",
+			wantNot:      []string{"checked", "pi"},
+		},
+		{
+			// The render normalises line endings, so a CRLF record resolves.
+			name:         "a CRLF record resolves its tier",
+			deployAgents: []string{"claude"},
+			frontmatter:  "---\r\nname: curator\r\ndescription: x\r\nkind: invocable\r\nmodel: top\r\n---\r",
+			wantSubs:     []string{"(1 checked)"},
+		},
+		{
+			// YAML refuses a repeated key, and the render with it.
+			name:         "a record the render cannot parse fails once",
 			deployAgents: []string{"claude", "opencode"},
 			frontmatter:  "---\nname: curator\ndescription: x\nkind: invocable\nmodel: top\ntargets: [claude]\ntargets: [opencode]\n---",
-			wantSubs:     []string{"(1 checked)"},
+			wantFail:     true,
+			wantSubs:     []string{"cannot be read for its targets"},
 		},
 		{
 			// An indented key belongs to a nested block, not to the record.
@@ -245,130 +257,5 @@ func TestAgentTiersDefaultRecordDir(t *testing.T) {
 	checkAgentTiersResolve(cfg, tierMap, rep)
 	if rep.Failures() != 1 {
 		t.Errorf("the default record dir must be read, so the undeclared tier fails:\n%s", buf.String())
-	}
-}
-
-// TestRecordTargetsDefaultsToEveryHarness pins the direction that, inverted,
-// turns correct data into noise: an ABSENT targets list means ALL harnesses.
-// A PRESENT one is read as the render reads it (see recordTargets).
-func TestRecordTargetsDefaultsToEveryHarness(t *testing.T) {
-	tests := []struct {
-		raw      string
-		declared bool
-		agent    string
-		want     bool
-	}{
-		{"", false, "claude", true},
-		{"", false, "opencode", true},
-		{"[claude]", true, "claude", true},
-		{"[claude]", true, "opencode", false},
-		{"[claude, opencode]", true, "opencode", true},
-		{"[opencode]", true, "claude", false},
-		{`["opencode"]`, true, "opencode", true},
-		{"", true, "claude", false}, // block style: the key line names nobody
-	}
-	for _, tt := range tests {
-		if got := recordTargets(tt.raw, tt.declared, tt.agent); got != tt.want {
-			t.Errorf("recordTargets(%q, %v, %q) = %v, want %v", tt.raw, tt.declared, tt.agent, got, tt.want)
-		}
-	}
-}
-
-// TestRecordTargetsAgreesWithTheRender runs the render's own predicate,
-// `skill_targets_agent` from scripts/compile-harness.sh, against the same
-// records the check reads. The check exists to predict the render, so a rule
-// that is merely more reasonable than the render's is a check that is wrong.
-func TestRecordTargetsAgreesWithTheRender(t *testing.T) {
-	bash, err := exec.LookPath("bash")
-	if err != nil || runtime.GOOS == "windows" {
-		t.Skip("needs bash to run the render's predicate")
-	}
-	script, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "compile-harness.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	fn := regexp.MustCompile(`(?ms)^skill_targets_agent\(\) \{\n.*?^\}\n`).Find(script)
-	if fn == nil {
-		t.Fatal("skill_targets_agent not found in compile-harness.sh; this test must follow it")
-	}
-
-	records := []string{
-		"model: top",
-		"model: top\ntargets: [claude]",
-		"model: top\ntargets: [claude, opencode]",
-		"model: top\ntargets: [\"opencode\"]",
-		"model: top\ntargets:\n  - claude",
-		"model: top\ntargets: []",
-		"model: top\ntargets: [copilot]",
-	}
-	agents := []string{"claude", "opencode", "copilot", "codex", "pi", "agy"}
-	for _, body := range records {
-		path := filepath.Join(t.TempDir(), "AGENT.md")
-		mustWrite(t, path, "---\nname: x\n"+body+"\n---\n\nBody.\n")
-		fm, err := readAgentFrontmatter(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		targets, declared := fm["targets"]
-		for _, agent := range agents {
-			// #nosec G204 -- the script text is this repository's own file
-			cmd := exec.Command(bash, "-c", string(fn)+`skill_targets_agent "$1" "$2"`, "_", path, agent)
-			render := cmd.Run() == nil
-			if got := recordTargets(targets, declared, agent); got != render {
-				t.Errorf("record %q, harness %s: check says targeted=%v, render says %v", body, agent, got, render)
-			}
-		}
-	}
-}
-
-// TestRecordModelAgreesWithTheRender holds the model: half to the render the
-// way the test above holds targets: (GUARD-020, #1740). The render reads the
-// tier with `skill_field` from scripts/compile-harness.sh; the check must read
-// the same bytes the same way, or it reports OK for a tier the render fails on.
-func TestRecordModelAgreesWithTheRender(t *testing.T) {
-	bash, err := exec.LookPath("bash")
-	if err != nil || runtime.GOOS == "windows" {
-		t.Skip("needs bash to run the render's reader")
-	}
-	script, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "compile-harness.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	fn := regexp.MustCompile(`(?ms)^skill_field\(\) \{\n.*?^\}\n`).Find(script)
-	if fn == nil {
-		t.Fatal("skill_field not found in compile-harness.sh; this test must follow it")
-	}
-
-	records := map[string]string{
-		"plain":             "---\nname: x\nmodel: top\n---\n\nBody.\n",
-		"CRLF":              "---\r\nname: x\r\nmodel: top\r\n---\r\n\r\nBody.\r\n",
-		"space before ':'":  "---\nname: x\nmodel : top\n---\n\nBody.\n",
-		"indented fences":   "  ---\nmodel: top\n  ---\n",
-		"indented closer":   "---\nname: x\n  ---\nmodel: top\n---\n",
-		"trailing space":    "---\nmodel: top  \n---\n",
-		"tab after ':'":     "---\nmodel:\ttop\n---\n",
-		"first one wins":    "---\nmodel: top\nmodel: mid\n---\n",
-		"body model only":   "---\nname: x\n---\nmodel: top\n",
-		"no frontmatter":    "model: top\n",
-		"fence with spaces": "---  \nmodel: mid\n---\n",
-		"bare CR after ':'": "---\r\nmodel:\r\n---\r\n",
-		"CR fence, LF body": "---\r\nmodel: top\n---\n",
-	}
-	for name, content := range records {
-		path := filepath.Join(t.TempDir(), "AGENT.md")
-		mustWrite(t, path, content)
-		fm, err := readAgentFrontmatter(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// #nosec G204 -- the script text is this repository's own file
-		out, err := exec.Command(bash, "-c", string(fn)+`skill_field "$1" model`, "_", path).Output()
-		if err != nil {
-			t.Fatalf("%s: skill_field: %v", name, err)
-		}
-		render := strings.TrimSuffix(string(out), "\n") // the $(...) the render reads it through drops it
-		if got := fm["model"]; got != render {
-			t.Errorf("%s: check reads model %q, render reads %q", name, got, render)
-		}
 	}
 }
