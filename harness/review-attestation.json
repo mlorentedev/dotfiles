@@ -127,6 +127,7 @@
   "classification": {
     "prefix": "Class: ",
     "classes": ["REAL", "THEORETICAL", "SPECULATIVE"],
-    "why": "TOOL-017 AC3. A finding's class is read from a whole line equal to prefix + class, never parsed out of prose: measured 2026-10-20 on #2832, #2833 and #2839, PR-Agent wrote the gradation as a header suffix `(REAL)`, as the first word of the body `REAL.`, or not at all. A finding with no such line, or with two that disagree, is unclassified and goes to a human. .pr_agent.toml asks the reviewer for exactly these lines, and tests/pr-agent-config.bats fails if the two drift apart."
+    "reviewers": ["github-actions"],
+    "why": "TOOL-017 AC3. A finding's class is read from a whole line equal to prefix + class, never parsed out of prose: measured 2026-10-20 on #2832, #2833 and #2839, PR-Agent wrote the gradation as a header suffix `(REAL)`, as the first word of the body `REAL.`, or not at all. A finding with no such line, or with two that disagree, is unclassified and goes to a human. .pr_agent.toml asks the reviewer for exactly these lines, and tests/pr-agent-config.bats fails if the two drift apart. `reviewers` names who is asked for the line: PR-Agent (github-actions) only, because CodeRabbit writes its own severity format and every one of its findings would read as unclassified. `dotf pr triage-queue` names a pending PR's unclassified findings from these reviewers; it reports them and never makes a PR pending (owner, #1062, 2026-10-21)."
   }
 }

@@ -44,3 +44,4 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 - [ ] Folder moved: `specs/TOOL-017-deterministic-review-triage/` -> `specs/archive/TOOL-017-deterministic-review-triage/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+- 2026-10-21, owner decisions on #1062: AC4-AC6 option A (a reproduction is a committed failing test or a recorded non-zero exit, never a model's judgement); AC7 option B (the PR-level gate stands). The registry now names `github-actions` as the one classifying reviewer.
