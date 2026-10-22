@@ -1,0 +1,26 @@
+version: 1
+run_id: "bugs-20261022t0740z"
+armed_by: manu
+armed_at: 2026-10-22T07:40:00Z
+expires_at: 2026-10-22T15:35:00Z
+objective: "Land small, mechanical dotfiles bug fixes from the unassigned backlog, each under the standing merge grant."
+scope:
+  write_paths: ["cli/**", "tests/**", "docs/lessons/**", ".agent/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "setup-linux.sh", "setup-windows.ps1", "versions.conf"]
+  max_files: 8
+  max_loc: 50
+allowed_commands: [dotf, gh, git, go, bats, shellcheck, golangci-lint]
+queue:
+  source: bitacora
+  filter: "dotfiles, open, unassigned, label bug, mechanical fix whose cause the title states, no spec needed; ordered #2872, #2812, #2803; vetoed: #2873 #2896 #2905 #2907 #2785 #2926 #2928 (path contention or frozen paths)"
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 30
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+  advisor_note: "dotf agent auto is denied on this Mac (no machine identity, #1236/#1547); the operator named the harness advisor this turn."
