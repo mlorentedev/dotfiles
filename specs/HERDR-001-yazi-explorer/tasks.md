@@ -38,8 +38,9 @@ created: "2026-10-18"
       `HERDR_ACTIVE_*` first and `HERDR_PANE_ID`/`HERDR_TAB_ID` second.
 - [x] [AC3] Failing test: a second call with an explorer already running closes
       it and opens nothing; another tab's explorer is never touched.
-- [x] [AC3] Toggle detection by foreground process (`yazi`), not by a pane label
-      that any rename clears; verified live: opened `w10:p9`, then closed it.
+- [x] [AC3] Toggle ownership by the `files` pane label, never by the foreground
+      process (#2815, and #2854 for the press from inside the explorer); verified
+      live: opened `w10:p9`, then closed it.
 - [x] [AC4] Failing test: no yazi on PATH refuses and names `dotf tools sync`.
 - [x] [AC4] `herdrLookPath` preflight before any herdr call.
 - [x] [AC1] Ordering guard: a test fails if a binding names `dotf herdr explorer`

@@ -42,9 +42,10 @@ this session, on herdr 0.9.3, macOS arm64.
   `dotf herdr explorer` deploys fine in CI (built from the tree) and fails on
   every new machine, whose `DOTF_VERSION` is `0.75.0` and has no such subcommand
   (lesson 373). A test enforced the order until the binding landed with 0.76.0.
-- **Toggle detection by foreground process, not pane label.** `herdr pane rename`
-  sets a label a later rename clears, and `pane list` only carries it when set;
-  "the pane running yazi" is true for exactly as long as it is true.
+- **Toggle ownership by pane label, not by foreground process.** The first
+  design looked for the pane running yazi; review showed that closes a yazi the
+  owner opened themselves (#2815). The explorer is now the pane labelled `files`,
+  and a press from inside it closes it (#2854, lesson 503).
 - **`dotf herdr files` was designed and dropped.** The popup runs `yazi` directly
   (no dotf coupling, so it ships now); a second subcommand to add a friendlier
   missing-binary message was not worth a public CLI surface.
