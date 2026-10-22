@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 )
 
 // AddOptions configures the creation of a new worktree.
@@ -27,6 +29,9 @@ type AddOptions struct {
 	ShareIssue bool
 	TTL        time.Duration
 	Creator    string
+	// LockPath and LockTimeout default to DefaultLockPath and a minute.
+	LockPath    string
+	LockTimeout time.Duration
 }
 
 // AddRunner executes the low-level git worktree creation.
@@ -216,6 +221,11 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 	}
 
 	branchName, ttl, creator := resolveAddDefaults(opts)
+	unlock, err := lockIssueClaim(opts)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	if err := refuseHeldIssue(opts, runner, now); err != nil {
 		return nil, err
 	}
@@ -272,6 +282,26 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		Metadata: &meta,
 		State:    StateActive,
 	}, nil
+}
+
+// lockIssueClaim holds the worktree lock from the held-issue scan until the
+// lease is saved, so two adds for one issue cannot both pass the scan.
+func lockIssueClaim(opts AddOptions) (func(), error) {
+	if opts.Issue == 0 || opts.ShareIssue {
+		return func() {}, nil
+	}
+	path, timeout := opts.LockPath, opts.LockTimeout
+	if path == "" {
+		path = DefaultLockPath()
+	}
+	if timeout <= 0 {
+		timeout = time.Minute
+	}
+	unlock, err := filelock.Lock(path, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("another worktree operation holds the lock, so #%d cannot be checked: %w", opts.Issue, err)
+	}
+	return unlock, nil
 }
 
 // refuseHeldIssue stops a second session on one machine from taking an issue

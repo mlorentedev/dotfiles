@@ -76,24 +76,24 @@ Two halves. The deletion needs no decision; the retire step on live machines doe
 - [x] [AC9] Edit the stale mentions outside the deletion: `docs/architecture.md:27,29` and the comments in `systemd/hive.service.d/10-dotf-secrets.conf:8,58`, plus `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`, which now calls the timer historical
 - [x] State in the PR: until #1993 retires `prerequisite_command`, Windows setup still runs `uv tool install --upgrade hive-vault` on every run
 
-### PR6 — Windows installs hive through hive's own layout (AC2, AC4) — added 2026-10-21, gated on an owner decision
+### PR6 — Windows installs hive through hive's own layout (AC2, AC4) — added 2026-10-21
 
-**Decided (owner, 2026-10-21): (A).** The two shapes that were weighed:
+Decided by the owner on 2026-10-21: a catalog source, as a `self_install` field on the `uv-tool` class rather than a source type of its own. ADR-036's amendment of the same date is the contract.
 
-- **(A) A `packages.json` source for hive's own installer** (for example `type: hive-self`, run as `uvx --from hive-vault hive self-upgrade <pin>`, probed with `hive --version` in a new process). It keeps one install channel per tool class (ADR-036) and gives `dotf tools` the install to report on, and it is a new public contract in the catalog schema. It is #1993's direction.
-- **(B) A dedicated `dotf converge` step for hive on Windows**, outside the catalog. It is narrower, a second place a tool is installed, and the catalog would still report hive as unsupported on Windows.
-
-Either way:
-
-- [ ] [AC2] Failing test first: a clean Windows guest gets hive from the step and not from `prerequisite_command`
-- [ ] [AC4] Remove the Windows run of `prerequisite_command` (with #1993), so no `uv tool` copy of hive-vault is made on Windows
-- [ ] [AC4] A missing hive is reported by the step that owns it, so the converge is not green while the doctor fails (Baseline 2, V1 and V5)
-- [ ] [AC2] Guest run: `dotf vm windows --ref <PR6 ref>` flips V2–V6, and the second converge changes nothing. The second converge runs in a new process, which is HIVE-328's AC7 fresh-shell check. **Gated on hive#515** (no hive install succeeds on Arm64 today, V6); without it, run it on a clean x64 Windows machine
+- [x] [AC4] Failing tests, then `self_install` in the catalog. `Load` refuses one that is not on a uv tool, that lists no platform or an unknown one, or one the tool's platforms exclude, and args that never pass `{version}` (hive ADR-020) (`TestLoad_SelfInstall`)
+- [x] [AC4] Review fix (PR-Agent on #2901): an unreadable registered PATH is a refusal in Install and Plan, not an absent hive that would be self-upgraded down (`TestInstallUvTool_SelfInstallRefusesAnUnreadableRegisteredPath`, mutation-checked)
+- [x] [AC4] Failing tests, then the install. On a listed OS it runs `uv tool run --refresh-package hive-vault --from hive-vault==<pin> [--python <series>] hive self-upgrade <pin>`; elsewhere it stays `uv tool install`. At or above the pin it does nothing (`TestInstallUvTool_SelfInstall*`)
+- [x] [AC4] The probe reads the registered PATH (`env.RegisteredPath`) after the process PATH, before the install and after it. A hive newer than the pin, on a PATH this process predates, is never `self-upgrade`d down (`TestInstallUvTool_SelfInstallProbesThePersistentPath`, mutation-checked: dropping the fallback fails it)
+- [x] [AC4] `packages.json`: hive drops `platforms` and gains `self_install` (`TestTheRepoCatalogDeclaresHiveSelfInstalledOnWindows`, plus the jq mirror in `tests/packages-json.bats`)
+- [x] [AC4] `mcp-servers.json`: hive's `prerequisite_command` is gone, so Windows setup no longer makes a `uv tool` copy, and #1993's acceptance holds (this PR closes it). The loop's reader of the field is dead code and leaves with the loop under CLI-096 (#2000)
+- [x] [AC4] A missing hive on Windows is now the tools step's to report: `dotf tools install hive` is a real install there, so the doctor's fix names it on every OS (`TestHiveDaemon_NotInstalledFixFollowsTheOS`, superseding PR7's Windows line)
+- [ ] [AC2] Guest run: `dotf vm windows --ref <PR6 ref>` flips V2, V4 and V5, and the second converge changes nothing. The second converge runs in a new process, which is HIVE-328's AC7 fresh-shell check. **Gated on hive#515**: on the Arm64 guest `uv tool run --from hive-vault==<pin>` fails at the cryptography build exactly as V6 did, so before a hive release with that fix this run proves nothing. Without one, run it on a clean x64 Windows machine
+- [x] [AC4] V3 flips in the run that installs hive. `setup-windows.ps1` calls `Sync-SessionPath` right after `dotf tools install`, so the `Get-Command hive` gate at line 584 sees the launcher. Measured on #2901's `test-windows` (x64 runner, run 39721972641): `hive self-upgrade: switched none -> 4.4.1`, then `[SUCCESS] Installed hive daemon service (Scheduled Task, v4.4.1)` in the same setup run. An earlier draft of this line said it stayed dark: that was inferred, not measured
 - [ ] Document the install model in one place, as deferred in PR3: what owns the layout, what installs it, that nothing upgrades it unattended (ADR-020), and which OS uses which mechanism
 
 ### PR7 — doctor names the right fix on Windows (#2856) — added 2026-10-21
 
-- [x] Failing test: the not-installed fix follows the OS; Windows never gets `dotf tools install hive` (`TestHiveDaemon_NotInstalledFixFollowsTheOS`, landed in #2869, `c213ae90`)
+- [x] Failing test: the not-installed fix follows the OS; Windows never gets `dotf tools install hive` (`TestHiveDaemon_NotInstalledFixFollowsTheOS`, landed in #2869, `c213ae90`). *Superseded by PR6*, where that command installs hive on Windows too
 - [x] `hiveInstallRemedy`: the catalog pin on Linux and macOS, hive's own bootstrap on Windows (#2869, `c213ae90`, closes #2856)
 
 ## Closing

@@ -109,14 +109,13 @@ func hiveDaemonState(stdout string) (string, bool) {
 	return "", false
 }
 
-// hiveInstallRemedy names the install that owns hive on this OS. The catalog
-// entry is POSIX-only (packages.json), so on Windows `dotf tools install hive`
-// skips; there hive builds its own layout and PATH launcher (hive ADR-019), and
-// the launcher reaches a shell opened after it, not the one that ran it (#2856).
+// hiveInstallRemedy is the catalog install, which on Windows runs hive's own
+// self install (packages.json self_install): hive builds its layout and PATH
+// launcher (hive ADR-019), and the launcher reaches a shell opened after it,
+// not the one that ran it (#2856).
 func hiveInstallRemedy(goos string) string {
 	if goos == "windows" {
-		return "Fix: `uvx --from hive-vault hive self-upgrade`, which builds hive's own install and launcher, " +
-			"then open a new shell so the launcher is on PATH."
+		return "Fix: `dotf tools install hive`, which runs hive's own self install, then open a new shell so its launcher is on PATH."
 	}
 	return "Fix: `dotf tools install hive`, which installs the catalog pin."
 }
