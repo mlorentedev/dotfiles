@@ -44,7 +44,7 @@ created: "2026-06-21"
 
 - Slice 5 rewire, Linux setup: `setup-linux.sh` calls `dotf harness deploy --repo-root "$CURRENT_DIR"`; the script went from 722 to 716 lines.
 - `tests/setup-fails-loudly.bats` now finds the block by the `dotf harness deploy` line and still requires `exit 1` and no `log_warning` in it; the `compile-harness.bats` test that grepped for the script call is deleted with the call.
-- Every bats file that references `setup-linux.sh` or `compile-harness` (48 files, 667 tests) passes but `harness-doctrine-records.bats`'s real-vault refresh, which fails the same way on main: the vault's crystallize skill is ahead of its committed record.
+- The bats files that reference `setup-linux.sh` or `compile-harness` (48 files): 666 of 667 tests pass. The one failure is `harness-doctrine-records.bats`'s real-vault refresh, which also fails on a clean `origin/main` (`a4e46b1e`) because the committed records lag their vault skills; ticketed as #2913.
 - The `integration` job is the behavioural check: its container builds dotf from the tree and runs setup-linux, then `verify-setup.bats` counts the deployed skills and commands.
 
 ## Decisions made during implementation
