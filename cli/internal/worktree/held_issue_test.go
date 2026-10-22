@@ -106,3 +106,29 @@ func TestAddForAnIssueWaitsOnTheWorktreeLock(t *testing.T) {
 		t.Fatalf("add without --issue waited on the lock: %v", err)
 	}
 }
+
+// The lock must still be held while the scan runs and while git creates the
+// worktree, which is after the scan and before the lease is written: an add
+// that let go of it any earlier would let a second add pass the same scan.
+func TestAddHoldsTheWorktreeLockFromScanToLease(t *testing.T) {
+	runner, _ := heldIssueRunner(t, time.Now().Add(-time.Minute))
+	opts := heldIssueOpts(t, 2824)
+	held := func(stage string) {
+		unlock, err := TryLockFile(opts.LockPath)
+		if err == nil {
+			unlock()
+			t.Errorf("the worktree lock was free during %s", stage)
+		} else if !errors.Is(err, ErrLocked) {
+			t.Fatalf("probe the lock during %s: %v", stage, err)
+		}
+	}
+	list, add := runner.OnWorktreeList, runner.OnWorktreeAdd
+	runner.OnWorktreeList = func(repo string) (string, error) { held("the scan"); return list(repo) }
+	runner.OnWorktreeAdd = func(repo, target, branch, base string) error {
+		held("the worktree add")
+		return add(repo, target, branch, base)
+	}
+	if _, err := AddWithRunner(opts, runner, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+}
