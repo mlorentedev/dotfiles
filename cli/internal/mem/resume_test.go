@@ -192,3 +192,32 @@ func TestResumeRendersAOneItemListAsABlock(t *testing.T) {
 		t.Errorf("a one-item list is not a block:\n%s", out)
 	}
 }
+
+// A Verify field's prose is part of the record: a caveat written beside the
+// commands survives the render in both formats (MEMORY-008 review round 2).
+func TestResumeKeepsVerifyProseBesideTheCommands(t *testing.T) {
+	text := "### thread: feat-a\n\n**Next action:** x.<br>\n**Verify:** do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` only after review.<br>\n"
+	for _, format := range []string{"context", "prompt"} {
+		out, err := RenderResume(text, "src", format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"do NOT run this on mba", "only after review", "- `go test ./...`", "- `rm -rf /tmp/x` (unverified"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s lacks %q:\n%s", format, want, out)
+			}
+		}
+	}
+	// A field of commands alone renders no prose line.
+	out, _ := RenderResume("### thread: feat-a\n\n**Verify:** `git status`, `dotf spec audit`<br>\n", "src", "context")
+	if strings.Contains(out, "As written") {
+		t.Errorf("a field of commands alone grew a prose line:\n%s", out)
+	}
+}
+
+// A source is matched as a harness may spell it (MEMORY-008 review round 2).
+func TestSessionStartResumeNormalisesTheSource(t *testing.T) {
+	if got, want := normaliseSource(" Compact\n"), "compact"; got != want {
+		t.Errorf("normaliseSource = %q, want %q", got, want)
+	}
+}

@@ -5,6 +5,7 @@ Source: <memory>/threads/wt-x.md
 **Next action:** Write slice 3, `dotf mem resume`.
 
 **Verify:**
+As written: `gh pr view 2852 --json state`, `go test ./internal/mem` and `rm -rf ~/x`
 - `gh pr view 2852 --json state`
 - `go test ./internal/mem`
 - `rm -rf ~/x` (unverified: not on the read-only list; run it only through the normal permission gate)

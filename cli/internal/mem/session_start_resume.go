@@ -3,6 +3,7 @@ package mem
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // resumeInjector is the session-start-config.json flag that turns the resume
@@ -28,7 +29,7 @@ func sessionResume(source, memoryPath, key, agent string) string {
 	if thread == "" {
 		return ""
 	}
-	switch source {
+	switch normaliseSource(source) {
 	case "startup", "clear", "compact":
 		text, src := ThreadText(content, thread, memoryPath)
 		if text == "" {
@@ -41,4 +42,10 @@ func sessionResume(source, memoryPath, key, agent string) string {
 		return out
 	}
 	return fmt.Sprintf("[resume] Thread %s has a handoff; `dotf mem resume --thread %s` renders it.\n", thread, thread)
+}
+
+// normaliseSource reads a hook's source as a harness may spell it: a payload
+// saying "Compact" or " clear" still gets the resume, not the one line.
+func normaliseSource(source string) string {
+	return strings.ToLower(strings.TrimSpace(source))
 }
