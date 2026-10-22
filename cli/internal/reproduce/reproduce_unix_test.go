@@ -14,17 +14,24 @@ import (
 // A check that leaves a child holding its output must still end at the
 // timeout: killing the check does not close a pipe its child inherited.
 func TestRunTimesOutPastAChildHoldingTheOutput(t *testing.T) {
-	done := make(chan Result, 1)
+	// The repository is made on the test goroutine, and the goroutine only
+	// sends: t.Fatal elsewhere would hang the test instead of failing it.
+	dir := newRepo(t)
+	type outcome struct {
+		res Result
+		err error
+	}
+	done := make(chan outcome, 1)
 	go func() {
-		got, err := Run(context.Background(), Options{Dir: newRepo(t), Command: []string{"sh", "-c", "sleep 30 & sleep 30"}, Timeout: 100 * time.Millisecond})
-		if err != nil {
-			t.Errorf("Run: %v", err)
-		}
-		done <- got
+		got, err := Run(context.Background(), Options{Dir: dir, Command: []string{"sh", "-c", "sleep 30 & sleep 30"}, Timeout: 100 * time.Millisecond})
+		done <- outcome{got, err}
 	}()
 	select {
-	case got := <-done:
-		if got.State != CouldNotRun {
+	case o := <-done:
+		if o.err != nil {
+			t.Fatalf("Run: %v", o.err)
+		}
+		if got := o.res; got.State != CouldNotRun {
 			t.Errorf("State = %q, want %q", got.State, CouldNotRun)
 		}
 	case <-time.After(15 * time.Second):
