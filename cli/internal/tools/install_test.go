@@ -937,6 +937,25 @@ func TestInstallUvTool_SelfInstall(t *testing.T) {
 	}
 }
 
+// uv resolves the package's dependencies before the tool runs, so a source
+// build there fails before the tool's own guard can act: on Windows Arm64,
+// cryptography has no wheel and its build needs link.exe (AI-028 V6, hive#523).
+// Each no_build entry reaches uv as --no-build-package, which makes uv take the
+// newest release that has a wheel.
+func TestInstallUvTool_SelfInstallRefusesSourceBuilds(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.GOOS = "windows"
+	tool := hiveSelfTool()
+	tool.Source.SelfInstall.NoBuild = []string{"cryptography", "cffi"}
+	if _, err := in.Install(tool); err != nil {
+		t.Fatal(err)
+	}
+	if want := "uv tool run --refresh-package hive-vault --no-build-package cryptography --no-build-package cffi --from hive-vault==4.4.1 hive self-upgrade 4.4.1"; len(rec) != 1 || rec[0] != want {
+		t.Errorf("Run = %v, want %q", rec, want)
+	}
+}
+
 // The self install runs on the pinned Python, as a uv tool install does.
 func TestInstallUvTool_SelfInstallRunsOnThePinnedPython(t *testing.T) {
 	var rec []string

@@ -3,6 +3,7 @@ package tools
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -411,6 +412,10 @@ func TestLoad_SelfInstall(t *testing.T) {
 	if si := c.Tools[0].Source.SelfInstall; si == nil || !c.Tools[0].Source.SelfInstalls("windows") || c.Tools[0].Source.SelfInstalls("linux") {
 		t.Fatalf("self_install = %+v, want it on windows only", si)
 	}
+	nb := strings.Replace(ok, `"args":`, `"no_build":["cryptography"],"args":`, 1)
+	if c, err := Load(writeCatalog(t, nb)); err != nil || !slices.Equal(c.Tools[0].Source.SelfInstall.NoBuild, []string{"cryptography"}) {
+		t.Fatalf("no_build: Load = %+v, %v; want [cryptography]", c.Tools, err)
+	}
 	for name, tc := range map[string]struct{ from, to, want string }{
 		// An install with no version in it is an upgrade to whatever is newest:
 		// unattended, which hive ADR-020 rules out.
@@ -420,7 +425,9 @@ func TestLoad_SelfInstall(t *testing.T) {
 		"no platform":         {`"platforms":["windows"],`, ``, "platforms"},
 		"not a uv tool":       {`"type":"uv-tool"`, `"type":"npm"`, "uv-tool"},
 		// The entry's own platforms exclude the OS, so the field never runs.
-		"an OS the tool skips": {`"package":"hive-vault",`, `"package":"hive-vault","platforms":["linux"],`, "windows"},
+		// An empty name would reach uv as a bare --no-build-package.
+		"an empty no_build name": {`"args":`, `"no_build":[""],"args":`, "no_build"},
+		"an OS the tool skips":   {`"package":"hive-vault",`, `"package":"hive-vault","platforms":["linux"],`, "windows"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			bad := strings.Replace(ok, tc.from, tc.to, 1)

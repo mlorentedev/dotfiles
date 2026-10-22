@@ -23,8 +23,8 @@ created: "2026-10-22"
 
 ### PR 1a: the output split and the shared redaction primitive (no new verb)
 
-- [ ] [P] [AC5] Failing test: progress and the guest's output are two writers; `==> ` goes to stderr
-- [ ] [AC5] Split `Options.Out`/`RunOptions.Out`; the tests that read the progress writer follow the stream
+- [x] [P] [AC5] Failing test: progress and the guest's output are two writers; `==> ` goes to stderr
+- [x] [AC5] Split `Options.Out`/`RunOptions.Out`; the tests that read the progress writer follow the stream
 - [ ] [AC7] Move `redactWriter` out of `cmd/secrets.go` into one package; its tests move with it, not rewritten, and `dotf secrets run` keeps passing
 - [ ] Own PR, never bundled: the redaction move is a security primitive
 

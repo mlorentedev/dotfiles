@@ -29,14 +29,15 @@ const (
 
 // RunOptions is one run of the Windows guest.
 type RunOptions struct {
-	Machine Machine
-	Source  string        // a zip of the ref to converge (git archive), copied into the guest
-	Dotf    string        // a dotf.exe source build to converge with; "" uses the release the ref pins
-	Keep    bool          // leave the guest running for inspection
-	Agent   time.Duration // until the guest agent answers and the test user is logged on
-	Step    time.Duration // one converge
-	Poll    time.Duration
-	Out     io.Writer
+	Machine  Machine
+	Source   string        // a zip of the ref to converge (git archive), copied into the guest
+	Dotf     string        // a dotf.exe source build to converge with; "" uses the release the ref pins
+	Keep     bool          // leave the guest running for inspection
+	Agent    time.Duration // until the guest agent answers and the test user is logged on
+	Step     time.Duration // one converge
+	Poll     time.Duration
+	Out      io.Writer // the guest's own output (a failed step's log)
+	Progress io.Writer // the `==> ` lines
 }
 
 // Run boots a throwaway overlay of clean-base, copies in the ref's archive,
@@ -75,14 +76,14 @@ func Run(h Host, o RunOptions) (err error) {
 	}
 	defer func() { _ = log.Close() }()
 
-	step(o.Out, "boot a throwaway overlay of clean-base (QEMU's output in %s)", l.Log())
+	step(o.Progress, "boot a throwaway overlay of clean-base (QEMU's output in %s)", l.Log())
 	p, err := start(h, o.Machine, log)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if o.Keep {
-			step(o.Out, "kept: the guest is still running; `dotf vm windows stop` stops it")
+			step(o.Progress, "kept: the guest is still running; `dotf vm windows stop` stops it")
 			return
 		}
 		kill(p)
@@ -96,7 +97,7 @@ func Run(h Host, o RunOptions) (err error) {
 		return err
 	}
 
-	step(o.Out, "copy the ref's archive into %s", guestWork)
+	step(o.Progress, "copy the ref's archive into %s", guestWork)
 	if _, err := q.Run("cmd.exe", []string{"/c", "mkdir", guestWork}); err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func Run(h Host, o RunOptions) (err error) {
 	if err := runStep(q, o, "second", "second converge: dotf converge", Idempotent); err != nil {
 		return err
 	}
-	step(o.Out, "converged, and the second run changed nothing")
+	step(o.Progress, "converged, and the second run changed nothing")
 	return nil
 }
 
@@ -132,7 +133,7 @@ func copyDotf(q *QGA, o RunOptions) error {
 	if o.Dotf == "" {
 		return nil
 	}
-	step(o.Out, "copy the dotf build %s in", o.Dotf)
+	step(o.Progress, "copy the dotf build %s in", o.Dotf)
 	f, err := os.Open(o.Dotf)
 	if err != nil {
 		return err
@@ -205,7 +206,7 @@ func waitLogon(q *QGA, o RunOptions) error {
 // a person converges. It relays the step's output, then judges the step on
 // its own converge report.
 func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunReport) error) error {
-	step(o.Out, "%s", label)
+	step(o.Progress, "%s", label)
 	// Judge this step on its own report: one that writes none must not pass
 	// on the previous one's.
 	if _, err := q.Run("cmd.exe", []string{"/c", "del", "/f", "/q", guestReport}); err != nil {
