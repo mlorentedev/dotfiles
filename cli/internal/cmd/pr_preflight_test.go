@@ -148,7 +148,16 @@ func TestPrPreflight_ASetupErrorExitsTwo(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Setenv("NAN_API_KEY", tc.key)
+			summary := filepath.Join(t.TempDir(), "summary.md")
+			t.Setenv("GITHUB_STEP_SUMMARY", summary)
 			_, stderr, err := execute(t, tc.args...)
+			// A caller mistake found before any probe must not tell the job
+			// summary that NaN left the pool: nothing was asked of NaN.
+			if name != "unwritable output" {
+				if _, serr := os.Stat(summary); serr == nil {
+					t.Errorf("a setup error wrote the job summary; it must not claim a NaN result")
+				}
+			}
 			if ExitCode(err) != 2 {
 				t.Errorf("exit code = %d (%v), want 2", ExitCode(err), err)
 			}
