@@ -165,13 +165,13 @@ The first live refusal on the real file named `legacy-undated` first and told th
 
 ### Review round 1 (FAIL) and its fixes
 
-The first independent review (`review.md` at `302a427b`, nan/qwen3.8-flash) returned FAIL on two REAL Majors inside AC2. Every finding, with its fix:
+The first independent review (`review-round-1.md`, at `302a427b`, nan/qwen3.8-flash) returned FAIL on two REAL Majors inside AC2. Every finding, with its fix:
 
 | Finding | Fix | Test |
 |---|---|---|
 | F-A: the read-only list rendered code runners' escape hatches as safe (`go test -exec=`, `--outputdir=`, `bats /tmp/x.bats`) | the four code runners pass only allowlisted flags, and positional arguments stay inside the checkout (lesson 513) | `TestReadOnlyCommand`: the three reproduced inputs plus `-toolexec`, `-vettool`, `-cpuprofile`, `--formatter`, `~`, `..`; controls `./...`, `-run '^X$'`, `--filter 'a b'` |
 | F-B: `SelectThread` read only the heading stamp, so a thread owned by its journal was handed to another agent | `SelectThread` reads ownership with `threadWriter`, as `threadOwner` does | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous`: `feat-j` (journal names pi) |
-| F-C: with no `--agent`, an owned thread was handed to any caller | a caller that names no agent gets only a thread nobody owns; the hook always names `claude`, and catchup passes `--agent` | same test: `feat-a` with no agent lists candidates |
+| F-C: with no `--agent`, an owned thread was handed to any caller | a caller that names no agent gets only a thread nobody owns; the hook always names `claude`, catchup passes `--agent`, and the doctrine fallback now reads `dotf mem resume --agent <agent>` (vault `552675d8`; agy surface 7,762 characters against 8,000) | same test: `feat-a` with no agent lists candidates |
 | F-D: the printed source was rebuilt as `Dir(memory)/MEMORY.md` | `ThreadText` takes the memory path and returns it for an inline block | `TestThreadTextForKey` reads through `memory2.md` |
 | F-E: the `handoff_resume` declaration was a verbal follow-up | filed as #2915 | n/a |
 | F-F: AC5 and AC6 unticked in the Evidence list | ticked | n/a |
