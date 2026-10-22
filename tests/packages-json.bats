@@ -91,3 +91,14 @@ mise_catalog_excludes_windows() {
             and any(.source.self_install.args[]; contains("{version}")))' "$CATALOG"
     [ "$status" -eq 0 ]
 }
+
+# uv resolves hive's dependencies before hive runs, so hive's own guard
+# against a cryptography source build (hive#523) cannot reach the bootstrap.
+# Without no_build, a fresh Windows Arm64 machine fails at link.exe and ends
+# with no hive (AI-028 V6).
+@test "hive's Windows self install never builds cryptography from source" {
+    run jq -e '.tools[] | select(.name == "hive") | .source.self_install
+        | (.platforms | index("windows")) != null
+        and (.no_build | index("cryptography")) != null' "$CATALOG"
+    [ "$status" -eq 0 ] || { echo "hive self_install lost no_build cryptography"; false; }
+}

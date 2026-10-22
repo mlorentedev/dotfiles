@@ -75,8 +75,8 @@ type personaFrontmatter struct {
 // it. `specs/HARNESS-046/check-roster-consistency.py` matches `skills:` with
 // `^skills:\s*\[(.*?)\]` and falls back to `[]` when that fails, so the block
 // form this spec introduces would make that guard return "no skills" in silence.
-// `doctor.readAgentFrontmatter` skips indented lines outright, so it cannot see
-// a block list either. Hand-rolled frontmatter parsing is how a schema change
+// A single-line field reader skips indented lines outright, so it cannot see a
+// block list either. Hand-rolled frontmatter parsing is how a schema change
 // turns a guard into a no-op; the module already depends on yaml/v3.
 func LoadPersona(path string) (*Persona, error) {
 	raw, err := os.ReadFile(path) // #nosec G304 -- path is built from the manifest's own record_dir

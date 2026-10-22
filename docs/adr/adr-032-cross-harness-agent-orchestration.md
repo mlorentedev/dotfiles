@@ -289,6 +289,16 @@ regenerated from probes, and its restoration is ordered **before** the first dis
 Second, denial fails safe: **a machine whose identity cannot be established denies every
 non-local pool** until it is declared, so the unknown case degrades to "no cross-pool dispatch"
 rather than to "all pools allowed".
+
+**Declaring the identity (amendment, #1236, #1547).** The identity is declared with
+`dotf env identity set <ID>` and reported by `dotf doctor` (section *Machine identity*); a hand edit
+of the file is no longer the only route. The id is a **free label**, not a registered name: the only
+thing read from it is whether one is declared (`MachinePolicy.Identified`), and nothing routes,
+selects a pool or looks anything up by its value. The verb never derives it from the hostname, which
+would hand every rebuilt machine an identity it did not choose and defeat the denial above, and it
+never overwrites a declared id: a different id needs `--replace`. If a pool is ever keyed on the id,
+this paragraph is the place to revisit it.
+
 That is what makes #899 (broken CLI wrapper) and #462 (Orca not installed by bootstrap) blockers
 rather than conveniences — an executor that needs a button pressed in an app is not replicable.
 

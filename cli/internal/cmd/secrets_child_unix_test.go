@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/redact"
 )
 
 // SEC-002 AC1, the half that proves the fix. `test -t 1` is the child asking
@@ -27,7 +29,7 @@ func TestRunChildPTY_ChildSeesATerminal(t *testing.T) {
 // fix, this was the ONLY behaviour, which is why pi exited silently.
 func TestRunChild_ChildSeesAPipe(t *testing.T) {
 	var buf bytes.Buffer
-	rw := newRedactWriter(&buf, nil)
+	rw := redact.New(&buf, nil)
 	code, err := runChild([]string{"sh", "-c", "test -t 1"}, nil, strings.NewReader(""), rw, rw)
 	if err != nil {
 		t.Fatalf("runChild: %v", err)
@@ -46,7 +48,7 @@ func TestRunChildPTY_RedactsASecretSplitAcrossWrites(t *testing.T) {
 	injected := []string{"OPENROUTER_API_KEY=" + secret}
 
 	var buf bytes.Buffer
-	rw := newRedactWriter(&buf, injected)
+	rw := redact.New(&buf, injected)
 
 	// Two writes with a gap, so the secret genuinely crosses a boundary rather
 	// than arriving in one buffer.
