@@ -49,11 +49,11 @@ The run is green while the doctor fails: the converge has no step that owns hive
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
 - [x] AC1 (loud-vs-quiet) -> `tests/hive-upgrade-timer.bats`: `hive-upgrade.ps1 is loud and non-zero when no install is found`, `... stays silent when the install is already current`, `... reports an unreachable PyPI without failing the tick`, `... does not collapse no-install into the already-current guard`. Suite green 33/33; script ASCII-clean. B5/B6 flip once the SSOT is deployed (see the deploy caveat below). *Superseded 2026-10-21:* PR5 (#2857) deletes the script and this suite, so this line is history: it proves #796 at the time, and nothing replaces it, because AC9 removes what AC1 tested.
-- [ ] AC2 (bootstrap, rewritten 2026-10-21) -> a guest run on PR6's ref where V2, V4 and V5 flip, and the second converge changes nothing
+- [x] AC2 (bootstrap, rewritten 2026-10-21) -> guest run 2026-10-22 on #2922's `68ed76db` (Arm64, hive 4.4.2, `--dotf` a source build of that commit): V2, V4 and V5 flip, and the second converge changes nothing. See "Guest run on Arm64" below
 - AC3 -> *withdrawn 2026-10-21* (hive ADR-020); AC9 replaces it
 - [x] AC4 (no uv install or `uv tool list` inference on Windows; no silent skip, rewritten 2026-10-21) -> the setup gate half is `016bf1a8` (#1311); the catalog half is #2901 (`a4e46b1e`): Windows installs hive through `hive self-upgrade`, never `uv tool install`, and an install that places nothing fails. V3 flipped on the x64 `test-windows` runner in the run that installed hive (run 39721972641)
 - AC7 -> *withdrawn 2026-10-21*: Baseline 2 replaces the broken-box table
-- [ ] AC9 (no unattended upgrade, added 2026-10-21) -> PR5 (#2876, `ec5170ff`): `tests/hive-daemon-gate.bats` `no setup script installs an unattended hive upgrade`, plus the retire step's changed=0 rerun. That rerun needs a machine that still holds the old trigger: a clean CI runner or guest never had one, so its changed=0 proves nothing. Plan, cheapest first: (1) msi over ssh with a dotf carrying #2876 (msi is powered off as of 2026-10-22); (2) a guest seeded from a ref before #2876, so the old setup installs the task, then the release, then converge twice; (3) the work-lab box, in the batched Windows session
+- [ ] AC9 (no unattended upgrade, added 2026-10-21) -> PR5 (#2876, `ec5170ff`): `tests/hive-daemon-gate.bats` `no setup script installs an unattended hive upgrade`, plus the retire step's changed=0 rerun. That rerun needs a machine that still holds the old trigger: a clean CI runner or guest never had one, so its changed=0 proves nothing. The guest cannot be seeded: the old setup installed `DotfilesHiveUpgrade` only when `Get-Command hive` succeeded, and on Arm64 it never got hive installed (V3, V6). Each `dotf vm windows` run also starts from a fresh clean-base. So the rerun needs msi (powered off as of 2026-10-22) or the work-lab box, in the batched Windows session. On the guest the step reports `no unattended hive upgrade is installed` on both runs, which is the clean-machine half
 - [x] AC5 (A1/A3 reconciliation) -> `AI-022/tasks.md` supersession block + `AI-023` forward pointer
 - [x] AC6 (Linux decision recorded) -> Linux keeps `uv tool`; recorded in both `proposal.md` and `AI-022/tasks.md`
 
@@ -142,7 +142,21 @@ hive 4.4.1 installed via hive self-upgrade 4.4.1 (hive-vault)
 [SUCCESS] Installed hive daemon service (Scheduled Task, v4.4.1)
 ```
 
-So on x64, V2 and V3 flip in one setup run. That job was red for another reason: the spec audit flagged GUARD-003 as a zombie, because #2898 closed #1052 after this branch last merged main. AC2 still needs its guest run: the second converge with changed=0, and Arm64, which is gated on hive#515.
+So on x64, V2 and V3 flip in one setup run. That job was red for another reason: the spec audit flagged GUARD-003 as a zombie, because #2898 closed #1052 after this branch last merged main. AC2's guest run is below.
+
+## Guest run on Arm64 (2026-10-22)
+
+`dotf vm windows --ref 68ed76db --dotf <windows/arm64 build of 68ed76db>`. Clean Windows 11 Arm64 guest, standard user, hive pinned at 4.4.2 with `self_install.no_build: ["cryptography"]`. Full log: `.agent/runs/ai028-20261022t0735z/vm-ac2-68ed76db.log` on `chore/autopilot-ai028-20261022t0735z`.
+
+| # | Baseline 2 (main, 2026-10-21) | This run |
+|---|---|---|
+| V2 | `hive is not installed on windows by this catalog; skipping` | `hive self-upgrade: switched none -> 4.4.2.` / `hive 4.4.2 installed via hive self-upgrade 4.4.2 (hive-vault)` (log:725-726); second run `hive 4.4.2 already installed; skipping` (log:1484) |
+| V4 | `Registered MCP hive` with no hive on PATH | `[SUCCESS] Registered MCP hive` (log:943), and hive is on PATH |
+| V5 | `[FAIL] mcp-servers.json registers hive as hive client, but hive is not on PATH` | no such row; `hive daemon` section `(1 checks, all ok)`, which is `hive service status` reporting healthy (log:1271, 1754) |
+| V6 | `Failed to build cryptography==50.0.2` … `link.exe not found` | no source build: `Downloading cryptography (2.8MiB)` is a wheel |
+| verdict | converged (hive silently absent) | `==> converged, and the second run changed nothing` (log:1909) |
+
+The first attempt at 07:10Z failed for an unrelated reason. The guest clock runs 2 hours behind, and registry.npmjs.org's certificate was then under 2 hours old, so all four npm installs failed with `certificate is not yet valid`. The hive rows were the same in that attempt. Filed as #2932; the rerun after the certificate passed 2 hours of age is the run above.
 
 ## Decisions made during implementation
 
