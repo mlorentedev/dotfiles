@@ -22,8 +22,8 @@ setup() {
     [ "$status" -eq 1 ] || { echo "$output"; false; }
 }
 
-@test "setup-linux.sh stops when compile-harness --deploy fails" {
-    block="$(awk '/scripts\/compile-harness\.sh" --deploy \)/{f=1} f{print} f&&/^fi$/{exit}' "$SH")"
+@test "setup-linux.sh stops when dotf harness deploy fails" {
+    block="$(awk '/^if dotf harness deploy --repo-root "\$CURRENT_DIR"/{f=1} f{print} f&&/^fi$/{exit}' "$SH")"
     [ -n "$block" ] || false
     grep -qE '^    exit 1$' <<<"$block"
     run grep -E 'log_warning' <<<"$block"

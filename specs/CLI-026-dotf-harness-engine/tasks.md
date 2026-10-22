@@ -30,7 +30,7 @@ created: "2026-06-21"
 
 ## Slice 3 — rewire skills (part of AC8; needs a release carrying slices 1–2)
 
-- [ ] `deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`
+- [x] ~~`deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`~~ superseded: no caller runs `compile-harness.sh --deploy` once the slice 5 rewire lands, and slice 7 deletes it
 - [ ] `setup-windows.ps1` calls `dotf harness skills`; delete `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their Pester/bats parity tests
 - [ ] Note the skills half fixed on #1733
 - [ ] `doctor`'s `recordTargets` (`checks_agent_tiers.go`) mirrors the shell's substring match on purpose (`TestRecordTargetsAgreesWithTheRender`); switch it and its test to `harness.SkillTargetsAgent` in the slice that moves the agent render to Go (slice 4), so the check keeps predicting the render
@@ -46,7 +46,7 @@ created: "2026-06-21"
 - [x] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell (`dotf harness deploy`, `tests/harness-deploy-parity.bats`)
 - [ ] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
   - [x] `records-harness` calls `harness.Deploy` in process (`converge.HarnessDeploy`); `CompileHarnessDeploy` deleted
-  - [ ] `setup-linux.sh` calls `dotf harness deploy` (supersedes slice 3's shell delegation line)
+  - [x] `setup-linux.sh` calls `dotf harness deploy` (supersedes slice 3's shell delegation line)
   - [ ] `setup-windows.ps1` calls `dotf harness deploy`; `Deploy-SkillRecord` and its helpers deleted; `records-harness` gains `windows`
   - [ ] `converge/harness.go` `CompileHarnessDeploy` runs `dotf harness deploy` in process instead of `bash scripts/compile-harness.sh --deploy`; on Windows this gives the step agents and doctrine for the first time
   - [ ] `setup-windows.ps1`: the `Deploy-SkillRecord` block and its helpers are deleted, replaced by the one `dotf harness deploy` call

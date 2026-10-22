@@ -42,8 +42,15 @@ created: "2026-06-21"
 - Mutation check, slice 5 rewire: making `HarnessDeploy` return nil without deploying fails that test.
 - `tests/harness-deploy-parity.bats` 3/3 after the composition moved into `harness.Deploy`: the verb's output did not change.
 
+- Slice 5 rewire, Linux setup: `setup-linux.sh` calls `dotf harness deploy --repo-root "$CURRENT_DIR"`; the script went from 722 to 716 lines.
+- `tests/setup-fails-loudly.bats` now finds the block by the `dotf harness deploy` line and still requires `exit 1` and no `log_warning` in it; the `compile-harness.bats` test that grepped for the script call is deleted with the call.
+- Every bats file that references `setup-linux.sh` or `compile-harness` (48 files, 667 tests) passes but `harness-doctrine-records.bats`'s real-vault refresh, which fails the same way on main: the vault's crystallize skill is ahead of its committed record.
+- The `integration` job is the behavioural check: its container builds dotf from the tree and runs setup-linux, then `verify-setup.bats` counts the deployed skills and commands.
+
 ## Decisions made during implementation
 
+- Slice 5 rewire, Linux setup: `dotf` is called by name. Setup exports `~/.local/bin` onto PATH before `install_dotf`, and a failed install already stops setup, so no fallback lookup is needed at this line.
+- Slice 3's shell delegation is not done: it would change `compile-harness.sh --deploy`, which no caller runs after this rewire.
 - Slice 5 rewire, converge: the composition moved from the `deploy` command into `harness.Deploy`, which returns every surface's outcomes; the command prints from them and converge calls it in process.
 - Slice 5 rewire, converge: in process rather than a `dotf harness deploy` child. Converge is the `dotf` binary, so a child would add a lookup of its own path and give nothing back: each surface's error already names the item that failed.
 - Slice 5 rewire, converge: `records-harness` stays linux and darwin until `setup-windows.ps1` stops deploying the same files, or Windows would deploy twice.
