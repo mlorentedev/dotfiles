@@ -1,5 +1,5 @@
 ---
-id: "lesson-509-a-fail-closed-default-needs-a-writer-and-a-doctor-row"
+id: "lesson-515-a-fail-closed-default-needs-a-writer-and-a-doctor-row"
 type: lesson
 status: active
 title: "A fail-closed default needs a writer and a doctor row"
