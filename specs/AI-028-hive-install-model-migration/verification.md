@@ -134,7 +134,15 @@ $ jq -e '<the tests/packages-json.bats self_install filter>' mutated.json
 false        # exit 1
 ```
 
-The tests run against a fake uv and a fake probe. Nothing here has run `hive self-upgrade` on Windows: that is AC2's guest run, gated on hive#515.
+On the x64 `test-windows` runner (#2901, run 39721972641, job 119637916180), the setup run's own log:
+
+```
+hive self-upgrade: switched none -> 4.4.1.
+hive 4.4.1 installed via hive self-upgrade 4.4.1 (hive-vault)
+[SUCCESS] Installed hive daemon service (Scheduled Task, v4.4.1)
+```
+
+So on x64, V2 and V3 flip in one setup run. That job was red for another reason: the spec audit flagged GUARD-003 as a zombie, because #2898 closed #1052 after this branch last merged main. AC2 still needs its guest run: the second converge with changed=0, and Arm64, which is gated on hive#515.
 
 ## Decisions made during implementation
 

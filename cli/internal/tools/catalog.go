@@ -80,8 +80,10 @@ type Source struct {
 	Command string `json:"command,omitempty"`
 	// Platforms lists the GOOS values the tool installs on; absent means all of
 	// them. A github-release tool gets this from its Asset map. Other sources
-	// need it to name a tool that belongs to one OS family. A tool whose channel
-	// differs by OS keeps its platforms and says so in SelfInstall (hive).
+	// need it to name a tool that belongs to one OS family. A tool installed on
+	// every OS through a channel that differs by OS lists no platforms and names
+	// the odd OS in SelfInstall instead (hive: uv tool on POSIX, its own
+	// installer on Windows).
 	Platforms []string `json:"platforms,omitempty"`
 	// SelfInstall hands a uv-tool's install to the tool itself on the OSes it
 	// lists: dotf runs `uv tool run --from <package>==<version> <name> <args>`,

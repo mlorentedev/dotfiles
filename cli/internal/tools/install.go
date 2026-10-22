@@ -259,8 +259,7 @@ func (in *Installer) registeredVersion(name string) string {
 	}
 	dirs, err := in.RegisteredPath()
 	if err != nil {
-		_, _ = fmt.Fprintf(in.Out, "warning: %s: reading the registered PATH: %v; probing this process's PATH only\n", name, err)
-		return ""
+		return "" // refusal reports it, so the install never acts on this answer
 	}
 	copies := copiesOnPath(name, in.GOOS, strings.Join(dirs, string(os.PathListSeparator)), os.Getenv("PATHEXT"))
 	if len(copies) == 0 {
@@ -353,6 +352,13 @@ func (in *Installer) refusal(t Tool) string {
 	case "npm", "uv-tool":
 		if t.Source.Package == "" {
 			return t.Source.Type + " source declares no package"
+		}
+		// An unreadable registered PATH could hold a copy above the pin, which
+		// the self install would downgrade: refuse rather than read it as absent.
+		if t.Source.SelfInstalls(in.GOOS) && in.RegisteredPath != nil {
+			if _, err := in.RegisteredPath(); err != nil {
+				return "cannot read the registered PATH (" + err.Error() + "), where an installed " + t.Name + " may be; refusing a self install that could downgrade it"
+			}
 		}
 	}
 	return ""

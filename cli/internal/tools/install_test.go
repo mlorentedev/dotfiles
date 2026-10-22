@@ -1004,3 +1004,26 @@ func TestInstallUvTool_SelfInstallThatPlacesNothingFails(t *testing.T) {
 		t.Errorf("Install = %v, want the self install and the per-user PATH named", err)
 	}
 }
+
+// A registered PATH that cannot be read could hold a hive newer than the pin,
+// and reading it as absent would self-upgrade that hive down to the pin. Install
+// and Plan both refuse instead, with the same reason.
+func TestInstallUvTool_SelfInstallRefusesAnUnreadableRegisteredPath(t *testing.T) {
+	var rec []string
+	in := newNpmInstaller("", &rec, nil)
+	in.GOOS = "windows"
+	in.CurrentVersion = nil
+	in.Probe = func(string, ...string) ([]byte, error) { return nil, errors.New("not found") }
+	in.RegisteredPath = func() ([]string, error) { return nil, errors.New("access denied") }
+	if _, err := in.Install(hiveSelfTool()); err == nil || !strings.Contains(err.Error(), "access denied") || len(rec) != 0 {
+		t.Errorf("Install = %v with calls %v, want a refusal naming the read error and no run", err, rec)
+	}
+	if p := in.Plan(hiveSelfTool()); p.Action != PlanRefused || !strings.Contains(p.Note, "access denied") {
+		t.Errorf("Plan = %+v, want %q naming the read error", p, PlanRefused)
+	}
+	in.GOOS = "linux"
+	rec = nil
+	if _, err := in.Install(hiveSelfTool()); len(rec) != 1 || err != nil && strings.Contains(err.Error(), "access denied") {
+		t.Errorf("off a self_install OS the registered PATH is never read: %v, calls %v", err, rec)
+	}
+}
