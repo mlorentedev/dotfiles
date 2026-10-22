@@ -48,15 +48,15 @@ That requires "dispositioned" to be mechanical rather than remembered, which it 
 
 ## Acceptance criteria
 
-- [ ] AC1. A PR-Agent review completing causes the gate to re-evaluate, with no human action and no manual re-run, verified on a live PR rather than by inspection.
-- [ ] AC2. The re-evaluation publishes to the commit status, and the status carries the latest verdict rather than the first.
-- [ ] AC3. A PR whose reviewer declined, or never ran, still ends red after the trigger fires.
-- [ ] AC4. The trigger re-evaluates the pull request the reviewer actually ran on, and no other.
-- [ ] AC5. A guard fails when the gate's workflow loses its `workflow_run` trigger, and has been observed failing on that specific mutation — including confirmation that the mutation reached the file, since an invalid mutation and an absent guard produce the same green.
-- [ ] AC6. The required-check adoption is documented with its ordering constraint, so it cannot be enabled before #1041.
-- [ ] AC7. Reviewer output that has not been dispositioned is **findable without anyone remembering to look**: a read-only query lists open PRs carrying reviewer output newer than their last recorded triage. It lists; it never applies.
-- [ ] AC8. "Dispositioned" is mechanical, not a judgement: a PR leaves the queue when a triage record newer than the reviewer's output exists on it, written by an account with standing to write it (not any commenter), and re-enters when the reviewer speaks again.
-- [ ] AC9. The queue and the gate read the same reviewer registry. Neither hardcodes a marker string the other also knows.
+- [x] AC1. A PR-Agent review completing causes the gate to re-evaluate, with no human action and no manual re-run, verified on a live PR rather than by inspection.
+- [x] AC2. The re-evaluation publishes to the commit status, and the status carries the latest verdict rather than the first.
+- [x] AC3. A PR whose reviewer declined, or never ran, still ends red after the trigger fires.
+- [x] AC4. The trigger re-evaluates the pull request the reviewer actually ran on, and no other.
+- [x] AC5. A guard fails when the gate's workflow loses its `workflow_run` trigger, and has been observed failing on that specific mutation — including confirmation that the mutation reached the file, since an invalid mutation and an absent guard produce the same green.
+- [x] AC6. The required-check adoption is documented with its ordering constraint, so it cannot be enabled before #1041.
+- [x] AC7. Reviewer output that has not been dispositioned is **findable without anyone remembering to look**: a read-only query lists open PRs carrying reviewer output newer than their last recorded triage. It lists; it never applies.
+- [x] AC8. "Dispositioned" is mechanical, not a judgement: a PR leaves the queue when a triage record newer than the reviewer's output exists on it, written by an account with standing to write it (not any commenter), and re-enters when the reviewer speaks again.
+- [x] AC9. The queue and the gate read the same reviewer registry. Neither hardcodes a marker string the other also knows.
 
 ## References
 
