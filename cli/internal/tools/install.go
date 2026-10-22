@@ -566,7 +566,11 @@ func (in *Installer) selfInstall(t Tool, act action) (Result, error) {
 	for i, a := range t.Source.SelfInstall.Args {
 		selfArgs[i] = t.expand(a, in.GOARCH)
 	}
-	args := []string{"tool", "run", "--refresh-package", pkg, "--from", pkg + "==" + t.Version}
+	args := []string{"tool", "run", "--refresh-package", pkg}
+	for _, dep := range t.Source.SelfInstall.NoBuild {
+		args = append(args, "--no-build-package", dep)
+	}
+	args = append(args, "--from", pkg+"=="+t.Version)
 	if py := in.pythonSeries(); py != "" {
 		args = append(args, "--python", py)
 	}
