@@ -133,8 +133,10 @@ _found_has_pid() {
         '13799 /bin/sh /tmp/bats-run-13800/obsidian --user-data-dir=/tmp/bats-run-13800/test/1' \
         '113800 /bin/sh /tmp/obsidian')"
     _found_has_pid "$found" 13799
-    ! _found_has_pid "$found" 13800 || false
-    ! _found_has_pid "$found" 1380 || false
+    run _found_has_pid "$found" 13800
+    [ "$status" -eq 1 ]
+    run _found_has_pid "$found" 1380
+    [ "$status" -eq 1 ]
 }
 
 # The leak itself, asserted rather than timed: no descendant of a fake launched
