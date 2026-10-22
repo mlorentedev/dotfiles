@@ -83,14 +83,22 @@ $ dotf lint powershell          -> exit 0
 $ bash -n setup-linux.sh; zsh -n setup-linux.sh   -> exit 0
 ```
 
-The 703 bats tests in the files that reference a changed path (`git grep -l` over `tests/`) pass. This proves only the repo half of AC9: nothing installs a timer any more. The other half, a machine that already has one losing it, waits on the retire step, which is an owner decision. Until then a machine set up before this change keeps `hive-upgrade.timer` or `DotfilesHiveUpgrade`, now pointing at a script this repo no longer deploys.
+The 703 bats tests in the files that reference a changed path (`git grep -l` over `tests/`) pass. That is the repo half of AC9: nothing installs a timer any more. The machine half is the `hive-upgrade-retire` converge step:
+
+```
+$ go test ./internal/converge/ -run HiveUpgradeRetire   -> ok (7 tests)
+$ go test ./... && go vet ./... && GOOS=windows go vet ./...   -> ok
+$ golangci-lint run ./internal/converge/...   -> 0 issues
+```
+
+The tests run against a fake scheduler. The live proof is two runs on msi (Linux) and on the work-lab box (Windows, elevated), after a release carrying the step; both are open tasks in PR5.
 
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
 - **Split into AI-028 + AI-029 rather than one ticket** (2026-08-07). The install model and the multi-client registration SSOT are separate failures with separate blast radii; the repo's own precedent is #574 being split out of #551 for atomic-PR discipline.
-- **Resumed and re-scoped, not abandoned** (owner, 2026-10-21). It was triaged as an abandon candidate to free a WIP slot (12 active against ADR-043's 10, with PLAT-005 waiting). Baseline 2 then showed hive is never installed on the Arm64 guest while converge stays green, and that the guest removes the hardware gate that had stalled it. PLAT-005 waits a cycle. *Narrowed the same day:* the diagnostic run (V6) traced the guest's failure to a missing `win_arm64` wheel, so the "every fresh Windows machine" reading that informed the decision holds for Arm64 only. The x64 shape, a uv copy that ADR-019 rules out, is inferred, not measured. RESUME still rests on AC4's uv-on-Windows, AC9 and #1993, and the owner re-confirms it on return.
+- **Resumed and re-scoped, not abandoned** (owner, 2026-10-21). It was triaged as an abandon candidate to free a WIP slot (12 active against ADR-043's 10, with PLAT-005 waiting). Baseline 2 then showed hive is never installed on the Arm64 guest while converge stays green, and that the guest removes the hardware gate that had stalled it. PLAT-005 waits a cycle. *Narrowed the same day:* the diagnostic run (V6) traced the guest's failure to a missing `win_arm64` wheel, so the "every fresh Windows machine" reading that informed the decision holds for Arm64 only. The x64 shape, a uv copy that ADR-019 rules out, is inferred, not measured. RESUME still rests on AC4's uv-on-Windows, AC9 and #1993. The owner re-confirmed it the same day, and decided the three open questions: PR6 is a `hive-self` catalog source, Arm64 is fixed in hive (hive#515), and the retire step is a converge step.
 - **PR1 sequenced before the model change.** The loud-vs-quiet fix does not depend on resolving the bootstrap question, and it is what makes the next recurrence visible. Shipping it first means the session produces a durable improvement even if the model migration proves deeper than expected.
 
 ## Promotion candidates
@@ -98,7 +106,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
 - [x] Lesson for the repo's `docs/lessons.md`? yes: docs/lessons/lesson-159-a-guard-that-is-quiet-when-idle-and-quiet-when-bro.md (captured 2026-08-07, *"A guard that is quiet when idle and quiet when broken is not a guard"*; Baseline 2 shows the class again on the converge path)
-- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the mechanism and the upgrade policy are hive's decisions (hive ADR-015, ADR-019, ADR-020) and this repo consumes them. Re-ask if PR6's install shape turns out to be a new catalog source type, which is a decision of this repo's own
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the mechanism and the upgrade policy are hive's decisions (hive ADR-015, ADR-019, ADR-020) and this repo consumes them. PR6 is now a new catalog source type (owner, 2026-10-21), which is this repo's own decision, so PR6 carries its ADR
 - [x] New pattern candidate for `00_meta/patterns/`? no: lesson-159 holds the insight, and a second instance inside the same spec is not a recurrence outside the incident
 
 ## Archive checklist
