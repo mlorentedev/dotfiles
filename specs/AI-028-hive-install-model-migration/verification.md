@@ -75,15 +75,29 @@ $ LC_ALL=C grep -nP '[^\x00-\x7F]' windows/hive-upgrade.ps1
 ### PR5: the timer deletion (#2857), 2026-10-21
 
 ```
-$ bats tests/hive-daemon-gate.bats
+$ bats tests/hive-daemon-gate.bats        # red: the guard copied onto d233110d^, before the deletion
+not ok 2 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+#   `[ "$status" -eq 1 ]' failed
+$ bats tests/hive-daemon-gate.bats        # the same guard with setup-linux.sh moved away: grep exits 2
+not ok 1 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
+
+$ bats tests/hive-daemon-gate.bats        # green, head
 ok 1 parity: both setups probe hive's version through dotf tools version, not uv tool list (AI-034, #791)
 ok 2 no setup script installs an unattended hive upgrade (#2857, hive ADR-020)
 
 $ dotf lint powershell          -> exit 0
-$ bash -n setup-linux.sh; zsh -n setup-linux.sh   -> exit 0
+$ bash -n setup-linux.sh; echo "bash -n exit=$?"; zsh -n setup-linux.sh; echo "zsh -n exit=$?"
+bash -n exit=0
+zsh -n exit=0
+
+# every bats file that names a changed path, run under bash so the list splits
+$ bash -c 'files=$(for p in $(git diff --name-only origin/main...HEAD); do git grep -l "$(basename $p)" -- "tests/*.bats"; done | sort -u); bats $files > out.txt 2>&1; echo "exit=$?"; head -1 out.txt; grep -c "^not ok" out.txt'
+exit=0
+1..840
+0
 ```
 
-The 703 bats tests in the files that reference a changed path (`git grep -l` over `tests/`) pass. That is the repo half of AC9: nothing installs a timer any more. The machine half is the `hive-upgrade-retire` converge step:
+Those 840 tests in 50 files pass. That is the repo half of AC9: nothing installs a timer any more. The machine half is the `hive-upgrade-retire` converge step:
 
 ```
 $ go test ./internal/converge/ -run HiveUpgradeRetire   -> ok (7 tests)

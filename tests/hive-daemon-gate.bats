@@ -14,15 +14,15 @@ setup() {
     grep -qF 'dotf tools version hive' "$DOTFILES_DIR/setup-linux.sh"
     grep -qF 'dotf tools version hive' "$DOTFILES_DIR/setup-windows.ps1"
     run grep -F "hive_ver=\$(uv tool list" "$DOTFILES_DIR/setup-linux.sh"
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
     run grep -F "uv tool list 2>\$null | Select-String -Pattern '^hive-vault" "$DOTFILES_DIR/setup-windows.ps1"
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
 }
 
 @test "no setup script installs an unattended hive upgrade (#2857, hive ADR-020)" {
     run grep -nE 'hive-upgrade|DotfilesHiveUpgrade|uv tool upgrade hive-vault' \
         "$DOTFILES_DIR/setup-linux.sh" "$DOTFILES_DIR/setup-windows.ps1"
-    [ "$status" -ne 0 ]
+    [ "$status" -eq 1 ]
     [ ! -e "$DOTFILES_DIR/systemd/hive-upgrade.timer" ]
     [ ! -e "$DOTFILES_DIR/windows/hive-upgrade.ps1" ]
 }
