@@ -109,7 +109,7 @@
       "source": {
         "type": "uv-tool",
         "package": "hive-vault",
-        "platforms": ["linux", "darwin"]
+        "self_install": {"platforms": ["windows"], "args": ["self-upgrade", "{version}"]}
       }
     },
     {

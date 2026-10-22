@@ -107,6 +107,43 @@ $ golangci-lint run ./internal/converge/...   -> 0 issues
 
 The tests run against a fake scheduler. The live proof is two runs on msi (Linux) and on the work-lab box (Windows, elevated), after a release carrying the step; both are open tasks in PR5.
 
+### PR6: hive self-installs on Windows (2026-10-21)
+
+```
+$ go test ./internal/tools/ -run 'SelfInstall|TheRepoCatalogDeclaresHive' -v | grep -E '^--- '
+--- PASS: TestTheRepoCatalogDeclaresHiveSelfInstalledOnWindows
+--- PASS: TestLoad_SelfInstall
+--- PASS: TestInstallUvTool_SelfInstall
+--- PASS: TestInstallUvTool_SelfInstallRunsOnThePinnedPython
+--- PASS: TestInstallUvTool_SelfInstallProbesThePersistentPath
+--- PASS: TestInstallUvTool_SelfInstallThatPlacesNothingFails
+$ go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...   -> ok
+$ golangci-lint run   -> 0 issues
+
+# the argv against a real uv (Mac, ephemeral: nothing is installed)
+$ uv --version
+uv 0.12.18 (01cb90c1a 2026-09-22 aarch64-apple-darwin)
+$ uv tool run --refresh-package hive-vault --from hive-vault==4.4.1 --python 3.13 hive --version
+hive-vault 4.4.1        # exit 0
+
+# mutation: current() without the registered-PATH fallback
+--- FAIL: TestInstallUvTool_SelfInstallProbesThePersistentPath
+
+# mutation: packages.json self_install args "latest" instead of "{version}"
+$ jq -e '<the tests/packages-json.bats self_install filter>' mutated.json
+false        # exit 1
+```
+
+On the x64 `test-windows` runner (#2901, run 39721972641, job 119637916180), the setup run's own log:
+
+```
+hive self-upgrade: switched none -> 4.4.1.
+hive 4.4.1 installed via hive self-upgrade 4.4.1 (hive-vault)
+[SUCCESS] Installed hive daemon service (Scheduled Task, v4.4.1)
+```
+
+So on x64, V2 and V3 flip in one setup run. That job was red for another reason: the spec audit flagged GUARD-003 as a zombie, because #2898 closed #1052 after this branch last merged main. AC2 still needs its guest run: the second converge with changed=0, and Arm64, which is gated on hive#515.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -120,7 +157,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
 - [x] Lesson for the repo's `docs/lessons.md`? yes: docs/lessons/lesson-159-a-guard-that-is-quiet-when-idle-and-quiet-when-bro.md (captured 2026-08-07, *"A guard that is quiet when idle and quiet when broken is not a guard"*; Baseline 2 shows the class again on the converge path)
-- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the mechanism and the upgrade policy are hive's decisions (hive ADR-015, ADR-019, ADR-020) and this repo consumes them. PR6 is now a new catalog source type (owner, 2026-10-21), which is this repo's own decision, so PR6 carries its ADR
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes, for PR6: the catalog's `self_install` field is this repo's own contract, recorded as `docs/adr/adr-036-install-channels.md`'s 2026-10-21 amendment. The mechanism and the upgrade policy stay hive's (hive ADR-015, ADR-019, ADR-020)
 - [x] New pattern candidate for `00_meta/patterns/`? no: lesson-159 holds the insight, and a second instance inside the same spec is not a recurrence outside the incident
 
 ## Archive checklist
