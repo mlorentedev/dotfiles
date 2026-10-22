@@ -5,83 +5,91 @@ created: "2026-10-21"
 
 # Tasks - TOOL-031-pr-agent-reusable-workflow
 
-> TDD order: each task is one focused commit.
+> TDD order. One task = one focused commit.
 >
-> Markers:
-> - `[P]`: depends on no unchecked task.
-> - `[AC<n>]`: serves acceptance criterion n.
+> Markers: `[P]` means no dependency on an unchecked task; `[AC<n>]` means the task serves acceptance criterion n.
 >
-> Repositories:
-> - **D**: dotfiles (this spec).
-> - **C**: `mlorentedev/ci-workflows` (a local clone at `~/Projects/ci-workflows` until the remote exists).
-> - **H**: hive.
+> Repos:
+> - **D**: dotfiles (this spec, `cli/` and the workflow)
+> - **C**: `mlorentedev/ci-workflows`
+> - **H**: hive
 
 ## Setup
 
-- [x] Branch `feat/pr-agent-reusable-workflow` in a dotfiles worktree; #2893 claimed and In Progress
-- [ ] `proposal.md` complete; the owner has reviewed the `[AGENT-DRAFT]` criteria
-- [ ] Owner: `gh repo create mlorentedev/ci-workflows --public --description "Shared CI referenced by SHA (ADR-042)"` (R5)
-- [ ] D: the spec PR opened as a draft once 0.77.0 is out (R4)
+- [x] Branch `feat/pr-agent-reusable-workflow` in a dotfiles worktree. #2893 is claimed and In Progress.
+- [ ] `proposal.md` complete; owner reviews the `[AGENT-DRAFT]` criteria and R2
+- [ ] Comment on #2217 (CLI-101) and kubelab#2295 that TOOL-031 carries them
 
 ## Implementation
 
-### B1. C: scripts, pool and their tests (moved, behaviour unchanged)
+### A1. D: `dotf pr route` (one PR)
 
-- [ ] [P] [AC2] C:
-  - Run `git init`.
-  - Copy `scripts/pr-agent-{model-preflight,route,publish-guard,push-gate}.sh` from D at a recorded SHA.
-  - Copy their bats tests (`pr-agent-route.bats`, `pr-agent-publish-guard.bats`, `pr-agent-model-preflight.bats`, `pr-agent-push-gate.bats`) and fixtures.
-  - Run `bats tests/`. Expected: the same pass count as in D.
-- [ ] [AC2] C: create `pr-agent/pool.json`.
-  - Content: D's `harness/reviewer-pool.json`, reduced to `id`, `vendor` and `pr_agent` per member, plus `pr_agent_risk` and kubelab's `forge_rank`.
-  - Point route.sh's `POOL_FILE` default at it.
-  - Test first: a bats case asserting that every member with `pr_agent.weight > 0` has a model and that the draw ignores `forge_rank`. FAIL, then PASS.
-- [ ] [AC2] C: `.github/workflows/ci.yml` runs bats and actionlint, with actions pinned by SHA
+- [ ] [AC1] Go tests first, in `cli/internal/prreview/route_test.go`, ported from `tests/pr-agent-route.bats`:
+  - an exact share at every weight point;
+  - the risk route at 1500 lines and at 1499;
+  - the label route;
+  - the allowlist refusal;
+  - a missing price row or ceiling;
+  - the key on stdin;
+  - the summary lines.
 
-### B2. C: the reusable workflow
+  Expected: FAIL (package absent).
+- [ ] [AC1] Implement `cli/internal/prreview/route.go` and the embedded pool (`//go:embed` of a build-time copy of `harness/reviewer-pool.json`, with a test that the copy equals the source). `--pool embedded|<path>`, no implicit fallback. Expected: PASS.
+- [ ] [AC1] Wire `dotf pr route` in `cli/internal/cmd/pr.go` (`--changed-lines`, `--labels`, `--pool`, `--json`, with the GitHub outputs and step summary written when `GITHUB_OUTPUT` is set). Then a differential test: the bats fixture pools through the script and through `dotf pr route` give identical outputs.
 
-- [ ] [AC2] Test first (`tests/pr-agent-workflow.bats`). It asserts:
-  - the only trigger is `on: workflow_call`;
-  - secret `NAN_API_KEY` is required and `PR_AGENT_ANTHROPIC_API_KEY` is `required: false`;
-  - there is no `secrets: inherit` and no `github.workflow_sha`;
-  - there is no branch literal (`main`, `master`, `release-please--`).
+### A2 to A4. D: `preflight`, `guard`, `gate` (one PR each)
 
-  Expected: FAIL (the file does not exist yet).
-- [ ] [AC2] Create `.github/workflows/pr-agent.yml` from D's workflow. Tests PASS.
-  - Drop `on:`, the workflow-level `concurrency` and `permissions`.
-  - Keep the job lane.
-  - Check out the repository parsed from `job.workflow_ref`, at `job.workflow_sha` (R1).
-- [ ] [AC2] Test, then change: both Anthropic attempts set `LITELLM__CUSTOM_LLM_PROVIDER: anthropic`
-- [ ] [AC2] Test, then change: upload `pr-number` / `pr-number.txt` on every run, numeric check first
-- [ ] [AC2] Test, then change: the upstream-contract read uses the `job.workflow_*` pair. The remedy text stops naming `dotfiles/secrets/registry.yaml` and names the caller's secret instead.
+- [ ] [P] [AC2] `dotf pr preflight`: port the `pr-agent-model-preflight.bats` cases to Go (FAIL), implement (PASS), keep the output names
+- [ ] [P] [AC2] `dotf pr guard`: port the `pr-agent-publish-guard.bats` cases (FAIL), implement (PASS)
+- [ ] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract read (FAIL), implement (PASS)
 
-### B3. C: push-gate action, kubelab inputs, caller fixtures
+### A5. D: the workflow switches (one PR)
 
-- [ ] [AC3] `actions/push-gate`, test first: the composite step exits non-zero when the gate script errors (FAIL). Implement it (PASS), then use it in the workflow.
-- [ ] [AC1] Port kubelab's reviewable and declare tests (`kubelab tests/test_pr_agent_workflow.py:411-640, 485-527`) as bats for input `declare_unreviewed`. FAIL, then implement, then PASS.
-  - On: label and section are written, idempotently, and a stale label is cleared.
-  - Off: the notice only.
-- [ ] [AC6] Input `skip_branch_prefixes` (default `release-please--`). Test it with a kubelab-shaped list that includes `deploy/` and `promote/`.
-- [ ] [AC6] Add `tests/fixtures/callers/{kubelab,dotfiles,hive}.yml`, plus a bats case asserting that each fixture's `with:` and `secrets:` match the workflow's declared inputs and secrets, with no unknown key.
-- [ ] C: README (inputs, secrets, the caller template, the pinning rule). Tag `v0.1.0`.
+- [ ] [AC3] `tests/pr-agent-config.bats`, test first:
+  - no `./scripts/pr-agent-*` invocation remains;
+  - the job builds `dotf` from the PR head before the first decision;
+  - the output names are unchanged.
+
+  Expected: FAIL.
+- [ ] [AC3] Change `.github/workflows/pr-agent.yml` (PASS), then delete the four scripts and their bats suites
+- [ ] [AC3] Make one live run on a PR that changes a weight and link it in `verification.md`
+- [ ] Release: the owner merges the release-please PR, which ships `dotf pr …` in a tagged version
+
+### B. C: the thin reusable workflow (blocked on R5's repo)
+
+- [ ] [AC4] Bats tests first:
+  - `on: workflow_call` only, with the declared secrets and no `inherit`;
+  - no branch literal and no `github.workflow_sha`;
+  - a `dotf_version` input;
+  - an install step that verifies a checksum.
+
+  Expected: FAIL.
+- [ ] [AC4] Write `.github/workflows/pr-agent.yml`, derived from D's A5 workflow:
+  - the triggers, permissions and workflow-level concurrency are dropped;
+  - own files come from `job.workflow_ref` at `job.workflow_sha`;
+  - `dotf` is installed at `inputs.dotf_version` (R3);
+  - every decision step is `dotf pr …`.
+
+  Expected: PASS.
+- [ ] [AC4] `actions/push-gate`: the composite runs `dotf pr gate` and fails the step on error. Test first.
+- [ ] [AC4] [AC6] Inputs `declare_unreviewed` and `skip_branch_prefixes`, with kubelab's declare tests (`tests/test_pr_agent_workflow.py:411-640, 485-527`) ported as bats
+- [ ] [AC6] Add caller fixtures `tests/fixtures/callers/{kubelab,dotfiles,hive}.yml`, plus a bats case that each fixture's `with:` and `secrets:` match the declared interface
+- [ ] C: README (inputs, secrets, caller template, pinning rule) and a CI workflow (bats and actionlint); tag `v0.1.0`
 
 ### C/D. H: pilot
 
-- [ ] [AC4] H PR-C (draft): add `.github/workflows/pr-agent-shared.yml` next to the existing job.
-  - The caller is pinned to C's `v0.1.0` SHA.
+- [ ] [AC5] H PR-C (draft): add `.github/workflows/pr-agent-shared.yml`.
+  - It is pinned to C's `v0.1.0` SHA and passes `pool: embedded` and `dotf_version`.
   - The caller owns triggers, permissions and concurrency.
-  - `tests/test_pr_agent_workflow.py` gains a test of the pin's shape.
-- [ ] [AC4] H PR-C: on one PR, both jobs run and the job summary names the drawn member. Link the run in `verification.md`.
-- [ ] Owner: `dotf secrets sync ci` for `PR_AGENT_ANTHROPIC_API_KEY` to hive (R5). This is a cost decision.
-- [ ] [AC5] After PR-C merges, tabulate seven days of hive runs in `verification.md`: the drawn member and the Haiku fallbacks.
-- [ ] [AC5] H PR-D: remove the old job and its tests. `verification.md` records that `review` is not a required check (`gh api repos/mlorentedev/hive/branches/master/protection`).
+  - A pin-shape test is added.
+- [ ] [AC5] On one PR, both jobs run, and the summary names the member, the pool source and the dotf version
+- [ ] Owner: `dotf secrets sync ci` for `PR_AGENT_ANTHROPIC_API_KEY` to hive (R5)
+- [ ] [AC5] Tabulate seven days of runs in `verification.md`
+- [ ] [AC5] H PR-D: remove the old job. Record that `review` is not a required check (`gh api repos/mlorentedev/hive/branches/master/protection`).
 
 ## Closing
 
 - [ ] Every acceptance criterion is covered by a test or a recorded run
-- [ ] `features.json` verifications are not vacuous
-- [ ] B3's PR closes #1570, with the AC6 evidence
-- [ ] PR-D closes hive#503
-- [ ] ts-bridge-91 told the pilot is green (ts-bridge#474)
-- [ ] `verification.md` filled in, with the promotion lines answered, including whether to amend ADR-042 (R6)
-- [ ] An independent adversarial review (not by the implementer) before archive
+- [ ] #2217 is closed by A5, #1570 by B with the AC6 evidence, and hive#503 by PR-D. ts-bridge-91 is told when the pilot is green (ts-bridge#474).
+- [ ] `verification.md` filled; promotion lines answered
+- [ ] Independent adversarial review (not the implementer) before archive
