@@ -195,6 +195,18 @@ func TestRunWithAProbeThatDoesNotLand(t *testing.T) {
 			}
 			return p
 		},
+		// The file is still the bytes the test wrote (LF), not git's
+		// rendering of it (CRLF): every git write changes the bytes and
+		// none changes the content. Measured on the Windows runner.
+		"mode-only patch under autocrlf": func(t *testing.T, dir string) string {
+			run(t, dir, "config", "core.autocrlf", "true")
+			p := filepath.Join(t.TempDir(), "mode.diff")
+			body := "diff --git a/a.txt b/a.txt\nold mode 100644\nnew mode 100755\n"
+			if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			return p
+		},
 		"mode-only patch": func(t *testing.T, _ string) string {
 			p := filepath.Join(t.TempDir(), "mode.diff")
 			body := "diff --git a/a.txt b/a.txt\nold mode 100644\nnew mode 100755\n"

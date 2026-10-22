@@ -15,7 +15,6 @@ package reproduce
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"maps"
@@ -113,12 +112,12 @@ func probed(ctx context.Context, o Options, top string, res Result) (Result, err
 		res.State, res.Output = DidNotLand, err.Error()
 		return res, nil
 	}
-	before := fingerprint(top, targets)
+	before := fingerprint(ctx, top, targets)
 	if _, err := git(ctx, top, "apply", o.Probe); err != nil {
 		res.State, res.Output = DidNotLand, err.Error()
 		return res, nil
 	}
-	if maps.Equal(before, fingerprint(top, targets)) {
+	if maps.Equal(before, fingerprint(ctx, top, targets)) {
 		res.State = DidNotLand
 	} else {
 		res.Exit, res.State, res.Output = check(ctx, o)
@@ -126,16 +125,15 @@ func probed(ctx context.Context, o Options, top string, res Result) (Result, err
 	// The revert must not inherit a check's timeout: a probe left applied
 	// is worse than any verdict.
 	revertErr := restore(context.WithoutCancel(ctx), top, targets)
-	if revertErr != nil || !maps.Equal(before, fingerprint(top, targets)) {
+	if revertErr != nil || !maps.Equal(before, fingerprint(context.WithoutCancel(ctx), top, targets)) {
 		return res, fmt.Errorf("%w: %s no longer match the commit %s (%v)", ErrNotReverted, strings.Join(targets, ", "), res.Head, revertErr)
 	}
 	return res, nil
 }
 
 // restore puts the targets back as HEAD has them, which is how they were
-// found: the tree was clean. A reverse patch would not do: under autocrlf,
-// git apply writes LF where the checkout wrote CRLF, so the bytes do not
-// come back (measured on the Windows runner). A target HEAD lacks was
+// found: the tree was clean. Unlike a reverse patch it does not depend on
+// the check having left the probed lines alone. A target HEAD lacks was
 // created by the probe and is removed.
 func restore(ctx context.Context, top string, targets []string) error {
 	tracked, err := git(ctx, top, append([]string{"ls-tree", "--name-only", "-z", "HEAD", "--"}, targets...)...)
@@ -187,17 +185,25 @@ func probeTargets(ctx context.Context, dir, probe string) ([]string, error) {
 	return targets, nil
 }
 
-// fingerprint is each target's content hash; a missing file is its own
-// value, so a probe that creates or deletes a file lands too.
-func fingerprint(dir string, targets []string) map[string]string {
+// fingerprint is each target's content as git sees it: the blob id after
+// the checkout's eol conversion and clean filters are undone. Raw bytes are
+// the wrong frame: under autocrlf a file git calls clean may be LF on disk
+// while every git write renders it CRLF, so the bytes change on apply and on
+// restore although the content does not (measured on the Windows runner). A
+// missing file is its own value, so a probe that creates or deletes a file
+// lands too.
+func fingerprint(ctx context.Context, top string, targets []string) map[string]string {
 	sums := make(map[string]string, len(targets))
 	for _, t := range targets {
-		b, err := os.ReadFile(filepath.Join(dir, t))
-		if err != nil {
+		if _, err := os.Stat(filepath.Join(top, t)); err != nil {
 			sums[t] = "absent"
 			continue
 		}
-		sums[t] = fmt.Sprintf("%x", sha256.Sum256(b))
+		id, err := git(ctx, top, "hash-object", "--", t)
+		if err != nil {
+			id = "unreadable: " + err.Error()
+		}
+		sums[t] = id
 	}
 	return sums
 }
