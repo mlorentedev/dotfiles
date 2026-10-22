@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os/exec"
 
@@ -54,36 +53,23 @@ func newHarnessDeployCmd() *cobra.Command {
 func deployHarness(cmd *cobra.Command, repoRoot, home string, dryRun bool) error {
 	w, ew := cmd.OutOrStdout(), cmd.ErrOrStderr()
 	has := func(name string) bool { _, err := exec.LookPath(name); return err == nil }
-	var errs []error
+	d, err := harness.Deploy(repoRoot, home, has, dryRun)
 
-	instructions, err := harness.DeployInstructions(repoRoot, home, has, dryRun)
-	reportInstructionOutcomes(w, instructions, dryRun)
-	errs = append(errs, err)
-
-	skills, err := harness.DeploySkills(repoRoot, home, has, dryRun)
-	reportSkillOutcomes(w, ew, skills, dryRun)
-	errs = append(errs, err)
-
-	agents, agentsErr := harness.DeployAgents(repoRoot, home, dryRun)
-	reportAgentOutcomes(w, ew, agents, dryRun)
-	if agentsErr != nil {
+	reportInstructionOutcomes(w, d.Instructions, dryRun)
+	reportSkillOutcomes(w, ew, d.Skills, dryRun)
+	reportAgentOutcomes(w, ew, d.Agents, dryRun)
+	if d.AgentsErr != nil {
 		_, _ = fmt.Fprintln(ew, "[deploy] presence and doctrine NOT written: the agents surface failed; its error follows")
-		return errors.Join(append(errs, agentsErr)...)
+		return err
 	}
-
 	if dryRun {
 		_, _ = fmt.Fprintln(w, "[deploy] presence has no preview; not run under --dry-run")
 	} else {
-		presence, err := harness.DeployPresence(repoRoot, home)
-		reportPresenceOutcomes(w, ew, presence)
-		errs = append(errs, err)
+		reportPresenceOutcomes(w, ew, d.Presence)
 	}
+	reportDoctrineOutcomes(w, ew, d.Doctrine, dryRun)
 
-	doctrine, err := harness.DeployDoctrine(repoRoot, home, dryRun)
-	reportDoctrineOutcomes(w, ew, doctrine, dryRun)
-	errs = append(errs, err)
-
-	if err := errors.Join(errs...); err != nil {
+	if err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintln(w, "[deploy] OK")

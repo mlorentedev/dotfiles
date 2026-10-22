@@ -218,7 +218,7 @@ var convergeOptions = func() converge.Options {
 	run, stdout := tools.HomeRunners(home)
 	dest := filepath.Join(home, ".local", "bin")
 	return converge.Options{
-		RunHarnessDeploy: converge.CompileHarnessDeploy,
+		RunHarnessDeploy: converge.HarnessDeploy,
 		MiseRun:          run,
 		MiseStdout:       stdout,
 		// Install progress goes to stderr, apart from the report on stdout.

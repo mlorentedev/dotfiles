@@ -21,8 +21,8 @@ import (
 // Options carries the side effects a registry needs from its caller, so a test
 // can drive the registry without running the real tools (lesson 335).
 type Options struct {
-	// RunHarnessDeploy deploys the instruction files, skills and presence;
-	// CompileHarnessDeploy in production.
+	// RunHarnessDeploy deploys the instruction files, skills, agents, presence
+	// and doctrine; HarnessDeploy in production.
 	RunHarnessDeploy func(Env) error
 	// MiseRun and MiseStdout run mise and the tools it installs;
 	// tools.HomeRunners in production. Unset, the tools step is skipped.
