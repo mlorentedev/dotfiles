@@ -16,7 +16,7 @@
   {
     "id": "TOOL-031-pr-agent-reusable-workflow-f3",
     "behavior": "dotfiles' pr-agent.yml calls dotf pr built from the PR head and no pr-agent script remains",
-    "verification": "bats tests/pr-agent-config.bats && ! ls scripts/pr-agent-*.sh 2>/dev/null",
+    "verification": "bats tests/pr-agent-config.bats && [ -z \"$(find scripts -maxdepth 1 -name 'pr-agent-*.sh')\" ]",
     "state": "pending",
     "evidence": ""
   },
