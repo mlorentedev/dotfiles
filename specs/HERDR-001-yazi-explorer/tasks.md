@@ -52,7 +52,7 @@ created: "2026-10-18"
       does not define, and names the key it expects.
 
 - [x] [AC1] `[[keys.command]] prefix+shift+e` -> `dotf herdr explorer`, once
-      `DOTF_VERSION` reached 0.76.0; the guard became the binding's own test.
+      `DOTF_VERSION` reached 0.77.0 (0.76.0 carried the subcommand, 0.77.0 the toggle fix); the guard became the binding's own test.
 
 ## Closing
 

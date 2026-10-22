@@ -41,7 +41,7 @@ this session, on herdr 0.9.3, macOS arm64.
 - **The docked binding waits for a release.** A `[[keys.command]]` naming
   `dotf herdr explorer` deploys fine in CI (built from the tree) and fails on
   every new machine, whose `DOTF_VERSION` is `0.75.0` and has no such subcommand
-  (lesson 373). A test enforced the order until the binding landed with 0.76.0.
+  (lesson 373). A test enforced the order until the binding landed, with the floor at 0.77.0 (the release carrying #2854).
 - **Toggle ownership by pane label, not by foreground process.** The first
   design looked for the pane running yazi; review showed that closes a yazi the
   owner opened themselves (#2815). The explorer is now the pane labelled `files`,

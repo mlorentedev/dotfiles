@@ -114,14 +114,15 @@ setup() {
     # The docked key runs `dotf`, so it needs a release that carries the
     # subcommand. DOTF_VERSION is what a new machine installs: the key may only
     # name `dotf herdr explorer` once that pin has reached the release that added
-    # it (0.76.0, lesson 373). Past it, the pin only moves forward.
+    # it and the toggle fix for a press from inside the explorer (0.77.0,
+    # #2854, lesson 373). Past it, the pin only moves forward.
     block=$(grep -A6 'key = "prefix+shift+e"' "$SRC")
     [[ "$block" == *'type = "shell"'* ]] || { echo "prefix+shift+e is not a shell command: $block"; false; }
     [[ "$block" == *'command = "dotf herdr explorer"'* ]] || { echo "prefix+shift+e does not run dotf herdr explorer: $block"; false; }
     dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
     [ -n "$dotf_pin" ] || { echo "versions.conf has no DOTF_VERSION"; false; }
-    lowest=$(printf '%s\n0.76.0\n' "$dotf_pin" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)
-    [ "$lowest" = "0.76.0" ] || { echo "DOTF_VERSION=$dotf_pin predates the release carrying dotf herdr explorer (0.76.0)"; false; }
+    lowest=$(printf '%s\n0.77.0\n' "$dotf_pin" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)
+    [ "$lowest" = "0.77.0" ] || { echo "DOTF_VERSION=$dotf_pin predates the release carrying the docked explorer (0.77.0)"; false; }
 }
 
 @test "dotf herdr explorer exists and names its provisioner" {

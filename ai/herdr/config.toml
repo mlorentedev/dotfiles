@@ -33,7 +33,7 @@ height = "90%"
 # explorer docked as a split on the right: `dotf herdr explorer` toggles it, so
 # pressing the key again closes it. Nothing here installs yazi -- YAZI_VERSION
 # in versions.conf does, through `dotf tools sync`. The docked key runs the
-# pinned dotf, so it needs a release that carries the subcommand (0.76.0).
+# pinned dotf, so it needs a release that carries the subcommand and its toggle fix (0.77.0).
 [[keys.command]]
 key = "prefix+e"
 type = "popup"
