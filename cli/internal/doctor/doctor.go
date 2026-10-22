@@ -88,7 +88,7 @@ func Run(opts Options) (int, error) {
 	// Folded env-contract sweep (the doctor.sh surface). In --quick mode this is
 	// the ONLY work: it is the fast, fork-free subset wired into the SessionStart
 	// hook (CLI-013), so it must skip the heavy healthcheck sweep below — chiefly
-	// the ~2.8s compile-harness drift gate.
+	// the harness drift gate and the vault reads.
 	if contract != nil {
 		checkContractEnvVars(sys, contract, rep, opts.Fix)
 		checkPersistedEnv(sys, cfg, rep)

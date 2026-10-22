@@ -190,7 +190,7 @@ func TestAgentTiersResolve(t *testing.T) {
 
 // TestAgentTiersMissingInputsAreNotFailures pins that this check stays silent
 // about things it does not own. A missing manifest or record dir is diagnosed by
-// checkCompileHarnessDrift, and duplicating that here would print two failures
+// checkRecordDrift, and duplicating that here would print two failures
 // for one cause.
 func TestAgentTiersMissingInputsAreNotFailures(t *testing.T) {
 	t.Run("no manifest at all", func(t *testing.T) {
@@ -212,7 +212,7 @@ func TestAgentTiersMissingInputsAreNotFailures(t *testing.T) {
 		rep.Section("test")
 		checkAgentTiersResolve(&Config{DotfilesDir: dir}, tierMap, rep)
 		if rep.Failures() != 0 {
-			t.Errorf("a manifest that does not parse is checkCompileHarnessDrift's failure, not this check's")
+			t.Errorf("a manifest that does not parse is checkRecordDrift's failure, not this check's")
 		}
 		if !strings.Contains(buf.String(), "does not parse") {
 			t.Errorf("the check must say it did not run, or silence reads as a pass:\n%s", buf.String())

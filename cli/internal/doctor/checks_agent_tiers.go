@@ -56,7 +56,7 @@ func agentDeployTargets(cfg *Config, rep *Report) (recordDir string, deploy []st
 	raw, err := os.ReadFile(filepath.Join(cfg.DotfilesDir, "harness", "manifest.json"))
 	if err != nil {
 		// Not a failure of this check: the deploy dir simply may not carry a
-		// manifest yet. checkCompileHarnessDrift owns that diagnosis.
+		// manifest yet. checkRecordDrift owns that diagnosis.
 		return "", nil, false
 	}
 	var manifest struct {
