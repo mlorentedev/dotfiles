@@ -35,8 +35,8 @@ func convergeFixture(t *testing.T) (repo, home string) {
 			t.Fatal(err)
 		}
 	}
-	// The real deploy runs scripts/compile-harness.sh, which this fixture does
-	// not have; a test that needs it opts in with its own runner (lesson 335).
+	// The real deploy reads harness/manifest.json, which this fixture does not
+	// have; a test that needs it opts in with its own runner (lesson 335).
 	saved := convergeOptions
 	convergeOptions = func() converge.Options {
 		return converge.Options{

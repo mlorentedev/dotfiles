@@ -25,7 +25,8 @@ func heldIssueRunner(t *testing.T, expires time.Time) (*MockAddRunner, string) {
 }
 
 func heldIssueOpts(t *testing.T, issue int) AddOptions {
-	return AddOptions{RepoRoot: filepath.Join(t.TempDir(), "repo"), WorktreeRoot: t.TempDir(), Slug: "second", Issue: issue}
+	return AddOptions{RepoRoot: filepath.Join(t.TempDir(), "repo"), WorktreeRoot: t.TempDir(), Slug: "second", Issue: issue,
+		LockPath: filepath.Join(t.TempDir(), "wt.lock")}
 }
 
 func TestAddRefusesAnIssueALiveLeaseHolds(t *testing.T) {
@@ -82,5 +83,52 @@ func TestAddWithoutAnIssueDoesNotScan(t *testing.T) {
 	}
 	if runner.WorktreeListRan {
 		t.Error("add without --issue listed the worktrees")
+	}
+}
+
+// Two adds for one issue must not both pass the scan before either writes its
+// lease: the scan through SaveMetadata runs under the worktree lock.
+func TestAddForAnIssueWaitsOnTheWorktreeLock(t *testing.T) {
+	lock := filepath.Join(t.TempDir(), "wt.lock")
+	unlock, err := TryLockFile(lock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	runner, _ := heldIssueRunner(t, time.Now().Add(-time.Minute))
+	opts := heldIssueOpts(t, 2824)
+	opts.LockPath, opts.LockTimeout = lock, 50*time.Millisecond
+	if _, err := AddWithRunner(opts, runner, time.Now()); err == nil || runner.WorktreeListRan {
+		t.Fatalf("add scanned for #2824 while another add held the lock: %v", err)
+	}
+	opts.Issue = 0
+	if _, err := AddWithRunner(opts, runner, time.Now()); err != nil {
+		t.Fatalf("add without --issue waited on the lock: %v", err)
+	}
+}
+
+// The lock must still be held while the scan runs and while git creates the
+// worktree, which is after the scan and before the lease is written: an add
+// that let go of it any earlier would let a second add pass the same scan.
+func TestAddHoldsTheWorktreeLockFromScanToLease(t *testing.T) {
+	runner, _ := heldIssueRunner(t, time.Now().Add(-time.Minute))
+	opts := heldIssueOpts(t, 2824)
+	held := func(stage string) {
+		unlock, err := TryLockFile(opts.LockPath)
+		if err == nil {
+			unlock()
+			t.Errorf("the worktree lock was free during %s", stage)
+		} else if !errors.Is(err, ErrLocked) {
+			t.Fatalf("probe the lock during %s: %v", stage, err)
+		}
+	}
+	list, add := runner.OnWorktreeList, runner.OnWorktreeAdd
+	runner.OnWorktreeList = func(repo string) (string, error) { held("the scan"); return list(repo) }
+	runner.OnWorktreeAdd = func(repo, target, branch, base string) error {
+		held("the worktree add")
+		return add(repo, target, branch, base)
+	}
+	if _, err := AddWithRunner(opts, runner, time.Now()); err != nil {
+		t.Fatal(err)
 	}
 }

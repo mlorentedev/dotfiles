@@ -45,9 +45,9 @@ created: "2026-06-21"
 
 - [x] Compose instructions → skills → agents → presence → doctrine, failure collected like the shell (`dotf harness deploy`, `tests/harness-deploy-parity.bats`)
 - [ ] Rewire `setup-linux.sh`, `setup-windows.ps1` and `converge/harness.go` (`records-harness`) to it
-  - [ ] `converge/harness.go` `CompileHarnessDeploy` runs `dotf harness deploy` in process instead of `bash scripts/compile-harness.sh --deploy`; on Windows this gives the step agents and doctrine for the first time
-  - [ ] `setup-windows.ps1`: the `Deploy-SkillRecord` block and its helpers are deleted, replaced by the one `dotf harness deploy` call
-  - [ ] `setup-linux.sh`: whatever still calls the script for a deploy calls the verb
+  - [x] `records-harness` calls `harness.Deploy` in process (`converge.HarnessDeploy`); `CompileHarnessDeploy` deleted
+  - [ ] `setup-linux.sh` calls `dotf harness deploy` (supersedes slice 3's shell delegation line)
+  - [ ] `setup-windows.ps1` calls `dotf harness deploy`; `Deploy-SkillRecord` and its helpers deleted; `records-harness` gains `windows`
 
 ## Slice 6 — `dotf harness check` (AC5, AC6)
 
