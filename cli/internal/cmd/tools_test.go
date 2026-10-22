@@ -215,6 +215,9 @@ func TestListAsset(t *testing.T) {
 		Type: "uv-tool", Package: "hive-vault", Platforms: []string{"linux", "darwin"}}}
 	sops := tools.Tool{Name: "sops", Version: "3.13.1", Source: tools.Source{
 		Type: "github-release", Asset: map[string]string{"linux": "sops-v{version}.linux.{goarch}"}}}
+	hiveSelf := tools.Tool{Name: "hive", Version: "4.4.1", Source: tools.Source{
+		Type: "uv-tool", Package: "hive-vault",
+		SelfInstall: &tools.SelfInstall{Platforms: []string{"windows"}, Args: []string{"self-upgrade", "{version}"}}}}
 	bw := tools.Tool{Name: "bw", Source: tools.Source{Type: "npm", Package: "@bitwarden/cli"}}
 	gh := tools.Tool{Name: "gh", Source: tools.Source{Type: "system", Apt: "gh", Winget: "GitHub.cli"}}
 	cases := []struct {
@@ -223,6 +226,8 @@ func TestListAsset(t *testing.T) {
 	}{
 		{hive, "linux", "uv:hive-vault"},
 		{hive, "windows", "(not in the catalog on this platform)"},
+		{hiveSelf, "linux", "uv:hive-vault"},
+		{hiveSelf, "windows", "self:hive-vault"}, // hive installs itself; nothing is a uv tool there
 		{sops, "linux", "sops-v3.13.1.linux.amd64"},
 		{sops, "windows", "(no build for this platform)"},
 		{bw, "windows", "npm:@bitwarden/cli"},

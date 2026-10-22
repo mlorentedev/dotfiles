@@ -196,17 +196,17 @@ func TestHiveDaemon_RegisteredButNotInstalledFails(t *testing.T) {
 	}
 }
 
-// The not-installed fix names the install that owns hive on each OS. The
-// catalog entry is POSIX-only, so on Windows `dotf tools install hive` skips
-// and the doctor would keep failing behind a fix that does nothing (#2856);
-// there hive builds its own layout and launcher (hive ADR-019).
+// The not-installed fix is the catalog install on every OS: on Windows it runs
+// hive's own self install (hive ADR-019, ADR-036 amendment 2026-10-21), whose
+// launcher reaches a shell opened after it, so the fix says to open one. A
+// bare uvx line there would bypass the pin (#2856).
 func TestHiveDaemon_NotInstalledFixFollowsTheOS(t *testing.T) {
 	cases := []struct {
 		goos, want, never string
 	}{
-		{"linux", "`dotf tools install hive`", "self-upgrade"},
-		{"darwin", "`dotf tools install hive`", "self-upgrade"},
-		{"windows", "`uvx --from hive-vault hive self-upgrade`", "dotf tools install hive"},
+		{"linux", "`dotf tools install hive`", "new shell"},
+		{"darwin", "`dotf tools install hive`", "new shell"},
+		{"windows", "`dotf tools install hive`, which runs hive's own self install, then open a new shell", "uvx"},
 	}
 	for _, c := range cases {
 		t.Run(c.goos, func(t *testing.T) {

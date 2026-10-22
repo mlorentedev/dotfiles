@@ -362,130 +362,21 @@ refute_legacy_mise_sync() {
     jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
-@test "setup-windows.ps1 deploys skills from records via Deploy-SkillRecord (SDD-008, AI-014 successor)" {
-    # opencode commands (and claude/agy skills) are now rendered from the committed
-    # vault skill records by Deploy-SkillRecord, honoring per-skill targets[], with
-    # stale outputs pruned -- replacing the former ai\opencode\commands copy loop.
-    grep -qF 'function Deploy-SkillRecord' "$PS1_SCRIPT"
-    grep -qF 'Deploy-SkillRecord -DotfilesDir' "$PS1_SCRIPT"
-    grep -qF 'Test-SkillTargetsAgent' "$PS1_SCRIPT"
-    grep -qF 'harness\manifest.json' "$PS1_SCRIPT"
+@test "setup-windows.ps1 deploys the harness with dotf harness deploy, the verb setup-linux.sh calls (CLI-026)" {
+    # One Go implementation on every OS: the PowerShell renderer
+    # (Deploy-SkillRecord and its helpers) and the hand copies of the
+    # instruction files are gone, and so is the separate presence call.
+    grep -qE '^& dotf harness deploy --repo-root \$DotfilesDir[[:space:]]*$' "$PS1_SCRIPT"
+    grep -qF 'dotf harness deploy --repo-root "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep '^function (Deploy-SkillRecord|Convert-SkillRecord|Test-SkillTargetsAgent|Get-SkillField|Test-SkillFrontmatterKeyKept)\b' "$PS1_SCRIPT"
+    refute_grep_fixed '& dotf harness presence' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 no longer deploys skills from the removed ai\\skills tree (SDD-008)" {
     # the ai\skills / ai\opencode\commands references that remain are historical
-    # comments in the Deploy-SkillRecord block, never active Test-Path sources.
+    # comments, never active Test-Path sources.
     refute_grep '\$skillsSource\s*=\s*"\$DotfilesDir\\ai\\skills"' "$PS1_SCRIPT"
     refute_grep '\$opencodeCmdsSrc\s*=' "$PS1_SCRIPT"
-}
-
-# Runs setup-windows.ps1's skill renderer on <record>, writing the result to
-# <outfile>; sets $status/$output like any other `run`. Extracts the two
-# functions that carry the rule rather than dot-sourcing (and running) the whole
-# multi-hundred-line deploy script.
-_render_skill_record() {  # <kind> <record> <srcpath> <outfile>
-    local fn_body
-    fn_body="$(sed 's/\r$//' "$PS1_SCRIPT" \
-        | awk '/^function (Test-SkillFrontmatterKeyKept|Convert-SkillRecord) \{/,/^\}$/')"
-    [ -n "$fn_body" ]
-    run pwsh -NonInteractive -Command "
-        $fn_body
-        \$result = Convert-SkillRecord -Kind '$1' -RecordMd '$(_winpath "$2")' -SrcPath '$3'
-        Set-Content -LiteralPath '$(_winpath "$4")' -Value \$result -Encoding UTF8
-    "
-}
-
-@test "Convert-SkillRecord does not stack a second set of generated_* fields on a record that already carries its own (HARNESS-069)" {
-    # A previous adversarial review of HARNESS-069 (bash side) found this bug
-    # live on this exact function: it never got the strip-rule fix, so once a
-    # committed record carries its own generated_* provenance, every Windows
-    # skill/command deploy produced duplicate YAML keys. A source-text grep
-    # cannot catch this class -- it has to run the real function.
-    require_pwsh
-
-    local scratch="$BATS_TEST_TMPDIR/convert-skill-record"
-    mkdir -p "$scratch"
-    local record="$scratch/SKILL.md"
-    # Shaped like a record HARNESS-069's refresh already stamped: its own
-    # generated_* fields already present, pointing at the vault.
-    printf -- '---\ngenerated: true\ngenerated_from: 00_meta/skills/demo/SKILL.md\ngenerated_sha: aaaaaaaaaaaaaaaa\nname: demo\ndescription: fixture skill.\n---\n\nBody.\n' \
-        > "$record"
-
-    local out="$scratch/out.md"
-    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
-    [ "$status" -eq 0 ]
-
-    [ "$(grep -c '^generated:' "$out")" -eq 1 ]
-    [ "$(grep -c '^generated_from:' "$out")" -eq 1 ]
-    [ "$(grep -c '^generated_sha:' "$out")" -eq 1 ]
-    # The fresh set must win -- it must point at the deploy source, not the
-    # stale vault path the record's own (stripped) fields carried.
-    grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
-    grep -q '^name: demo' "$out"
-}
-
-@test "Convert-SkillRecord drops neutral/store-only keys so Claude Code discovers the skill unconditionally (#1080 parity)" {
-    # Claude Code reads a top-level `paths:` as a conditional / path-scoped
-    # skill and holds it dormant until a matching file is touched in the
-    # session, so a deployed record that keeps `paths:` disappears from the
-    # session-start roster. compile-harness.sh was fixed for that in #1080;
-    # this function is its Windows twin and was not, which took 34 of 43
-    # skills off this box (measured 2026-08-29).
-    require_pwsh
-
-    local scratch="$BATS_TEST_TMPDIR/convert-skill-neutral"
-    mkdir -p "$scratch"
-    local record="$scratch/SKILL.md"
-    # Two shapes a per-line filter gets wrong: a `paths:` value that wraps (the
-    # orphaned list item outlives its key), and a comment before the first key
-    # (the awk twin drops it, because its keep starts unset).
-    cat > "$record" <<'FIXTURE'
----
-# store-only metadata follows
-id: demo-skill
-type: skill
-status: active
-created: 2026-08-29
-owner: manu
-name: demo
-description: fixture skill,
-  wrapped onto a second line.
-allowed-tools: Read, Grep
-targets: [claude]
-keywords: [alpha, beta]
-paths: ['**/a/**',
-  '**/b/**']
-requires: [jq]
----
-
-Body.
-FIXTURE
-
-    local out="$scratch/out.md"
-    _render_skill_record skill "$record" '.claude/skills/demo/SKILL.md' "$out"
-    [ "$status" -eq 0 ]
-
-    # Neutral metadata is gone, and so is every line that hung off it.
-    refute_grep '^(id|type|status|created|owner|paths|keywords|requires|targets):' "$out"
-    refute_grep_fixed "'**/b/**'" "$out"
-    refute_grep_fixed '# store-only metadata follows' "$out"
-    # Native execution fields survive, continuation lines included.
-    grep -q '^name: demo' "$out"
-    grep -q '^description: fixture skill,' "$out"
-    grep -q '^  wrapped onto a second line.' "$out"
-    grep -q '^allowed-tools: Read, Grep' "$out"
-    grep -q '^generated_from: .claude/skills/demo/SKILL.md' "$out"
-}
-
-@test "the native-field allowlist is identical in setup-windows.ps1 and compile-harness.sh (cross-OS parity)" {
-    # Two renderers, one rule. Drift here is silent: each side keeps deploying,
-    # and only the agents on the other OS lose the skill.
-    local pat sh_list ps_list
-    pat='\(name\|description\|allowed-tools[^)]*\)'
-    sh_list=$(grep -oE "$pat" "$BATS_TEST_DIRNAME/../scripts/compile-harness.sh" | head -1)
-    ps_list=$(sed 's/\r$//' "$PS1_SCRIPT" | grep -oE "$pat" | head -1)
-    [ -n "$sh_list" ]
-    [ "$sh_list" = "$ps_list" ]
 }
 
 # --- BUG-005: Windows PowerShell 5.1 auto-reexec under pwsh ---
@@ -638,15 +529,15 @@ FIXTURE
 # keeps setup-windows.ps1 in lockstep (regression class: BUG-001 + BUG-002).
 
 @test "parity: CLAUDE.md is verified after deploy on both OSes" {
-    # Linux and macOS: compile-harness.sh --deploy copies it from
-    # agents.presence[], and its post-condition (outside the harness regions it
-    # equals ai/claude/CLAUDE.md) is held by dotf converge's records-harness
-    # probe and doctor's instruction-drift check, not by a grep in the setup.
+    # Both OSes: `dotf harness deploy` copies it from agents.presence[], and its
+    # post-condition (outside the harness regions it equals ai/claude/CLAUDE.md)
+    # is held by dotf converge's records-harness probe and doctor's
+    # instruction-drift check, not by a grep in the setup. Neither setup copies
+    # it itself (CLI-026).
     refute_grep 'cp "\$CURRENT_DIR/ai/claude/CLAUDE.md"' "$DOTFILES_DIR/setup-linux.sh"
+    refute_grep_fixed '$claudeMdSource' "$PS1_SCRIPT"
+    grep -qF -- "-Exclude 'settings.json', 'CLAUDE.md'" "$PS1_SCRIPT"
     [ "$(jq -r '.agents.presence[] | select(.agent=="claude") | .source' "$DOTFILES_DIR/harness/manifest.json")" = "ai/claude/CLAUDE.md" ]
-    # Windows keeps its copy and pointer check until the Go deploy of the
-    # instruction files ships in a release (PLAT-001b PR 2c).
-    grep -qF "Select-String -Path \"\$ClaudeHome\\CLAUDE.md\" -Pattern 'First, read \`AGENTS.md\`'" "$PS1_SCRIPT"
 }
 
 @test "parity: AGY.md and .geminiignore deploy through dotf deploy on every OS (#1843 B11)" {
@@ -940,16 +831,6 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     refute_grep '^[[:space:]]*("\$_dotf"|dotf) deploy [a-z]' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-@test "setup-windows.ps1 writes rendered skill files and the copilot catalog through Write-Utf8LfFile, never Set-Content (WIN-008)" {
-    # Set-Content joins with CRLF and rewrites the whole file, so the deployed
-    # copilot-instructions.md drifted from its LF source on every run (#1289).
-    grep -qF 'Write-Utf8LfFile -Path $catFile' "$PS1_SCRIPT"
-    run grep -qF 'Set-Content -LiteralPath $catFile' "$PS1_SCRIPT"
-    [ "$status" -ne 0 ]
-    run grep -cF 'Write-Utf8LfFile -Path' "$PS1_SCRIPT"
-    [ "$output" -ge 3 ]
-}
-
 @test "setup-windows.ps1 mirrors sensitive/ recursively so dr/ reaches the deploy dir (WIN-011)" {
     grep -qF "Copy-Item -Path (Join-Path \$sensitiveSource '*') -Destination \$sensitiveDest -Recurse -Force" "$PS1_SCRIPT"
 }
@@ -1023,24 +904,6 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     [ -n "$uv_line" ]
     [ -n "$mcp_line" ]
     [ "$uv_line" -lt "$mcp_line" ]
-}
-
-# HARNESS-092 (#1326): agent presence -- the forced-skills roster between
-# AGENT-PRESENCE markers in every harness instructions file -- reached Windows
-# through no path at all: compile-harness.sh's deploy_agent_presence had no
-# port. Both setups now call `dotf harness presence`; here it must run after
-# the base files and the skill records are deployed, or it finds nothing to
-# join. Measured on the invocation line, not on any mention.
-@test "setup-windows.ps1 injects agent presence via dotf harness presence after Deploy-SkillRecord (HARNESS-092)" {
-    grep -qE '^[[:space:]]*& dotf harness presence --repo-root \$DotfilesDir[[:space:]]*$' "$PS1_SCRIPT"
-    deploy_line=$(grep -n '^Deploy-SkillRecord -DotfilesDir' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    presence_line=$(grep -n '& dotf harness presence' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$deploy_line" ]
-    [ -n "$presence_line" ]
-    [ "$deploy_line" -lt "$presence_line" ]
-    # parity: the Linux engine delegates to the same verb (that it carries no
-    # injector of its own is compile-harness.bats' assertion)
-    grep -qF 'dotf harness presence --repo-root "$REPO_ROOT"' "$DOTFILES_DIR/scripts/compile-harness.sh"
 }
 
 # CLI-062 (#1338): the DX-006 Orca hook repair is `dotf orca tune-hooks`, the

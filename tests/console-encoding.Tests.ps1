@@ -39,39 +39,3 @@ Describe 'scripts/utils.ps1 console encoding' -Skip:(-not $script:onWindows) {
         Get-Content -LiteralPath $script:Profile -Raw | Should -Match '\[Console\]::OutputEncoding\s*='
     }
 }
-
-Describe 'Write-Utf8LfFile' -Skip:(-not $script:onWindows) {
-
-    BeforeAll {
-        . (Resolve-Path (Join-Path $PSScriptRoot '..\scripts\utils.ps1')).Path
-    }
-
-    It 'writes LF line endings and no BOM from CRLF input' {
-        $p = Join-Path $TestDrive 'a.md'
-        Write-Utf8LfFile -Path $p -Content "one`r`ntwo`r`n"
-        $bytes = [IO.File]::ReadAllBytes($p)
-        ($bytes -contains 13) | Should -BeFalse
-        $bytes[0] | Should -Not -Be 0xEF
-        [Text.Encoding]::UTF8.GetString($bytes) | Should -Be "one`ntwo`n"
-    }
-
-    It 'ends the file with exactly one LF' {
-        $p = Join-Path $TestDrive 'b.md'
-        Write-Utf8LfFile -Path $p -Content 'x'
-        [IO.File]::ReadAllText($p) | Should -Be "x`n"
-        Write-Utf8LfFile -Path $p -Content "x`n"
-        [IO.File]::ReadAllText($p) | Should -Be "x`n"
-    }
-
-    It 'creates the parent directory' {
-        $p = Join-Path $TestDrive 'nested\deeper\c.md'
-        Write-Utf8LfFile -Path $p -Content 'y'
-        Test-Path -LiteralPath $p | Should -BeTrue
-    }
-
-    It 'is what setup uses for every rendered .md it writes' {
-        $setup = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\setup-windows.ps1') -Raw
-        ([regex]::Matches($setup, 'Write-Utf8LfFile -Path')).Count | Should -BeGreaterOrEqual 3
-        $setup | Should -Not -Match 'Set-Content -LiteralPath \$catFile'
-    }
-}

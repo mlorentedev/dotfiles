@@ -79,14 +79,12 @@ load 'lib/refute'
     # mention: the comments name the old form on purpose.
     refute_grep 'cp -rf "\$CURRENT_DIR/ai/copilot/"\*' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'Copy-Item "\$copilotSource\\\*"' "$DOTFILES_DIR/setup-windows.ps1"
-    # Linux and macOS: compile-harness.sh --deploy (and dotf converge) deploy it
-    # from agents.presence[], gated on copilot being on PATH (PLAT-001b), so the
-    # setup script no longer copies it.
+    # Every OS: `dotf harness deploy` (and dotf converge) deploy it from
+    # agents.presence[], gated on copilot being on PATH (PLAT-001b, CLI-026), so
+    # neither setup script copies it.
     [ "$(jq -r '.agents.presence[] | select(.agent=="copilot") | "\(.source) \(.requires_command)"' "$DOTFILES_DIR/harness/manifest.json")" = "ai/copilot/copilot-instructions.md copilot" ]
     refute_grep 'cp -f "\$CURRENT_DIR/ai/copilot/copilot-instructions.md"' "$DOTFILES_DIR/setup-linux.sh"
-    # Windows keeps its explicit copy until the Go deploy of the instruction
-    # files ships in a release (PLAT-001b PR 2c).
-    grep -qF 'Copy-Item "$copilotSource\copilot-instructions.md"' "$DOTFILES_DIR/setup-windows.ps1"
+    refute_grep_fixed 'copilot-instructions.md" -Force' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
 @test "copilot is a packages.json catalog tool (npm) and neither setup carries an install block (AI-038, ADR-036)" {

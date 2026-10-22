@@ -179,6 +179,11 @@ type Installer struct {
 	// so the first is the one that answers. Nil means a scan of $PATH; tests
 	// inject the machine's answer.
 	PathCopies func(name string) []string
+	// RegisteredPath is the PATH Windows hands a new process (env.RegisteredPath):
+	// the machine's and the user's registry Path, expanded. A self-installing
+	// tool writes its launcher dir to the user's, which this process's PATH
+	// predates, so its probe reads both. Nil means the process PATH alone.
+	RegisteredPath func() ([]string, error)
 }
 
 func (in *Installer) defaults() {
@@ -237,9 +242,30 @@ func (in *Installer) current(t Tool) string {
 		return in.CurrentVersion(t.Name)
 	}
 	if t.Source.Type == "npm" || t.Source.Type == "uv-tool" {
-		return in.pathVersion(t.Name)
+		if v := in.pathVersion(t.Name); v != "" || !t.Source.SelfInstalls(in.GOOS) {
+			return v
+		}
+		return in.registeredVersion(t.Name)
 	}
 	return in.installedVersion(t.Name)
+}
+
+// registeredVersion probes the first copy of name on the registered PATH.
+// Missing it would read an installed tool as absent, and a self install below
+// the version that is there downgrades it (`hive self-upgrade <older>` does).
+func (in *Installer) registeredVersion(name string) string {
+	if in.RegisteredPath == nil {
+		return ""
+	}
+	dirs, err := in.RegisteredPath()
+	if err != nil {
+		return "" // refusal reports it, so the install never acts on this answer
+	}
+	copies := copiesOnPath(name, in.GOOS, strings.Join(dirs, string(os.PathListSeparator)), os.Getenv("PATHEXT"))
+	if len(copies) == 0 {
+		return ""
+	}
+	return ProbeVersion(copies[0], in.Probe)
 }
 
 // Install converges the tool to its pinned version, dispatching on source type.
@@ -326,6 +352,13 @@ func (in *Installer) refusal(t Tool) string {
 	case "npm", "uv-tool":
 		if t.Source.Package == "" {
 			return t.Source.Type + " source declares no package"
+		}
+		// An unreadable registered PATH could hold a copy above the pin, which
+		// the self install would downgrade: refuse rather than read it as absent.
+		if t.Source.SelfInstalls(in.GOOS) && in.RegisteredPath != nil {
+			if _, err := in.RegisteredPath(); err != nil {
+				return "cannot read the registered PATH (" + err.Error() + "), where an installed " + t.Name + " may be; refusing a self install that could downgrade it"
+			}
 		}
 	}
 	return ""
@@ -500,6 +533,9 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 	// --refresh-package revalidates this package's index entry: a pin bumped
 	// minutes after its release otherwise fails with "no version of <pkg>==<v>"
 	// on a machine whose uv cache still holds the index from before it.
+	if t.Source.SelfInstalls(in.GOOS) {
+		return in.selfInstall(t, action)
+	}
 	args := []string{"tool", "install", "--force", "--refresh-package", pkg}
 	if py := in.pythonSeries(); py != "" {
 		args = append(args, "--python", py)
@@ -516,6 +552,37 @@ func (in *Installer) installUvTool(t Tool) (Result, error) {
 		res = Upgraded
 	}
 	_, _ = fmt.Fprintf(in.Out, "%s %s %s via uv (%s)\n", t.Name, t.Version, res, pkg)
+	return res, nil
+}
+
+// selfInstall runs the pinned package once from uv's cache, as
+// `<name> <args>`, and the tool installs itself (hive self-upgrade builds its
+// versions/<v>, repoints current and writes its launcher). Nothing of it stays
+// in uv's tool dir, which is the point on Windows (hive ADR-019). The caller
+// has decided the pin is above what is installed, so it never downgrades.
+func (in *Installer) selfInstall(t Tool, act action) (Result, error) {
+	pkg := t.Source.Package
+	selfArgs := make([]string, len(t.Source.SelfInstall.Args))
+	for i, a := range t.Source.SelfInstall.Args {
+		selfArgs[i] = t.expand(a, in.GOARCH)
+	}
+	args := []string{"tool", "run", "--refresh-package", pkg, "--from", pkg + "==" + t.Version}
+	if py := in.pythonSeries(); py != "" {
+		args = append(args, "--python", py)
+	}
+	args = append(append(args, t.Name), selfArgs...)
+	if err := in.Run("uv", args...); err != nil {
+		return Skipped, fmt.Errorf("%s: uv %s: %w", t.Name, strings.Join(args, " "), err)
+	}
+	self := t.Name + " " + strings.Join(selfArgs, " ")
+	if err := checkProbed(t, in.current(t), self+" exited 0, but "+t.Name+" runs from neither this process's PATH nor the registered PATH a new shell reads (the per-user PATH it writes its launcher to)"); err != nil {
+		return Skipped, err
+	}
+	res := Installed
+	if act == actionUpgrade {
+		res = Upgraded
+	}
+	_, _ = fmt.Fprintf(in.Out, "%s %s %s via %s (%s)\n", t.Name, t.Version, res, self, pkg)
 	return res, nil
 }
 

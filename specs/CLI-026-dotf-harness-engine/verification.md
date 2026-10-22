@@ -38,15 +38,39 @@ created: "2026-06-21"
 - Mutation check, slice 1: restoring the shell's "drop every `---`" in the prompt render fails `TestRenderSkillRecord`; restoring substring `targets:` matching fails `TestSkillTargetsAgent/inline_list_names_copilot,_not_pi_(#1733)`.
 - Manual oracle run, slice 1: 35 records, 240 files on each side with copilot and pi on PATH; `diff -r -x prompts` empty, file modes identical, rerun `0 deployed, 204 current, 0 pruned`.
 
+- Slice 5 rewire, converge: `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout` applies `records-harness` with `HarnessDeploy` on this checkout into an empty home; the probe then passes and a second plan reports 0 changes.
+- Mutation check, slice 5 rewire: making `HarnessDeploy` return nil without deploying fails that test.
+- `tests/harness-deploy-parity.bats` 3/3 after the composition moved into `harness.Deploy`: the verb's output did not change.
+
+- Slice 5 rewire, Linux setup: `setup-linux.sh` calls `dotf harness deploy --repo-root "$CURRENT_DIR"`; the script went from 722 to 716 lines.
+- `tests/setup-fails-loudly.bats` now finds the block by the `dotf harness deploy` line and still requires `exit 1` and no `log_warning` in it; the `compile-harness.bats` test that grepped for the script call is deleted with the call.
+- The bats files that reference `setup-linux.sh` or `compile-harness` (48 files): 666 of 667 tests pass. The one failure is `harness-doctrine-records.bats`'s real-vault refresh, which also fails on a clean `origin/main` (`a4e46b1e`) because the committed records lag their vault skills; ticketed as #2913.
+- The `integration` job is the behavioural check: its container builds dotf from the tree and runs setup-linux, then `verify-setup.bats` counts the deployed skills and commands.
+
+- Slice 5 rewire, Windows setup: `setup-windows.ps1` calls `& dotf harness deploy --repo-root $DotfilesDir` and stops on a non-zero exit; the script went from 1556 to 1277 lines.
+- Removed with it: `Deploy-SkillRecord` and its four helpers, the separate `dotf harness presence` call, and the hand copies of `CLAUDE.md`, opencode's and pi's `AGENTS.md` and `copilot-instructions.md`. Each of those files is an `agents.presence` entry the verb writes.
+- `tests/setup-fails-loudly.bats` gains the Windows row; `setup-windows.bats`, `antigravity.bats`, `copilot-config.bats` and `opencode.bats` assert the verb call and the absence of the removed code.
+- `tests/copilot-native-skills-smoke.ps1` deploys with `dotf harness skills --home <scratch>` instead of importing the PowerShell functions; its LF, BOM, filtering and discovery assertions are unchanged.
+- The bats files referencing either setup script or `compile-harness`: 725 of 726 tests pass; the one failure is the real-vault refresh (#2913). `dotf lint powershell` clean; both PowerShell files parse with 0 errors; both are ASCII.
+- `records-harness` runs on Windows; `TestConverge_AStepsOutputPrecedesItsResultLine` now expects it first on every OS. Windows behaviour is held by `test-windows` and `test (windows-latest)`; the live run on the work-lab box is the open task above.
+
 ## Decisions made during implementation
 
+- Slice 5 rewire, Windows setup: the hand copies of the instruction files went in the same change as the skill renderer. Left in place they would be a second writer of files the verb owns, and the verb deploys them anyway.
+- Slice 5 rewire, Windows setup: `CLAUDE.md` is excluded from the bulk copy of `ai\claude` for the same reason; the bulk copy keeps the plugin JSON files it carried.
+- Slice 5 rewire, Windows setup: Windows now gets agent records and doctrine, which it never had (#1387). The deploy fails setup loudly, where `Deploy-SkillRecord` returned quietly and presence only warned.
+- Slice 5 rewire, Linux setup: `dotf` is called by name. Setup exports `~/.local/bin` onto PATH before `install_dotf`, and a failed install already stops setup, so no fallback lookup is needed at this line.
+- Slice 3's shell delegation is not done: it would change `compile-harness.sh --deploy`, which no caller runs after this rewire.
+- Slice 5 rewire, converge: the composition moved from the `deploy` command into `harness.Deploy`, which returns every surface's outcomes; the command prints from them and converge calls it in process.
+- Slice 5 rewire, converge: in process rather than a `dotf harness deploy` child. Converge is the `dotf` binary, so a child would add a lookup of its own path and give nothing back: each surface's error already names the item that failed.
+- Slice 5 rewire, converge: `records-harness` stays linux and darwin until `setup-windows.ps1` stops deploying the same files, or Windows would deploy twice.
 - Slice 1: the copilot catalog moved to its own slice to keep slice 1 under the executable-line cap (about 293 lines).
 - Slice 1: a record whose frontmatter is not valid YAML is now an error for that record (reported after the rest deploy); the shell never parsed it. Every committed record parses (`TestSkillTargetsAgent_EveryCommittedRecordParses`).
 - Slice 1: an explicit empty or null `targets:` deploys to nobody, as the shell's substring match did.
 - Slice 4 (agents): the model and capability maps are read in process, so the shell's "dotf absent or too old" degrade (a render with no `model:` line and a warning) has no Go form: a tier that cannot be resolved is an error for that record. The shell's whitespace-in-model-id refusal is kept.
 - Slice 5: a failed agent record stops presence and doctrine, as the shell did (its `set -e` ended the run there); every other failure is collected and the run goes on. The exit code is 1 for any failure, where the shell used 2 for a failed instruction deploy; every caller treats non-zero alike. `--dry-run` previews every surface but presence, which has no preview mode, and says so.
 - Slice 6: the check validates and does not render: the Go skill and agent renders are total functions, so the shell's separate "fails to render" step has nothing left to catch. A drifted region names its first differing line instead of printing a unified diff; the oracle compares every unindented line. Paths in the report have no doubled `/` (the shell's `*/` glob left one). The `ci.yml` and doctor wiring waits for a release that carries the verb (#1814 class), like slice 5's rewire.
-- Slice 5: the rewire of `setup-linux.sh`, `setup-windows.ps1` and the `records-harness` converge step waits for a release that carries the verb (#1814 class).
+- Slice 5: the rewire of `setup-linux.sh`, `setup-windows.ps1` and the `records-harness` converge step waited for a release that carries the verb (#1814 class); 0.77.0 does.
 - Slice 4 (doctrine): the roster comes from `harness.RenderPresence` in process, so the shell's "dotf absent, payload carries no roster" degrade has no Go form. The warnings (shadowing file, non-ASCII left after the fold, breached cap in characters or bytes) are returned per file and printed on stderr, in the shell's words.
 - Slice 4 (agents): the persona roster stays with `dotf harness presence`; `deploy` composes the two (slice 5).
 - Slice 2: the catalog's record order differs from the oracle's. The shell's `*/` glob sorted `test-driven-development/` before `test/` even under `LC_ALL=C` (the `/` is in the sort key); Go uses byte order of the names, as declared. The oracle compares the bullets as a set (lesson 505), so the cutover rewrites the deployed catalog once, in a new order.

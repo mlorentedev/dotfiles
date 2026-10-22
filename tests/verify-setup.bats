@@ -396,7 +396,7 @@ setup() {
 }
 
 @test "opencode commands deployed to ~/.config/opencode/commands/ (SDD-008)" {
-    # Post-SDD-008: setup-linux.sh runs compile-harness.sh --deploy, which renders
+    # Post-SDD-008: setup-linux.sh runs `dotf harness deploy`, which renders
     # each committed vault skill record whose targets[] includes opencode to a
     # command .md. The container has no vault, so --refresh is skipped and --deploy
     # uses the committed records.

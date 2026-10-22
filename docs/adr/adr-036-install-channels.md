@@ -88,3 +88,25 @@ deletes their MCP loops.
 ## Amendment 2026-10-06 (ADR-044, #2013)
 
 Toolchains (Java, Go, Python, Maven, Node) and the pinned single-binary CLIs (age, zoxide, shellcheck, jq, bats, golangci-lint, sops, direnv, fzf, herdr, lazygit) move to **mise**, rendered from `versions.conf` by `dotf tools sync` and installed with `mise install --locked` against a committed `mise.lock` (ADR-044). The `github-release` source type keeps the two bootstrap binaries, mise and `dotf`. The npm, uv-tool and class-3 rows are unchanged; mise replaces Homebrew as a toolchain channel on macOS, and what Homebrew may still install there is #2013 D4, still proposed. A pin that moves to mise lives only in `versions.conf`, so decision 2 still holds with that file as the single place.
+
+## Amendment 2026-10-21 (AI-028 PR6, #791)
+
+The PyPI class gets its Windows half. The 2026-10-03 amendment declared hive `platforms: [linux, darwin]`, so the catalog installed nothing on Windows. The setup script then filled that gap with `uv tool install --upgrade hive-vault`, which is the copy hive ADR-019 rules out, and on Windows Arm64 the install failed in silence (AI-028 Baseline 2). This amendment supersedes that `platforms` line.
+
+A `uv-tool` source may now declare **`self_install`**: the OSes on which the package installs itself through its own installer instead of `uv tool`, and that installer's arguments.
+
+```json
+"source": {"type": "uv-tool", "package": "hive-vault",
+           "self_install": {"platforms": ["windows"], "args": ["self-upgrade", "{version}"]}}
+```
+
+On a listed OS, `dotf tools install` runs `uv tool run --refresh-package <package> --from <package>==<pin> [--python <series>] <name> <args>` (`uvx` is that command), with `{version}` expanded to the pin. Everywhere else it runs `uv tool install` as before. One entry and one class still cover hive on every OS. This is a field of the class and not a new source type: the class already says its channel differs by OS, and a type named after one tool would be the only one of its kind.
+
+Four rules are part of the contract:
+
+1. **The pin is a floor, and the probe enforces it.** hive's `self-upgrade <v>` repoints `current` at `<v>` even when a newer version is current. The catalog never runs it when `<name> --version` already reports the pin or higher. That probe is what keeps decision 2's pin-as-floor; the installer alone would downgrade.
+2. **The arguments must carry `{version}`.** A self-installer without a version resolves the newest release itself, which is the unattended upgrade hive ADR-020 forbids. `Load` rejects `args` without it. Installing a version the owner pinned and committed is an install, not an upgrade on the user's behalf.
+3. **The tool is probed where the installer puts it, before the install and after.** A self-installer adds its launcher to the per-user persistent PATH (`HKCU\Environment`), which a process started earlier does not see. The probe resolves `<name>` on the process PATH, then on the registered PATH a new process gets (`env.RegisteredPath`, which converge's tools step already reads). Before the install this is what rule 1 stands on: an installed hive that reads as absent would be `self-upgrade`d down to the pin. After it, a fresh install is not reported as failed, and a launcher that never landed is not reported as installed. A registered PATH that cannot be read is a refusal, never an absent tool.
+4. **uv is still the manager.** `uvx` comes with uv, so an entry without uv on PATH waits for it, as every `uv-tool` entry does (`PlanMissingManager`).
+
+`platforms` keeps its meaning: an entry with `self_install` and no `platforms` installs on every OS. hive's Windows install stops coming from `mcp-servers.json`'s `prerequisite_command`, and with hive's line removed no entry uses that field. The field's reader in the Windows setup loop is dead code from here, and goes with that loop under CLI-096 (#2000).
