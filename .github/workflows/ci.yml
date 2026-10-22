@@ -165,11 +165,6 @@ jobs:
         run: |
           shellcheck --severity=error setup-linux.sh
 
-      - name: Verify skill records render cleanly, offline (SDD-008)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        run: |
-          ./scripts/compile-harness.sh --check
-
       - name: Lint bats @test names (no silent-skipped tests)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
@@ -333,6 +328,13 @@ jobs:
         run: |
           go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf
           echo "DOTF_BIN=$RUNNER_TEMP/dotf" >> "$GITHUB_ENV"
+
+      # The offline harness drift gate (SDD-008), from this PR's dotf on every OS
+      # (CLI-026). It replaced `compile-harness.sh --check` in the lint job.
+      - name: Verify harness regions and records, offline (dotf harness check)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        run: |
+          "$DOTF_BIN" harness check --repo-root "$GITHUB_WORKSPACE"
 
       - name: Install pre-commit
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -549,6 +551,10 @@ jobs:
           go build -o "$RUNNER_TEMP/dotf" ./cmd/dotf
           echo "DOTF_BIN=$RUNNER_TEMP/dotf" >> "$GITHUB_ENV"
 
+      - name: Verify harness regions and records, offline (dotf harness check)
+        run: |
+          "$DOTF_BIN" harness check --repo-root "$GITHUB_WORKSPACE"
+
       # A pull request runs only the os-sensitive tier here, so a file that bash
       # 3.2 cannot even parse reached main green and broke the full suite there
       # (a `case` pattern's `)` inside $(...), #2433). Parsing every file costs
@@ -660,6 +666,13 @@ jobs:
           $userPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
           if ($userPath -notlike "*$bin*") { [Environment]::SetEnvironmentVariable('PATH', "$userPath;$bin", 'User') }
           & "$bin\dotf.exe" version
+
+      - name: Verify harness regions and records, offline (dotf harness check)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        shell: pwsh
+        run: |
+          dotf harness check --repo-root $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # CI-010 (#2047): the pinned pi CLI is restored on a pull request instead
       # of reinstalled from npm, which was ~130 s of every PR's run (p50 508 s,
