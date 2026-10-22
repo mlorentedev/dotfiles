@@ -12,6 +12,10 @@ name: Bitácora status — In Progress on assign
 # So the move happens only from "Backlog" or from no status. A run that sits in
 # the queue can finish after a deliberate "Blocked" set right after the
 # assignment, and an unconditional write erased that park silently (#2878).
+# The read and the write are still two calls: the Projects API has no
+# conditional mutation, so a status set in the milliseconds between them is
+# overwritten. That residual window is accepted; the queue delay it replaces
+# was minutes long.
 #
 # Uses actions/github-script for the Projects v2 GraphQL (the `gh project` CLI
 # fails with "unknown owner type" under a fine-grained PAT).
