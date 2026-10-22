@@ -38,15 +38,22 @@ created: "2026-06-21"
 - Mutation check, slice 1: restoring the shell's "drop every `---`" in the prompt render fails `TestRenderSkillRecord`; restoring substring `targets:` matching fails `TestSkillTargetsAgent/inline_list_names_copilot,_not_pi_(#1733)`.
 - Manual oracle run, slice 1: 35 records, 240 files on each side with copilot and pi on PATH; `diff -r -x prompts` empty, file modes identical, rerun `0 deployed, 204 current, 0 pruned`.
 
+- Slice 5 rewire, converge: `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout` applies `records-harness` with `HarnessDeploy` on this checkout into an empty home; the probe then passes and a second plan reports 0 changes.
+- Mutation check, slice 5 rewire: making `HarnessDeploy` return nil without deploying fails that test.
+- `tests/harness-deploy-parity.bats` 3/3 after the composition moved into `harness.Deploy`: the verb's output did not change.
+
 ## Decisions made during implementation
 
+- Slice 5 rewire, converge: the composition moved from the `deploy` command into `harness.Deploy`, which returns every surface's outcomes; the command prints from them and converge calls it in process.
+- Slice 5 rewire, converge: in process rather than a `dotf harness deploy` child. Converge is the `dotf` binary, so a child would add a lookup of its own path and give nothing back: each surface's error already names the item that failed.
+- Slice 5 rewire, converge: `records-harness` stays linux and darwin until `setup-windows.ps1` stops deploying the same files, or Windows would deploy twice.
 - Slice 1: the copilot catalog moved to its own slice to keep slice 1 under the executable-line cap (about 293 lines).
 - Slice 1: a record whose frontmatter is not valid YAML is now an error for that record (reported after the rest deploy); the shell never parsed it. Every committed record parses (`TestSkillTargetsAgent_EveryCommittedRecordParses`).
 - Slice 1: an explicit empty or null `targets:` deploys to nobody, as the shell's substring match did.
 - Slice 4 (agents): the model and capability maps are read in process, so the shell's "dotf absent or too old" degrade (a render with no `model:` line and a warning) has no Go form: a tier that cannot be resolved is an error for that record. The shell's whitespace-in-model-id refusal is kept.
 - Slice 5: a failed agent record stops presence and doctrine, as the shell did (its `set -e` ended the run there); every other failure is collected and the run goes on. The exit code is 1 for any failure, where the shell used 2 for a failed instruction deploy; every caller treats non-zero alike. `--dry-run` previews every surface but presence, which has no preview mode, and says so.
 - Slice 6: the check validates and does not render: the Go skill and agent renders are total functions, so the shell's separate "fails to render" step has nothing left to catch. A drifted region names its first differing line instead of printing a unified diff; the oracle compares every unindented line. Paths in the report have no doubled `/` (the shell's `*/` glob left one). The `ci.yml` and doctor wiring waits for a release that carries the verb (#1814 class), like slice 5's rewire.
-- Slice 5: the rewire of `setup-linux.sh`, `setup-windows.ps1` and the `records-harness` converge step waits for a release that carries the verb (#1814 class).
+- Slice 5: the rewire of `setup-linux.sh`, `setup-windows.ps1` and the `records-harness` converge step waited for a release that carries the verb (#1814 class); 0.77.0 does.
 - Slice 4 (doctrine): the roster comes from `harness.RenderPresence` in process, so the shell's "dotf absent, payload carries no roster" degrade has no Go form. The warnings (shadowing file, non-ASCII left after the fold, breached cap in characters or bytes) are returned per file and printed on stderr, in the shell's words.
 - Slice 4 (agents): the persona roster stays with `dotf harness presence`; `deploy` composes the two (slice 5).
 - Slice 2: the catalog's record order differs from the oracle's. The shell's `*/` glob sorted `test-driven-development/` before `test/` even under `LC_ALL=C` (the `/` is in the sort key); Go uses byte order of the names, as declared. The oracle compares the bullets as a set (lesson 505), so the cutover rewrites the deployed catalog once, in a new order.
