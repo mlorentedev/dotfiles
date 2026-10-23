@@ -75,6 +75,35 @@
         "allow_fork_syncing": false
       }
     },
+    "mlorentedev/ci-workflows": {
+      "branch": "main",
+      "protection": {
+        "required_status_checks": {
+          "strict": true,
+          "checks": [
+            {
+              "context": "lint",
+              "app_id": 15368
+            }
+          ]
+        },
+        "required_pull_request_reviews": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews": false,
+          "require_code_owner_reviews": false,
+          "require_last_push_approval": false
+        },
+        "enforce_admins": true,
+        "required_signatures": false,
+        "required_linear_history": false,
+        "allow_force_pushes": false,
+        "allow_deletions": false,
+        "block_creations": false,
+        "required_conversation_resolution": false,
+        "lock_branch": false,
+        "allow_fork_syncing": false
+      }
+    },
     "mlorentedev/hive": {
       "branch": "master",
       "protection": {
