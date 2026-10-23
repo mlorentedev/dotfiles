@@ -37,7 +37,7 @@
   {
     "id": "GUARD-017-protection-as-code-f6",
     "behavior": "spec-gate is required on dotfiles main and apply --dry-run reports changed=0",
-    "verification": "gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts | index(\"spec-gate\") != null' | grep -qx true && dotf forge protection apply --repo mlorentedev/dotfiles --dry-run | grep -q 'changed=0'",
+    "verification": "gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts | index(\"spec-gate\") != null' | grep -qx true && out=$(dotf forge protection apply --repo mlorentedev/dotfiles --dry-run) && printf '%s\\n' \"$out\" | grep -q 'changed=0'",
     "state": "pending",
     "evidence": ""
   }

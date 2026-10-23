@@ -82,6 +82,7 @@ On 2026-10-15 the owner ran `apply` and `check` from a main checkout that predat
 
 - Promotion candidates held placeholders: applied, answered below.
 - `proposal.md` showed AC5 and AC6 unticked: applied, both ticked (checkbox state is outside the contract digest).
+- PR-Agent on #2959: f6 piped `dotf` into `grep`, so a non-zero `dotf` exit with `changed=0` in its output still passed. Applied after the review: the output is captured first, so `dotf`'s exit status gates the check. The criterion f6 verifies is unchanged; only its command was tightened.
 - f6 needs network and `gh` auth: declined. AC6 is defined as a live check against the forge, so an offline command could not prove it; f6 is run by hand, as the other live evidence in this file was.
 
 ## Promotion candidates
@@ -108,4 +109,4 @@ Run from `chore/guard-017-ac6-close`, base `origin/main` `d9700c74`.
 - [x] `dotf forge protection check`: `12 repositories: 9 ok, 0 drift, 3 declared state, 0 unanswerable`, exit 0, `[OK] mlorentedev/dotfiles`. The drift that PR-B left on purpose is gone.
 - [x] `features.json` gains f5 (AC4, `TestProtectionSchema*`) and f6 (AC6, the live check above). Each of f1-f6's verification commands exits 0.
 - `go build ./... && go vet ./... && GOOS=windows go vet ./...`: clean. `go test ./internal/forge/... ./internal/cmd/... ./internal/doctor/... -count=1`: ok. `golangci-lint run` at the pinned 2.12.2 on those packages: `0 issues.`
-- The declaration names 12 repositories, not the 14 of PR-B: two entries have been removed since. Both were declared-state entries: PR-B skipped 5 and this run skips 3, while the protected repositories are 9 in both.
+- The declaration names 12 repositories, not the 14 of PR-B: #2200 (`7b067099`) removed `fae-brain` and `openkm-brain` when they moved to Gitea. Both were `unavailable` state entries, so no protected repository left the declaration: PR-B skipped 5 and this run skips 3, while the protected repositories are 9 in both.
