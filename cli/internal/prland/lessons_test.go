@@ -23,7 +23,12 @@ func TestDecide_RefusesALessonNumberTheBaseAlreadyHolds(t *testing.T) {
 		"the refusal names the command that frees it (#2939)": {
 			files: []string{"docs/lessons/lesson-497-b.md"},
 			base:  map[int]string{497: "docs/lessons/lesson-497-a.md"},
-			want:  "merge main into the branch, run `dotf lessons renumber docs/lessons/lesson-497-b.md --next`",
+			want:  "merge main into the branch, run `dotf lessons renumber 'docs/lessons/lesson-497-b.md' --next`",
+		},
+		"a path from the PR is quoted in the command it suggests": {
+			files: []string{"docs/lessons/lesson-497-x;touch${IFS}pwned'.md"},
+			base:  map[int]string{497: "docs/lessons/lesson-497-a.md"},
+			want:  `dotf lessons renumber 'docs/lessons/lesson-497-x;touch${IFS}pwned'\''.md' --next`,
 		},
 		"a category directory shares the numbering": {
 			files: []string{"docs/lessons/ci/lesson-12-x.md"},
