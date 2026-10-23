@@ -141,6 +141,14 @@ print(next(e['model'] for e in d['pool'] if e['role'] == 'primary'))
     grep -qE '^max_model_tokens = [0-9]+' "$CFG"
 }
 
+@test "pr-agent: the PR body reaches the reviewer whole (#2954)" {
+    # Upstream clips the description to 500 tokens, which cuts the template's
+    # last sections; the reviewer then reports them as missing.
+    run grep -E '^max_description_tokens = [0-9]+' "$CFG"
+    [ "$status" -eq 0 ]
+    [ "${output##* }" -ge 2000 ]
+}
+
 @test "pr-agent: response language is English per English-only durable record policy" {
     grep -q 'response_language = "en-US"' "$CFG"
 }

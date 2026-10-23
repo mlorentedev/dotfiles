@@ -109,6 +109,13 @@ model_weak = "openai/qwen3.6"
 custom_model_max_tokens = 200000
 max_model_tokens = 200000
 
+# The PR body is clipped to this before it enters the prompt; upstream's 500
+# (v0.48.0) cut a 3,225-character body, and this repo's template puts the
+# SDD skip rationale and the Knowledge section last, so the reviewer flagged
+# them as missing (#2954). 3000 holds the longest body measured with room left,
+# and is small against max_model_tokens.
+max_description_tokens = 3000
+
 # The reviewer answers in English to ensure all durable PR review records and
 # review comments remain strictly in English per global harness doctrine.
 # Release PRs are not reviewed, and this pairs with an exemption in
