@@ -65,3 +65,9 @@ Covered. `caffeinate -i -t 43200` was held from 07:40Z.
 ## Next action
 
 Glance at the two skip-sdd calls (#2920, #2937), then take #2954's one-line `.pr_agent.toml` change.
+
+## After the report (owner, 2026-10-22)
+
+- The two skip-sdd calls were confirmed, with a correction: both crossed the Discipline Gate's public-contract trigger (AGENTS.md:152: #2937 adds JSON fields, #2920 changes a gate's severity), not only the line count. The run should have parked them and asked about a spec with `--over-wip-limit`. That rule is now a standing feedback memory (`feedback-skip-sdd-is-not-a-line-count`).
+- #2954: the cause is confirmed upstream (pr-agent v0.48.0 `get_pr_description` clips the body to `max_description_tokens`, 500 by default). The fix is #2961, and the owner merges it.
+- #2953: #2962.
