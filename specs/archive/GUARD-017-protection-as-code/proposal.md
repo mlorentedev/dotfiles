@@ -1,7 +1,7 @@
 ---
 id: "GUARD-017-protection-as-code"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-09-23"
 issue: "mlorentedev/dotfiles#1451"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, forge, branch-protection, iac, doctor]
@@ -138,11 +138,11 @@ repository is reviewed on its own.
   override.
 - [x] **AC4 (PR-A).** Schema validation rejects a repo that declares neither a
   protection object nor a state, and a state that has no reason.
-- [ ] **AC5 (PR-B).** A test against a fake forge shows `apply` sends a
+- [x] **AC5 (PR-B).** A test against a fake forge shows `apply` sends a
   complete PUT body (no declared field missing), re-reads, and reports
   `changed=0` on the second run. The preflight refuses a never-reported
   context.
-- [ ] **AC6 (PR-B, live, owner-run).**
+- [x] **AC6 (PR-B, live, owner-run).**
   `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'`
   includes `spec-gate`. Then `dotf forge protection apply --dry-run` reports
   `changed=0`.
@@ -155,3 +155,5 @@ repository is reviewed on its own.
   §5.2 AC-1.5, D-1, D-6, D-7, R-1, R-2.
 - Measurement, 2026-09-23: 24 active repos, 13 with a `specs/` tree, 9
   protected; see the #1627 comment.
+
+<!-- archived 2026-10-22 — PR: https://github.com/mlorentedev/dotfiles/pull/2959 -->
