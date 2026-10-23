@@ -219,6 +219,20 @@ func (q *QGA) open(path, mode string) (int, error) {
 	return h, err
 }
 
+// SetTime sets the guest's clock to t.
+func (q *QGA) SetTime(t time.Time) error {
+	return q.call("guest-set-time", map[string]int64{"time": t.UnixNano()}, nil)
+}
+
+// Time returns the guest's clock.
+func (q *QGA) Time() (time.Time, error) {
+	var ns int64
+	if err := q.call("guest-get-time", nil, &ns); err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(0, ns), nil
+}
+
 // Shutdown asks the guest to power off. The agent sends no reply, because
 // the guest goes away; the caller waits for QEMU to exit instead.
 func (q *QGA) Shutdown() error {
