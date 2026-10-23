@@ -42,7 +42,8 @@ func lessonReasons(f Facts) []string {
 		}
 		n, _ := lessonNumber(file)
 		if held, taken := f.BaseLessons[n]; taken && held != file && !slices.Contains(f.Freed, held) {
-			r = append(r, fmt.Sprintf("lesson %d is already %s on %s: renumber %s to the next free number", n, held, f.BaseRef, file))
+			r = append(r, fmt.Sprintf("lesson %d is already %s on %s: merge %s into the branch, run `dotf lessons renumber %s --next` from the repository root, push, and land again",
+				n, held, f.BaseRef, f.BaseRef, file))
 		}
 	}
 	return r
