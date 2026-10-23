@@ -41,6 +41,12 @@ A1 is about 600 executable lines, so it ships as three PRs, each based on the pr
 ### A2 to A4. D: `preflight`, `guard`, `gate` (one PR each)
 
 - [x] [P] [AC2] `dotf pr preflight`: port the `pr-agent-model-preflight.bats` cases to Go (FAIL), implement (PASS), keep the output names
+  - The route's probe and the NaN probe share one request path, `post` in
+    `probe.go`, which refuses every redirect so neither key can follow one to
+    another host. A differential test holds `Preflight` to the script, as A1b
+    does for `Route`.
+  - Exit 0 when a model answered, 1 when none did, 2 on a setup error,
+    including an unwritable `--output`; a setup error writes no job summary.
 - [ ] [P] [AC2] `dotf pr guard`: port the `pr-agent-publish-guard.bats` cases (FAIL), implement (PASS)
 - [ ] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract read (FAIL), implement (PASS)
 
@@ -56,7 +62,7 @@ A1 is about 600 executable lines, so it ships as three PRs, each based on the pr
 - [ ] [AC3] Make one live run on a PR that changes a weight and link it in `verification.md`
 - [ ] Release: the owner merges the release-please PR, which ships `dotf pr …` in a tagged version
 
-### B. C: the thin reusable workflow (blocked on R5's repo)
+### B. C: the thin reusable workflow (R5's repo exists: `mlorentedev/ci-workflows`, empty)
 
 - [ ] [AC4] Bats tests first:
   - `on: workflow_call` only, with the declared secrets and no `inherit`;
