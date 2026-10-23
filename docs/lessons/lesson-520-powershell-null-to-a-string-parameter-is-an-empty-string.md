@@ -1,5 +1,5 @@
 ---
-id: "lesson-519-powershell-null-to-a-string-parameter-is-an-empty-string"
+id: "lesson-520-powershell-null-to-a-string-parameter-is-an-empty-string"
 type: lesson
 status: active
 title: "PowerShell's $null passed to a string parameter is an empty string"
