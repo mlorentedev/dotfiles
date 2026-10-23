@@ -36,6 +36,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Landing and restoring compare each target's git blob id (`git hash-object`), not its raw bytes. On the Windows runner (autocrlf) a file git called clean was LF on disk while every git write rendered it CRLF, so a mode-only probe failed to revert by byte comparison although its content never changed (lesson 512, second instance). Targets are restored by checking them out from HEAD, which the clean-tree check makes exactly how they were found. A first fix that only changed the restore, on the hypothesis that `git apply -R` was at fault, failed the same way on the same runner.
 - `WaitDelay` bounds `Wait` after a timeout kill, because a child holding the output pipe outlives the kill.
 - The command applies nothing and decides nothing: a human pastes its row into `## Review triage`. Gating `apply` on it is AC4, the next slice.
+- 2026-10-22, AC4 and AC6 (owner: the gate refuses, option A over report-only). The check reads the existing human-written `## Review triage` table rather than a new format: a finding's row is the first naming its `path:line` (bounded, so `a.go:4` is not `a.go:40`; the base name will do), and its disposition the first later cell opening with apply, defer, refuted or skip, so a disposition word in the item cell is not read. `apply` needs `Reproduction: reproduced`, `refuted` needs `Reproduction: did-not-reproduce`, `skip` of a REAL finding is refused, `defer` passes. Only the newest triage record with standing (#2870) counts, and only for findings it could have seen.
+- The gate lives in the queue, not in `land`: a held PR is pending, so `land` refuses it through the condition it already checks, and `triage-queue` names the finding and what its row lacks. A triaged PR now costs one inline read when the registry declares a classifying reviewer; the read is shared with the AC3 report.
 - 2026-10-22, #2926: a check is inverted by the harness (`--defect-when-passes`), never by the shell. `sh -c '! check'` maps 127 to 0, so a check that never ran refuted the finding it was meant to test (lesson 518). The inversion is applied after the could-not-run cases are classified, so those stay `could-not-run` in both directions.
 - The row names the direction (`defect when the check passes`), because the same exit code now means opposite things on two rows and a reader cannot tell them apart otherwise.
 - The row quotes its command and escapes `|`. Dogfooding the gate on #2924 produced two rows whose quoted pattern lost its quotes, so the recorded command was not the one that ran; a pipe inside the row also splits the triage table's cell. The gate still reads such a row, since the disposition is the first cell after the naming one.
@@ -45,9 +47,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons.md`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons.md`? yes, written: lesson 512 (a landing check reads paths and content in the frame the patch wrote them), from AC5
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the decisions are the owner's rulings on #1062 (option A, the gate refuses, PR-level guard), recorded in this log and on the issue; none outlives the spec as an architectural choice
+- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. candidate, not yet: "a reviewer's class is a hypothesis; reproduce before apply" would apply to kubelab's PR-Agent too, but it has run in one repo only; decide at archive
 
 ## Archive checklist
 

@@ -712,3 +712,68 @@ func TestParseRegistryReadsTheClassifyingReviewers(t *testing.T) {
 		t.Fatalf("Classification.Reviewers = %v, want [github-actions]", r.Classification.Reviewers)
 	}
 }
+
+// triagedPR10 is reviewedPR10 after a triage record with standing whose one
+// row is row.
+func triagedPR10(row string) map[string]string {
+	return map[string]string{
+		"/pulls": reviewedPR10["/pulls"],
+		"/issues/10/comments": `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nfindings here","created_at":"2026-09-02T10:00:00Z"},
+		  {"user":{"login":"mlorentedev"},"author_association":"OWNER","created_at":"2026-09-02T11:00:00Z",
+		   "body":"## Review triage\n\n| Item | Disposition | Reason |\n|---|---|---|\n` + row + `"}]`,
+		"/pulls/10/comments": `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":4,"created_at":"2026-09-02T10:00:01Z"}]`,
+	}
+}
+
+// AC4 as the owner ruled it (#1062): a triaged PR whose REAL finding was
+// applied without a reproduction is pending again, so land refuses it.
+func TestFetchHoldsATriagedPRWithAnUnreproducedRealFinding(t *testing.T) {
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: triagedPR10("| `cli/a.go:4` | apply | fixed |")}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 || len(got[0].Unreproduced) != 1 || !strings.Contains(got[0].Reason, "reproduc") {
+		t.Fatalf("got %+v, want PR #10 pending on one unreproduced REAL finding", got)
+	}
+}
+
+func TestFetchClearsATriagedPRWhoseRealFindingWasReproduced(t *testing.T) {
+	row := "| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |"
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: triagedPR10(row)}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("got %+v, want an empty queue", got)
+	}
+}
+
+// A gate that cannot read what it gates on fails closed: the PR stays listed.
+func TestFetchHoldsATriagedPRWhoseFindingsCannotBeRead(t *testing.T) {
+	fake := &fakeGH{responses: triagedPR10("| `cli/a.go:4` | apply | fixed |"), errs: map[string]error{"/pulls/10/comments": errors.New("boom")}}
+	got, err := fetchWith(context.Background(), fake.run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 || !got[0].FindingsUnread {
+		t.Fatalf("got %+v, want PR #10 listed with FindingsUnread", got)
+	}
+}
+
+// Without a classifying reviewer there is no REAL finding to gate, and a
+// triaged PR costs no extra request.
+func TestFetchReadsNoInlineFindingsOfATriagedPRWithoutADeclaration(t *testing.T) {
+	fake := &fakeGH{responses: triagedPR10("| `cli/a.go:4` | apply | fixed |")}
+	got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("got %+v, want an empty queue", got)
+	}
+	for _, req := range fake.seen() {
+		if strings.Contains(req, "/pulls/10/comments") {
+			t.Fatalf("read inline comments with no classifying reviewer declared: %q", req)
+		}
+	}
+}

@@ -123,3 +123,25 @@ func TestPrTriageQueue_SaysWhenClassesAreNotChecked(t *testing.T) {
 		t.Errorf("stdout = %q, want the not-checked note", stdout)
 	}
 }
+
+// A PR held for an unreproduced REAL finding names the finding and what its
+// row lacks, and how to produce the missing row: the output is the only
+// place a reader learns why a triaged PR is still listed.
+func TestPrTriageQueue_NamesUnreproducedFindings(t *testing.T) {
+	st := prtriage.Status{PR: prtriage.PR{Number: 42, Title: "mine"}, Pending: true,
+		Reason: "triaged, but 1 REAL finding(s) lack the reproduction their disposition needs",
+		Unreproduced: []prtriage.Unreproduced{{
+			Finding: prtriage.Comment{Path: "cli/a.go", Line: 4},
+			Problem: "applied without a `Reproduction: reproduced` row from `dotf pr reproduce`",
+		}}}
+	stubTriageFetch(t, func(int) ([]prtriage.Status, error) { return []prtriage.Status{st}, nil })
+	stdout, _, err := execute(t, "pr", "triage-queue", "--repo", "o/r", "--registry", validRegistry(t), "--pr", "42")
+	if !errors.Is(err, errPending) {
+		t.Errorf("err = %v, want errPending", err)
+	}
+	for _, want := range []string{"cli/a.go:4", "applied without", "dotf pr reproduce"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout = %q, want it to contain %q", stdout, want)
+		}
+	}
+}
