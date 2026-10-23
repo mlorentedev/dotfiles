@@ -60,7 +60,7 @@ Run on 2026-09-25 in `dotfiles-wt-protection-apply` (branch `feat/protection-app
 - [x] **Mutation battery**: 9 mutants, one per run, each killed by a test failure: `restrictions` made omitempty, the re-read check disabled, `--dry-run` ignored, the preflight disabled, the source app ignored, unmerged pull requests counted, the 5-PR window unbounded, the signatures call dropped, an unprotected branch not counted as a change.
 - [x] **Live, read-only**, before the declaration changed: `dotf forge protection apply --dry-run` over all 14 declared repositories reported `changed=0 (0 applied, 0 planned), 9 unchanged, 5 skipped, 0 refused, 0 failed`, exit 0. The declaration and the forge agree on every field of every protected repository.
 - [x] **Live, read-only**, after declaring `spec-gate` on `mlorentedev/dotfiles`: the same command plans exactly one field, `required_status_checks.checks`, adding `spec-gate@15368`, and the preflight passes, because `spec-gate` reported on the recent merged pull requests. Exit 0; nothing was written.
-- [ ] **AC6**, owner-run after merge: `dotf forge protection apply --repo mlorentedev/dotfiles`, then `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'` includes `spec-gate`, and a second `apply --dry-run` reports `changed=0`. Until then, `dotf forge protection check` and `dotf doctor` report that one field as drift, which is the declaration being ahead of the forge on purpose.
+- [x] **AC6**, owner-run after merge (done; measured below): `dotf forge protection apply --repo mlorentedev/dotfiles`, then `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'` includes `spec-gate`, and a second `apply --dry-run` reports `changed=0`. Until then, `dotf forge protection check` and `dotf doctor` report that one field as drift, which is the declaration being ahead of the forge on purpose.
 
 ## Test status: PR-B
 
@@ -92,3 +92,14 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 - [ ] Folder moved: `specs/GUARD-017-protection-as-code/` -> `specs/archive/GUARD-017-protection-as-code/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+## Evidence: AC6 and closing (2026-10-22)
+
+Run from `chore/guard-017-ac6-close`, base `origin/main` `d9700c74`.
+
+- [x] **AC6**, live: `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'` returns `lint`, `lint-powershell`, `test`, `test-windows`, `review-attestation`, `cli-gate`, `spec-gate`, `changes`, `knowledge-gate` and `from-zero-gate`; `spec-gate` is at index 6.
+- [x] `dotf forge protection apply --dry-run` over the whole declaration: `12 repositories: changed=0 (0 applied, 0 planned), 9 unchanged, 3 skipped, 0 refused, 0 failed`, exit 0.
+- [x] `dotf forge protection check`: `12 repositories: 9 ok, 0 drift, 3 declared state, 0 unanswerable`, exit 0, `[OK] mlorentedev/dotfiles`. The drift that PR-B left on purpose is gone.
+- [x] `features.json` gains f5 (AC4, `TestProtectionSchema*`) and f6 (AC6, the live check above). Each of f1-f6's verification commands exits 0.
+- `go build ./... && go vet ./... && GOOS=windows go vet ./...`: clean. `go test ./internal/forge/... ./internal/cmd/... ./internal/doctor/... -count=1`: ok. `golangci-lint run` at the pinned 2.12.2 on those packages: `0 issues.`
+- The declaration names 12 repositories, not the 14 of PR-B: two entries have been removed since. Both were declared-state entries: PR-B skipped 5 and this run skips 3, while the protected repositories are 9 in both.

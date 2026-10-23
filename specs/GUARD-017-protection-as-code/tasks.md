@@ -32,18 +32,18 @@ created: "2026-09-23"
 
 - [x] [AC5] Failing tests against a fake forge: complete PUT body, re-read assert, `changed=0` on the second run → `TestProtectionApply*`
 - [x] [AC5] Reported-context preflight → `TestProtectionApplyRefusesUnreportedContext`
-- [ ] [AC6] Declare `spec-gate` on dotfiles `main`; the owner runs `apply`
+- [x] [AC6] Declare `spec-gate` on dotfiles `main`; the owner runs `apply` → live on `main`, `apply --dry-run` reports `changed=0` (2026-10-22, `features.json` f6)
 - [x] [AC1] [AC5] `check` and `apply` refuse a declaration that differs from origin's default branch, `--unmerged` to override → `TestCheckFresh`, `TestForgeProtectionRefusesAStaleDeclaration` (2026-10-15, lesson 442)
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test (AC1-AC5 by unit tests, AC6 by the live check f6)
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command (f1-f6)
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 

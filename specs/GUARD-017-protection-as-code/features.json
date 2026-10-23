@@ -26,5 +26,19 @@
     "verification": "cd cli && out=$(go test ./internal/forge/... -run 'TestProtectionApply' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "GUARD-017-protection-as-code-f5",
+    "behavior": "the declaration schema rejects an incomplete repo entry and accepts both declared shapes",
+    "verification": "cd cli && out=$(go test ./internal/forge/... -run 'TestProtectionSchema' -count=1 -v 2>&1); rc=$?; n=$(printf '%s\\n' \"$out\" | grep -c '^=== RUN'); [ \"$rc\" -eq 0 ] && [ \"$n\" -ge 1 ]",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "GUARD-017-protection-as-code-f6",
+    "behavior": "spec-gate is required on dotfiles main and apply --dry-run reports changed=0",
+    "verification": "gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts | index(\"spec-gate\") != null' | grep -qx true && dotf forge protection apply --repo mlorentedev/dotfiles --dry-run | grep -q 'changed=0'",
+    "state": "pending",
+    "evidence": ""
   }
 ]
