@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
@@ -15,13 +14,9 @@ import (
 // harnesses that tier covers. They can drift apart in the repository, and until
 // this check existed nothing noticed until someone ran a deploy on a machine.
 //
-// Why this is a doctor check and not part of `compile-harness.sh --check`: that
-// mode is the offline drift gate and it runs in the CI `lint` job, which installs
-// no Go and has no `dotf`. Resolving tiers there would report drift on a
-// perfectly good record purely because the machine lacks the resolver —
-// conflating a property of the deploy ENVIRONMENT with a property of the
-// committed RECORD. `dotf doctor` has neither problem: it already loads this
-// registry, and it runs where `dotf` exists by definition.
+// Why this is a doctor check and not part of `dotf harness check`: that is the
+// offline drift gate over the records' shape, and a tier is a question about the
+// model map a deploy resolves against. `dotf doctor` already loads that map.
 //
 // Scoped to the harnesses `agents.deploy` actually renders to. A tier gap for a
 // harness nothing deploys to is a real question (see #1170 for copilot's) but it
@@ -82,20 +77,29 @@ func agentDeployTargets(cfg *Config, rep *Report) (recordDir string, deploy []st
 }
 
 // checkRecordTier resolves one record's tier for every harness it targets, and
-// returns how many pairs it checked and how many failed.
+// returns how many pairs it checked and how many failed. It reads the record
+// with the render's own predicates (harness.SkillTargetsAgent,
+// harness.RecordModelTier), because this check exists to predict what the next
+// deploy does: a rule merely more reasonable than the render's would be wrong.
 func checkRecordTier(cfg *Config, parsed map[string]any, rep *Report, record string, deploy []string) (checked, failed int) {
-	fm, err := readAgentFrontmatter(filepath.Join(cfg.DotfilesDir, record))
+	raw, err := os.ReadFile(filepath.Join(cfg.DotfilesDir, record)) // #nosec G304 -- path is built from the manifest's own record_dir
 	if err != nil {
 		return 0, 0
 	}
-	tier := fm["model"]
+	tier := harness.RecordModelTier(raw)
 	if tier == "" {
 		// Declaring no tier is not an error; the render emits no model line.
 		return 0, 0
 	}
-	targets, declared := fm["targets"]
 	for _, agent := range deploy {
-		if !recordTargets(targets, declared, agent) {
+		targeted, err := harness.SkillTargetsAgent(raw, agent)
+		if err != nil {
+			// The render refuses the record on every harness for the same
+			// reason, so it is reported once.
+			rep.Fail(fmt.Sprintf("agent record %s cannot be read for its targets (%v) — the render will fail on the next deploy", record, err))
+			return checked, failed + 1
+		}
+		if !targeted {
 			continue
 		}
 		checked++
@@ -108,81 +112,4 @@ func checkRecordTier(cfg *Config, parsed map[string]any, rep *Report, record str
 		}
 	}
 	return checked, failed
-}
-
-// readAgentFrontmatter reads the single-line frontmatter values an agent record
-// declares. Deliberately minimal: it answers only what this check asks, and the
-// authoritative parse lives in the render pipeline.
-//
-// It reads them the way the render's `skill_field` (scripts/compile-harness.sh)
-// does, byte for byte, because this check predicts the render (GUARD-020,
-// #1740): a fence is `---` at column 0, optionally followed by whitespace; a
-// key matches only at column 0 and directly before its colon; a value loses
-// the whitespace after the colon and keeps everything else, a CR included. So
-// a CRLF record reports `top\r`, the tier the render fails to resolve, rather
-// than `top`. TestRecordModelAgreesWithTheRender runs the awk beside this.
-//
-// Values are returned raw, including any YAML flow-sequence brackets, because
-// the caller decides what a given key's shape means.
-func readAgentFrontmatter(path string) (map[string]string, error) {
-	data, err := os.ReadFile(path) // #nosec G304 -- path is built from the manifest's own record_dir
-	if err != nil {
-		return nil, err
-	}
-	const awkSpace = " \t\n\v\f\r" // awk's [[:space:]]
-	out := map[string]string{}
-	delims := 0
-	for _, line := range strings.Split(string(data), "\n") {
-		if rest, ok := strings.CutPrefix(line, "---"); ok && strings.Trim(rest, awkSpace) == "" {
-			delims++
-			if delims >= 2 {
-				break
-			}
-			continue
-		}
-		if delims != 1 {
-			continue
-		}
-		key, value, found := strings.Cut(line, ":")
-		if !found {
-			continue
-		}
-		// The first occurrence wins, as it does in the render's awk (`exit` on
-		// the first match).
-		if !seen(out, key) {
-			out[key] = strings.TrimLeft(value, awkSpace)
-		}
-	}
-	return out, nil
-}
-
-func seen(m map[string]string, k string) bool {
-	_, ok := m[k]
-	return ok
-}
-
-// recordTargets answers whether the render deploys a record to one harness.
-//
-// It is the render's rule, not a better one, because this check exists to
-// predict what the next deploy does. The render (`skill_targets_agent` in
-// scripts/compile-harness.sh) reads the first frontmatter line that starts
-// with `targets:` and treats the record as targeting a harness when that line
-// CONTAINS the harness name:
-//
-//   - key absent: every harness. Getting this backwards would make a persona
-//     scoped to one harness fail against every other, a false positive on
-//     correct data and the fastest way to make an operator stop reading.
-//   - key present: a substring match, so `["opencode"]` targets opencode, and
-//     a block-style list (`targets:` with the entries on later lines) targets
-//     nobody, because its first line names no harness.
-//
-// The substring rule is imprecise (`copilot` contains `pi`), and a block list
-// silently deploying nowhere is a render defect. Both are tracked in #1733
-// (HARNESS-159); TestRecordTargetsAgreesWithTheRender holds this function to
-// the render until then.
-func recordTargets(raw string, declared bool, agent string) bool {
-	if !declared {
-		return true
-	}
-	return strings.Contains(raw, agent)
 }

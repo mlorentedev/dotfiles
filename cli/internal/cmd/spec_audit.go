@@ -73,7 +73,9 @@ and only asking the forge can find it.
 
   FAIL          the issue is CLOSED (a zombie), or the link resolves to no
                 issue, to a pull request, or is malformed
-  WARN          the spec is linked only in prose, or not at all
+  WARN          the spec is linked only in prose, or not at all, or it is a
+                zombie the default branch has already archived (this
+                checkout predates the archive: merge the base)
   UNANSWERABLE  the forge could not be asked (auth, network, rate limit)
 
 Exit status is 0 only when nothing is FAIL or UNANSWERABLE: a question that
@@ -105,6 +107,7 @@ could not be answered must not read as a clean audit.`,
 				c.PrintErrln("spec audit:", err)
 				return err
 			}
+			spec.ExcuseArchivedZombies(findings, spec.GHArchiveLookup(specAuditRun, home))
 			printSpecAudit(c.OutOrStdout(), findings)
 			if spec.AuditNeedsAttention(findings) {
 				return errAuditAttention

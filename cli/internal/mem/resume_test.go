@@ -65,7 +65,7 @@ func TestResumeRendersVerifyAndAwaiting(t *testing.T) {
 				t.Errorf("%s: lacks %q:\n%s", format, want, out)
 			}
 		}
-		if strings.Contains(out, "`gh pr view 2852 --json state` (unverified") {
+		if strings.Contains(out, "`go test ./internal/mem` (unverified") {
 			t.Errorf("%s: a read-only command was marked unverified", format)
 		}
 	}
@@ -74,7 +74,7 @@ func TestResumeRendersVerifyAndAwaiting(t *testing.T) {
 func TestReadOnlyCommand(t *testing.T) {
 	for cmd, want := range map[string]bool{
 		"git status":                    true,
-		"gh pr view 2852 --json state":  true,
+		"gh pr view 2852 --json state":  false,
 		"dotf spec audit":               true,
 		"go test ./internal/mem":        true,
 		"rm -rf ~/x":                    false,
@@ -93,7 +93,7 @@ func TestReadOnlyCommand(t *testing.T) {
 		"git diff --output file":        false,
 		"go test -o bin ./x":            false,
 		"go build ./...":                false,
-		"git diff main -- x.go":         true,
+		"git diff main -- x.go":         false,
 		"cat ~/.config/secrets.env":     false,
 		"grep -r token ~":               false,
 		// The code runners take only flags that neither name a program nor an
@@ -108,11 +108,25 @@ func TestReadOnlyCommand(t *testing.T) {
 		"bats ../outside.bats":                           false,
 		"bats --formatter /tmp/f tests/x.bats":           false,
 		"shellcheck ~/x.sh":                              false,
-		"go test ./... -run '^TestX$' -count=1 -v":       true,
-		"go test ./internal/mem ./internal/cmd -count=1": true,
+		"go test ./... -run '^TestX$' -count=1 -v":       false,
+		"go test ./internal/mem ./internal/cmd -count=1": false,
 		"go vet ./...":                                   true,
-		"bats tests/x.bats --filter 'under 8000'":        true,
+		"bats tests/x.bats --filter 'under 8000'":        false,
 		"shellcheck scripts/a.sh":                        true,
+		// Round 3: only flagless plain commands are read-only. A flag, a quote,
+		// a variable or a colon makes it unverified, however harmless the one
+		// in hand (the -count, --json, --filter and -- rows above flipped).
+		"go test ${IFS}-exec=/tmp/evil ./...": false,
+		"go test '-exec=/tmp/x' ./...":        false,
+		"dotf doctor --fix":                   false,
+		"gh pr view 1 --web":                  false,
+		"git show HEAD:secrets/x":             false,
+		"git status\tx":                       false,
+		"gh issue view 1689":                  true,
+		"gh pr view 2852":                     true,
+		"go test ./...":                       true,
+		"bats tests/x.bats":                   true,
+		"git log origin/main":                 true,
 	} {
 		if got := readOnlyCommand(cmd); got != want {
 			t.Errorf("readOnlyCommand(%q) = %v, want %v", cmd, got, want)
@@ -196,22 +210,39 @@ func TestResumeRendersAOneItemListAsABlock(t *testing.T) {
 // A Verify field's prose is part of the record: a caveat written beside the
 // commands survives the render in both formats (MEMORY-008 review round 2).
 func TestResumeKeepsVerifyProseBesideTheCommands(t *testing.T) {
-	text := "### thread: feat-a\n\n**Next action:** x.<br>\n**Verify:** do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` only after review.<br>\n"
-	for _, format := range []string{"context", "prompt"} {
-		out, err := RenderResume(text, "src", format)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, want := range []string{"do NOT run this on mba", "only after review", "- `go test ./...`", "- `rm -rf /tmp/x` (unverified"} {
-			if !strings.Contains(out, want) {
-				t.Errorf("%s lacks %q:\n%s", format, want, out)
+	for name, tc := range map[string]struct {
+		field string
+		want  []string
+	}{
+		"one line": {
+			"do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` only after review.<br>",
+			[]string{"do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` (unverified) only after review."},
+		},
+		// Round 3: every line of the field, not its first.
+		"two lines": {
+			"`git status`<br>\nnot on mba, and see #1234 for the caveat<br>",
+			[]string{"`git status`\nnot on mba, and see #1234 for the caveat"},
+		},
+		"bullets": {
+			"\n- `gh issue view 1689`\n- the queue is answered by hand\n- `dotf doctor --fix`",
+			[]string{"- `gh issue view 1689`\n- the queue is answered by hand\n- `dotf doctor --fix` (unverified)"},
+		},
+	} {
+		text := "### thread: feat-a\n\n**Next action:** x.<br>\n**Verify:** " + tc.field + "\n"
+		for _, format := range []string{"context", "prompt"} {
+			out, err := RenderResume(text, "src", format)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(out, want) {
+					t.Errorf("%s, %s: lacks %q:\n%s", name, format, want, out)
+				}
+			}
+			if strings.Contains(out, "(unverified)") != strings.Contains(out, unverifiedNote) {
+				t.Errorf("%s, %s: the note and the markers disagree:\n%s", name, format, out)
 			}
 		}
-	}
-	// A field of commands alone renders no prose line.
-	out, _ := RenderResume("### thread: feat-a\n\n**Verify:** `git status`, `dotf spec audit`<br>\n", "src", "context")
-	if strings.Contains(out, "As written") {
-		t.Errorf("a field of commands alone grew a prose line:\n%s", out)
 	}
 }
 

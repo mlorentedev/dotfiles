@@ -1,0 +1,83 @@
+---
+spec: "MEMORY-008-handoff-resume"
+verdict: "FAIL"
+reviewed_sha: "4f19d07d06799ba376fe888e29a07a303895d66f"
+reviewer: "nan/qwen3.8-flash"
+date: "2026-10-22"
+---
+
+## Adversarial review
+
+**Scope**: MEMORY-008-handoff-resume (issue #1689), slices 0–5 plus the round-1 (#2916) and round-2 (#2917) fixes. Round 3, run by the model drawn from `harness/reviewer-pool.json`; judged as the WHOLE change, and every earlier fix re-tested against the current tree rather than accepted from `verification.md`.
+**Sources**: `specs/MEMORY-008-handoff-resume/{proposal,tasks,verification,features}.md`, `review-round-1.md`, `review-round-2.md`, `review-request.json`; code read: `cli/internal/mem/{thread,thread_store,resume,session_start_resume,session_start,session_start_adapter,handoff}.go`, `cli/internal/cmd/{mem,mem_resume,mem_handoff}.go`, `cli/internal/mem/testdata/{resume,session_start_resume}/*`. Executed: `go build ./...`, `go vet ./internal/mem ./internal/cmd`, `go test ./...` (whole module), `gofmt -l .`, all six `features.json` commands run by hand, one `bats --filter` count, three throwaway probe tests in `internal/mem` (all removed), `gh issue view` on #1689 and #2915, `/tmp/dotf-review mem resume` built from this tree.
+
+**Note on the stated base.** `e1c5754c` is an ancestor of HEAD, but the range carries ~750 commits and 2,445 files / 165,957 insertions (`git diff --stat e1c5754c...HEAD`), because the twelve PRs of this spec landed on `main` across a month. It is not a bounded diff of this change; rounds 1 and 2 recorded the same. This is a launcher/base-resolution defect, not this change's, and is stated so the range is never silently read as "the diff under review". The change was read through its own commits (#1701 #1702 #1703 #1711 #1716 #2852 #2880 #2881 #2885 #2908 #2916 #2917) and file set.
+
+### Contract and digest check
+
+`dotf spec digest MEMORY-008-handoff-resume` returns exactly the three digests in `review-request.json` — `features.json 358ebb49…`, `proposal.md 297a6356…`, `tasks.md 97e4977c…`. This run modified none of the contract set; `git status` afterwards shows only the launcher's `review-request.json` and this file.
+
+### Spec and task alignment
+
+- **AC1 (pure render)** — met and pinned. `RenderResume` takes no clock, cwd or env; `TestResumeIsAPureRenderOfTheThreadFile` renders a fixture twice per format and compares against `testdata/resume/{context,prompt}.golden`, and refuses an unknown format. Purity holds; **fidelity does not** (Major F-3).
+- **AC2 (Verify + Awaiting Manu + ambiguity)** — ambiguity is real: `SelectThread` prefers this agent's fork, refuses another agent's thread (heading stamp *or* journal, the round-1 F-B/F-C fix, confirmed present in code), and a caller naming no agent gets only an unowned thread; the CLI lists every key with its own `--thread` flag (`TestMemResumeListsCandidates`). But the read-only gate AC2 rests on is bypassable (Majors F-1, F-2).
+- **AC3 (SessionStart by source)** — verified as written: one golden per source, `startup`/`clear`/`compact` byte-exact full block, `resume`/`fork` one line, unknown source degrades to the line; `ClaudeContext` prepends the block; `normaliseSource` covers the round-2 "Compact " question. Whether Claude's `matcher: "*"` group actually fires on `compact`/`clear` remains unobserved live (Question F-5) — AC3 asks for fixtures, and the proposal declares the envelope its own risk.
+- **AC4 (budget)** — verified: the inline-vs-stored fixture test asserts its own non-vacuity (`the inline fixture is %d bytes, not past the … budget: the test proves nothing`), the stored shape lands far under 25,000 B, and an over-budget growth is refused naming only dated threads. `ReplaceFile` preserves the replaced file's mode (the 0600 defect found and fixed in slice 1).
+- **AC5 / AC6 (skills and doctrine)** — verified by command, not by assertion: f5 and f6 exit 0; `catchup` step 1 is `dotf mem resume --agent <agent>` with the "list and ask, never pick" instruction, and the `handoff` record says never to hand-type a resume prompt.
+- **Test traceability** — every `Test…` name I sampled from `verification.md` (17, including both round-2 additions) exists as a `func Test…(` in the tree. No ticked box stands on a test that is not there.
+- **Build / tests / format** — `go build ./...` clean, `go vet` clean on the two touched packages, `gofmt -l .` empty, `go test ./... -count=1` across the whole module: no failures. All six feature commands: exit 0 each. The bats filter in f6 matches exactly 1 test, so the command is not vacuous.
+- **Ticketed items checked live** — #2915 (`handoff_resume` not declared in `session-start-config.json`) is OPEN, so the round-2 disposition is real, not a verbal promise. #1689 is OPEN, as the work gate requires.
+- **Test deletions** — the test-line deletions in #2852, #2885 and #2916 are assertion *replacements* (a stricter `ThreadText` signature, a richer budget message, extended candidate expectations), not removed coverage; no test function was deleted by this change. Retention bar satisfied; nothing to record as a field.
+
+**Mutations and reproductions I ran myself** (each reverted; tree clean afterwards):
+
+| Probe / mutation | Result |
+|---|---|
+| `readOnlyCommand("go test ${IFS}-exec=/tmp/evil")` | **true** — renders as verified read-only |
+| `readOnlyCommand("go test $EVILFLAG ./...")` | **true** |
+| `readOnlyCommand("dotf doctor --fix")`, `("gh pr view 1 --web")` | **true** — both are mutating/interactive forms |
+| `bash -c 'set -- go test ${IFS}-exec=/bin/true ./...'` | the shell hands `go test` the argument `-exec=/bin/true` — the flag class F-A exists |
+| multi-line `Verify` field with a caveat on the second line | the caveat is **absent** from the render |
+| list-shaped `Verify` with a prose-only bullet | the prose bullet is **absent** from the render |
+
+### Findings
+
+| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
+|----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
+| Major | REAL | security gate (F-1) | The round-1 F-A fix (code runners take only allowlisted flags) is defeated by a **variable reference**. `shellControl` catches `$(`, backticks, `;`, `\|` and newlines, but not `$NAME` or `${NAME}`; and `runnerArgsSafe` inspects only arguments that *begin* with `-`, while `insideCheckout` passes `${IFS}-exec=/tmp/evil` (no leading `/`, no `..` segment). So `` `go test ${IFS}-exec=/tmp/evil` `` in a `Verify:` line renders as a verified, read-only command, and the shell then splits it into the very `-exec=` flag that runs an arbitrary program. The threat model is the spec's own words in `proposal.md`: "A `Verify:` line is an injection surface. A `MEMORY` file is input the next session did not write." The mitigation the proposal states — "marks any command outside a read-only allowlist as unverified" — does not hold for this shape, and it fails **silently**: the output says nothing, because it believes the command is safe. | reproduced in this session by throwaway probe tests (since removed) plus `set --` in bash showing `-exec=/bin/true`; `cli/internal/mem/resume.go` `shellControl`, `runnerArgsSafe`, `insideCheckout` | **UNTESTED** — `TestReadOnlyCommand` has `ls $(rm x)` (a `$(` case) and the ten literal escape hatches from F-A, but no `$NAME` / `${NAME}` argument | code + tests (both outside the contract set) |
+| Major | REAL | security gate (F-2) | Non-runner prefixes take **no argument checking at all** (`runnerArgsSafe` returns true when the prefix is not in `codeRunners`), so the mutating and interactive forms of listed commands render as read-only: `dotf doctor --fix` (which per its own help "wires safe repaired state (e.g. `core.hooksPath`)") and `gh pr view 1 --web` (opens a browser). `readOnlyPrefixes` deliberately omits "subcommands that have a writing form (`git branch -D`, `git fetch`, `go build`)" — the flag-level writing form of an allowlisted command is the same rule, not applied. Consequence is bounded (a repair, a browser), unlike F-1, but the same claim ("on the read-only list") is printed for a command that is not read-only. | `readOnlyCommand("dotf doctor --fix") = true` in this session; `cli/internal/cmd/doctor.go` `--fix` help text; `readOnlyPrefixes` comment in `resume.go` | **UNTESTED** — the table's only `dotf` case is `dotf spec audit`, with no flag | code + tests |
+| Major | REAL | rendering fidelity (F-3) | Round 2's prose fix is **partial**: `verifyLines` keeps the field's prose only from its *first* line. `As written: ` prints `entryLine(v, 0)`, which stops at the first non-blank line, and the loop after it emits only backticked commands. So a `Verify:` field written across lines — the shape the renderer itself produces, and the shape a pasted resume round-trips into — loses every continuation line: my probe lost `not on mba, and see #1234 for the caveat`, and a list-shaped field lost the prose-only bullet `the queue is answered by hand`. Against the package's own stated invariant for the same text (`ParseThread`'s "No line of the body is dropped", `TestParseThreadDropsNoLine`): the parser keeps it, the renderer deletes it. Same mechanism, same field, same cost as the round-2 Major; only the input shape is different. Secondarily, `As written:` re-publishes the raw field, so an unverified command appears twice — once marked, once in plain text (`rm -rf ~/x` in `testdata/resume/context.golden`). | reproduced in this session (two probe renders, both formats); `cli/internal/mem/resume.go` `verifyLines`, `entryLine`; the committed goldens show the unmarked echo | `TestResumeKeepsVerifyProseBesideTheCommands` covers a **single-line** field only; multi-line and list-shaped fields → **UNTESTED** | code + tests |
+| Minor | REAL | config SSOT | `handoff_resume` is implemented and default-on but absent from `session-start-config.json`, whose inventory bats counts 11 injectors against 12 in code. Dispositioned in round 2 and **verified open as #2915** in this session, so it is tracked, not promised. | `grep -rn handoff_resume` → code + its test only; `gh issue view 2915` → OPEN | `TestSessionStartResumeCanBeTurnedOff` proves the toggle; the config-inventory guard does not cover it → UNTESTED at the drifted layer | code/config + tests (outside the staleness set) |
+| Question / assumption | THEORETICAL | hook wiring | The `SessionStart` group with `matcher: "*"` firing on `compact`/`clear` is still unobserved against a live payload (`verification.md` says so; round 2 kept it open). The goldens prove the code path and the envelope, not what Claude sends. **UNVERIFIED here**: no live transcript is in the tree and this run cannot reach one. | `verification.md` slice 4; `cli/internal/harness/bind*.go` uses `UseMatcher: true` with an empty matcher | UNTESTED | spec/observation — record the next real `/compact` in `verification.md`; if the hook does not fire, the hook half needs a ticket |
+| Minor | REAL | spec artifacts (contract set) | `proposal.md` still has all six acceptance boxes `[ ]` while `verification.md` ticks each one; `proposal.md` says the entry is "about 350 B" against a designed 450 B worst case (160 + 24 + 72 + count + pointer); `tasks.md`'s Closing block is unticked; and all six `features.json` entries still carry `"state": "pending"` with empty evidence, though every one of those commands exits 0 when run. None is a behaviour defect, and **none may be edited to satisfy this review** — an edit to the contract set invalidates the verdict on it. | `proposal.md` AC block; `thread_store.go` cap constants; `tasks.md` Closing; `features.json` states vs the six runs above | n/a | contract set — carry to the archive PR or the re-review, never a post-review edit |
+| Minor | SPECULATIVE | context size | The injected resume is uncapped: the 25,000 B budget bounds `MEMORY.md`, not a thread file, so a large thread file is injected in full on every `compact`. Round 2 declined it with a reason (thread files are operator-written; measured ones are small); I did not overturn that and record it as declined, not fixed. | code read of `ThreadText`/`RenderResume`; probe figures in `verification.md` slice 2 | UNTESTED | — surface only; do not gate |
+
+### Evaluator rubric
+
+| Dimension | Grade (A-D) | Rationale (one line) |
+|-----------|-------------|----------------------|
+| Correctness        | C | All six ACs meet their stated test on the paths they exercise, and every round-1/round-2 fix is present in the tree, but two REAL Majors sit inside AC2's own security gate and one inside AC1's render: the gate says "safe" about commands that are not, silently. |
+| Verification       | B | Independently reproduced: whole-module `go test` clean, `build`/`vet`/`gofmt` clean, all six feature commands exit 0, cited tests all exist, f6's bats filter matches one test, #2915 verified open. It stops at B because `verification.md` records F-A as closed and the round-2 prose gap as closed, and both are still reachable through shapes its own table does not contain. |
+| Scope              | B | The spec's file set maps to its slices with no unrelated edits inside `cli/internal/mem`; the graded change is read through those files because the launcher's base is a 2,445-file range. |
+| Reliability        | C | Reads fail closed (absent file, unknown format, ambiguous thread, over-budget growth, cross-key collision) and writes are atomic and mode-preserving; but the mechanism that is supposed to *warn* degrades silently in F-1/F-2/F-3 — no refusal, no marker, nothing the next session can see. |
+| Maintainability    | B | Label set defined once in `ThreadLabels`; small single-purpose functions; the allowlist carries the reason in its comments. F-1 is a shape the design invites: an allowlist of *prefixes* checked with `HasPrefix`, when the risk lives in arguments. |
+| Handoff-readiness  | B | ADR-056, lessons 507/508/513, per-round disposition tables and a real ticket for the config gap; the unticked contract artifacts and the still-unobserved live `compact` payload are the loose ends. |
+
+### Verdict
+FAIL
+
+Aggregation and severity agree: no D, two C (rubric floor = PASS WITH GAPS minimum), but three **REAL Majors** force FAIL until addressed. F-1 is the one that must not be traded away: the change prints "verified read-only" about `go test ${IFS}-exec=/tmp/evil`, and a session that trusts the render is being told the opposite of the truth about a command that runs any program the thread file names.
+
+**`dotf spec archive` is NOT advisable in this state.**
+
+### Recommended next steps
+
+Routed by set. **Nothing here asks for a contract-set edit** — `proposal.md`, `tasks.md` and `features.json` are closed for this verdict; the unticked boxes and the "about 350 B" wording are for the implementer to disposition in `verification.md` or carry into the archive PR.
+
+Outside the contract set (fix, then re-review):
+1. **F-1** — reject any argument carrying `$` (`$NAME`, `${NAME}`) before the prefix/flag check for the code runners, or resolve-and-reject: `${IFS}` is only dangerous because the check reads the literal. Add the reproduced inputs to `TestReadOnlyCommand` as table rows, with the controls (`./...`, `-run '^X$'`, `--filter 'a b'`) kept passing.
+2. **F-2** — give the non-runner prefixes the same argument discipline, or move the commands that have a mutating flag form off the read-only list and say why in the comment that already explains `git branch -D`. At minimum: `dotf doctor --fix` and `gh pr view --web` must render unverified.
+3. **F-3** — keep the whole `Verify` field, not its first line: render continuation prose as written (including bullets that hold no command), and stop echoing an unmarked copy of a marked command — `As written:` should carry the field's prose with its commands removed, or the marked list should be the only rendering. Add multi-line and list-shaped cases to `TestResumeKeepsVerifyProseBesideTheCommands`, and expect the goldens to move (they are outside the contract set).
+4. Re-run `dotf spec review MEMORY-008-handoff-resume` after 1–3; round 4 judges the whole change again, since a fix to `verifyLines` interacts with the goldens and with F-2.
+5. #2915 (declare `handoff_resume` in `session-start-config.json`, with the bats count following the code) can land any time; it does not gate the verdict.
+6. On the next real `/compact` or `/clear` in a session on a release carrying slice 4, record in `verification.md` whether the hook fired — that closes the one Question this round cannot answer.

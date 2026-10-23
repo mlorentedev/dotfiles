@@ -78,14 +78,15 @@ func newVMWindowsCmd() *cobra.Command {
 			}
 			defer func() { _ = os.Remove(src) }()
 			return vm.Run(host, vm.RunOptions{
-				Machine: vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
-				Source:  src,
-				Dotf:    dotf,
-				Keep:    keep,
-				Agent:   10 * time.Minute,
-				Step:    time.Hour,
-				Poll:    5 * time.Second,
-				Out:     cmd.OutOrStdout(),
+				Machine:  vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
+				Source:   src,
+				Dotf:     dotf,
+				Keep:     keep,
+				Agent:    10 * time.Minute,
+				Step:     time.Hour,
+				Poll:     5 * time.Second,
+				Out:      cmd.OutOrStdout(),
+				Progress: cmd.ErrOrStderr(),
 			})
 		},
 	}
@@ -105,29 +106,39 @@ func newVMWindowsStopCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			host, _, _, layout, err := windowsGuest()
+			// Stop only dials the guest's QMP socket and removes its files, so
+			// it needs the state directory and not QEMU on PATH.
+			layout, err := windowsLayout()
 			if err != nil {
 				return err
 			}
-			return vm.Stop(host, layout, cmd.OutOrStdout())
+			return vm.Stop(vm.ExecHost{}, layout, cmd.ErrOrStderr())
 		},
 	}
 }
 
-// windowsGuest resolves QEMU and the guest's state directory on the one host
-// the guest runs on.
-func windowsGuest() (host vm.ExecHost, firmware, vars string, l vm.Layout, err error) {
+// windowsLayout resolves the guest's state directory on the one host the guest
+// runs on.
+func windowsLayout() (l vm.Layout, err error) {
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
-		return host, "", "", l, withExitCode(2, errors.New("the Windows guest runs on a macOS Arm64 host only"))
+		return l, withExitCode(2, errors.New("the Windows guest runs on a macOS Arm64 host only"))
+	}
+	state, err := env.StateDir()
+	if err != nil {
+		return l, err
+	}
+	return vm.Layout{Dir: filepath.Join(state, "vm", "windows")}, nil
+}
+
+// windowsGuest adds QEMU to windowsLayout, for the commands that start a guest.
+func windowsGuest() (host vm.ExecHost, firmware, vars string, l vm.Layout, err error) {
+	if l, err = windowsLayout(); err != nil {
+		return host, "", "", l, err
 	}
 	if host, firmware, vars, err = vm.FindQEMU(); err != nil {
 		return host, "", "", l, withExitCode(2, err)
 	}
-	state, err := env.StateDir()
-	if err != nil {
-		return host, "", "", l, err
-	}
-	return host, firmware, vars, vm.Layout{Dir: filepath.Join(state, "vm", "windows")}, nil
+	return host, firmware, vars, l, nil
 }
 
 // archiveRef writes an archive of ref's tree in format (zip or tar.gz), under
@@ -208,6 +219,7 @@ func newVMWindowsBuildCmd() *cobra.Command {
 				Install:      2 * time.Hour,
 				Agent:        10 * time.Minute,
 				Out:          cmd.OutOrStdout(),
+				Progress:     cmd.ErrOrStderr(),
 			})
 		},
 	}
@@ -259,17 +271,19 @@ func newVMLinuxCmd() *cobra.Command {
 			}
 			defer func() { _ = os.Remove(src) }()
 			return vm.Verify(execLimactl, vm.Options{
-				Ref:    ref,
-				Source: src,
-				Name:   fmt.Sprintf("dotf-linux-%d", time.Now().Unix()),
-				Keep:   keep,
-				Token:  os.Getenv("GITHUB_TOKEN"),
-				Out:    cmd.OutOrStdout(),
+				Ref:      ref,
+				Source:   src,
+				Name:     fmt.Sprintf("dotf-linux-%d", time.Now().Unix()),
+				Keep:     keep,
+				Token:    os.Getenv("GITHUB_TOKEN"),
+				Out:      cmd.OutOrStdout(),
+				Progress: cmd.ErrOrStderr(),
 			})
 		},
 	}
 	cmd.Flags().StringVar(&ref, "ref", "HEAD", "committed branch, tag or commit to converge")
 	cmd.Flags().BoolVar(&keep, "keep", false, "leave the guest running for inspection")
+	addSessionVerbs(cmd)
 	return cmd
 }
 

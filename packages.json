@@ -104,12 +104,12 @@
     },
     {
       "name": "hive",
-      "version": "4.4.1",
+      "version": "4.4.2",
       "profile": "full",
       "source": {
         "type": "uv-tool",
         "package": "hive-vault",
-        "self_install": {"platforms": ["windows"], "args": ["self-upgrade", "{version}"]}
+        "self_install": {"platforms": ["windows"], "args": ["self-upgrade", "{version}"], "no_build": ["cryptography"]}
       }
     },
     {

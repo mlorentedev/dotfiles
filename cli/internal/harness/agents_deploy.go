@@ -110,10 +110,17 @@ type agentResolver struct {
 	modelErr, capErr error
 }
 
+// RecordModelTier is the neutral tier an agent record declares in its
+// frontmatter `model:` line, read as the render reads it; "" when it declares
+// none.
+func RecordModelTier(record []byte) string {
+	return skillField(record, "model")
+}
+
 // modelLine is `model: <id>` for the record's tier, or "" when it declares
 // none. A tier the map cannot resolve is an error, never a missing line.
 func (r *agentResolver) modelLine(record []byte, agent string) (string, error) {
-	tier := skillField(record, "model")
+	tier := RecordModelTier(record)
 	if tier == "" {
 		return "", nil
 	}

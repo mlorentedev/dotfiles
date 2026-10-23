@@ -48,7 +48,7 @@ git config --global --includes user.name
 
 ## New machine
 
-1. `gh auth login`. Grant what the board tooling needs as well; #2204 tracks requesting every scope in this one step.
+1. `gh auth login -s gist,read:org,read:project,repo,workflow` asks for every scope the board tooling needs in this one step. On a machine already logged in, `dotf doctor` names the `gh auth refresh` that adds the missing ones.
 2. `dotf deploy` installs `dotfiles.gitconfig`.
 3. `dotf converge --only git-config` adds the include and, with gh logged in, runs `gh auth setup-git`. A second run reports `0 changed`.
 
