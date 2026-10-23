@@ -26,6 +26,11 @@ created: "2026-10-21"
 
 A1 is about 600 executable lines, so it ships as three PRs, each based on the previous one.
 
+A1a landed alone as #2940. A1c (#2942) was merged into the A1b branch, so
+A1b and A1c reach `main` together through #2941: about 420 executable lines
+in one squash, each half of it reviewed as its own PR. The cap was kept per
+review, not per merge.
+
 - **A1a: the pieces the route reads and writes.**
   - [x] [AC1] The shared pool parser reads the `pr_agent` blocks and `pr_agent_risk` (`spec.ParseReviewerPool`).
   - [x] [AC1] The allowlist, with a price row and ceiling per model, and drift tests against the script's `ALLOWED_ANTHROPIC` and the bats `prices` dict.
