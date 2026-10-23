@@ -54,7 +54,18 @@ review, not per merge.
     including an unwritable `--output`. A setup error found before any probe
     writes no job summary; an unwritable `--output` is found after the probes,
     so their summary is already written.
-- [ ] [P] [AC2] `dotf pr guard`: port the `pr-agent-publish-guard.bats` cases (FAIL), implement (PASS)
+- [x] [P] [AC2] `dotf pr guard`: port the `pr-agent-publish-guard.bats` cases (FAIL), implement (PASS)
+  - It reaches GitHub through `gh api` with the script's own arguments (the
+    path, `--jq '.content'`, `--jq '.head.sha'`, `--paginate`), through an
+    injectable runner, so the differential test runs the script and the port
+    against one stub `gh` on PATH, the stub the bats suite uses.
+  - It keeps the script's API rules: a 404 is an answer and is not retried;
+    any other failure is retried three times, `GUARD_RETRY_SECONDS` apart, and
+    is then reported as an outage, never as a missing marker or review.
+  - `--probe --output FILE` appends `published=true|false|unknown` and exits 0;
+    only a measured `false` lets the second attempt run. Without `--probe` it
+    is the final guard: exit 0 when this run published a review, 1 when not,
+    naming the last attempt that ran. A usage error exits 2.
 - [ ] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract read (FAIL), implement (PASS)
 
 ### A5. D: the workflow switches (one PR)
