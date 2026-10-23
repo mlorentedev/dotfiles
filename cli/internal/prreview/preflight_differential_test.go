@@ -34,7 +34,9 @@ type scriptRun struct {
 	requests                string
 }
 
-func requireScript(t *testing.T) string {
+// requireScript is the path of scripts/<name>, or skips (fails on CI) when it
+// cannot run here: it needs Linux and tools.
+func requireScript(t *testing.T, name string, tools ...string) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		// The script runs only on ubuntu runners, and jq on Windows ends each
@@ -42,7 +44,7 @@ func requireScript(t *testing.T) string {
 		// its own. The port is held to the script where the script runs.
 		t.Skip("the script runs only on Linux runners")
 	}
-	for _, tool := range []string{"bash", "jq", "curl"} {
+	for _, tool := range tools {
 		if _, err := exec.LookPath(tool); err != nil {
 			// On a Linux CI runner the script's tools are a given; their absence
 			// there would skip every comparison silently, so it fails instead.
@@ -52,7 +54,7 @@ func requireScript(t *testing.T) string {
 			t.Skipf("%s is not installed", tool)
 		}
 	}
-	script, err := filepath.Abs(repoFile("scripts", "pr-agent-model-preflight.sh"))
+	script, err := filepath.Abs(repoFile("scripts", name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +106,7 @@ func requestLog(api *nanAPI) string {
 }
 
 func TestPreflightMatchesTheScript(t *testing.T) {
-	script := requireScript(t)
+	script := requireScript(t, "pr-agent-model-preflight.sh", "bash", "jq", "curl")
 	for _, c := range preflightCases() {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -231,7 +233,7 @@ func preflightCases() []preflightCase {
 // Where the script is wrong the port is not, and each divergence is pinned on
 // both sides so that neither moves unnoticed.
 func TestPreflightDivergesFromTheScriptWhereTheScriptIsWrong(t *testing.T) {
-	script := requireScript(t)
+	script := requireScript(t, "pr-agent-model-preflight.sh", "bash", "jq", "curl")
 	up := map[string]string{"mimo-v2.6-flash": "200", "1": "200", "null": "200"}
 
 	// A fallback that is not a model id: the script probes the JSON text of a
