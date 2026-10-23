@@ -75,7 +75,8 @@ setup() {
     # session. opencode (reads {env:NAN_API_KEY} from opencode.jsonc), pi and agy
     # are wrapped to launch through `dotf secrets run`, so the secret lives only
     # in their child process — never the session.
-    grep -qE 'dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY' "$PROFILE_SCRIPT"
+    grep -qE 'dotf secrets run --only \(\$Names -join' "$PROFILE_SCRIPT"
+    grep -qE 'Invoke-WithSessionSecrets -Names NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -App opencode' "$PROFILE_SCRIPT"
 }
 
 @test "parity: neither .bashrc nor profile.ps1 auto-loads secrets; both wrap the AI CLIs" {
