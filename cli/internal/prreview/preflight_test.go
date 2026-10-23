@@ -321,7 +321,9 @@ func TestPreflight_ASetupErrorIsNotAModelFailure(t *testing.T) {
 
 func TestPreflight_ABlankTimeoutIsNinetySecondsAndAnUnreadableOneIsToo(t *testing.T) {
 	for raw, want := range map[string]time.Duration{"": 90 * time.Second, "2": 2 * time.Second, "0.5": 500 * time.Millisecond,
-		"0": 90 * time.Second, "-3": 90 * time.Second, "abc": 90 * time.Second} {
+		"0": 90 * time.Second, "-3": 90 * time.Second, "abc": 90 * time.Second,
+		// Out of time.Duration's range: the conversion would wrap or be undefined.
+		"1e10": 90 * time.Second, "Inf": 90 * time.Second, "NaN": 90 * time.Second} {
 		if got, _ := preflightTimeout(raw); got != want {
 			t.Errorf("preflightTimeout(%q) = %s, want %s", raw, got, want)
 		}

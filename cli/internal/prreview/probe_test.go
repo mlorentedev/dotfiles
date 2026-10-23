@@ -203,6 +203,7 @@ func TestParseTimeout(t *testing.T) {
 	for raw, want := range map[string]time.Duration{
 		"": 30 * time.Second, "2": 2 * time.Second, "0.5": 500 * time.Millisecond,
 		"0": 30 * time.Second, "-3": 30 * time.Second, "abc": 30 * time.Second,
+		"1e10": 30 * time.Second, "Inf": 30 * time.Second, "NaN": 30 * time.Second,
 	} {
 		if got := ParseTimeout(raw); got != want {
 			t.Errorf("ParseTimeout(%q) = %s, want %s", raw, got, want)

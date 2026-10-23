@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,12 +15,24 @@ import (
 const defaultProbeTimeout = 30 * time.Second
 
 // ParseTimeout reads ROUTE_PROBE_TIMEOUT: seconds, fractions allowed. An empty,
-// unreadable or non-positive value is the default.
+// unreadable, non-positive or out-of-range value is the default.
 func ParseTimeout(raw string) time.Duration {
-	if s, err := strconv.ParseFloat(raw, 64); err == nil && s > 0 {
-		return time.Duration(s * float64(time.Second))
+	if d, ok := parseSeconds(raw); ok {
+		return d
 	}
 	return defaultProbeTimeout
+}
+
+// parseSeconds reads a positive number of seconds that fits a time.Duration.
+// Converting a float beyond its range is implementation-defined in Go: arm64
+// saturates, amd64 yields a negative duration, so every probe would time out at
+// once on the runners. Such a value, Inf and NaN all report false.
+func parseSeconds(raw string) (time.Duration, bool) {
+	s, err := strconv.ParseFloat(raw, 64)
+	if err != nil || !(s > 0) || s >= float64(math.MaxInt64)/float64(time.Second) {
+		return 0, false
+	}
+	return time.Duration(s * float64(time.Second)), true
 }
 
 type message struct {

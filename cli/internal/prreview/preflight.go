@@ -130,11 +130,11 @@ func (in PreflightInputs) chain() ([]string, error) {
 }
 
 // preflightTimeout reads PREFLIGHT_TIMEOUT: seconds, fractions allowed. An empty,
-// unreadable or non-positive value is the default. The second value is the
-// number as the warnings and the summary print it.
+// unreadable, non-positive or out-of-range value is the default. The second
+// value is the number as the warnings and the summary print it.
 func preflightTimeout(raw string) (time.Duration, string) {
-	if s, err := strconv.ParseFloat(raw, 64); err == nil && s > 0 {
-		return time.Duration(s * float64(time.Second)), raw
+	if d, ok := parseSeconds(raw); ok {
+		return d, raw
 	}
 	return defaultPreflightSecond * time.Second, strconv.Itoa(defaultPreflightSecond)
 }
