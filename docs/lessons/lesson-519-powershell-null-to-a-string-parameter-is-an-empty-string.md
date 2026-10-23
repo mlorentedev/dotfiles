@@ -33,10 +33,12 @@ matched. The scan still printed OK, now with 19 tokens instead of 24.
 ## Solution
 
 An absent name is removed with `Remove-Item Env:$n`, and a value is set with `Set-Item Env:$n`. Neither goes
-through a .NET string parameter. The behavioural test runs the real functions from the profile, which it reads
-with the PowerShell parser, under pwsh on all three runners, and checks `[Environment]::GetEnvironmentVariable`
-against `$null`. The scanner now reads the `-Names` list at each call site and fails on any `--only` argument
-it cannot parse, instead of skipping it.
+through a .NET string parameter. The behavioural test, `tests/profile-secret-wrappers.Tests.ps1`, runs the real
+functions from the profile, which it reads with the PowerShell parser, and checks
+`[Environment]::GetEnvironmentVariable` against `$null`. It is a Pester suite because CI runs every `*.Tests.ps1`
+on Windows, where the wrappers run; a new bats file there needs a `ci.yml` edit to be picked up. The scanner
+now reads the `-Names` list at each call site and fails on any `--only` argument it cannot parse, instead of
+skipping it.
 
 ## Rule
 

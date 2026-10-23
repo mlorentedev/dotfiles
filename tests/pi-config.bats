@@ -38,7 +38,7 @@ setup() {
     grep -qE '^[[:space:]]*function pi \{' "$DOTFILES_DIR/powershell/profile.ps1" \
         || { echo "profile.ps1: no pi wrapper"; return 1; }
     # What the wrapper does with the names is tested by behaviour in
-    # profile-secret-wrappers.bats; this pins only that pi asks for NAN_API_KEY.
+    # profile-secret-wrappers.Tests.ps1; this pins only that pi asks for NAN_API_KEY.
     grep -qE '^[[:space:]]*Invoke-WithSessionSecrets -Names [A-Z_,]*NAN_API_KEY[A-Z_,]* -App pi ' "$DOTFILES_DIR/powershell/profile.ps1" \
         || { echo "profile.ps1: pi wrapper does not inject NAN_API_KEY"; return 1; }
 }
