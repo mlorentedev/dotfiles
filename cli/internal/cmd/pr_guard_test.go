@@ -104,3 +104,24 @@ func TestPrGuard_AUsageErrorExitsTwo(t *testing.T) {
 		})
 	}
 }
+
+// An empty STARTED would let any older github-actions comment with a marker
+// count as this run's review, so both modes refuse it before calling gh.
+func TestPrGuard_AnEmptyStartedIsAUsageError(t *testing.T) {
+	for name, args := range map[string][]string{
+		"guard": {"pr", "guard"},
+		"probe": {"pr", "guard", "--probe", "--output", filepath.Join(t.TempDir(), "github_output")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			calls := guardEnv(t, guardReviewComment)
+			t.Setenv("STARTED", "")
+			_, stderr, err := execute(t, args...)
+			if ExitCode(err) != 2 {
+				t.Errorf("exit code = %d (%v), want 2", ExitCode(err), err)
+			}
+			if !strings.Contains(stderr, "STARTED") || len(*calls) != 0 {
+				t.Errorf("stderr = %q, calls = %v; want STARTED named and no gh call", stderr, *calls)
+			}
+		})
+	}
+}

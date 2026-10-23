@@ -45,7 +45,7 @@ PR_NUMBER, BASE_REF, STARTED, HEAD_SHA, ATTEMPTS, ROUTE_NOTE and ROUTE_OUTCOME.
 Annotations go to stdout.
 
 Exit status is 0 when a review was published (always, with --probe), 1 when
-not, and 2 for a usage error.`,
+not, and 2 for a usage error, an empty STARTED included.`,
 		Args: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return guardUsage(c, "pr guard takes no arguments")
@@ -74,6 +74,11 @@ func (o *guardOpts) run(c *cobra.Command, _ []string) error {
 		BaseRef: os.Getenv("BASE_REF"), Started: os.Getenv("STARTED"), HeadSHA: os.Getenv("HEAD_SHA"),
 		Attempts: os.Getenv("ATTEMPTS"), RouteNote: os.Getenv("ROUTE_NOTE"),
 		RouteOutcome: os.Getenv("ROUTE_OUTCOME"), RetrySeconds: os.Getenv("GUARD_RETRY_SECONDS")}
+	// The script accepts an empty STARTED, which makes every older review
+	// count as this run's; the workflow always sets it, so refusing is safe.
+	if in.Started == "" {
+		return guardUsage(c, "pr guard: STARTED is empty; it must be this run's start time")
+	}
 	env := prreview.GuardEnv{Out: c.OutOrStdout(), GH: prGuardGH}
 	if !o.probe {
 		return prreview.Guard(c.Context(), in, env)
