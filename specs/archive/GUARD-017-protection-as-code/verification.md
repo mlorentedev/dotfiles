@@ -78,20 +78,26 @@ On 2026-10-15 the owner ran `apply` and `check` from a main checkout that predat
 - `go vet` and `GOOS=windows go vet` on `internal/forge` and `internal/cmd`: clean. `go test ./...`: ok. `golangci-lint run` (pinned) on both packages: 0 issues.
 - [x] After the #2557 review (PR-Agent, three findings): `forge.LandedDeclaration` compares without fetching, and `dotf doctor` WARNs when the declaration differs from origin's default branch as last fetched (`TestCheckBranchProtectionWarnsOnADeclarationThatHasNotLanded`: a stale checkout whose old declaration still matches the forge, which PASSed before). The sweep does not fetch, and an unanswerable comparison draws nothing there: the gate is `check`/`apply`. `apply --unmerged` refuses without `--dry-run` (`TestForgeProtectionApplyUnmergedNeedsDryRun`), so an unlanded declaration is never written. The fetch is bounded at 60 s. Mutations on the doctor WARN, the `--unmerged` guard and the comparison (always "same") are each killed.
 
+## Review dispositions (2026-10-22, agy/gemini-3.8-flash-high, PASS WITH GAPS)
+
+- Promotion candidates held placeholders: applied, answered below.
+- `proposal.md` showed AC5 and AC6 unticked: applied, both ticked (checkbox state is outside the contract digest).
+- f6 needs network and `gh` auth: declined. AC6 is defined as a live check against the forge, so an offline command could not prove it; f6 is run by hand, as the other live evidence in this file was.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-442-a-declaration-read-from-a-checkout-is-only-as-current-as-the-checkout.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the one policy decision, D-1 (no required approvals), is recorded in proposal.md and pinned by TestProtectionApprovalsRationalePinned
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: forge protection is declared once, in dotfiles, for every repository; no other project carries its own
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/GUARD-017-protection-as-code/` -> `specs/archive/GUARD-017-protection-as-code/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/GUARD-017-protection-as-code/` -> `specs/archive/GUARD-017-protection-as-code/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 ## Evidence: AC6 and closing (2026-10-22)
 
