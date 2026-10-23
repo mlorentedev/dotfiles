@@ -16,10 +16,15 @@ created: "2026-06-21"
   - [x] deploy -> `tests/harness-deploy-parity.bats`: the full committed manifest deployed by `compile-harness.sh --deploy` and `dotf harness deploy` into two HOMEs, byte-identical but for agy's prompts and the copilot file, which differs only by the catalog's bullet order; a second Go deploy writes nothing. `TestHarnessDeploy_*` cover convergence and a failed agent record stopping presence and doctrine
 - [ ] AC5 check -> slice 6
   - [x] the Go verb -> `tests/harness-check-parity.bats` (5 tests): the same exit status and the same report lines as `compile-harness.sh --check` on the committed checkout and on each kind of drift (an edited, a missing and a doubly-marked region, an END line with a tail, a coverage gap, skill and agent records without their required frontmatter). `TestCheckDrift_*` (including a CRLF record that validates), `TestFirstDifference`
-  - [ ] `ci.yml` and `dotf doctor` call it on every OS -> after a release carries the verb
-- [ ] AC6 `--against-vault` -> slice 6
+  - [x] `dotf doctor` calls it in process on every OS -> #2921, `TestCheckRecordDrift` (the Windows case passes instead of skipping)
+  - [ ] `ci.yml` calls it on Linux, macOS and Windows -> #2923, green on all three test jobs, waiting for the owner to land it
+- [x] AC6 `--against-vault` -> #2936, `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
 - [ ] AC7 refresh in Go -> slice 7
 - [ ] AC8 callers rewired -> slices 3 and 5
+  - [x] converge -> #2902, `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout`
+  - [x] `setup-linux.sh` -> #2912, `tests/setup-fails-loudly.bats`
+  - [x] `setup-windows.ps1` -> #2914, `tests/setup-windows.bats`, `tests/setup-fails-loudly.bats`
+  - [ ] live acceptance on the work-lab Windows box after a release carries it (#1387)
 - [ ] AC9 bash engine deleted -> slice 7
 
 ## Test status
@@ -30,6 +35,11 @@ created: "2026-06-21"
 - Slice 4 (doctrine), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-doctrine-parity.bats` 4/4; `golangci-lint` 0 issues; `GOOS=windows go vet` clean.
 - Slice 5 (deploy, Go half), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-deploy-parity.bats` 3/3 under bash and zsh; `golangci-lint` 0 issues; `GOOS=windows go vet` clean. Real checkout into an empty HOME: 4 instruction files, catalog, 204 skill outputs, 7 agents, 4 presence regions, 2 doctrine files, `[deploy] OK`.
 - Slice 6 (check, Go verb), 2026-10-21, macOS arm64: `go test ./internal/harness/ ./internal/cmd/` ok; `tests/harness-check-parity.bats` 5/5 under bash and zsh; `golangci-lint` 0 issues after a cache clean; `GOOS=windows go vet` clean. Real checkout: both engines exit 0 with the same 47 OK lines.
+- Slice 6 (AC6, `--against-vault`), 2026-10-22, macOS arm64: `go test ./...` ok; `golangci-lint` (pinned) 0 issues; `GOOS=windows go vet ./...` clean. `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit` passes on a refreshed record, exits with drift once the vault source is edited, and the offline check still passes; `TestHarnessCheck_AgainstVaultRefusesWithoutAVault` refuses a missing vault instead of reporting it clean.
+- Live run, AC6: on this checkout, with the machine's vault, `dotf harness check --against-vault` prints 2 `[STALE]` skill records and exits 1, the records #2913 tracks.
+- Mutation check, AC6: disabling the sha comparison (`case got != sha` to `case false`) fails `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`.
+- Doctor agent tiers on the Go predicates, 2026-10-22, macOS arm64: `go test ./internal/doctor/ ./internal/harness/` ok; `golangci-lint` (pinned) 0 issues; `GOOS=windows go vet` clean. Live `dotf doctor`: `every declared agent tier resolves for its deploy targets (7 checked)`.
+- Mutation check, doctor agent tiers: treating every harness as targeted fails 3 cases of `TestAgentTiersResolve` (scoped targets, `copilot` not targeting `pi`, the unparseable record).
 - Mutation check, slice 6: keeping the full-only marker lines fails 4 of the 5 oracle tests; closing the region on an END line with a tail fails 1; treating every id as opted out fails all 5; accepting a record without `---` on line 1 fails 1.
 - Mutation check, slice 5: running skills before instructions fails 2 of the 3 oracle tests (the catalog finds no instructions file to write into on a fresh HOME); leaving presence out fails 2 of the 3.
 - Mutation check, slice 4 (doctrine): changing the payload heading fails 3 of the 4 oracle tests.
@@ -65,6 +75,8 @@ created: "2026-06-21"
 - Slice 5 rewire, converge: the composition moved from the `deploy` command into `harness.Deploy`, which returns every surface's outcomes; the command prints from them and converge calls it in process.
 - Slice 5 rewire, converge: in process rather than a `dotf harness deploy` child. Converge is the `dotf` binary, so a child would add a lookup of its own path and give nothing back: each surface's error already names the item that failed.
 - Slice 6, doctor: the drift gate runs in process against the deploy mirror, as the shell gate did, and no longer skips on Windows. The instruction-file remedy is `dotf harness deploy` on every OS rather than `dotf converge`: it is the verb that writes those files, and doctor already names it for the doctrine payloads.
+- Slice 6, AC6: the record-to-vault comparison moved from doctor into `harness.CompareWithVault`, so doctor and the verb read one implementation. Doctor keeps it a WARN (either side can be the older one on a given machine); the verb fails, because it is asked. It compares the `generated_sha` stamp, which sees a vault edit nobody refreshed but not a record edited on its own; that half needs the Go render and is a slice 7 task.
+- Doctor agent tiers: the check follows the Go render, so its verdict changed in two cases. A block-style `targets:` list now targets the harnesses it names, and a harness name inside another (`copilot`, `pi`) is no longer a match (#1733). A record whose frontmatter YAML does not parse fails once, as the render refuses it.
 - Slice 5 rewire, converge: `records-harness` stays linux and darwin until `setup-windows.ps1` stops deploying the same files, or Windows would deploy twice.
 - Slice 1: the copilot catalog moved to its own slice to keep slice 1 under the executable-line cap (about 293 lines).
 - Slice 1: a record whose frontmatter is not valid YAML is now an error for that record (reported after the rest deploy); the shell never parsed it. Every committed record parses (`TestSkillTargetsAgent_EveryCommittedRecordParses`).

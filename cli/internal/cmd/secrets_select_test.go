@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"bytes"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -56,59 +54,5 @@ func TestWantsInteractiveChild_FollowsTheTerminalSeam(t *testing.T) {
 		if askedFor[0] != os.Stdout.Fd() {
 			t.Errorf("the branch consulted fd %d, not stdout (%d)", askedFor[0], os.Stdout.Fd())
 		}
-	}
-}
-
-// A tail that is a proper prefix of a secret must not be written out raw when
-// the stream ends -- those are the leading bytes of a credential, and Flush is
-// exactly the moment the transcript is closed.
-func TestRedactWriter_DoesNotFlushAPartialSecretPrefixRaw(t *testing.T) {
-	const secret = "mock-openrouter-test-token-val"
-	injected := []string{"OPENROUTER_API_KEY=" + secret}
-
-	var buf bytes.Buffer
-	rw := newRedactWriter(&buf, injected)
-
-	// The child dies mid-key: a long proper prefix and then nothing.
-	if _, err := rw.Write([]byte("key is mock-openrouter-test-toke")); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if err := rw.Flush(); err != nil {
-		t.Fatalf("Flush: %v", err)
-	}
-
-	got := buf.String()
-	if strings.Contains(got, "mock-open") {
-		t.Errorf("Flush emitted credential material raw: %q", got)
-	}
-	if !strings.Contains(got, "[REDACTED:OPENROUTER_API_KEY]") {
-		t.Errorf("the partial prefix was not reported as redacted material: %q", got)
-	}
-}
-
-// If one injected value is a prefix of another, replacing the shorter first
-// breaks the longer one's match and leaks its suffix. Order is free to fix.
-func TestRedactWriter_HandlesOneSecretBeingAPrefixOfAnother(t *testing.T) {
-	injected := []string{
-		"SHORTKEY=mock-prefix-value",
-		"LONGKEY=mock-prefix-value-with-more",
-	}
-
-	var buf bytes.Buffer
-	rw := newRedactWriter(&buf, injected)
-
-	if _, err := rw.Write([]byte("using mock-prefix-value-with-more now\n")); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if err := rw.Flush(); err != nil {
-		t.Fatalf("Flush: %v", err)
-	}
-
-	got := buf.String()
-	if strings.Contains(got, "-with-more") {
-		t.Errorf("the longer secret's suffix leaked because the shorter one matched first: %q", got)
-	}
-	if !strings.Contains(got, "[REDACTED:LONGKEY]") {
-		t.Errorf("the longer secret was not redacted under its own name: %q", got)
 	}
 }

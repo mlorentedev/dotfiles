@@ -135,6 +135,7 @@ type AuditFinding struct {
 	Source   LinkSource
 	Severity AuditSeverity
 	Detail   string
+	zombie   bool // its issue is CLOSED: the one verdict a stale checkout can fake
 }
 
 // AuditNeedsAttention reports whether an audit is anything other than clean.
@@ -167,7 +168,7 @@ func AuditIssueState(repoRoot, homeRepo string, lookup IssueStateLookup) ([]Audi
 	states := lookupAll(findings, lookup)
 	for i := range findings {
 		if findings[i].Severity == "" {
-			grade(&findings[i], states[findings[i].Ref])
+			grade(&findings[i], states[findings[i].Ref], homeRepo)
 		}
 	}
 	return findings, nil
@@ -246,12 +247,19 @@ func lookupAll(findings []AuditFinding, lookup IssueStateLookup) map[IssueRef]lo
 	return results
 }
 
-func grade(f *AuditFinding, r lookupResult) {
+// grade turns one lookup into a verdict. A 404 is proof of absence only in the
+// repository the token is scoped to: GitHub answers 404 for a missing issue and
+// for a repository the token cannot see alike, so elsewhere it is "not verified"
+// (#1909), the verdict an unauthenticated run already gets.
+func grade(f *AuditFinding, r lookupResult, homeRepo string) {
 	switch {
 	case r.err != nil:
 		f.Severity, f.Detail = SeverityUnanswerable, fmt.Sprintf("%s could not be checked: %v", f.Ref, r.err)
 	case r.state == StateClosed:
 		f.Severity, f.Detail = SeverityFail, fmt.Sprintf("zombie: %s is CLOSED but the spec is still active", f.Ref)
+		f.zombie = true
+	case r.state == StateNotFound && !strings.EqualFold(f.Ref.Repo, homeRepo):
+		f.Severity, f.Detail = SeverityUnanswerable, fmt.Sprintf("%s could not be verified: GitHub answered 404, which is also what a repository this token cannot see answers", f.Ref)
 	case r.state == StateNotFound:
 		f.Severity, f.Detail = SeverityFail, fmt.Sprintf("unresolvable link: %s does not exist", f.Ref)
 	case r.state == StateNotIssue:
@@ -262,5 +270,51 @@ func grade(f *AuditFinding, r lookupResult) {
 		f.Severity, f.Detail = SeverityWarn, fmt.Sprintf("%s is open, but linked only in prose — move it to the `issue:` frontmatter field", f.Ref)
 	default:
 		f.Severity, f.Detail = SeverityOK, fmt.Sprintf("%s is open", f.Ref)
+	}
+}
+
+// ArchiveLookup answers whether the forge's default branch already holds
+// specs/archive/<specID>. A non-nil error means it could not be asked.
+type ArchiveLookup func(specID string) (bool, error)
+
+// archiveRoutes are where `spec archive` moves a spec: the plain route, and
+// the one `--abandoned` takes.
+var archiveRoutes = []string{"specs/archive/", "specs/archive/_abandoned/"}
+
+// GHArchiveLookup builds an ArchiveLookup over the REST contents endpoint of
+// homeRepo. It names no ref, so the forge answers for its default branch.
+func GHArchiveLookup(run func(args ...string) (stdout, stderr string, err error), homeRepo string) ArchiveLookup {
+	return func(specID string) (bool, error) {
+		for _, route := range archiveRoutes {
+			_, errOut, err := run("api", fmt.Sprintf("repos/%s/contents/%s%s", homeRepo, route, specID), "--jq", ".[0].name")
+			switch {
+			case err == nil:
+				return true, nil
+			case !strings.Contains(errOut, "HTTP 404"):
+				return false, fmt.Errorf("gh api %s%s: %s", route, specID, firstLine(errOut, err))
+			}
+		}
+		return false, nil
+	}
+}
+
+// ExcuseArchivedZombies re-grades a zombie as a WARN when the default branch
+// has already archived its spec (#2918). The audit reads the specs from a
+// checkout cut when the run started and the issue state live, so an archive
+// that merges in between leaves an active spec beside a closed issue. A base
+// that cannot be asked keeps the FAIL: the zombie question was answered.
+func ExcuseArchivedZombies(findings []AuditFinding, archived ArchiveLookup) {
+	for i := range findings {
+		f := &findings[i]
+		if !f.zombie {
+			continue
+		}
+		ok, err := archived(f.SpecID)
+		switch {
+		case err != nil:
+			f.Detail += fmt.Sprintf("; whether the default branch archived it could not be checked: %v", err)
+		case ok:
+			f.Severity, f.Detail = SeverityWarn, fmt.Sprintf("%s is CLOSED and the default branch already archived this spec, after this checkout was cut: merge the base", f.Ref)
+		}
 	}
 }

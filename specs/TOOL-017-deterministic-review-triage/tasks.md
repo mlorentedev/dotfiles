@@ -59,7 +59,9 @@ created: "2026-08-18"
 - [ ] `bats tests/*.bats`
 - [ ] `shellcheck` clean
 - [ ] Red-teamed: removing each fix turns its guard red, **and each mutation is confirmed to have landed**
-- [ ] Replayed against #1059's real payload: the REAL finding must come back **refuted**, and the multi-line hole must not be claimed as the reviewer's finding
+- [x] Replayed against #1059's real payload: the REAL finding must come back **refuted**, and the multi-line hole must not be claimed as the reviewer's finding
+  - Evidence (2026-10-22, at `1719024f`, the commit #1059 was reviewed on): the reviewer's flagless evasion as a probe gives `Reproduction: did-not-reproduce (exit 1, defect when the check passes) … with probe flagless.diff: \`bats tests/ci-age-pin.bats\``, since bats catches it at line 98: refuted. The multi-line `apt-get` form, which the reviewer did not name, gives `reproduced (exit 0, …) with probe multiline.diff`: a separate finding, not the reviewer's.
+  - The first replay wrapped the check as `sh -c '! bats …'`, which would read a missing `bats` (127) as a refutation; `--defect-when-passes` replaces that wrapper (#2926).
 
 ## Machine-readable features
 

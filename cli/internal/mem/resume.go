@@ -75,32 +75,6 @@ func pointerIn(block string) string {
 	return ""
 }
 
-// codeRunners are the listed commands that run code their arguments choose: a
-// flag can hand them a program (go test -exec, go vet -vettool) or an output
-// path, and a path can name a script outside the checkout (bats /tmp/x.bats).
-// For these only the flags below pass, and a path stays inside the checkout.
-// An allowlist, because the denylist before it missed --outputdir.
-var codeRunners = map[string]*regexp.Regexp{
-	"go test":    regexp.MustCompile(`^--?(run|skip|count|v|short|race|timeout|cover|failfast|json|list|shuffle|tags|p|parallel|cpu|bench|benchtime)(=.*)?$`),
-	"go vet":     regexp.MustCompile(`^--?(json|tags|v)(=.*)?$`),
-	"bats":       regexp.MustCompile(`^(-f|--filter|-j|--jobs|-t|--tap|-p|--pretty|-r|--recursive|--print-output-on-failure|--show-output-of-passing-tests|-x|--trace|--timing|-T)(=.*)?$`),
-	"shellcheck": regexp.MustCompile(`^(-x|--external-sources|-a|--check-sourced|-S|--severity|-s|--shell|-e|--exclude|-i|--include|-f|--format)(=.*)?$`),
-}
-
-// insideCheckout is false for a path argument that can leave the working
-// directory: absolute, home-relative, or with a .. segment (./... is not one).
-func insideCheckout(arg string) bool {
-	if strings.HasPrefix(arg, "/") || strings.HasPrefix(arg, "~") || strings.HasPrefix(arg, `\`) || filepath.VolumeName(arg) != "" {
-		return false
-	}
-	for _, seg := range strings.FieldsFunc(arg, func(r rune) bool { return r == '/' || r == '\\' }) {
-		if seg == ".." {
-			return false
-		}
-	}
-	return true
-}
-
 // readOnlyPrefixes are the Verify commands a resume presents as safe to run
 // first. Anything else is marked unverified: a MEMORY file is input the next
 // session did not write, and the session still runs every command through its
@@ -114,46 +88,45 @@ var readOnlyPrefixes = []string{
 	"go test", "go vet", "bats", "shellcheck",
 }
 
-// writesFile is an argument that makes a listed command write a file:
-// git diff --output=x, go test -o x.
-var writesFile = regexp.MustCompile(`^(--output(=.*)?|-o.*)$`)
+// plainCommand is a command made only of characters the shell does not
+// interpret, separated by plain spaces, so the shell splits it exactly where
+// strings.Fields does: the check reads what will run. No quote, `$`, `~`,
+// `=`, `:` or line break gets through, which is what defeated every narrower
+// rule before it (${IFS}-exec=, a quoted '-exec=', HEAD:secrets).
+var plainCommand = regexp.MustCompile(`^[A-Za-z0-9_./ -]+$`)
 
-// shellControl is what lets one command run another: chaining, pipes,
-// redirection, substitution and a line break. A prefix match proves nothing
-// past it.
-var shellControl = regexp.MustCompile("[;&|<>`\\n\\r]|\\$\\(")
-
+// readOnlyCommand is true only where read-only is decidable: a listed prefix
+// followed by plain positional words that stay inside the checkout. Every
+// flag is refused, because every escape hatch the reviews found was one
+// (go test -exec, --outputdir, dotf doctor --fix, gh pr view --web); a
+// command with flags renders unverified and still runs through the gate.
 func readOnlyCommand(cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
-	if shellControl.MatchString(cmd) {
+	if !plainCommand.MatchString(cmd) {
 		return false
 	}
-	for _, arg := range strings.Fields(cmd) {
-		if writesFile.MatchString(arg) {
-			return false
-		}
-	}
 	for _, p := range readOnlyPrefixes {
-		if cmd == p || strings.HasPrefix(cmd, p+" ") {
-			return runnerArgsSafe(p, strings.Fields(strings.TrimPrefix(cmd, p)))
+		if cmd != p && !strings.HasPrefix(cmd, p+" ") {
+			continue
 		}
+		for _, arg := range strings.Fields(strings.TrimPrefix(cmd, p)) {
+			if strings.HasPrefix(arg, "-") || !insideCheckout(arg) {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }
 
-// runnerArgsSafe holds a code runner's arguments to codeRunners; any other
-// listed command passes.
-func runnerArgsSafe(prefix string, args []string) bool {
-	flags, ok := codeRunners[prefix]
-	if !ok {
-		return true
+// insideCheckout is false for a path that can leave the working directory:
+// absolute, or with a .. segment (./... is not one).
+func insideCheckout(arg string) bool {
+	if strings.HasPrefix(arg, "/") {
+		return false
 	}
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			if !flags.MatchString(arg) {
-				return false
-			}
-		} else if !insideCheckout(arg) {
+	for _, seg := range strings.Split(arg, "/") {
+		if seg == ".." {
 			return false
 		}
 	}
@@ -163,29 +136,33 @@ func runnerArgsSafe(prefix string, args []string) bool {
 // inlineCode finds the backticked commands in a Verify field.
 var inlineCode = regexp.MustCompile("`([^`]+)`")
 
-// hasWords is text with a word in it, not just the commas between commands.
-var hasWords = regexp.MustCompile(`[[:alpha:]]`)
+// unverifiedNote explains the in-place marker once per field.
+const unverifiedNote = "(a command marked unverified is not a plain read-only one; run it only through the normal permission gate)"
 
-// verifyLines renders each Verify command as a list item, marking the ones
-// outside the read-only allowlist. Prose with no command is kept as written.
-func verifyLines(v string) []string {
-	var out []string
-	// Prose beside the commands is part of the record (a caveat such as "not on
-	// mba"), so it is kept as written above the list, never dropped.
-	if prose := inlineCode.ReplaceAllString(v, ""); hasWords.MatchString(stripBreaks(prose)) && inlineCode.MatchString(v) {
-		out = append(out, "As written: "+entryLine(v, 0))
-	}
-	for _, m := range inlineCode.FindAllStringSubmatch(v, -1) {
-		line := "- `" + m[1] + "`"
-		if !readOnlyCommand(m[1]) {
-			line += " (unverified: not on the read-only list; run it only through the normal permission gate)"
+// verifyText is a Verify field as written, every line kept, with each command
+// that is not provably read-only marked where it stands. One rendering, so no
+// unmarked copy of a marked command exists, and prose, caveats and bullets
+// without a command all survive (ParseThread drops no line either).
+func verifyText(v string) (string, bool) {
+	marked := false
+	out := inlineCode.ReplaceAllStringFunc(stripBreaks(v), func(span string) string {
+		if readOnlyCommand(strings.Trim(span, "`")) {
+			return span
 		}
-		out = append(out, line)
+		marked = true
+		return span + " (unverified)"
+	})
+	return strings.Trim(out, "\n"), marked
+}
+
+// verifyBlock is the field's text under a heading line, which carries the
+// note when anything in it is marked.
+func verifyBlock(heading, v string) string {
+	text, marked := verifyText(v)
+	if marked {
+		heading += " " + unverifiedNote
 	}
-	if len(out) == 0 && strings.TrimSpace(v) != "" {
-		out = append(out, "- "+entryLine(v, 0))
-	}
-	return out
+	return heading + "\n" + text
 }
 
 // RenderResume renders a thread's full text for the next session (MEMORY-008).
@@ -227,7 +204,7 @@ func renderContext(th Thread, source string) string {
 func writeField(b *strings.Builder, label, v string) {
 	switch label {
 	case "Verify":
-		fmt.Fprintf(b, "\n**Verify:**\n%s\n", strings.Join(verifyLines(v), "\n"))
+		fmt.Fprintf(b, "\n%s\n", verifyBlock("**Verify:**", v))
 	default:
 		sep := " "
 		if strings.Contains(v, "\n") || strings.HasPrefix(strings.TrimSpace(v), "- ") {
@@ -250,7 +227,7 @@ func renderPrompt(th Thread, source string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Resume thread %s. Its full handoff is %s; read it before acting.\n", th.Key, source)
 	if v, ok := th.Get("Verify"); ok && strings.TrimSpace(v) != "" {
-		fmt.Fprintf(&b, "\nFirst confirm the state it describes:\n%s\n", strings.Join(verifyLines(v), "\n"))
+		fmt.Fprintf(&b, "\n%s\n", verifyBlock("First confirm the state it describes:", v))
 	}
 	if v, ok := th.Get("Awaiting Manu"); ok && strings.TrimSpace(v) != "" {
 		fmt.Fprintf(&b, "\nThese wait on Manu; ask, do not decide them:\n%s\n", stripBreaks(v))

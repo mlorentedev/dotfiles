@@ -15,9 +15,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: `cd cli && go test ./...` -> exit 0 (2026-10-22, #2926 branch); `golangci-lint run` -> 0 issues; `GOOS=windows go vet ./...` -> ok
+- Manual smoke test: the #1059 replay rerun at `1719024f` with `--defect-when-passes` (see `tasks.md`); the AC4 gate run on #2924's own triage record -> `[OK]`, exit 0
+- No regressions in existing test suite: yes
 
 ## Decisions made during implementation
 
@@ -36,6 +36,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Landing and restoring compare each target's git blob id (`git hash-object`), not its raw bytes. On the Windows runner (autocrlf) a file git called clean was LF on disk while every git write rendered it CRLF, so a mode-only probe failed to revert by byte comparison although its content never changed (lesson 512, second instance). Targets are restored by checking them out from HEAD, which the clean-tree check makes exactly how they were found. A first fix that only changed the restore, on the hypothesis that `git apply -R` was at fault, failed the same way on the same runner.
 - `WaitDelay` bounds `Wait` after a timeout kill, because a child holding the output pipe outlives the kill.
 - The command applies nothing and decides nothing: a human pastes its row into `## Review triage`. Gating `apply` on it is AC4, the next slice.
+- 2026-10-22, #2926: a check is inverted by the harness (`--defect-when-passes`), never by the shell. `sh -c '! check'` maps 127 to 0, so a check that never ran refuted the finding it was meant to test (lesson 518). The inversion is applied after the could-not-run cases are classified, so those stay `could-not-run` in both directions.
+- The row names the direction (`defect when the check passes`), because the same exit code now means opposite things on two rows and a reader cannot tell them apart otherwise.
+- The row quotes its command and escapes `|`. Dogfooding the gate on #2924 produced two rows whose quoted pattern lost its quotes, so the recorded command was not the one that ran; a pipe inside the row also splits the triage table's cell. The gate still reads such a row, since the disposition is the first cell after the naming one.
+- `classify` lost its `started` parameter: a mutation removing `!started` survived, because a check that never started keeps exit -1 and `exit < 0` already catches it. Deleted rather than kept as documentation, per the mutation discipline.
 
 ## Promotion candidates
 

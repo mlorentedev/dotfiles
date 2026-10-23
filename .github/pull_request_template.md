@@ -44,5 +44,5 @@ Empty rationale = the spec-gate fails even with the "skip-sdd" label.
 - [ ] `bats tests/*.bats` passes (or relevant test suites)
 - [ ] `shellcheck scripts/*.sh setup-linux.sh` clean on changed `.sh`
 - [ ] `cd cli && go test ./...` passes (if touching Go tooling)
-- [ ] `./scripts/compile-harness.sh --check` clean (if touching skills or manifest)
+- [ ] `dotf harness check` clean (if touching skills or manifest)
 - [ ] Manual verification (describe):

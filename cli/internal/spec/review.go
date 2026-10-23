@@ -334,6 +334,18 @@ func reviewWaiver(specDir string) (waived bool, reason string) {
 	return true, strings.TrimSpace(f["review_waived_reason"])
 }
 
+// signedFail names the review file of either signer whose verdict is FAIL, or
+// "" when none is. A malformed or provisional file is not a signed refusal, so
+// a waiver still stands in for it (GUARD-018, #1644).
+func signedFail(specDir string) string {
+	for _, slot := range []ReviewSlot{FirstSigner, SecondSigner} {
+		if r, found, err := FindReviewIn(specDir, slot); found && err == nil && r.Verdict == VerdictFail {
+			return slot.Review
+		}
+	}
+	return ""
+}
+
 // checkReviewGate is Archive's second pre-flight. It returns nil when the spec
 // may be archived, and an error naming both declared escapes otherwise.
 func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker) error {
@@ -341,6 +353,11 @@ func checkReviewGate(repoRoot, specID, specDir string, checker StalenessChecker)
 		if reason == "" {
 			return fmt.Errorf("proposal.md declares `review: waived` without a reason\n" +
 				"add a non-empty `review_waived_reason:` so the waiver is auditable")
+		}
+		if failed := signedFail(specDir); failed != "" {
+			return fmt.Errorf("%s records verdict FAIL, and `review: waived` stands in for a review nobody ran, not for one that refused\n"+
+				"apply the findings and run `dotf spec review %s` again; to abandon the spec with its findings ticketed, `dotf spec archive --help` lists the recorded exits",
+				failed, specID)
 		}
 		return nil
 	}

@@ -47,3 +47,18 @@ func TestMemResumeListsCandidates(t *testing.T) {
 		t.Errorf("want the candidates listed:\n%s", out)
 	}
 }
+
+// A thread key comes from MEMORY.md and --agent from the caller: neither may
+// put shell syntax into the line the operator copies (MEMORY-008 review round 4).
+func TestMemResumeQuotesTheCandidateLine(t *testing.T) {
+	memory := filepath.Join(t.TempDir(), "MEMORY.md")
+	doc := "# M\n\n## Session Handoff\n\n### thread: x;echo${IFS}pwned (writer: pi)\n\n**Next action:** a.\n"
+	if err := os.WriteFile(memory, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := runMemResumeT(t, "--memory", memory, "--thread", "nope", "--agent", "claude --x")
+	want := "dotf mem resume --thread 'x;echo${IFS}pwned' --memory '" + memory + "' --agent 'claude --x'\n"
+	if !strings.Contains(out, want) {
+		t.Errorf("want %q in:\n%s", want, out)
+	}
+}

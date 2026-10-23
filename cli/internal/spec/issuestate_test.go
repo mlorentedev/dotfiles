@@ -81,6 +81,7 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 	writeAuditSpec(t, root, "A-001-open", frontmatter(`issue: "mlorentedev/dotfiles#1"`))
 	writeAuditSpec(t, root, "A-002-zombie", frontmatter(`issue: "mlorentedev/dotfiles#2"`))
 	writeAuditSpec(t, root, "A-003-gone", frontmatter(`issue: "mlorentedev/kubelab#611"`))
+	writeAuditSpec(t, root, "A-003b-gone-here", frontmatter(`issue: "mlorentedev/dotfiles#612"`))
 	writeAuditSpec(t, root, "A-004-pull", frontmatter(`issue: "#4"`))
 	writeAuditSpec(t, root, "A-005-prose", frontmatter(`status: draft`)+"\n- GH issue: [#5](https://github.com/mlorentedev/dotfiles/issues/5)\n")
 	writeAuditSpec(t, root, "A-006-unlinked", frontmatter(`status: draft`))
@@ -97,11 +98,12 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 	}
 
 	f := &fakeLookup{states: map[string]IssueState{
-		"mlorentedev/dotfiles#1":  StateOpen,
-		"mlorentedev/dotfiles#2":  StateClosed,
-		"mlorentedev/kubelab#611": StateNotFound,
-		"mlorentedev/dotfiles#4":  StateNotIssue,
-		"mlorentedev/dotfiles#5":  StateOpen,
+		"mlorentedev/dotfiles#1":   StateOpen,
+		"mlorentedev/dotfiles#2":   StateClosed,
+		"mlorentedev/kubelab#611":  StateNotFound,
+		"mlorentedev/dotfiles#612": StateNotFound,
+		"mlorentedev/dotfiles#4":   StateNotIssue,
+		"mlorentedev/dotfiles#5":   StateOpen,
 	}}
 	got, err := AuditIssueState(root, homeRepo, f.lookup)
 	if err != nil {
@@ -110,7 +112,8 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 	want := map[string]AuditSeverity{
 		"A-001-open":            SeverityOK,
 		"A-002-zombie":          SeverityFail,
-		"A-003-gone":            SeverityFail,
+		"A-003-gone":            SeverityUnanswerable,
+		"A-003b-gone-here":      SeverityFail,
 		"A-004-pull":            SeverityFail,
 		"A-005-prose":           SeverityWarn,
 		"A-006-unlinked":        SeverityWarn,
@@ -136,10 +139,24 @@ func TestIssueStateAuditClassifies(t *testing.T) {
 			break
 		}
 	}
+	// A 404 from another repository is not "does not exist": the token may not
+	// see that repository (#1909), so the verdict is "not verified", never FAIL.
+	for _, fd := range got {
+		switch fd.SpecID {
+		case "A-003-gone":
+			if !strings.Contains(fd.Detail, "could not be verified") {
+				t.Errorf("cross-repo 404 detail = %q, want it to say the issue could not be verified", fd.Detail)
+			}
+		case "A-003b-gone-here":
+			if !strings.Contains(fd.Detail, "does not exist") {
+				t.Errorf("home-repo 404 detail = %q, want %q", fd.Detail, "does not exist")
+			}
+		}
+	}
 	// One lookup per distinct issue: A-002, A-008 and A-009 share #2, and the
 	// malformed and unlinked specs are never looked up.
-	if len(f.calls) != 5 {
-		t.Errorf("lookups = %v, want 5 distinct issues", f.calls)
+	if len(f.calls) != 6 {
+		t.Errorf("lookups = %v, want 6 distinct issues", f.calls)
 	}
 }
 
@@ -280,5 +297,102 @@ func TestIssueStateGHLookup_DoesNotRetryTheCallersDeadline(t *testing.T) {
 	}, Attempts(3), noWait)
 	if _, err := lookup(IssueRef{"o/r", 1}); err == nil || calls != 1 {
 		t.Errorf("got %v after %d call(s), want unanswerable after 1", err, calls)
+	}
+}
+
+func TestArchiveGHLookup(t *testing.T) {
+	cases := []struct {
+		name    string
+		stderr  string
+		err     error
+		want    bool
+		wantErr bool
+	}{
+		{"archived on the default branch", "", nil, true, false},
+		{"not archived", "gh: Not Found (HTTP 404)\n", errors.New("exit status 1"), false, false},
+		{"rate limit is unanswerable", "gh: API rate limit exceeded (HTTP 403)\n", errors.New("exit status 1"), false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotArgs []string
+			archived := GHArchiveLookup(func(args ...string) (string, string, error) {
+				gotArgs = args
+				return "proposal.md\n", tc.stderr, tc.err
+			}, homeRepo)
+			got, err := archived("A-002-zombie")
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Fatalf("got (%v, %v), want (%v, err=%v)", got, err, tc.want, tc.wantErr)
+			}
+			if len(gotArgs) < 2 || !strings.HasPrefix(gotArgs[1], "repos/"+homeRepo+"/contents/specs/archive/") {
+				t.Fatalf("gh called with %v, want the contents endpoint on the default branch", gotArgs)
+			}
+		})
+	}
+}
+
+// `spec archive --abandoned` routes to specs/archive/_abandoned/<id>, which is
+// as much an archive as the plain route: FIX-WIN-TUI-001 on 2026-10-22.
+func TestArchiveGHLookupFindsAnAbandonedSpec(t *testing.T) {
+	var asked []string
+	archived := GHArchiveLookup(func(args ...string) (string, string, error) {
+		asked = append(asked, args[1])
+		if strings.HasSuffix(args[1], "/_abandoned/A-002-zombie") {
+			return "proposal.md\n", "", nil
+		}
+		return "", "gh: Not Found (HTTP 404)\n", errors.New("exit status 1")
+	}, homeRepo)
+	if got, err := archived("A-002-zombie"); err != nil || !got {
+		t.Fatalf("got (%v, %v) after asking %v, want an abandoned spec read as archived", got, err, asked)
+	}
+}
+
+// A checkout cut before the default branch archived a spec still holds it
+// active while its issue is already closed: that is a stale ref, not a zombie
+// (#2918). Only a zombie is excused, and only on an answered "archived".
+func TestExcuseArchivedZombies(t *testing.T) {
+	root := t.TempDir()
+	writeAuditSpec(t, root, "A-002-zombie", frontmatter(`issue: "mlorentedev/dotfiles#2"`))
+	writeAuditSpec(t, root, "A-003-gone", frontmatter(`issue: "mlorentedev/kubelab#611"`))
+	f := &fakeLookup{states: map[string]IssueState{
+		"mlorentedev/dotfiles#2":  StateClosed,
+		"mlorentedev/kubelab#611": StateNotFound,
+	}}
+	cases := []struct {
+		name       string
+		archived   ArchiveLookup
+		wantZombie AuditSeverity
+		wantDetail string
+	}{
+		{"archived on the base", func(string) (bool, error) { return true, nil }, SeverityWarn, "merge the base"},
+		{"not archived anywhere", func(string) (bool, error) { return false, nil }, SeverityFail, "zombie:"},
+		{"the base cannot be asked", func(string) (bool, error) { return false, errors.New("HTTP 403") }, SeverityFail, "could not be checked"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := AuditIssueState(root, homeRepo, f.lookup)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var asked []string
+			ExcuseArchivedZombies(got, func(id string) (bool, error) {
+				asked = append(asked, id)
+				return tc.archived(id)
+			})
+			if !reflect.DeepEqual(asked, []string{"A-002-zombie"}) {
+				t.Errorf("asked the base about %v, want only the zombie", asked)
+			}
+			for _, fd := range got {
+				switch fd.SpecID {
+				case "A-002-zombie":
+					if fd.Severity != tc.wantZombie || !strings.Contains(fd.Detail, tc.wantDetail) {
+						t.Errorf("zombie graded %s %q, want %s containing %q", fd.Severity, fd.Detail, tc.wantZombie, tc.wantDetail)
+					}
+				case "A-003-gone":
+					if fd.Severity != SeverityUnanswerable {
+						t.Errorf("an issue that is not a zombie was excused: %s", fd.Severity)
+					}
+				}
+			}
+		})
 	}
 }

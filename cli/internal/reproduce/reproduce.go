@@ -47,7 +47,11 @@ type Options struct {
 	Dir     string        // repository root
 	Command []string      // the check; its exit decides the state
 	Timeout time.Duration // zero means no limit beyond ctx
-	Probe   string        // a patch applied for the run; its files are restored after it
+	// DefectWhenPasses inverts a check that ran to its own exit: the
+	// defect exists when it exits 0. For a claim that a guard misses
+	// something, whose own test then passes (#2926).
+	DefectWhenPasses bool
+	Probe            string // a patch applied for the run; its files are restored after it
 }
 
 // outputTail bounds the output a record carries: the end of a failing
@@ -229,20 +233,22 @@ func check(ctx context.Context, o Options) (int, State, string) {
 		exit = cmd.ProcessState.ExitCode()
 	}
 	timedOut := errors.Is(ctx.Err(), context.DeadlineExceeded)
-	return exit, classify(exit, started, timedOut), tail(out.String(), outputTail)
+	return exit, classify(exit, timedOut, o.DefectWhenPasses), tail(out.String(), outputTail)
 }
 
 // classify maps one run of the check to a state. Only a check that ran to
-// its own exit can reproduce or refute: a start failure, a shell's 126 or
-// 127, a signal (exit -1) or a timeout says nothing about the defect.
-func classify(exit int, started, timedOut bool) State {
+// its own exit can reproduce or refute: a start failure or a signal (both
+// exit -1), a shell's 126 or 127, or a timeout says nothing about the defect, and
+// stays could-not-run whichever way the check is read. defectWhenPasses
+// inverts only a check that ran.
+func classify(exit int, timedOut, defectWhenPasses bool) State {
 	switch {
-	case !started, timedOut, exit < 0, exit == 126, exit == 127:
+	case timedOut, exit < 0, exit == 126, exit == 127:
 		return CouldNotRun
-	case exit == 0:
-		return DidNotReproduce
-	default:
+	case (exit == 0) == defectWhenPasses:
 		return Reproduced
+	default:
+		return DidNotReproduce
 	}
 }
 

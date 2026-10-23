@@ -566,7 +566,11 @@ func (in *Installer) selfInstall(t Tool, act action) (Result, error) {
 	for i, a := range t.Source.SelfInstall.Args {
 		selfArgs[i] = t.expand(a, in.GOARCH)
 	}
-	args := []string{"tool", "run", "--refresh-package", pkg, "--from", pkg + "==" + t.Version}
+	args := []string{"tool", "run", "--refresh-package", pkg}
+	for _, dep := range t.Source.SelfInstall.NoBuild {
+		args = append(args, "--no-build-package", dep)
+	}
+	args = append(args, "--from", pkg+"=="+t.Version)
 	if py := in.pythonSeries(); py != "" {
 		args = append(args, "--python", py)
 	}
@@ -679,7 +683,21 @@ func (in *Installer) verifyOnPath(t Tool, manager string) error {
 	if err == nil || version == "" {
 		return err
 	}
-	switch copies := in.PathCopies(t.Name); len(copies) {
+	copies := in.PathCopies(t.Name)
+	moved, rerr := retireLegacyShims(t.Name, copies)
+	if rerr != nil {
+		return fmt.Errorf("%w; %v", err, rerr)
+	}
+	if len(moved) > 0 {
+		if checkProbed(t, in.current(t), absent) == nil {
+			dropShims(moved)
+			_, _ = fmt.Fprintf(in.Out, "%s: removed the legacy launcher that shadowed the %s install\n", t.Name, manager)
+			return nil
+		}
+		restoreShims(moved)
+		copies = in.PathCopies(t.Name)
+	}
+	switch len(copies) {
 	case 0:
 		return err
 	case 1:

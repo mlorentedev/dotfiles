@@ -26,12 +26,13 @@ type Limactl func(stdin io.Reader, stdout, stderr io.Writer, args ...string) err
 
 // Options is one verification run.
 type Options struct {
-	Ref    string    // the committed ref Source was archived from, for the log
-	Source string    // a tar.gz of Ref's tree under dotfiles/ (git archive --prefix=dotfiles/)
-	Name   string    // the Lima instance, unique per run
-	Keep   bool      // leave the instance running for inspection
-	Token  string    // GITHUB_TOKEN for the guest's downloads; it reaches the guest on stdin only
-	Out    io.Writer // progress and the guest's output
+	Ref      string    // the committed ref Source was archived from, for the log
+	Source   string    // a tar.gz of Ref's tree under dotfiles/ (git archive --prefix=dotfiles/)
+	Name     string    // the Lima instance, unique per run
+	Keep     bool      // leave the instance running for inspection
+	Token    string    // GITHUB_TOKEN for the guest's downloads; it reaches the guest on stdin only
+	Out      io.Writer // the guest's and limactl's own output
+	Progress io.Writer // the `==> ` lines; stderr, so stdout stays the guest's
 }
 
 // hostShares are the filesystem types through which a guest sees a host
@@ -51,32 +52,25 @@ func Verify(l Limactl, o Options) (err error) {
 	if o.Source == "" {
 		return errors.New("no source archive to converge")
 	}
-	tmpl, err := os.CreateTemp("", "dotf-vm-*.yaml")
+	tmpl, cleanup, err := writeTemplate()
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.Remove(tmpl.Name()) }()
-	if _, err := tmpl.Write(LinuxTemplate); err != nil {
-		_ = tmpl.Close()
-		return err
-	}
-	if err := tmpl.Close(); err != nil {
-		return err
-	}
+	defer cleanup()
 
 	// Registered before the start: a start that fails partway (an image
 	// download, provisioning) can leave the instance and its disk behind.
 	defer func() {
 		if o.Keep {
-			step(o.Out, "kept: limactl shell %s; remove with limactl delete --force %s", o.Name, o.Name)
+			step(o.Progress, "kept: limactl shell %s; remove with limactl delete --force %s", o.Name, o.Name)
 			return
 		}
 		if derr := l(nil, o.Out, o.Out, "delete", "--force", o.Name); derr != nil {
 			err = errors.Join(err, fmt.Errorf("limactl delete %s: %w", o.Name, derr))
 		}
 	}()
-	step(o.Out, "boot %s (Ubuntu 24.04, nothing shared with the host)", o.Name)
-	if err := l(nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl.Name()); err != nil {
+	step(o.Progress, "boot %s (Ubuntu 24.04, nothing shared with the host)", o.Name)
+	if err := l(nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl); err != nil {
 		return fmt.Errorf("limactl start: %w", err)
 	}
 
@@ -100,13 +94,13 @@ func Verify(l Limactl, o Options) (err error) {
 	if err := Isolated(pid1, mounts); err != nil {
 		return err
 	}
-	step(o.Out, "isolated: systemd is PID 1, no host directory mounted, HOME=%s", home)
+	step(o.Progress, "isolated: systemd is PID 1, no host directory mounted, HOME=%s", home)
 
 	// limactl copy goes over ssh, so plain mode's no-mount isolation holds.
 	// The archive extracts to dotfiles/ under ~/Projects.
 	repo := home + "/Projects/dotfiles"
 	archive := home + "/dotf-src.tar.gz"
-	step(o.Out, "copy a git archive of %s into the guest", o.Ref)
+	step(o.Progress, "copy a git archive of %s into the guest", o.Ref)
 	if err := l(nil, o.Out, o.Out, "copy", o.Source, o.Name+":"+archive); err != nil {
 		return fmt.Errorf("limactl copy: %w", err)
 	}
@@ -122,7 +116,7 @@ func Verify(l Limactl, o Options) (err error) {
 
 	report := home + "/.local/state/dotfiles/converge/last.json"
 	run := func(label string, check func(converge.RunReport) error, args ...string) error {
-		step(o.Out, "%s", label)
+		step(o.Progress, "%s", label)
 		// Judge this run on its own report: a run that writes none must not
 		// pass on the previous one's.
 		if _, err := capture("rm", "-f", report); err != nil {
@@ -146,7 +140,7 @@ func Verify(l Limactl, o Options) (err error) {
 	if err := run("second converge: dotf converge", Idempotent, home+"/.local/bin/dotf", "converge"); err != nil {
 		return err
 	}
-	step(o.Out, "converged, and the second run changed nothing")
+	step(o.Progress, "converged, and the second run changed nothing")
 	return nil
 }
 
@@ -200,6 +194,31 @@ func Idempotent(r converge.RunReport) error {
 	return fmt.Errorf("the second converge changed %d thing(s): %s", r.Changed, strings.Join(changing, ", "))
 }
 
+// step writes one progress line. A nil writer discards it, so an Options built
+// without Progress stays quiet instead of panicking.
 func step(w io.Writer, format string, a ...any) {
+	if w == nil {
+		return
+	}
 	_, _ = fmt.Fprintf(w, "==> "+format+"\n", a...)
+}
+
+// writeTemplate writes the Lima template to a temporary file and returns its
+// path and the function that removes it.
+func writeTemplate() (path string, cleanup func(), err error) {
+	f, err := os.CreateTemp("", "dotf-vm-*.yaml")
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup = func() { _ = os.Remove(f.Name()) }
+	if _, err := f.Write(LinuxTemplate); err != nil {
+		_ = f.Close()
+		cleanup()
+		return "", nil, err
+	}
+	if err := f.Close(); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	return f.Name(), cleanup, nil
 }

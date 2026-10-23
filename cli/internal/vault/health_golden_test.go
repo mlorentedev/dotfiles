@@ -29,6 +29,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/gittest"
 )
 
 // The stub's contract, read from its environment. Set only on the process
@@ -44,6 +46,9 @@ func TestMain(m *testing.M) {
 	if os.Getenv(stubEnvActive) == "1" {
 		os.Exit(runObsidianStub(os.Args[1:]))
 	}
+	// Keeps every git these tests start from forking a background gc that
+	// outlives the test (#2803).
+	gittest.Quiet()
 	os.Exit(m.Run())
 }
 
