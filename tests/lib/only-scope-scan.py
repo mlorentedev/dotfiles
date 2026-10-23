@@ -40,6 +40,13 @@ except ImportError:  # pragma: no cover - environment defect, not a code path
 # this static scan cannot judge those and skips them explicitly.
 EXPANSION = "$"
 
+# The one `--only` argument that is not a list: the profile's helper forwarding
+# the names its callers pass with -Names, which are read at the call site.
+FORWARD = "($Names"
+
+# Prefix for an `--only` argument the scan cannot read; never a registry name.
+UNREADABLE = "unreadable --only argument: "
+
 # The surfaces a human launch actually goes through. Specs and archived docs are
 # prose about past states and are deliberately not scanned.
 SCAN_GLOBS = (".zsh/*.zsh", "scripts/*.sh", "systemd/**/*.conf")
@@ -91,9 +98,24 @@ def tokens_in(path):
     """
     with open(path, encoding="utf-8", errors="replace") as handle:
         for lineno, line in enumerate(handle, 1):
-            if re.match(r"\s*(#|//)", line) or not re.search(r"secrets\s+run\b", line):
+            if re.match(r"\s*(#|//)", line):
                 continue
-            for match in re.finditer(r"--only[=\s]+([A-Za-z0-9_,${}]+)", line):
+            # The PowerShell wrappers name their scope at the call site and the
+            # helper forwards it (#2909); the list read here is that call site's.
+            for match in re.finditer(r"Invoke-WithSessionSecrets\b.*?-Names\s+([A-Za-z0-9_,]+)", line):
+                for token in match.group(1).split(","):
+                    if token.strip():
+                        yield lineno, token.strip()
+            if not re.search(r"secrets\s+run\b", line):
+                continue
+            for match in re.finditer(r"--only[=\s]+(\S+)", line):
+                if match.group(1) == FORWARD:
+                    continue
+                if not re.fullmatch(r"[A-Za-z0-9_,${}]+", match.group(1)):
+                    # An argument this scan cannot read must not pass as checked:
+                    # the forward above was invisible to it until #2909.
+                    yield lineno, UNREADABLE + match.group(1)
+                    continue
                 for token in match.group(1).split(","):
                     token = token.strip()
                     if token and EXPANSION not in token:

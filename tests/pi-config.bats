@@ -37,8 +37,10 @@ setup() {
     done
     grep -qE '^[[:space:]]*function pi \{' "$DOTFILES_DIR/powershell/profile.ps1" \
         || { echo "profile.ps1: no pi wrapper"; return 1; }
-    grep -qE '^[[:space:]]*\$env_b64 = \(dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- powershell -NoProfile -Command "\[Convert\]::ToBase64String' "$DOTFILES_DIR/powershell/profile.ps1" \
-        || { echo "profile.ps1: pi wrapper does not extract NAN_API_KEY through secrets run"; return 1; }
+    # What the wrapper does with the names is tested by behaviour in
+    # profile-secret-wrappers.bats; this pins only that pi asks for NAN_API_KEY.
+    grep -qE '^[[:space:]]*Invoke-WithSessionSecrets -Names [A-Z_,]*NAN_API_KEY[A-Z_,]* -App pi ' "$DOTFILES_DIR/powershell/profile.ps1" \
+        || { echo "profile.ps1: pi wrapper does not inject NAN_API_KEY"; return 1; }
 }
 
 # #2813: herdr identifies an agent by the FOREGROUND process of the pane terminal,
