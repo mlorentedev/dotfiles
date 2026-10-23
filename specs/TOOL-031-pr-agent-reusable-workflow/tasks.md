@@ -46,7 +46,9 @@ A1 is about 600 executable lines, so it ships as three PRs, each based on the pr
     another host. A differential test holds `Preflight` to the script, as A1b
     does for `Route`.
   - Exit 0 when a model answered, 1 when none did, 2 on a setup error,
-    including an unwritable `--output`; a setup error writes no job summary.
+    including an unwritable `--output`. A setup error found before any probe
+    writes no job summary; an unwritable `--output` is found after the probes,
+    so their summary is already written.
 - [ ] [P] [AC2] `dotf pr guard`: port the `pr-agent-publish-guard.bats` cases (FAIL), implement (PASS)
 - [ ] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract read (FAIL), implement (PASS)
 
