@@ -93,6 +93,9 @@ func Run(h Host, o RunOptions) (err error) {
 		return err
 	}
 	defer func() { _ = q.Close() }()
+	if err := syncClock(q, o); err != nil {
+		return err
+	}
 	if err := waitLogon(q, o); err != nil {
 		return err
 	}
@@ -180,6 +183,43 @@ func running(h Host, l Layout) bool {
 	}
 	_ = conn.Close()
 	return true
+}
+
+// clockSkew is how far the guest clock may sit from the host's once set: the
+// round trip of two agent calls, with room to spare.
+const clockSkew = time.Minute
+
+// syncClock sets the guest clock to the host's. QEMU's arm64 RTC carries UTC
+// and Windows reads it as local time, so a guest in a UTC+2 zone boots two
+// hours behind and rejects any certificate issued in the last two hours
+// (#2932). Setting it through the agent needs no clean-base rebuild and also
+// corrects the drift of a kept guest. It is read back, because a run on a
+// wrong clock fails later for a reason that has nothing to do with the ref.
+func syncClock(q *QGA, o RunOptions) error {
+	was, err := q.Time()
+	if err != nil {
+		return fmt.Errorf("read the guest clock: %w", err)
+	}
+	step(o.Progress, "set the guest clock to the host's (it was %s)", skew(time.Since(was)))
+	if err := q.SetTime(time.Now()); err != nil {
+		return fmt.Errorf("set the guest clock: %w", err)
+	}
+	got, err := q.Time()
+	if err != nil {
+		return fmt.Errorf("read the guest clock back: %w", err)
+	}
+	if d := time.Since(got); d > clockSkew || d < -clockSkew {
+		return fmt.Errorf("the guest clock is still %s after guest-set-time, so TLS in the guest would fail on certificate dates", skew(d))
+	}
+	return nil
+}
+
+// skew names how far a clock sits from the host's, d being host minus guest.
+func skew(d time.Duration) string {
+	if d < 0 {
+		return (-d).Round(time.Second).String() + " ahead"
+	}
+	return d.Round(time.Second).String() + " behind"
 }
 
 // waitLogon waits for autologon: a step runs in the test user's session, and

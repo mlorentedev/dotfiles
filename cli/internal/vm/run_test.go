@@ -37,7 +37,10 @@ type fakeGuest struct {
 	status  map[int]map[string]any // guest-exec-status by pid
 	asked   int                    // logon queries
 	quits   int
-	running bool // a QMP socket answers before the run starts
+	running bool  // a QMP socket answers before the run starts
+	clock   int64 // the guest clock, in ns; zero until a guest-set-time
+	stuck   bool  // the clock ignores guest-set-time, 2h behind like a UTC RTC read as UTC+2
+	setAt   int   // len(execs) when the clock was set, -1 if never
 }
 
 type guestStep struct {
@@ -94,9 +97,31 @@ func (g *fakeGuest) Dial(socket string) (net.Conn, error) {
 		"guest-file-write":  g.fwrite,
 		"guest-file-read":   g.fread,
 		"guest-file-close":  func(json.RawMessage) any { return map[string]any{} },
+		"guest-set-time":    g.setTime,
+		"guest-get-time":    g.getTime,
 	}}
 	go a.serve(guest)
 	return host, nil
+}
+
+func (g *fakeGuest) setTime(a json.RawMessage) any {
+	var st struct {
+		Time int64 `json:"time"`
+	}
+	_ = json.Unmarshal(a, &st)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.clock, g.setAt = st.Time, len(g.execs)
+	return map[string]any{}
+}
+
+func (g *fakeGuest) getTime(json.RawMessage) any {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.stuck || g.clock == 0 {
+		return time.Now().Add(-2 * time.Hour).UnixNano()
+	}
+	return g.clock
 }
 
 func (g *fakeGuest) exec(a json.RawMessage) any {
@@ -299,6 +324,48 @@ func TestRun_ConvergesTwiceOnAThrowawayOverlay(t *testing.T) {
 	}
 	if fi, _ := os.Stat(l.BaseDisk()); fi.Mode().Perm()&0o222 != 0 {
 		t.Error("the run made clean-base writable")
+	}
+}
+
+// The guest's RTC carries UTC and Windows reads it as local time, so a fresh
+// guest runs hours behind and rejects any certificate younger than that
+// (#2932). The run sets the clock from the host before it copies anything in.
+func TestRun_SetsTheGuestClockBeforeTheRun(t *testing.T) {
+	o := sealedBase(t)
+	g := newFakeGuest(t, okStep, nothingStep)
+	g.setAt = -1
+	before := time.Now()
+	if err := Run(g, o); err != nil {
+		t.Fatalf("%v\n%s", err, o.Out)
+	}
+	if g.setAt < 0 {
+		t.Fatal("the run never set the guest clock")
+	}
+	if got := o.Progress.(*bytes.Buffer).String(); !strings.Contains(got, "set the guest clock to the host's (it was 2h0m0s behind)") {
+		t.Errorf("the progress does not name the skew it corrected:\n%s", got)
+	}
+	if set := time.Unix(0, g.clock); set.Before(before.Add(-time.Second)) || set.After(time.Now()) {
+		t.Errorf("the guest clock was set to %v, not the host's time", set)
+	}
+	for _, e := range g.execs[:g.setAt] {
+		if strings.Contains(e, "mkdir") || strings.Contains(e, "schtasks") {
+			t.Errorf("%q ran before the clock was set", e)
+		}
+	}
+}
+
+// A clock that does not take is a run that would fail later for a reason
+// unrelated to the ref, so the run stops with the skew named.
+func TestRun_AGuestClockThatDoesNotTakeFails(t *testing.T) {
+	o := sealedBase(t)
+	g := newFakeGuest(t, okStep, nothingStep)
+	g.stuck = true
+	err := Run(g, o)
+	if err == nil || !strings.Contains(err.Error(), "clock") || !strings.Contains(err.Error(), "behind") {
+		t.Fatalf("want an error naming the clock skew, got %v", err)
+	}
+	if len(g.ran("schtasks.exe /run")) != 0 {
+		t.Error("a converge step ran on a guest with a wrong clock")
 	}
 }
 
