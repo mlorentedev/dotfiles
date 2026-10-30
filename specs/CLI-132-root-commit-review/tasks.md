@@ -84,13 +84,13 @@ created: "2026-10-30"
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one
   named test
-- [ ] Every acceptance criterion has a matching entry in `features.json`
-- [ ] `go test ./internal/spec/ ./internal/cmd/ -count=1` passes
-- [ ] `gofmt -l internal` is empty and `go vet ./...` passes
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in with command output
+- [x] Every acceptance criterion has a matching entry in `features.json`
+- [x] `go test ./internal/spec/ ./internal/cmd/ -count=1 -p 1 -timeout 40m` passes
+- [x] `gofmt -l internal` is empty and `go vet ./...` passes
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in with command output
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features

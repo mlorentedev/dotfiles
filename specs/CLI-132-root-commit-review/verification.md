@@ -15,7 +15,7 @@ Run every command from `cli/`. Commits are on `feat/root-commit-review`.
   `TestResolveReviewBaseDetailReportsAnUntraceableMove` (both untraceable
   shapes), `TestResolveReviewBaseDetailKeepsTheBaseOfAnOrdinarySpec`. The
   eleven existing `TestResolveReviewBase*` regressions pass unchanged.
-- [x] **AC2** -> batch 3 commit: `TestSpecReviewInitialLaunchesForARootCommitSpec`,
+- [x] **AC2** -> `d90643c1`: `TestSpecReviewInitialLaunchesForARootCommitSpec`,
   `TestSpecReviewInitialRefusesEveryOtherBaseState` (ordinary, uncommitted,
   untraceable; previous `review.md` and request byte-identical after the
   refusal), `TestSpecReviewWithoutInitialRefusesARootCommitSpecAndNamesTheFlag`.
@@ -24,7 +24,7 @@ Run every command from `cli/`. Commits are on `feat/root-commit-review`.
   (also pins that `git diff <tree>...HEAD` fails), `TestReviewPromptStatesTheInitialScope`,
   `TestReviewPromptKeepsTheTripleDotScopeForAnOrdinaryBase` (ordinary prompt
   byte-identical to `ReviewPromptIn`).
-- [x] **AC4** -> `39245ab5` and batch 3 commit: `TestReviewRequestRecordsTheInitialScope`,
+- [x] **AC4** -> `39245ab5` and `d90643c1`: `TestReviewRequestRecordsTheInitialScope`,
   `TestRecordReviewRequestWritesTheInitialScope`, and the dry-run assertions in
   `TestSpecReviewInitialLaunchesForARootCommitSpec`.
 - [x] **AC5** -> `39245ab5`: `TestProvenanceRefusesAnUnknownReviewScope`,
@@ -44,7 +44,7 @@ Run every command from `cli/`. Commits are on `feat/root-commit-review`.
 ## Test status
 
 - Focused: all commands in `features.json` pass.
-- Full packages: `go test ./internal/spec/ ./internal/cmd/ -count=1` -> see
+- Full packages: `go test ./internal/spec/ ./internal/cmd/ -count=1 -p 1 -timeout 40m` -> PASS; see
   "Full-suite runs" below.
 - `go build ./...` and `go vet ./internal/cmd/ ./internal/spec/`: clean.
 - Formatting: `gofmt` reports no change on every touched `.go` file after
@@ -61,7 +61,11 @@ Run every command from `cli/`. Commits are on `feat/root-commit-review`.
    and `TestOutputStringsHaveNoInternalReferences` because the new `--help`
    example used an id with a spec-area prefix. Corrected to
    `FEAT-002-first-commit`; both tests pass.
-2. Second run: pending.
+2. Second run, both packages in parallel: each exceeded `go test`'s default
+   10-minute timeout inside the `git` test helper. No assertion failed; every
+   git call takes seconds on this workstation.
+3. Third run, `go test ./internal/spec/ ./internal/cmd/ -count=1 -p 1 -timeout 40m`:
+   `ok internal/spec 531.779s`, `ok internal/cmd 367.146s`.
 
 ### Manual smoke test (real root-commit history)
 
