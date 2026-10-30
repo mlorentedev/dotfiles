@@ -78,6 +78,35 @@ type ReviewRequest struct {
 	// one, and the archive gate refuses a fallback signature whose request
 	// carries none, so a fallback never signs by habit or by draw.
 	FallbackReason string `json:"fallback_reason,omitempty"`
+	// Scope is "" for an ordinary review from BaseSHA, or ScopeInitial for a
+	// spec first added in a root commit (CLI-132, #2566). An initial request
+	// carries RootSHA and BaseTree and no BaseSHA; the archive gate refuses any
+	// other combination, and any scope the launcher never writes.
+	Scope string `json:"scope,omitempty"`
+	// RootSHA is the root commit that first added the spec, for an initial
+	// review: the reviewer reads `git log <root>..HEAD` as the corrections.
+	RootSHA string `json:"root_sha,omitempty"`
+	// BaseTree is the empty tree an initial review diffs from. A tree, not a
+	// commit, so the scope is the two-dot `git diff <tree> HEAD`.
+	BaseTree string `json:"base_tree,omitempty"`
+}
+
+// ScopeInitial is the request scope of a review launched with `--initial`.
+const ScopeInitial = "initial"
+
+// ReviewScope is what a launch asks the reviewer to diff. An ordinary review
+// starts from BaseSHA, the commit before the spec's work. An initial review
+// (CLI-132) has no such commit: the spec was born in RootSHA, a root commit,
+// so it starts from BaseTree, the empty tree.
+type ReviewScope struct {
+	BaseSHA  string
+	BaseTree string
+	RootSHA  string
+}
+
+// Initial reports whether the scope reviews from the empty tree.
+func (s ReviewScope) Initial() bool {
+	return s.BaseTree != ""
 }
 
 // HeadSHA returns the repository HEAD, or "" when repoRoot is not a checkout.
@@ -394,14 +423,26 @@ func WriteReviewRequest(specDir, reviewedSHA, reviewer, baseSHA string) error {
 // WriteReviewRequestIn records the launch of one signer's slot. fallbackReason
 // is empty unless a `signs: fallback` member was launched as the first signer.
 func WriteReviewRequestIn(specDir string, slot ReviewSlot, reviewedSHA, reviewer, baseSHA, fallbackReason string) error {
+	return WriteReviewRequestScoped(specDir, slot, reviewedSHA, reviewer, ReviewScope{BaseSHA: baseSHA}, fallbackReason)
+}
+
+// WriteReviewRequestScoped is WriteReviewRequestIn for a scope that may be an
+// initial review, which records its root commit and empty tree instead of a
+// base commit.
+func WriteReviewRequestScoped(specDir string, slot ReviewSlot, reviewedSHA, reviewer string, scope ReviewScope, fallbackReason string) error {
 	req := ReviewRequest{
 		ReviewedSHA:        reviewedSHA,
 		Reviewer:           reviewer,
 		RequestedAt:        time.Now().UTC().Format(time.RFC3339),
 		ReviewDigestBefore: fileDigest(filepath.Join(specDir, slot.Review)),
-		BaseSHA:            baseSHA,
+		BaseSHA:            scope.BaseSHA,
 		ContractDigests:    ContractDigests(specDir),
 		FallbackReason:     fallbackReason,
+		RootSHA:            scope.RootSHA,
+		BaseTree:           scope.BaseTree,
+	}
+	if scope.Initial() {
+		req.Scope = ScopeInitial
 	}
 	data, err := json.MarshalIndent(req, "", "  ")
 	if err != nil {

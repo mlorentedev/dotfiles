@@ -40,30 +40,30 @@ created: "2026-10-30"
   Expected: FAIL, `undefined: EmptyTree`.
 - [x] [AC3] Add `EmptyTree(repoRoot)` using `git hash-object -t tree --stdin`
   with empty input. Rerun the same command. Expected: PASS.
-- [ ] [P] [AC3] In `internal/spec/review_launch_test.go`, add
+- [x] [P] [AC3] In `internal/spec/review_launch_test.go`, add
   `TestReviewPromptStatesTheInitialScope` (empty tree, root commit,
   `git diff <tree> HEAD`, no `<tree>...`) and
   `TestReviewPromptKeepsTheTripleDotScopeForAnOrdinaryBase`. Run
   `go test ./internal/spec/ -run TestReviewPrompt -count=1`.
   Expected: FAIL, `undefined: ReviewScope`.
-- [ ] [AC3] In `internal/spec/review_launch.go`, add `ReviewScope` and
+- [x] [AC3] In `internal/spec/review_launch.go`, add `ReviewScope` and
   `ReviewPromptForScope`; make `ReviewPromptIn` delegate with an ordinary
   scope. Rerun. Expected: PASS, existing prompt tests unchanged.
-- [ ] [P] [AC4] In `internal/spec/review_request_test.go`, add
+- [x] [P] [AC4] In `internal/spec/review_request_test.go`, add
   `TestReviewRequestRecordsTheInitialScope` (`scope`, `root_sha`, `base_tree`
   present; `base_sha` absent). Run
   `go test ./internal/spec/ -run TestReviewRequestRecords -count=1`.
   Expected: FAIL, `undefined: WriteReviewRequestScoped`.
-- [ ] [AC4] Add `Scope`, `RootSHA`, and `BaseTree` (omitempty) to
+- [x] [AC4] Add `Scope`, `RootSHA`, and `BaseTree` (omitempty) to
   `ReviewRequest`, and `WriteReviewRequestScoped`; make
   `WriteReviewRequestIn` delegate. Rerun. Expected: PASS.
-- [ ] [P] [AC5] In `internal/spec/review_request_test.go`, add
+- [x] [P] [AC5] In `internal/spec/review_request_test.go`, add
   `TestProvenanceRefusesAnUnknownReviewScope`,
   `TestProvenanceRefusesAnInitialScopeWithoutItsRootOrTree`, and
   `TestProvenanceAcceptsAnInitialScope`. Run
   `go test ./internal/spec/ -run TestProvenance -count=1`.
   Expected: FAIL on the two refusals.
-- [ ] [AC5] In `internal/spec/review.go`, add `checkReviewScope` and call it
+- [x] [AC5] In `internal/spec/review.go`, add `checkReviewScope` and call it
   from `checkReviewProvenanceIn`. Rerun. Expected: PASS, existing provenance
   tests unchanged.
 - [ ] [P] [AC2] [AC4] In `internal/cmd/spec_review_base_test.go`, change the
