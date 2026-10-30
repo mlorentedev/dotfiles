@@ -20,7 +20,7 @@ created: "2026-10-30"
 
 ## Implementation
 
-- [ ] [P] [AC1] In `internal/spec/review_base_test.go`, add
+- [x] [P] [AC1] In `internal/spec/review_base_test.go`, add
   `TestResolveReviewBaseDetailReportsADirectRootCommitSpec`,
   `TestResolveReviewBaseDetailReportsASpecRenamedOutOfTheRootCommit`,
   `TestResolveReviewBaseDetailReportsAnUncommittedSpec`,
@@ -28,17 +28,17 @@ created: "2026-10-30"
   `TestResolveReviewBaseDetailKeepsTheBaseOfAnOrdinarySpec`. Run
   `go test ./internal/spec/ -run TestResolveReviewBaseDetail -count=1`.
   Expected: FAIL, `undefined: ResolveReviewBaseDetail`.
-- [ ] [AC1] In `internal/spec/review_request.go`, add `BaseRefusal`,
+- [x] [AC1] In `internal/spec/review_request.go`, add `BaseRefusal`,
   `ReviewBase`, and `ResolveReviewBaseDetail`; confirm a root commit with
   `git rev-list --parents -n 1`; make `ResolveReviewBase` return its `SHA`.
   Run `go test ./internal/spec/ -run TestResolveReviewBase -count=1`.
   Expected: PASS, including the existing rename regressions.
-- [ ] [P] [AC3] In `internal/spec/review_base_test.go`, add
+- [x] [P] [AC3] In `internal/spec/review_base_test.go`, add
   `TestEmptyTreeIsGitsEmptyTree` and
   `TestInitialScopeCoversTheRootImplementationAndLaterCorrections`. Run
   `go test ./internal/spec/ -run 'TestEmptyTree|TestInitialScope' -count=1`.
   Expected: FAIL, `undefined: EmptyTree`.
-- [ ] [AC3] Add `EmptyTree(repoRoot)` using `git hash-object -t tree --stdin`
+- [x] [AC3] Add `EmptyTree(repoRoot)` using `git hash-object -t tree --stdin`
   with empty input. Rerun the same command. Expected: PASS.
 - [ ] [P] [AC3] In `internal/spec/review_launch_test.go`, add
   `TestReviewPromptStatesTheInitialScope` (empty tree, root commit,
