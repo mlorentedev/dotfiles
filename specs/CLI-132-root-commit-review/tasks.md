@@ -66,7 +66,7 @@ created: "2026-10-30"
 - [x] [AC5] In `internal/spec/review.go`, add `checkReviewScope` and call it
   from `checkReviewProvenanceIn`. Rerun. Expected: PASS, existing provenance
   tests unchanged.
-- [ ] [P] [AC2] [AC4] In `internal/cmd/spec_review_base_test.go`, change the
+- [x] [P] [AC2] [AC4] In `internal/cmd/spec_review_base_test.go`, change the
   `resolveReviewBase` seam helpers (here and in `makeRepo`) to return
   `spec.ReviewBase`, then add `TestSpecReviewInitialLaunchesForARootCommitSpec`
   (dry-run prints scope, tree, and root; writes no request; leaves `review.md`
@@ -75,10 +75,10 @@ created: "2026-10-30"
   `TestSpecReviewWithoutInitialRefusesARootCommitSpecAndNamesTheFlag`. Run
   `go test ./internal/cmd/ -run TestSpecReview -count=1`.
   Expected: FAIL, `unknown flag: --initial`.
-- [ ] [AC2] [AC4] In `internal/cmd/spec.go`, add `--initial`, make
+- [x] [AC2] [AC4] In `internal/cmd/spec.go`, add `--initial`, make
   `reviewRange` return `spec.ReviewScope`, and pass it to the scoped prompt and
   request; document the flag in the command help. Rerun. Expected: PASS.
-- [ ] Refactor only after green. `gofmt -l internal` prints nothing,
+- [x] Refactor only after green. `gofmt -l internal` prints nothing,
   `go vet ./internal/spec/ ./internal/cmd/` passes, and no touched
   `internal/cmd` function exceeds cyclomatic complexity 15.
 

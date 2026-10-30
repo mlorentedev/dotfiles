@@ -1,5 +1,5 @@
 ---
-tags: [spec, verification, templates]
+tags: [spec, verification, review]
 created: "2026-10-30"
 ---
 
@@ -7,28 +7,93 @@ created: "2026-10-30"
 
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+Run every command from `cli/`. Commits are on `feat/root-commit-review`.
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] **AC1** -> `3fdded8e`: `TestResolveReviewBaseDetailReportsADirectRootCommitSpec`,
+  `TestResolveReviewBaseDetailReportsASpecRenamedOutOfTheRootCommit`,
+  `TestResolveReviewBaseDetailReportsAnUncommittedSpec`,
+  `TestResolveReviewBaseDetailReportsAnUntraceableMove` (both untraceable
+  shapes), `TestResolveReviewBaseDetailKeepsTheBaseOfAnOrdinarySpec`. The
+  eleven existing `TestResolveReviewBase*` regressions pass unchanged.
+- [x] **AC2** -> batch 3 commit: `TestSpecReviewInitialLaunchesForARootCommitSpec`,
+  `TestSpecReviewInitialRefusesEveryOtherBaseState` (ordinary, uncommitted,
+  untraceable; previous `review.md` and request byte-identical after the
+  refusal), `TestSpecReviewWithoutInitialRefusesARootCommitSpecAndNamesTheFlag`.
+- [x] **AC3** -> `3fdded8e`, `39245ab5`: `TestEmptyTreeIsGitsEmptyTree` (SHA-1
+  and SHA-256 repositories), `TestInitialScopeCoversTheRootImplementationAndLaterCorrections`
+  (also pins that `git diff <tree>...HEAD` fails), `TestReviewPromptStatesTheInitialScope`,
+  `TestReviewPromptKeepsTheTripleDotScopeForAnOrdinaryBase` (ordinary prompt
+  byte-identical to `ReviewPromptIn`).
+- [x] **AC4** -> `39245ab5` and batch 3 commit: `TestReviewRequestRecordsTheInitialScope`,
+  `TestRecordReviewRequestWritesTheInitialScope`, and the dry-run assertions in
+  `TestSpecReviewInitialLaunchesForARootCommitSpec`.
+- [x] **AC5** -> `39245ab5`: `TestProvenanceRefusesAnUnknownReviewScope`,
+  `TestProvenanceRefusesAnInitialScopeWithoutItsRootOrTree` (no root, no tree,
+  also a base), `TestProvenanceAcceptsAnInitialScope`; every existing
+  `TestProvenance*` passes unchanged.
+
+### Red before green
+
+| Batch | Command | Red observed |
+|---|---|---|
+| AC1, AC3 resolver | `go test ./internal/spec/ -run 'TestResolveReviewBaseDetail\|TestEmptyTree\|TestInitialScope' -count=1` | build failed: `undefined: ResolveReviewBaseDetail` |
+| AC3, AC4, AC5 | `go test ./internal/spec/ -run 'TestReviewPromptStatesTheInitialScope\|TestReviewPromptKeepsTheTripleDot\|TestReviewRequestRecordsTheInitialScope\|TestProvenance' -count=1` | build failed: `undefined: ReviewScope` |
+| AC5 behaviour | same command after `ReviewScope`, before `checkReviewScope` | `TestProvenanceRefusesAnUnknownReviewScope` and all three `TestProvenanceRefusesAnInitialScopeWithoutItsRootOrTree` cases FAIL; `TestProvenanceAcceptsAnInitialScope` PASS |
+| AC2, AC4 command | `go test ./internal/cmd/ -run 'TestSpecReview\|TestRecordReviewRequest' -count=1` | build failed: seam type mismatch, `undefined: emptyTreeOf` |
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Focused: all commands in `features.json` pass.
+- Full packages: `go test ./internal/spec/ ./internal/cmd/ -count=1` -> see
+  "Full-suite runs" below.
+- `go build ./...` and `go vet ./internal/cmd/ ./internal/spec/`: clean.
+- Formatting: `gofmt` reports no change on every touched `.go` file after
+  normalizing the Windows checkout's CRLF to LF.
+- golangci-lint was not run locally: endpoint security on this workstation
+  blocks it. CI runs it. Touched `internal/cmd` functions stay well below the
+  gocyclo line of 15 by inspection: `initialScope` 5, `reviewRange` 4,
+  `noReviewBaseError` 2, `describeScope` 2; the `spec review` closure gains no
+  branch.
+
+### Full-suite runs
+
+1. First run (607 s): `internal/cmd` failed `TestHelpTextHasNoInternalReferences`
+   and `TestOutputStringsHaveNoInternalReferences` because the new `--help`
+   example used an id with a spec-area prefix. Corrected to
+   `FEAT-002-first-commit`; both tests pass.
+2. Second run: pending.
+
+### Manual smoke test (real root-commit history)
+
+A binary built from this branch (`go build -o dotf-cli132.exe ./cmd/dotf`) was
+run in a private repository whose spec was added in its root commit and renamed
+later. Only `--dry-run` was used; no request, verdict, or transcript was
+written, and the target checkout stayed clean (hashes of its `review.md` and
+`review-request.json` identical before and after).
+
+- Without `--initial`: exit 1, the usual refusal plus "This spec was first
+  added in the root commit <root>: `dotf spec review <id> --initial` reviews it
+  from the empty tree instead". `<root>` equals `git rev-list --max-parents=0 HEAD`.
+- With `--initial --dry-run`: exit 0 and
+  `Scope: initial review, git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD (spec first added in root commit <root>)`.
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
+- `ResolveReviewBase` keeps its signature and answers; the new
+  `ResolveReviewBaseDetail` carries the reason, so no existing caller or test
+  changed meaning.
+- A root commit is confirmed positively with `git rev-list --parents -n 1`;
+  any other git failure reads as untraceable, never as a root, so a broken
+  repository cannot widen a review to the whole tree.
+- The empty tree is computed, not hard-coded, so SHA-256 repositories work.
+- `ReviewPromptIn` and `WriteReviewRequestIn` delegate to scoped variants with
+  an ordinary scope; ordinary prompts and requests are byte-identical to before.
+- Archive provenance validates the scope right after the empty-field check, so
+  a hand-written scope is refused before the sha and reviewer comparisons.
+- The command seam `resolveReviewBase` now returns `spec.ReviewBase`, and
+  `emptyTreeOf` joins it, so command tests can drive every resolver answer.
 
 ## Promotion candidates
-
-Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
 - [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>

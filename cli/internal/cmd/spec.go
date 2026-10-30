@@ -67,14 +67,15 @@ var runCommand = func(dir string, argv []string) error {
 // rand.IntN in production, a fixed index in tests so a launch is reproducible there.
 var reviewerDraw = rand.IntN
 
-// resolveReviewBase and headSHAOf are seams for the review scope (HARNESS-112).
-// The command-level fixtures build a fake .git directory rather than a real
-// repository, so the production resolvers answer "" there and every launch test
-// would hit the new refusal. The resolvers themselves are tested against real
-// git histories in internal/spec — a seam proves the caller honours the answer,
-// and only a real repository proves the answer is right.
-var resolveReviewBase = spec.ResolveReviewBase
+// resolveReviewBase, headSHAOf and emptyTreeOf are seams for the review scope
+// (HARNESS-112, CLI-132). The command-level fixtures build a fake .git directory
+// rather than a real repository, so the production resolvers answer "" there and
+// every launch test would hit the refusal. The resolvers themselves are tested
+// against real git histories in internal/spec — a seam proves the caller honours
+// the answer, and only a real repository proves the answer is right.
+var resolveReviewBase = spec.ResolveReviewBaseDetail
 var headSHAOf = spec.HeadSHA
+var emptyTreeOf = spec.EmptyTree
 
 // requestIgnored is a seam over spec.RequestIgnored, for the same reason.
 var requestIgnored = spec.RequestIgnoredIn
@@ -128,6 +129,7 @@ func newSpecReviewCmd() *cobra.Command {
 		foreground     bool
 		dryRun         bool
 		second         bool
+		initial        bool
 		fallbackReason string
 		timeout        time.Duration
 		stallTimeout   time.Duration
@@ -161,9 +163,17 @@ A spec whose proposal.md declares ` + "`risk: high`" + ` also needs a second sig
 a pool member of another vendor that declares ` + "`signs: second`" + `: --second launches it,
 after the first review, into review-second.md. A member that declares
 ` + "`signs: fallback`" + ` signs first only when the first signers failed, and
---fallback-reason names how they failed.`,
+--fallback-reason names how they failed.
+
+A spec first added in its repository's root commit has no commit before the
+work, so no review base resolves and the launch is refused. --initial reviews
+such a spec from git's empty tree instead: the reviewer reads the two-dot
+` + "`git diff <empty-tree> HEAD`" + `, which holds the root commit's implementation and
+every later correction, and the review request records the scope, the root
+commit and the tree. --initial is refused for any other spec.`,
 		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.8-flash-high\n" +
-			"  dotf spec review FEAT-012-reviewer-pool --second\n  dotf spec review FEAT-012-reviewer-pool --fallback-reason rate-limit",
+			"  dotf spec review FEAT-012-reviewer-pool --second\n  dotf spec review FEAT-012-reviewer-pool --fallback-reason rate-limit\n" +
+			"  dotf spec review FEAT-002-first-commit --initial --dry-run",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -183,14 +193,14 @@ after the first review, into review-second.md. A member that declares
 			}
 
 			skill := spec.ReviewerSkillPath(chosen.Runner)
-			baseSHA, headSHA, err := reviewRange(repoRoot, specDir, id)
+			scope, headSHA, err := reviewRange(repoRoot, specDir, id, initial)
 			if err != nil {
 				return err
 			}
 
 			transcript := spec.TranscriptPathIn(repoRoot, id, slot)
 			limits := spec.Limits{Deadline: timeout, StallTimeout: stallTimeout, Transcript: transcript}
-			argv, err := reviewerArgv(slot, chosen, id, repoRoot, skill, baseSHA, limits, filepath.Join(specDir, slot.Review))
+			argv, err := reviewerArgv(slot, chosen, id, repoRoot, skill, scope, limits, filepath.Join(specDir, slot.Review))
 			if err != nil {
 				return err
 			}
@@ -199,6 +209,7 @@ after the first review, into review-second.md. A member that declares
 
 			cmd.Printf("Reviewer:   %s (%s, %s)\n", chosen.ID, chosen.Runner, how)
 			cmd.Printf("Spec:       specs/%s\n", id)
+			cmd.Printf("Scope:      %s\n", describeScope(scope))
 			cmd.Printf("Transcript: %s\n", transcript)
 
 			launch := argv
@@ -233,7 +244,7 @@ after the first review, into review-second.md. A member that declares
 			// launched without one spends a review that can never archive.
 			// Refusing here costs nothing yet. So does an ignored request: it is
 			// written, and lost on every checkout but this one.
-			if err := recordReviewRequest(cmd, repoRoot, specDir, id, slot, headSHA, chosen.ID, baseSHA, fallbackReason); err != nil {
+			if err := recordReviewRequest(cmd, repoRoot, specDir, id, slot, headSHA, chosen.ID, scope, fallbackReason); err != nil {
 				return err
 			}
 
@@ -255,6 +266,8 @@ after the first review, into review-second.md. A member that declares
 	cmd.Flags().BoolVar(&foreground, "foreground", false, "run in this terminal instead of a detached tmux session")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the command that would run, and exit")
 	cmd.Flags().BoolVar(&second, "second", false, "launch the second signature, from a `signs: second` member of another vendor than the first signer, into "+spec.SecondSigner.Review)
+	cmd.Flags().BoolVar(&initial, "initial", false,
+		"review a spec first added in the repository's root commit from git's empty tree; refused for any other spec")
 	cmd.Flags().StringVar(&fallbackReason, "fallback-reason", "",
 		"launch a `signs: fallback` member as the first signer, naming how the first signers failed: "+strings.Join(spec.FallbackReasons, ", "))
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
@@ -290,30 +303,81 @@ func existingSpecDir(id string) (repoRoot, specDir string, err error) {
 	return repoRoot, specDir, nil
 }
 
-// reviewRange returns the base the reviewer will diff against, and HEAD.
+// reviewRange returns the scope the reviewer will diff, and HEAD.
 // Refusing when the base cannot be resolved, or when it IS the head, is the
 // point: a review with an empty diff does not fail, it quietly becomes a
 // reading of the spec folder and reports findings with no execution behind
 // them. That is worse than no review, because it arrives wearing a verdict.
-func reviewRange(repoRoot, specDir, id string) (baseSHA, headSHA string, err error) {
-	baseSHA = resolveReviewBase(repoRoot, specDir)
+//
+// initial (CLI-132) asks for the one supported review without a base commit,
+// and initialScope accepts it only for a spec born in a root commit.
+func reviewRange(repoRoot, specDir, id string, initial bool) (scope spec.ReviewScope, headSHA string, err error) {
+	base := resolveReviewBase(repoRoot, specDir)
 	headSHA = headSHAOf(repoRoot)
-	if baseSHA == "" {
-		return "", "", fmt.Errorf("cannot resolve a review base for specs/%s. One of:\n"+
-			"  - no commit adds that folder: commit the spec first;\n"+
-			"  - it was first added, under this or an earlier name, in the repository's root\n"+
-			"    commit, so there is no commit before the work to diff against;\n"+
-			"  - it was renamed in a way that cannot be traced back to where it began, or created\n"+
-			"    in the same commit that deleted another spec folder holding the same file names,\n"+
-			"    which looks the same as a move git did not pair and is refused for that reason.\n"+
-			"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
-			"call that a review", id)
+	if initial {
+		scope, err = initialScope(repoRoot, id, base)
+		return scope, headSHA, err
 	}
-	if baseSHA == headSHA {
-		return "", "", fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
-			"There is nothing to review: the spec folder was added by HEAD itself", baseSHA[:min(12, len(baseSHA))])
+	if base.SHA == "" {
+		return spec.ReviewScope{}, "", noReviewBaseError(id, base)
 	}
-	return baseSHA, headSHA, nil
+	if base.SHA == headSHA {
+		return spec.ReviewScope{}, "", fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
+			"There is nothing to review: the spec folder was added by HEAD itself", base.SHA[:min(12, len(base.SHA))])
+	}
+	return spec.ReviewScope{BaseSHA: base.SHA}, headSHA, nil
+}
+
+// noReviewBaseError is the default refusal. It names --initial only when the
+// spec was born in a root commit, the one case the flag supports.
+func noReviewBaseError(id string, base spec.ReviewBase) error {
+	hint := ""
+	if base.Refusal == spec.BaseRootCommit {
+		hint = fmt.Sprintf("\nThis spec was first added in the root commit %s: `dotf spec review %s --initial`\n"+
+			"reviews it from the empty tree instead", base.RootSHA, id)
+	}
+	return fmt.Errorf("cannot resolve a review base for specs/%s. One of:\n"+
+		"  - no commit adds that folder: commit the spec first;\n"+
+		"  - it was first added, under this or an earlier name, in the repository's root\n"+
+		"    commit, so there is no commit before the work to diff against;\n"+
+		"  - it was renamed in a way that cannot be traced back to where it began, or created\n"+
+		"    in the same commit that deleted another spec folder holding the same file names,\n"+
+		"    which looks the same as a move git did not pair and is refused for that reason.\n"+
+		"The reviewer diffs base...HEAD, so without a base it would browse the folder and\n"+
+		"call that a review%s", id, hint)
+}
+
+// initialScope accepts --initial for exactly one resolver answer: a spec first
+// added in a root commit. Every other answer is refused before anything is
+// written, so the flag can never widen an ordinary, uncommitted or untraceable
+// spec into a review of the whole tree.
+func initialScope(repoRoot, id string, base spec.ReviewBase) (spec.ReviewScope, error) {
+	switch base.Refusal {
+	case spec.BaseRootCommit:
+	case spec.BaseResolved:
+		return spec.ReviewScope{}, fmt.Errorf("--initial applies only to a spec first added in its repository's root commit;\n"+
+			"specs/%s has a review base (%s): run `dotf spec review %s` without --initial", id, base.SHA, id)
+	case spec.BaseNotCommitted:
+		return spec.ReviewScope{}, fmt.Errorf("--initial applies only to a committed spec first added in its repository's root commit;\n"+
+			"specs/%s is not committed: commit the spec first", id)
+	default:
+		return spec.ReviewScope{}, fmt.Errorf("--initial applies only to a spec first added in its repository's root commit;\n"+
+			"specs/%s was moved in a way that cannot be traced back to where it began, which no flag can review", id)
+	}
+	tree, err := emptyTreeOf(repoRoot)
+	if err != nil {
+		return spec.ReviewScope{}, fmt.Errorf("--initial needs the empty tree as its baseline: %w", err)
+	}
+	return spec.ReviewScope{BaseTree: tree, RootSHA: base.RootSHA}, nil
+}
+
+// describeScope is the launch line that says what the reviewer will diff, so a
+// dry run shows the whole scope before anything runs.
+func describeScope(scope spec.ReviewScope) string {
+	if scope.Initial() {
+		return fmt.Sprintf("initial review, git diff %s HEAD (spec first added in root commit %s)", scope.BaseTree, scope.RootSHA)
+	}
+	return fmt.Sprintf("git diff %s...HEAD", scope.BaseSHA)
 }
 
 // tmuxAvailable reports whether a detached session can be started. Its absence
@@ -331,7 +395,7 @@ func tmuxAvailable(cmd *cobra.Command) bool {
 // recordReviewRequest writes the review request before the reviewer starts, so
 // that `spec archive` can later check the verdict against it. The reasons it
 // must happen first, and must refuse the launch, are on its call site.
-func recordReviewRequest(cmd *cobra.Command, repoRoot, specDir, id string, slot spec.ReviewSlot, headSHA, reviewerID, baseSHA, fallbackReason string) error {
+func recordReviewRequest(cmd *cobra.Command, repoRoot, specDir, id string, slot spec.ReviewSlot, headSHA, reviewerID string, scope spec.ReviewScope, fallbackReason string) error {
 	if requestIgnored(repoRoot, specDir, slot) {
 		return fmt.Errorf("git ignores specs/%s/%s, so the review would not archive from any other checkout\n"+
 			"`spec archive` refuses a review without it. Stop ignoring `specs/**/%s` and re-run",
@@ -347,7 +411,7 @@ func recordReviewRequest(cmd *cobra.Command, repoRoot, specDir, id string, slot 
 	if err != nil {
 		return fmt.Errorf("could not keep the previous round's %s before the new one overwrites it: %w", slot.Review, err)
 	}
-	if err := spec.WriteReviewRequestIn(specDir, slot, headSHA, reviewerID, baseSHA, strings.TrimSpace(fallbackReason)); err != nil {
+	if err := spec.WriteReviewRequestScoped(specDir, slot, headSHA, reviewerID, scope, strings.TrimSpace(fallbackReason)); err != nil {
 		return fmt.Errorf("could not record the review request, so the review would not be archivable: %w\n"+
 			"`spec archive` refuses a review without %s; fix the spec folder's permissions and re-run",
 			errors.Join(err, undoRotation()), slot.Request)
@@ -447,7 +511,7 @@ growing length.`,
 // reviewerArgv is the pooled runner's command with its prompt, the time budget
 // included, under the deadline every runner gets in both modes (HARNESS-152).
 // Only agy used to be bounded, through its own --print-timeout.
-func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot, skill, baseSHA string, limits spec.Limits, review string) ([]string, error) {
+func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot, skill string, scope spec.ReviewScope, limits spec.Limits, review string) ([]string, error) {
 	if limits.StallTimeout < 0 {
 		return nil, fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", limits.StallTimeout)
 	}
@@ -456,7 +520,7 @@ func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot,
 		timeout = spec.DefaultReviewerTimeout
 	}
 	limits.Deadline = timeout
-	prompt := spec.ReviewPromptIn(slot, id, repoRoot, chosen.ID, chosen.Runner, skill, baseSHA) +
+	prompt := spec.ReviewPromptForScope(slot, id, repoRoot, chosen.ID, chosen.Runner, skill, scope) +
 		"\n" + spec.TimeBudget(time.Now(), timeout)
 	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
 	if err != nil {
