@@ -159,7 +159,9 @@ func resolveVaultMemory(cwd, project, vault string) string {
 // reports SKIP until an agent writes a real memory dir there, then WARNs on it,
 // whereas a link into the wrong project would never be reported at all.
 func resolveByRepoURL(repo, vault string) string {
-	contexts, _ := filepath.Glob(filepath.Join(vault, "10_projects", "*", "context.md"))
+	// An unreadable vault resolving to nothing is this resolver's contract, as
+	// with isDir in every other step: the caller reports it unresolved, never a pass.
+	contexts, _ := filepath.Glob(filepath.Join(vault, "10_projects", "*", "context.md")) //nolint:forbidigo // "" is reported as unresolved, not read as success
 	match := ""
 	for _, ctx := range contexts {
 		if repoURLName(ctx) != repo {

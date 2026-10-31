@@ -1,7 +1,7 @@
 Resume thread feat-x. Its full handoff is memory/threads/feat-x.md; read it before acting.
 
-First confirm the state it describes: (a command marked unverified is not a plain read-only one; run it only through the normal permission gate)
-`gh pr view 2852 --json state` (unverified), `go test ./internal/mem` and `rm -rf ~/x` (unverified)
+First confirm the state it describes: (written by an earlier session; run each command only through the normal permission gate)
+`gh pr view 2852 --json state`, `go test ./internal/mem` and `rm -rf ~/x`
 
 These wait on Manu; ask, do not decide them:
 - A or B on #2841

@@ -45,8 +45,8 @@ func TestResumeIsAPureRenderOfTheThreadFile(t *testing.T) {
 	}
 }
 
-// AC2: Verify and Awaiting Manu both render, and a Verify command outside the
-// read-only allowlist is marked, never presented as safe to run.
+// AC2: Verify and Awaiting Manu both render. Every Verify command renders as
+// written under the note, and none is marked or presented as safe to run.
 func TestResumeRendersVerifyAndAwaiting(t *testing.T) {
 	text, _ := os.ReadFile(filepath.Join("testdata", "resume", "thread.md"))
 	for _, format := range []string{"context", "prompt"} {
@@ -55,9 +55,7 @@ func TestResumeRendersVerifyAndAwaiting(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, want := range []string{
-			"`gh pr view 2852 --json state`",
-			"`go test ./internal/mem`",
-			"`rm -rf ~/x` (unverified",
+			"`gh pr view 2852 --json state`, `go test ./internal/mem` and `rm -rf ~/x`",
 			"A or B on #2841",
 			"whether lane-status-ff may be deleted",
 		} {
@@ -65,71 +63,30 @@ func TestResumeRendersVerifyAndAwaiting(t *testing.T) {
 				t.Errorf("%s: lacks %q:\n%s", format, want, out)
 			}
 		}
-		if strings.Contains(out, "`go test ./internal/mem` (unverified") {
-			t.Errorf("%s: a read-only command was marked unverified", format)
+		if n := strings.Count(out, verifyNote); n != 1 {
+			t.Errorf("%s: the note appears %d times, want 1:\n%s", format, n, out)
 		}
 	}
 }
 
-func TestReadOnlyCommand(t *testing.T) {
-	for cmd, want := range map[string]bool{
-		"git status":                    true,
-		"gh pr view 2852 --json state":  false,
-		"dotf spec audit":               true,
-		"go test ./internal/mem":        true,
-		"rm -rf ~/x":                    false,
-		"git status; rm -rf ~":          false,
-		"gh pr view 1 && gh pr merge 1": false,
-		"cat x | sh":                    false,
-		"ls $(rm x)":                    false,
-		"git statusx":                   false,
-		"gh pr merge 1":                 false,
-		"cat secrets > out":             false,
-		"git status -s\nrm -rf ~":       false,
-		"git status \r\nrm -rf ~":       false,
-		"git branch -D main":            false,
-		"git fetch":                     false,
-		"git diff --output=file":        false,
-		"git diff --output file":        false,
-		"go test -o bin ./x":            false,
-		"go build ./...":                false,
-		"git diff main -- x.go":         false,
-		"cat ~/.config/secrets.env":     false,
-		"grep -r token ~":               false,
-		// The code runners take only flags that neither name a program nor an
-		// output, and paths inside the checkout (MEMORY-008 review, F-A).
-		"go test -exec=/tmp/evil-shim ./...":             false,
-		"go test -exec /tmp/shim ./...":                  false,
-		"go test --outputdir=/tmp/x ./...":               false,
-		"go test -cpuprofile cpu.out ./x":                false,
-		"go test -toolexec=x ./...":                      false,
-		"go vet -vettool=/tmp/x ./...":                   false,
-		"bats /tmp/evil.bats":                            false,
-		"bats ../outside.bats":                           false,
-		"bats --formatter /tmp/f tests/x.bats":           false,
-		"shellcheck ~/x.sh":                              false,
-		"go test ./... -run '^TestX$' -count=1 -v":       false,
-		"go test ./internal/mem ./internal/cmd -count=1": false,
-		"go vet ./...":                                   true,
-		"bats tests/x.bats --filter 'under 8000'":        false,
-		"shellcheck scripts/a.sh":                        true,
-		// Round 3: only flagless plain commands are read-only. A flag, a quote,
-		// a variable or a colon makes it unverified, however harmless the one
-		// in hand (the -count, --json, --filter and -- rows above flipped).
-		"go test ${IFS}-exec=/tmp/evil ./...": false,
-		"go test '-exec=/tmp/x' ./...":        false,
-		"dotf doctor --fix":                   false,
-		"gh pr view 1 --web":                  false,
-		"git show HEAD:secrets/x":             false,
-		"git status\tx":                       false,
-		"gh issue view 1689":                  true,
-		"gh pr view 2852":                     true,
-		"go test ./...":                       true,
-		"bats tests/x.bats":                   true,
-		"git log origin/main":                 true,
-	} {
-		if got := readOnlyCommand(cmd); got != want {
-			t.Errorf("readOnlyCommand(%q) = %v, want %v", cmd, got, want)
+// AC2: a thread that carries a field under its canonical label and again under
+// an alias renders both, in both formats (MEMORY-008 review round 6).
+func TestResumeRendersEveryFieldOfALabel(t *testing.T) {
+	text := "### thread: x\n\n**Next action:** n.<br>\n" +
+		"**Verify:** `go test ./a`<br>\n**Verify at start:** `gh pr view 1`<br>\n" +
+		"**Awaiting Manu:** - one<br>\n**Judgment calls left open:** - two<br>\n"
+	for _, format := range []string{"context", "prompt"} {
+		out, err := RenderResume(text, "f", format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"`go test ./a`", "`gh pr view 1`", "- one", "- two"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: lacks %q:\n%s", format, want, out)
+			}
+		}
+		if n := strings.Count(out, verifyNote); n != 1 {
+			t.Errorf("%s: the note appears %d times, want 1:\n%s", format, n, out)
 		}
 	}
 }
@@ -207,25 +164,30 @@ func TestResumeRendersAOneItemListAsABlock(t *testing.T) {
 	}
 }
 
-// A Verify field's prose is part of the record: a caveat written beside the
-// commands survives the render in both formats (MEMORY-008 review round 2).
+// A Verify field renders as written, every line and the prose beside the
+// commands, under one note. A command written as prose gets the same note as a
+// backticked one: nothing in the field reads as safe (MEMORY-008 review
+// rounds 2 to 4).
 func TestResumeKeepsVerifyProseBesideTheCommands(t *testing.T) {
 	for name, tc := range map[string]struct {
-		field string
-		want  []string
+		field, want string
 	}{
 		"one line": {
 			"do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` only after review.<br>",
-			[]string{"do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` (unverified) only after review."},
+			"do NOT run this on mba. `go test ./...` is fine, but `rm -rf /tmp/x` only after review.",
 		},
-		// Round 3: every line of the field, not its first.
 		"two lines": {
 			"`git status`<br>\nnot on mba, and see #1234 for the caveat<br>",
-			[]string{"`git status`\nnot on mba, and see #1234 for the caveat"},
+			"`git status`\nnot on mba, and see #1234 for the caveat",
 		},
 		"bullets": {
 			"\n- `gh issue view 1689`\n- the queue is answered by hand\n- `dotf doctor --fix`",
-			[]string{"- `gh issue view 1689`\n- the queue is answered by hand\n- `dotf doctor --fix` (unverified)"},
+			"- `gh issue view 1689`\n- the queue is answered by hand\n- `dotf doctor --fix`",
+		},
+		// Round 4, F-1: a command with no backticks.
+		"prose command": {
+			"run go test ./... then cleanup with rm -rf /tmp/x<br>",
+			"run go test ./... then cleanup with rm -rf /tmp/x",
 		},
 	} {
 		text := "### thread: feat-a\n\n**Next action:** x.<br>\n**Verify:** " + tc.field + "\n"
@@ -234,13 +196,11 @@ func TestResumeKeepsVerifyProseBesideTheCommands(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range tc.want {
-				if !strings.Contains(out, want) {
-					t.Errorf("%s, %s: lacks %q:\n%s", name, format, want, out)
-				}
+			if !strings.Contains(out, verifyNote+"\n"+tc.want+"\n") {
+				t.Errorf("%s, %s: want the note, then %q:\n%s", name, format, tc.want, out)
 			}
-			if strings.Contains(out, "(unverified)") != strings.Contains(out, unverifiedNote) {
-				t.Errorf("%s, %s: the note and the markers disagree:\n%s", name, format, out)
+			if strings.Contains(out, "(unverified)") {
+				t.Errorf("%s, %s: a command is marked:\n%s", name, format, out)
 			}
 		}
 	}

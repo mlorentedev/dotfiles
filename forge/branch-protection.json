@@ -185,6 +185,10 @@
               "app_id": 15368
             },
             {
+              "context": "deploy-shape",
+              "app_id": 15368
+            },
+            {
               "context": "review-attestation",
               "app_id": 15368
             }

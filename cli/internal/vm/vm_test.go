@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -98,7 +99,7 @@ type fakeLima struct {
 	report    bool   // a report exists in the guest
 }
 
-func (f *fakeLima) run(stdin io.Reader, stdout, _ io.Writer, args ...string) error {
+func (f *fakeLima) run(_ context.Context, stdin io.Reader, stdout, _ io.Writer, args ...string) error {
 	call := strings.Join(args, " ")
 	f.calls = append(f.calls, call)
 	in := ""
@@ -136,7 +137,7 @@ func (f *fakeLima) run(stdin io.Reader, stdout, _ io.Writer, args ...string) err
 func TestVerify_ConvergesTwiceAndDeletesTheGuest(t *testing.T) {
 	f := &fakeLima{changed: []int{12, 0}}
 	var out strings.Builder
-	if err := Verify(f.run, Options{Ref: "feat/x", Source: "/tmp/src.tar.gz", Name: "dotf-linux-1", Token: "s3cr3t", Out: &out}); err != nil {
+	if err := Verify(context.Background(), f.run, Options{Ref: "feat/x", Source: "/tmp/src.tar.gz", Name: "dotf-linux-1", Token: "s3cr3t", Out: &out}); err != nil {
 		t.Fatalf("Verify: %v\n%s", err, out.String())
 	}
 	if !strings.HasPrefix(f.calls[0], "start --tty=false --name dotf-linux-1 ") {
@@ -184,7 +185,7 @@ func TestVerify_ConvergesTwiceAndDeletesTheGuest(t *testing.T) {
 
 func TestVerify_ASecondRunWithChangesFailsAndStillDeletes(t *testing.T) {
 	f := &fakeLima{changed: []int{12, 1}}
-	err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard})
+	err := Verify(context.Background(), f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard})
 	if err == nil || !strings.Contains(err.Error(), "second converge changed 1") {
 		t.Fatalf("want the second run's change reported, got %v", err)
 	}
@@ -195,7 +196,7 @@ func TestVerify_ASecondRunWithChangesFailsAndStillDeletes(t *testing.T) {
 
 func TestVerify_KeepLeavesTheGuest(t *testing.T) {
 	f := &fakeLima{changed: []int{1, 0}, failNext: "copy "}
-	if err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Keep: true, Out: io.Discard}); err == nil {
+	if err := Verify(context.Background(), f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Keep: true, Out: io.Discard}); err == nil {
 		t.Fatal("a failed copy must fail the run")
 	}
 	for _, c := range f.calls {
@@ -207,7 +208,7 @@ func TestVerify_KeepLeavesTheGuest(t *testing.T) {
 
 func TestVerify_RefusesARunWithNoSource(t *testing.T) {
 	f := &fakeLima{}
-	if err := Verify(f.run, Options{Ref: "main", Name: "n", Out: io.Discard}); err == nil || len(f.calls) != 0 {
+	if err := Verify(context.Background(), f.run, Options{Ref: "main", Name: "n", Out: io.Discard}); err == nil || len(f.calls) != 0 {
 		t.Errorf("no source: err %v after %d call(s)", err, len(f.calls))
 	}
 }
@@ -216,7 +217,7 @@ func TestVerify_RefusesARunWithNoSource(t *testing.T) {
 // instance and its disk behind: the delete must run anyway.
 func TestVerify_AFailedStartStillDeletes(t *testing.T) {
 	f := &fakeLima{failNext: "start "}
-	if err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard}); err == nil {
+	if err := Verify(context.Background(), f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard}); err == nil {
 		t.Fatal("a failed start must fail the run")
 	}
 	if last := f.calls[len(f.calls)-1]; last != "delete --force n" {
@@ -228,7 +229,7 @@ func TestVerify_AFailedStartStillDeletes(t *testing.T) {
 // is removed first, so a run that writes none cannot pass on stale data.
 func TestVerify_AConvergeThatWritesNoReportFails(t *testing.T) {
 	f := &fakeLima{changed: []int{0, 0}, silentRun: 2}
-	err := Verify(f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard})
+	err := Verify(context.Background(), f.run, Options{Ref: "main", Source: "/tmp/src.tar.gz", Name: "n", Out: io.Discard})
 	if err == nil || !strings.Contains(err.Error(), "left no report") {
 		t.Fatalf("a second converge that wrote no report must fail, got %v", err)
 	}

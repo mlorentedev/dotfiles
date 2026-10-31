@@ -39,6 +39,7 @@ func newPrCmd() *cobra.Command {
 	pr.AddCommand(newPrRouteCmd())
 	pr.AddCommand(newPrPreflightCmd())
 	pr.AddCommand(newPrGuardCmd())
+	pr.AddCommand(newPrGateCmd())
 	return pr
 }
 
@@ -94,6 +95,9 @@ cannot be read or is not open.`,
 					st.At.Local().Format("2006-01-02 15:04"), st.PR.URL)
 				if line := findingsLine(st); line != "" {
 					_, _ = fmt.Fprintf(c.OutOrStdout(), "         %s\n", line)
+				}
+				for _, u := range st.Unreproduced {
+					_, _ = fmt.Fprintf(c.OutOrStdout(), "         REAL %s:%d: %s\n", u.Finding.Path, u.Finding.Line, u.Problem)
 				}
 			}
 			if len(reg.Classification.Reviewers) == 0 {

@@ -92,7 +92,7 @@ Host macmini
 
 # --- LAN fallback (no VPN needed, local network only) ---
 Host rpi4-lan
-  Hostname 10.0.0.131
+  Hostname 172.16.1.1
   User manu
   UserKnownHostsFile ~/.ssh/known_hosts_pinned
   StrictHostKeyChecking yes

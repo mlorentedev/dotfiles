@@ -46,19 +46,23 @@ created: "2026-08-18"
 - [x] `[AC3]` red-direction: a finding whose class appears only in prose is `unclassified`, not parsed
 - [x] `[AC3]` consume `Classify` where findings are read: `dotf pr triage-queue` names a pending PR's inline findings without a declared class (report only, the verdict is unchanged)
 - [x] `[AC3]` declare the classifying reviewers in the registry: `classification.reviewers: ["github-actions"]`, pinned by `TestTheRealRegistryDeclaresTheClassificationMarker`
-- [ ] `[AC4]` gate `apply` on a successful reproduction for REAL findings — the next slice: `pr reproduce` decides nothing on its own; a human pastes its row today
-- [ ] `[AC6]` record a refuted REAL finding with its evidence, distinct from a skip
+- [x] `[AC4]` gate `apply` on a successful reproduction for REAL findings. The gate refuses (owner, 2026-10-22, #1062): `dotf pr triage-queue` holds a triaged PR whose record applies a REAL finding without a `Reproduction: reproduced` row, so `dotf pr land` refuses it; findings that cannot be read hold it too (fails closed). `prtriage.UnreproducedFindings` today
+- [x] `[AC6]` record a refuted REAL finding with its evidence, distinct from a skip: the disposition `refuted` needs a `Reproduction: did-not-reproduce` row, and a REAL finding that is skipped or declined holds the PR. `pr-review-triage` documents the rule
 - [x] `[AC1]` ~~trigger from the reviewer-finished signal (GUARD-003's `workflow_run`)~~ superseded: the pull-based `dotf pr triage-queue` (#1057, #1101), accepted by the owner on #1062 (2026-10-10)
 - [x] `[AC7]` closing guard, re-scoped to PR level by the owner (option B): `dotf pr land` refuses a PR the triage queue lists (`cli/internal/prland/prland.go:118`)
 - [x] `[AC7]` red-direction: a PR whose reviewer spoke after the last triage is pending (`TestEvaluate`), and `land` refuses it
-- [ ] `[AC8]` every check above has a red-direction test — asserted, not assumed
+- [x] `[AC8]` every check above has a red-direction test — asserted, not assumed: each slice ran a mutation pass, each mutation confirmed landed by checksum (AC3 #2845/#2863, AC5 15 killed #2903, AC4/AC6 16 killed here); every equivalent survivor had its guard deleted
 
 ## Verification
 
-- [ ] `go build ./... && go vet ./... && go test ./...`
-- [ ] `bats tests/*.bats`
-- [ ] `shellcheck` clean
-- [ ] Red-teamed: removing each fix turns its guard red, **and each mutation is confirmed to have landed**
+- [x] `go build ./... && go vet ./... && go test ./...`
+  - Evidence (2026-10-30, at `37ecb8db`): exit 0, and `GOOS=windows go vet ./...` exit 0. Each criterion's own command in `features.json` exits 0 and runs every test it names.
+- [x] `bats tests/*.bats`
+  - Evidence (2026-10-30, at `37ecb8db`): 2001 ok, 1 not ok. The failure is `tests/harness-doctrine-records.bats` "--refresh against the real vault…", which reads the machine's vault checkout: that checkout was 6 commits behind origin, so its `crystallize` source predates the record on main. It is not TOOL-017's, and the record matches origin's source (#2907, #2913, both closed).
+- [x] `shellcheck` clean
+  - Evidence (2026-10-30): `shellcheck -S warning scripts/*.sh setup-linux.sh` exit 0, the severity CI runs at.
+- [x] Red-teamed: removing each fix turns its guard red, **and each mutation is confirmed to have landed**
+  - Evidence: the mutation passes recorded on the AC8 line above, each mutation confirmed landed by checksum: AC3 #2845/#2863, AC5 15/15 #2903 and #2935, AC4/AC6 16/16 #2924.
 - [x] Replayed against #1059's real payload: the REAL finding must come back **refuted**, and the multi-line hole must not be claimed as the reviewer's finding
   - Evidence (2026-10-22, at `1719024f`, the commit #1059 was reviewed on): the reviewer's flagless evasion as a probe gives `Reproduction: did-not-reproduce (exit 1, defect when the check passes) … with probe flagless.diff: \`bats tests/ci-age-pin.bats\``, since bats catches it at line 98: refuted. The multi-line `apt-get` form, which the reviewer did not name, gives `reproduced (exit 0, …) with probe multiline.diff`: a separate finding, not the reviewer's.
   - The first replay wrapped the check as `sh -c '! bats …'`, which would read a missing `bats` (127) as a refutation; `--defect-when-passes` replaces that wrapper (#2926).

@@ -81,6 +81,20 @@ func TestSessionStartResumeInjectsNothingThatIsNotThisAgents(t *testing.T) {
 	}
 }
 
+// AC3: the one line a resumed or forked session gets carries a command the
+// operator copies, so a thread key from MEMORY.md is one shell word in it
+// (MEMORY-008 review round 5). The plain key stays bare in the goldens above.
+func TestSessionStartResumeQuotesTheOneLiner(t *testing.T) {
+	memory := filepath.Join(t.TempDir(), "MEMORY.md")
+	mustWrite(t, memory, "# M\n\n## Session Handoff\n\n### thread: wt-x;echo (writer: claude)\n\n**Next action:** a.\n")
+	for _, source := range []string{"resume", "fork"} {
+		got := sessionResume(source, memory, "wt-x;echo", "claude")
+		if want := "`dotf mem resume --thread 'wt-x;echo'`"; !strings.Contains(got, want) {
+			t.Errorf("source %s: want %s in %q", source, want, got)
+		}
+	}
+}
+
 // AC3: the handoff_resume injector flag turns the block off.
 func TestSessionStartResumeCanBeTurnedOff(t *testing.T) {
 	vaultDir, cwd := resumeVault(t)

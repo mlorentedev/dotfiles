@@ -30,9 +30,11 @@ github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okW
 # Homelab nodes: the key msi had recorded for each mesh address before this file
 # existed equalled the key the node presented to the Mac on 2026-10-14. Not read
 # on the node's console or disk. The LAN address on each line is the same host.
-# rpi4
+# rpi4: 172.16.1.1, its address on the lab LAN since it became the lab edge, presented
+# this same key to msi over the lab switch on 2026-10-26. 10.0.0.131 was its address on
+# the old home network and now sits in the lab Wi-Fi's DHCP pool, so it is dropped.
 # SHA256:KYrU7Dvr263Czt+TV4bT+s0M7/dw/POjEREX3ZtVmy0
-100.64.0.10,10.0.0.131 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXn9cB0VFpBw3LmhW8LX+KM3crQSENqjaFmZZGDw8B3
+100.64.0.10,172.16.1.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXn9cB0VFpBw3LmhW8LX+KM3crQSENqjaFmZZGDw8B3
 # rpi3
 # SHA256:oMvZWbyJrxhyHFDWmw15b+jh1iWMoO9n183O/qC3/Eg
 100.64.0.6,10.0.0.157 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILed5H+u1a0zBLSgsV6azry4NJSShSoupaccjW5kARB7

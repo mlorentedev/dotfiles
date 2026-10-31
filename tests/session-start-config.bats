@@ -26,8 +26,8 @@ setup() {
     done
 }
 
-@test "session-start-config.json has the 11 injector entries with enabled flags" {
-    for key in sdd_reminder doctor_drift hive_project specs_summary vault_root_detection vault_health auto_memory_symlink knowledge_health vault_baseline memory_temperature claude_json_size; do
+@test "session-start-config.json has the 12 injector entries with enabled flags" {
+    for key in sdd_reminder doctor_drift hive_project specs_summary vault_root_detection vault_health auto_memory_symlink knowledge_health vault_baseline memory_temperature claude_json_size handoff_resume; do
         val=$(jq -r ".injectors.$key.enabled // \"MISSING\"" "$CONFIG_JSON")
         [ "$val" != "MISSING" ] || { echo "missing key: injectors.$key.enabled"; return 1; }
     done

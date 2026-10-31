@@ -40,7 +40,7 @@ const sessionVerbs = "A session is a named guest that `up` holds until `down`. W
 	"3 no such session. Progress goes to stderr."
 
 func addSessionVerbs(linux *cobra.Command) {
-	linux.AddCommand(newVMUpCmd(), newVMDownCmd(), newVMStatusCmd())
+	linux.AddCommand(newVMUpCmd(), newVMDownCmd(), newVMStatusCmd(), newVMExecCmd(), newVMCpCmd())
 }
 
 func sessionFlags(c *cobra.Command, session *string, asJSON *bool, usage string) {
@@ -86,7 +86,7 @@ func newVMUpCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return emitSession(cmd, s.Up(session, cmd.ErrOrStderr(), cmd.ErrOrStderr()), asJSON)
+			return emitSession(cmd, s.Up(cmd.Context(), session, cmd.ErrOrStderr(), cmd.ErrOrStderr()), asJSON)
 		},
 	}
 	sessionFlags(c, &session, &asJSON, "session name (default linux-<unix time>)")
@@ -111,7 +111,7 @@ func newVMDownCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return emitSession(cmd, s.Down(session, cmd.ErrOrStderr()), asJSON)
+			return emitSession(cmd, s.Down(cmd.Context(), session, cmd.ErrOrStderr()), asJSON)
 		},
 	}
 	sessionFlags(c, &session, &asJSON, "session name (required)")
@@ -131,7 +131,7 @@ func newVMStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			list, err := s.List()
+			list, err := s.List(cmd.Context())
 			if err != nil {
 				rec := vm.NewRecord("", "linux", vm.StatusFailed)
 				rec.Stderr = err.Error()
