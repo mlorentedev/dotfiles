@@ -1,6 +1,10 @@
 package doctor
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+)
 
 // checkHiveBackendCanServe is CLI-042 AC9: "zero reachable models" must be
 // caught at diagnostic time, not under dispatch load.
@@ -112,7 +116,35 @@ func checkHiveBackendCanServe(sys *System, rep *Report) {
 		return
 	}
 
+	// The unit declares both halves, but `--skip-locked` (dotfiles#3005) starts it
+	// without the key when Bitwarden is locked, and the ExecStart above reads the
+	// same either way. That run leaves a trace, and this is the state the check
+	// was built for, so it fails the same way until the unlock restarts the unit.
+	if since := skippedSince(sys, "hive.service"); since != "" {
+		rep.Fail("hive.service started at " + since + " while Bitwarden was locked and runs without " +
+			"the worker API key, so the hive backend probes PRESENT and can serve nothing. " +
+			"Fix: `dotf secrets unlock`, which restarts it with the key.")
+		return
+	}
+
 	rep.Pass("hive.service carries both halves of the worker contract — the backend can reach its pool")
+}
+
+// skippedSince is when unit started without its secrets, from the trace
+// `dotf secrets run --skip-locked` leaves, or "" when it did not.
+func skippedSince(sys *System, unit string) string {
+	if sys.Getenv == nil {
+		return ""
+	}
+	dir := secrets.DegradedDir(sys.Getenv)
+	if dir == "" {
+		return ""
+	}
+	units, err := secrets.DegradedUnits(dir)
+	if err != nil {
+		return ""
+	}
+	return units[unit]
 }
 
 // execArgv pulls the command line out of the record `systemctl show -p ExecStart`

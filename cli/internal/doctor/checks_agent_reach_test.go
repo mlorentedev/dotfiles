@@ -5,6 +5,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
 // lookPathFor builds the LookPath seam: the named binaries resolve, everything
@@ -266,5 +269,35 @@ func TestHiveBackendCanServe_UnreadableUnitWarnsRatherThanPasses(t *testing.T) {
 	}
 	if strings.Contains(got, "can reach its pool") {
 		t.Errorf("an unreadable unit must never report the pass line, got: %s", got)
+	}
+}
+
+// dotfiles#3005: `--skip-locked` starts the daemon without the key while
+// Bitwarden is locked, and its ExecStart reads exactly like goodExecStart. The
+// trace that run leaves is what tells the two apart.
+func TestHiveBackendCanServe_StartedWhileLockedFails(t *testing.T) {
+	rt := t.TempDir()
+	getenv := func(k string) string { return map[string]string{"XDG_RUNTIME_DIR": rt}[k] }
+	skipped := goodExecStart[:strings.Index(goodExecStart, " --")] + " --skip-locked" + goodExecStart[strings.Index(goodExecStart, " --"):]
+	sys := &System{
+		Getenv:        getenv,
+		LookPath:      lookPathFor("systemctl", "hive"),
+		CommandOutput: unitSeam(skipped, goodEnv),
+	}
+
+	var before bytes.Buffer
+	checkHiveBackendCanServe(sys, capture(&before))
+	if !strings.Contains(before.String(), "can reach its pool") {
+		t.Fatalf("with no trace the unit must pass, got: %s", before.String())
+	}
+
+	if err := secrets.MarkDegraded(secrets.DegradedDir(getenv), "hive.service", time.Date(2026, 10, 30, 22, 54, 0, 0, time.UTC)); err != nil {
+		t.Fatal(err)
+	}
+	var after bytes.Buffer
+	checkHiveBackendCanServe(sys, capture(&after))
+	got := after.String()
+	if !strings.Contains(got, "can serve nothing") || !strings.Contains(got, "dotf secrets unlock") {
+		t.Fatalf("a daemon started while locked must fail and name the unlock, got: %s", got)
 	}
 }
