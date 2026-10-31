@@ -11,7 +11,7 @@
 # What these tests hold:
 # - the key names every input, so a PR that changes any of them misses and
 #   runs the fresh install itself: the runner image, PI_VERSION, packages.json,
-#   the Go installer (cli/internal/tools, `dotf tools`) and setup-windows.ps1;
+#   the Go installer with the packages it imports, and setup-windows.ps1;
 # - the match is exact (no restore-keys), so a stale install never stands in;
 # - only a push to main saves, as the job's last step, so the cache is always a
 #   fresh install from a fully green run, never one restored and re-saved;
@@ -50,7 +50,7 @@ setup() {
 
 @test "ci: the npm CLI cache key names the runner image, PI_VERSION, packages.json, the installer and setup-windows.ps1" {
     printf '%s\n' "$STEPS" | grep -q "PI_VERSION="
-    for part in "runner.os" "steps.picli.outputs.image" "steps.picli.outputs.version" "hashFiles('packages.json')" "hashFiles('cli/internal/tools/**', 'cli/internal/cmd/tools.go')" "hashFiles('setup-windows.ps1')"; do
+    for part in "runner.os" "steps.picli.outputs.image" "steps.picli.outputs.version" "hashFiles('packages.json')" "hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go')" "hashFiles('setup-windows.ps1')"; do
         printf '%s\n' "$RESTORE" | grep -E 'key: npm-clis-' | grep -qF "$part" || { echo "restore key lacks $part" >&2; return 1; }
         printf '%s\n' "$SAVE" | grep -E 'key: npm-clis-' | grep -qF "$part" || { echo "save key lacks $part" >&2; return 1; }
     done
