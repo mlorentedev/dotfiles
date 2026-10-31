@@ -26,9 +26,9 @@ text, so two runs print the same bytes.
 
 --format prompt (the default) is the paste-ready instruction a session used to
 type by hand; --format context is the block a session-start hook injects. Both
-put the Next action, the Verify commands and what awaits Manu first. A Verify
-command outside a read-only allowlist, or one that chains, pipes or redirects,
-is marked unverified: the file was written by another session.
+put the Next action, the Verify commands and what awaits Manu first. Verify
+renders as written under one note: the file was written by another session, so
+no command in it is presented as safe, and each runs through the permission gate.
 
 The thread is this checkout's (see handoff-write), or this agent's fork of it.
 When the working directory names no single thread for this agent, resume picks
