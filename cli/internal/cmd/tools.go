@@ -244,11 +244,18 @@ func listAsset(t tools.Tool, goos, goarch string) string {
 // toolsVersionRunner is the exec seam for `dotf tools version`; tests inject a fake.
 var toolsVersionRunner tools.Runner = tools.ProbeRunner
 
+// toolsVersionGOOS and toolsVersionCatalog are the OS and catalog `dotf tools
+// version` answers for; tests pin both, so no checkout's packages.json decides.
+var (
+	toolsVersionGOOS    = runtime.GOOS
+	toolsVersionCatalog = loadToolsCatalog
+)
+
 // versionTool is the catalog entry for name, or a bare tool probed on PATH
 // when the catalog has none or cannot be read: the command answers for any
 // tool, and the catalog only says where a self-installed one lives.
 func versionTool(name string) tools.Tool {
-	if cat, err := loadToolsCatalog(); err == nil {
+	if cat, err := toolsVersionCatalog(); err == nil {
 		if sel, err := selectTools(cat, name); err == nil && len(sel) == 1 {
 			return sel[0]
 		}
@@ -270,7 +277,7 @@ func newToolsVersionCmd() *cobra.Command {
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			v := tools.ProbeTool(versionTool(args[0]), runtime.GOOS, os.Getenv, toolsVersionRunner)
+			v := tools.ProbeTool(versionTool(args[0]), toolsVersionGOOS, os.Getenv, toolsVersionRunner)
 			if v == "" {
 				return fmt.Errorf("%s: no version found on PATH", args[0])
 			}
