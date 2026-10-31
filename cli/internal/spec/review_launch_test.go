@@ -591,3 +591,40 @@ func TestReviewPromptNamesTheDigestCommand(t *testing.T) {
 		t.Errorf("the prompt does not name the digest command:\n%s", p)
 	}
 }
+
+// CLI-132 (#2566): an initial review has no base commit. Its baseline is the
+// empty tree, which has no merge base, so the prompt must state a two-dot diff
+// and name the root commit the spec was born in, or the reviewer guesses.
+func TestReviewPromptStatesTheInitialScope(t *testing.T) {
+	const tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+	scope := ReviewScope{BaseTree: tree, RootSHA: "rootrootroot"}
+	p := ReviewPromptForScope(FirstSigner, "AI-001-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md", scope)
+	for _, want := range []string{
+		"initial review",
+		"`git diff " + tree + " HEAD`",
+		"rootrootroot",
+		"do NOT substitute",
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("the initial-scope prompt must carry %q:\n%s", want, p)
+		}
+	}
+	if strings.Contains(p, tree+"...") {
+		t.Errorf("the prompt states a triple-dot diff from a tree, which git refuses:\n%s", p)
+	}
+}
+
+// An ordinary scope must leave the existing prompt byte-for-byte unchanged.
+func TestReviewPromptKeepsTheTripleDotScopeForAnOrdinaryBase(t *testing.T) {
+	scoped := ReviewPromptForScope(FirstSigner, "AI-001-x", "/repo", "nan/x", "pi", "/skill.md", ReviewScope{BaseSHA: "basebasebase"})
+	plain := ReviewPromptIn(FirstSigner, "AI-001-x", "/repo", "nan/x", "pi", "/skill.md", "basebasebase")
+	if scoped != plain {
+		t.Error("an ordinary scope must produce exactly the prompt ReviewPromptIn always produced")
+	}
+	if !strings.Contains(scoped, "`git diff basebasebase...HEAD`") {
+		t.Errorf("the ordinary scope lost its triple-dot diff:\n%s", scoped)
+	}
+	if strings.Contains(scoped, "initial review") {
+		t.Errorf("an ordinary review must not be described as initial:\n%s", scoped)
+	}
+}

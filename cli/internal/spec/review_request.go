@@ -78,6 +78,35 @@ type ReviewRequest struct {
 	// one, and the archive gate refuses a fallback signature whose request
 	// carries none, so a fallback never signs by habit or by draw.
 	FallbackReason string `json:"fallback_reason,omitempty"`
+	// Scope is "" for an ordinary review from BaseSHA, or ScopeInitial for a
+	// spec first added in a root commit (CLI-132, #2566). An initial request
+	// carries RootSHA and BaseTree and no BaseSHA; the archive gate refuses any
+	// other combination, and any scope the launcher never writes.
+	Scope string `json:"scope,omitempty"`
+	// RootSHA is the root commit that first added the spec, for an initial
+	// review: the reviewer reads `git log <root>..HEAD` as the corrections.
+	RootSHA string `json:"root_sha,omitempty"`
+	// BaseTree is the empty tree an initial review diffs from. A tree, not a
+	// commit, so the scope is the two-dot `git diff <tree> HEAD`.
+	BaseTree string `json:"base_tree,omitempty"`
+}
+
+// ScopeInitial is the request scope of a review launched with `--initial`.
+const ScopeInitial = "initial"
+
+// ReviewScope is what a launch asks the reviewer to diff. An ordinary review
+// starts from BaseSHA, the commit before the spec's work. An initial review
+// (CLI-132) has no such commit: the spec was born in RootSHA, a root commit,
+// so it starts from BaseTree, the empty tree.
+type ReviewScope struct {
+	BaseSHA  string
+	BaseTree string
+	RootSHA  string
+}
+
+// Initial reports whether the scope reviews from the empty tree.
+func (s ReviewScope) Initial() bool {
+	return s.BaseTree != ""
 }
 
 // HeadSHA returns the repository HEAD, or "" when repoRoot is not a checkout.
@@ -138,7 +167,41 @@ func RequestIgnoredIn(repoRoot, specDir string, slot ReviewSlot) bool {
 // It also returns "" when the folder, under any of its names, was added in the
 // repository's root commit: there is no "before" to compare against, and
 // reviewing the entire repository history is not what was asked for.
+// ResolveReviewBaseDetail says which of those it was.
 func ResolveReviewBase(repoRoot, specDir string) string {
+	return ResolveReviewBaseDetail(repoRoot, specDir).SHA
+}
+
+// BaseRefusal is why ResolveReviewBaseDetail found no base. BaseResolved is
+// the zero value, so a ReviewBase carrying a SHA reads as resolved.
+type BaseRefusal int
+
+const (
+	BaseResolved BaseRefusal = iota
+	// BaseNotCommitted: no commit adds the folder under any of its names.
+	BaseNotCommitted
+	// BaseRootCommit: the folder was first added, under this or an earlier
+	// name, in a root commit, so no commit precedes the work. This is the one
+	// refusal `spec review --initial` accepts (CLI-132, #2566).
+	BaseRootCommit
+	// BaseUntraceable: a rename into the folder cannot be traced to where it
+	// began, or the trail is longer than the hop bound.
+	BaseUntraceable
+)
+
+// ReviewBase is ResolveReviewBaseDetail's whole answer: the base when one
+// resolves, otherwise why not, and for BaseRootCommit the root commit itself.
+type ReviewBase struct {
+	SHA     string
+	Refusal BaseRefusal
+	RootSHA string
+}
+
+// ResolveReviewBaseDetail is ResolveReviewBase that also names why no base
+// resolved. The launcher needs the reason, not just the absence: only a spec
+// born in the root commit has a supported review without a base commit, and an
+// untraceable move must stay refused however it is asked for.
+func ResolveReviewBaseDetail(repoRoot, specDir string) ReviewBase {
 	rel, err := filepath.Rel(repoRoot, specDir)
 	if err != nil {
 		rel = specDir
@@ -149,26 +212,67 @@ func ResolveReviewBase(repoRoot, specDir string) string {
 	for hop := 0; hop < 8; hop++ {
 		adding := earliestAdding(repoRoot, rel)
 		if adding == "" {
-			return ""
+			if hop == 0 {
+				return ReviewBase{Refusal: BaseNotCommitted}
+			}
+			return ReviewBase{Refusal: BaseUntraceable}
 		}
-		out, err := exec.Command("git", "-C", repoRoot, "rev-parse", adding+"^").Output()
-		if err != nil {
-			return "" // the adding commit is the root commit
+		parent, isRoot := parentOf(repoRoot, adding)
+		if isRoot {
+			return ReviewBase{Refusal: BaseRootCommit, RootSHA: adding}
 		}
-		parent := strings.TrimSpace(string(out))
+		if parent == "" {
+			return ReviewBase{Refusal: BaseUntraceable}
+		}
 		from, renamed := renamedFrom(repoRoot, parent, adding, rel)
 		if !renamed {
-			return parent
+			return ReviewBase{SHA: parent}
 		}
 		if from == "" {
 			// Something was renamed into the folder but its source cannot be
 			// traced. The parent would be a base after the work, which is the
 			// partial diff this function exists to refuse.
-			return ""
+			return ReviewBase{Refusal: BaseUntraceable}
 		}
 		rel = from
 	}
-	return ""
+	return ReviewBase{Refusal: BaseUntraceable}
+}
+
+// parentOf returns commit's first parent. isRoot is true only when git lists
+// the commit with no parent at all: any other failure is "" and false, which
+// the caller refuses as untraceable instead of mistaking it for a root commit
+// and widening the review to the whole tree.
+func parentOf(repoRoot, commit string) (parent string, isRoot bool) {
+	out, err := exec.Command("git", "-C", repoRoot, "rev-list", "--parents", "-n", "1", commit).Output()
+	if err != nil {
+		return "", false
+	}
+	fields := strings.Fields(string(out))
+	switch len(fields) {
+	case 0:
+		return "", false
+	case 1:
+		return "", true
+	default:
+		return fields[1], false
+	}
+}
+
+// EmptyTree returns the id of the empty tree in repoRoot's object format: the
+// baseline of an initial review (CLI-132). It is asked of git, not hard-coded,
+// because a SHA-256 repository's empty tree has a different id.
+//
+// It is a tree, not a commit, so it has no merge base: the review scope from it
+// is the two-dot `git diff <tree> HEAD`, never `<tree>...HEAD`.
+func EmptyTree(repoRoot string) (string, error) {
+	cmd := exec.Command("git", "-C", repoRoot, "hash-object", "-t", "tree", "--stdin")
+	cmd.Stdin = strings.NewReader("")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("computing the empty tree: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // earliestAdding is the first commit that added a file under rel. --diff-filter=A finds the commits that ADDED it; the last line of a
@@ -319,14 +423,26 @@ func WriteReviewRequest(specDir, reviewedSHA, reviewer, baseSHA string) error {
 // WriteReviewRequestIn records the launch of one signer's slot. fallbackReason
 // is empty unless a `signs: fallback` member was launched as the first signer.
 func WriteReviewRequestIn(specDir string, slot ReviewSlot, reviewedSHA, reviewer, baseSHA, fallbackReason string) error {
+	return WriteReviewRequestScoped(specDir, slot, reviewedSHA, reviewer, ReviewScope{BaseSHA: baseSHA}, fallbackReason)
+}
+
+// WriteReviewRequestScoped is WriteReviewRequestIn for a scope that may be an
+// initial review, which records its root commit and empty tree instead of a
+// base commit.
+func WriteReviewRequestScoped(specDir string, slot ReviewSlot, reviewedSHA, reviewer string, scope ReviewScope, fallbackReason string) error {
 	req := ReviewRequest{
 		ReviewedSHA:        reviewedSHA,
 		Reviewer:           reviewer,
 		RequestedAt:        time.Now().UTC().Format(time.RFC3339),
 		ReviewDigestBefore: fileDigest(filepath.Join(specDir, slot.Review)),
-		BaseSHA:            baseSHA,
+		BaseSHA:            scope.BaseSHA,
 		ContractDigests:    ContractDigests(specDir),
 		FallbackReason:     fallbackReason,
+		RootSHA:            scope.RootSHA,
+		BaseTree:           scope.BaseTree,
+	}
+	if scope.Initial() {
+		req.Scope = ScopeInitial
 	}
 	data, err := json.MarshalIndent(req, "", "  ")
 	if err != nil {

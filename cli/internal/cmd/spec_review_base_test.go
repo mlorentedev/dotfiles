@@ -2,8 +2,14 @@ package cmd
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // HARNESS-112. A review whose diff is empty does not fail — it silently becomes
@@ -11,10 +17,10 @@ import (
 // behind them. That is worse than no review, because it arrives wearing a
 // verdict. The launcher must refuse instead.
 
-func withReviewBase(t *testing.T, base, head string) {
+func withReviewBase(t *testing.T, base spec.ReviewBase, head string) {
 	t.Helper()
 	prevBase, prevHead := resolveReviewBase, headSHAOf
-	resolveReviewBase = func(string, string) string { return base }
+	resolveReviewBase = func(string, string) spec.ReviewBase { return base }
 	headSHAOf = func(string) string { return head }
 	t.Cleanup(func() { resolveReviewBase, headSHAOf = prevBase, prevHead })
 }
@@ -34,7 +40,7 @@ func seedReviewFixture(t *testing.T) string {
 
 func TestSpecReviewRefusesWhenNoBaseCanBeResolved(t *testing.T) {
 	seedReviewFixture(t)
-	withReviewBase(t, "", "headheadhead")
+	withReviewBase(t, spec.ReviewBase{Refusal: spec.BaseNotCommitted}, "headheadhead")
 
 	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--dry-run")
 	if err == nil {
@@ -48,7 +54,7 @@ func TestSpecReviewRefusesWhenNoBaseCanBeResolved(t *testing.T) {
 
 func TestSpecReviewRefusesWhenTheBaseIsTheHead(t *testing.T) {
 	seedReviewFixture(t)
-	withReviewBase(t, "samesamesame", "samesamesame")
+	withReviewBase(t, spec.ReviewBase{SHA: "samesamesame"}, "samesamesame")
 
 	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--dry-run")
 	if err == nil {
@@ -64,7 +70,7 @@ func TestSpecReviewRefusesWhenTheBaseIsTheHead(t *testing.T) {
 // launcher refusing everything.
 func TestSpecReviewLaunchesAndStatesTheBaseWhenOneResolves(t *testing.T) {
 	seedReviewFixture(t)
-	withReviewBase(t, "basebasebase", "headheadhead")
+	withReviewBase(t, spec.ReviewBase{SHA: "basebasebase"}, "headheadhead")
 
 	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--dry-run")
 	if err != nil {
@@ -73,5 +79,124 @@ func TestSpecReviewLaunchesAndStatesTheBaseWhenOneResolves(t *testing.T) {
 	if out := stdout + stderr; !strings.Contains(out, "basebasebase") {
 		t.Errorf("the launch does not hand the reviewer its base, so it will guess `main` — "+
 			"which is empty on a post-merge review:\n%s", out)
+	}
+}
+
+// CLI-132 (#2566). A spec born in its repository's root commit has no base
+// commit. --initial reviews it from the empty tree, and is refused for every
+// other resolver answer, so the flag can never widen an ordinary, uncommitted or
+// untraceable spec into a whole-tree review.
+
+func withEmptyTree(t *testing.T, tree string) {
+	t.Helper()
+	prev := emptyTreeOf
+	emptyTreeOf = func(string) (string, error) { return tree, nil }
+	t.Cleanup(func() { emptyTreeOf = prev })
+}
+
+// specEvidence is the bytes of the files a refused or dry-run launch must not
+// touch: the previous verdict and the previous request.
+func specEvidence(t *testing.T, root string) map[string]string {
+	t.Helper()
+	got := map[string]string{}
+	for _, name := range []string{spec.ReviewFile, spec.ReviewRequestFile} {
+		data, err := os.ReadFile(filepath.Join(root, "specs", "AI-001-x", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got[name] = string(data)
+	}
+	return got
+}
+
+func assertEvidenceUnchanged(t *testing.T, root string, before map[string]string) {
+	t.Helper()
+	for name, after := range specEvidence(t, root) {
+		if after != before[name] {
+			t.Errorf("%s changed, but nothing may be written before a reviewer starts:\nbefore: %s\nafter:  %s",
+				name, before[name], after)
+		}
+	}
+}
+
+func TestSpecReviewInitialLaunchesForARootCommitSpec(t *testing.T) {
+	root := seedReviewFixture(t)
+	withReviewBase(t, spec.ReviewBase{Refusal: spec.BaseRootCommit, RootSHA: "rootrootroot"}, "headheadhead")
+	withEmptyTree(t, "treetreetree")
+	before := specEvidence(t, root)
+
+	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--initial", "--dry-run")
+	if err != nil {
+		t.Fatalf("--initial was refused for a root-commit spec: %v\n%s", err, stdout+stderr)
+	}
+	out := stdout + stderr
+	for _, want := range []string{"initial review", "git diff treetreetree HEAD", "rootrootroot"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the dry run does not describe the initial scope (%q):\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "treetreetree...") {
+		t.Errorf("the scope is a triple-dot diff from a tree, which git refuses:\n%s", out)
+	}
+	assertEvidenceUnchanged(t, root, before)
+}
+
+func TestSpecReviewInitialRefusesEveryOtherBaseState(t *testing.T) {
+	for name, base := range map[string]spec.ReviewBase{
+		"ordinary spec":    {SHA: "basebasebase"},
+		"uncommitted spec": {Refusal: spec.BaseNotCommitted},
+		"untraceable move": {Refusal: spec.BaseUntraceable},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := seedReviewFixture(t)
+			withReviewBase(t, base, "headheadhead")
+			withEmptyTree(t, "treetreetree")
+			before := specEvidence(t, root)
+
+			stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--initial", "--dry-run")
+			if err == nil {
+				t.Fatalf("--initial was accepted for a spec not born in the root commit:\n%s", stdout+stderr)
+			}
+			if !strings.Contains(err.Error(), "--initial") {
+				t.Errorf("the refusal does not say why --initial does not apply: %v", err)
+			}
+			assertEvidenceUnchanged(t, root, before)
+		})
+	}
+}
+
+// The default refusal stays, and points at the supported path when it applies.
+func TestSpecReviewWithoutInitialRefusesARootCommitSpecAndNamesTheFlag(t *testing.T) {
+	seedReviewFixture(t)
+	withReviewBase(t, spec.ReviewBase{Refusal: spec.BaseRootCommit, RootSHA: "rootrootroot"}, "headheadhead")
+
+	stdout, stderr, err := execute(t, "spec", "review", "AI-001-x", "--dry-run")
+	if err == nil {
+		t.Fatalf("a root-commit spec was launched without --initial:\n%s", stdout+stderr)
+	}
+	for _, want := range []string{"cannot resolve a review base", "--initial", "rootrootroot"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not carry %q: %v", want, err)
+		}
+	}
+}
+
+// The request is what the archive checks, so the command must hand the
+// initial scope to it rather than a blank base.
+func TestRecordReviewRequestWritesTheInitialScope(t *testing.T) {
+	root := seedReviewFixture(t)
+	specDir := filepath.Join(root, "specs", "AI-001-x")
+	scope := spec.ReviewScope{BaseTree: "treetreetree", RootSHA: "rootrootroot"}
+
+	if err := recordReviewRequest(&cobra.Command{}, root, specDir, "AI-001-x", spec.FirstSigner,
+		"headheadhead", "nan/deepseek-v4-flash", scope, ""); err != nil {
+		t.Fatal(err)
+	}
+	req, found, err := spec.ReadReviewRequest(specDir)
+	if err != nil || !found {
+		t.Fatalf("no request was written: found=%v err=%v", found, err)
+	}
+	if req.Scope != spec.ScopeInitial || req.RootSHA != "rootrootroot" || req.BaseTree != "treetreetree" || req.BaseSHA != "" {
+		t.Errorf("the request does not record the initial scope: %+v", req)
 	}
 }

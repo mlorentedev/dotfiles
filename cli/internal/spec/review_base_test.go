@@ -367,3 +367,159 @@ func TestNewRepoWithSpecDisablesBackgroundMaintenance(t *testing.T) {
 		}
 	}
 }
+
+// CLI-132 (#2566): the resolver names WHY it found no base, because the launcher
+// accepts --initial for exactly one reason -- a spec born in the root commit --
+// and must keep refusing every other one.
+
+// initQuietRepo is an empty repository whose commits fork no background git
+// process that could outlive the test.
+func initQuietRepo(t *testing.T) string {
+	t.Helper()
+	repoRoot := t.TempDir()
+	git(t, repoRoot, "init", "-q", "-b", "main")
+	git(t, repoRoot, "config", "gc.auto", "0")
+	git(t, repoRoot, "config", "maintenance.auto", "false")
+	return repoRoot
+}
+
+func TestResolveReviewBaseDetailReportsADirectRootCommitSpec(t *testing.T) {
+	repoRoot := initQuietRepo(t)
+	writeAndCommit(t, repoRoot, "root: spec and implementation", "specs/NEW-001-x/proposal.md", "impl.go")
+	root := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	writeAndCommit(t, repoRoot, "correct the implementation", "fix.go")
+
+	got := ResolveReviewBaseDetail(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x"))
+	if want := (ReviewBase{Refusal: BaseRootCommit, RootSHA: root}); got != want {
+		t.Errorf("ResolveReviewBaseDetail = %+v, want %+v", got, want)
+	}
+}
+
+// The projects-toolkit shape: the root commit adds the spec, a later commit
+// renames it. Following the rename must land on the root commit, not on the
+// rename's parent, which would exclude the implementation.
+func TestResolveReviewBaseDetailReportsASpecRenamedOutOfTheRootCommit(t *testing.T) {
+	repoRoot := initQuietRepo(t)
+	writeAndCommit(t, repoRoot, "root: spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+	root := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	git(t, repoRoot, "mv", "specs/OLD-001-x", "specs/NEW-001-x")
+	git(t, repoRoot, "commit", "-qm", "rename the spec")
+
+	got := ResolveReviewBaseDetail(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x"))
+	if want := (ReviewBase{Refusal: BaseRootCommit, RootSHA: root}); got != want {
+		t.Errorf("ResolveReviewBaseDetail = %+v, want %+v", got, want)
+	}
+}
+
+func TestResolveReviewBaseDetailReportsAnUncommittedSpec(t *testing.T) {
+	repoRoot := initQuietRepo(t)
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "NEW-001-x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ResolveReviewBaseDetail(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x"))
+	if want := (ReviewBase{Refusal: BaseNotCommitted}); got != want {
+		t.Errorf("ResolveReviewBaseDetail = %+v, want %+v", got, want)
+	}
+}
+
+// Both untraceable shapes the plain resolver already refuses: a rename whose
+// source cannot be placed, and a move git did not pair. Neither is a root-commit
+// spec, so neither may be reviewed with --initial.
+func TestResolveReviewBaseDetailReportsAnUntraceableMove(t *testing.T) {
+	cases := map[string]func(t *testing.T, repoRoot string){
+		"rename from a source too shallow to place": func(t *testing.T, repoRoot string) {
+			writeAndCommit(t, repoRoot, "draft and implementation", "specs/draft.md", "impl.go")
+			if err := os.MkdirAll(filepath.Join(repoRoot, "specs", "NEW-001-x", "notes"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			git(t, repoRoot, "mv", "specs/draft.md", "specs/NEW-001-x/notes/draft.md")
+			git(t, repoRoot, "commit", "-qm", "file the draft as a spec")
+		},
+		"move git did not pair": func(t *testing.T, repoRoot string) {
+			writeAndCommit(t, repoRoot, "spec and implementation", "specs/OLD-001-x/proposal.md", "impl.go")
+			git(t, repoRoot, "rm", "-q", "-r", "specs/OLD-001-x")
+			newSpec := filepath.Join(repoRoot, "specs", "NEW-001-x", "proposal.md")
+			if err := os.MkdirAll(filepath.Dir(newSpec), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(newSpec, []byte("rewritten from scratch, nothing in common\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			git(t, repoRoot, "add", ".")
+			git(t, repoRoot, "commit", "-qm", "move and rewrite")
+		},
+	}
+	for name, build := range cases {
+		t.Run(name, func(t *testing.T) {
+			repoRoot := initQuietRepo(t)
+			writeAndCommit(t, repoRoot, "base", "README.md")
+			build(t, repoRoot)
+
+			got := ResolveReviewBaseDetail(repoRoot, filepath.Join(repoRoot, "specs", "NEW-001-x"))
+			if want := (ReviewBase{Refusal: BaseUntraceable}); got != want {
+				t.Errorf("ResolveReviewBaseDetail = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
+func TestResolveReviewBaseDetailKeepsTheBaseOfAnOrdinarySpec(t *testing.T) {
+	repoRoot, wantBase := newRepoWithSpec(t, "FOO-001-thing")
+
+	got := ResolveReviewBaseDetail(repoRoot, filepath.Join(repoRoot, "specs", "FOO-001-thing"))
+	if want := (ReviewBase{SHA: wantBase, Refusal: BaseResolved}); got != want {
+		t.Errorf("ResolveReviewBaseDetail = %+v, want %+v", got, want)
+	}
+}
+
+// The baseline of an initial review is the empty tree in the repository's own
+// object format. A hard-coded SHA-1 id would name a missing object in a SHA-256
+// repository.
+func TestEmptyTreeIsGitsEmptyTree(t *testing.T) {
+	cases := []struct{ format, want string }{
+		{"sha1", "4b825dc642cb6eb9a060e54bf8d69288fbee4904"},
+		{"sha256", "6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.format, func(t *testing.T) {
+			repoRoot := t.TempDir()
+			initCmd := exec.Command("git", "-C", repoRoot, "init", "-q", "--object-format="+tc.format)
+			if out, err := initCmd.CombinedOutput(); err != nil {
+				t.Skipf("this git cannot create a %s repository: %v\n%s", tc.format, err, out)
+			}
+
+			got, err := EmptyTree(repoRoot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tc.want {
+				t.Errorf("EmptyTree = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// The initial scope must hold the root commit's implementation AND every later
+// correction. The triple-dot form is pinned as invalid from a tree, which is
+// why the prompt has to state a two-dot diff.
+func TestInitialScopeCoversTheRootImplementationAndLaterCorrections(t *testing.T) {
+	repoRoot := initQuietRepo(t)
+	writeAndCommit(t, repoRoot, "root: spec and implementation", "specs/NEW-001-x/proposal.md", "impl.go")
+	writeAndCommit(t, repoRoot, "correct the implementation", "fix.go")
+	tree, err := EmptyTree(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scope := git(t, repoRoot, "diff", "--name-only", tree, "HEAD")
+	for _, want := range []string{"impl.go", "fix.go", "specs/NEW-001-x/proposal.md"} {
+		if !contains(scope, want) {
+			t.Errorf("the initial scope misses %s:\n%s", want, scope)
+		}
+	}
+	if out, err := exec.Command("git", "-C", repoRoot, "diff", "--name-only", tree+"...HEAD").CombinedOutput(); err == nil {
+		t.Errorf("a triple-dot diff from a tree succeeded, so the two-dot rule is unfounded:\n%s", out)
+	}
+}

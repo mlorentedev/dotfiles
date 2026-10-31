@@ -27,7 +27,7 @@ func makeRepo(t *testing.T) string {
 	// (HARNESS-112). Drive the seams instead; the resolvers are tested against
 	// real git histories in internal/spec.
 	prevBase, prevHead, prevIgnored := resolveReviewBase, headSHAOf, requestIgnored
-	resolveReviewBase = func(string, string) string { return "basebasebase" }
+	resolveReviewBase = func(string, string) spec.ReviewBase { return spec.ReviewBase{SHA: "basebasebase"} }
 	headSHAOf = func(string) string { return "headheadhead" }
 	requestIgnored = func(string, string, spec.ReviewSlot) bool { return false }
 	t.Cleanup(func() { resolveReviewBase, headSHAOf, requestIgnored = prevBase, prevHead, prevIgnored })
