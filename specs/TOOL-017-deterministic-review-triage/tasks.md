@@ -55,10 +55,14 @@ created: "2026-08-18"
 
 ## Verification
 
-- [ ] `go build ./... && go vet ./... && go test ./...`
-- [ ] `bats tests/*.bats`
-- [ ] `shellcheck` clean
-- [ ] Red-teamed: removing each fix turns its guard red, **and each mutation is confirmed to have landed**
+- [x] `go build ./... && go vet ./... && go test ./...`
+  - Evidence (2026-10-30, at `37ecb8db`): exit 0, and `GOOS=windows go vet ./...` exit 0. Each criterion's own command in `features.json` exits 0 and runs every test it names.
+- [x] `bats tests/*.bats`
+  - Evidence (2026-10-30, at `37ecb8db`): 2001 ok, 1 not ok. The failure is `tests/harness-doctrine-records.bats` "--refresh against the real vault…", which reads the machine's vault checkout: that checkout was 6 commits behind origin, so its `crystallize` source predates the record on main. It is not TOOL-017's, and the record matches origin's source (#2907, #2913, both closed).
+- [x] `shellcheck` clean
+  - Evidence (2026-10-30): `shellcheck -S warning scripts/*.sh setup-linux.sh` exit 0, the severity CI runs at.
+- [x] Red-teamed: removing each fix turns its guard red, **and each mutation is confirmed to have landed**
+  - Evidence: the mutation passes recorded on the AC8 line above, each mutation confirmed landed by checksum: AC3 #2845/#2863, AC5 15/15 #2903 and #2935, AC4/AC6 16/16 #2924.
 - [x] Replayed against #1059's real payload: the REAL finding must come back **refuted**, and the multi-line hole must not be claimed as the reviewer's finding
   - Evidence (2026-10-22, at `1719024f`, the commit #1059 was reviewed on): the reviewer's flagless evasion as a probe gives `Reproduction: did-not-reproduce (exit 1, defect when the check passes) … with probe flagless.diff: \`bats tests/ci-age-pin.bats\``, since bats catches it at line 98: refuted. The multi-line `apt-get` form, which the reviewer did not name, gives `reproduced (exit 0, …) with probe multiline.diff`: a separate finding, not the reviewer's.
   - The first replay wrapped the check as `sh -c '! bats …'`, which would read a missing `bats` (127) as a refutation; `--defect-when-passes` replaces that wrapper (#2926).
