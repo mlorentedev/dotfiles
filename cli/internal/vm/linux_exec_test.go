@@ -223,7 +223,7 @@ func TestExecForwardsASecretAndMasksIt(t *testing.T) {
 	}
 }
 
-// AC7: without --secret nothing is masked, even if piped stdin comes back.
+// AC7: piped stdin stays the caller's: with no secret forwarded, nothing is masked.
 func TestExecDoesNotRedactPlainStdin(t *testing.T) {
 	f := &listLima{guest: func(_ context.Context, in io.Reader, out, _ io.Writer, _ []string) error {
 		_, err := io.Copy(out, in)
