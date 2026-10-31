@@ -95,3 +95,34 @@ func TestProbeVersionArgs(t *testing.T) {
 		})
 	}
 }
+
+// ProbeTool reads a self-installed tool at its launcher on the OS it installs
+// itself on, and on PATH everywhere else, so a uv copy on Windows never
+// answers for hive (#2991).
+func TestProbeTool(t *testing.T) {
+	hive := Tool{Name: "hive", Source: Source{Type: "uv-tool", SelfInstall: &SelfInstall{Platforms: []string{"windows"}, Launcher: `%LOCALAPPDATA%\hive\bin\hive.cmd`}}}
+	run := func(name string, _ ...string) ([]byte, error) {
+		switch name {
+		case `C:\L\hive\bin\hive.cmd`:
+			return []byte("hive-vault 4.4.2"), nil
+		case "hive":
+			return []byte("hive-vault 4.3.0"), nil
+		}
+		return nil, errors.New("not found")
+	}
+	getenv := func(k string) string {
+		if k == "LOCALAPPDATA" {
+			return `C:\L`
+		}
+		return ""
+	}
+	if got := ProbeTool(hive, "windows", getenv, run); got != "4.4.2" {
+		t.Errorf("windows: %q, want the launcher's 4.4.2", got)
+	}
+	if got := ProbeTool(hive, "linux", getenv, run); got != "4.3.0" {
+		t.Errorf("linux: %q, want PATH's 4.3.0", got)
+	}
+	if got := ProbeTool(hive, "windows", func(string) string { return "" }, run); got != "" {
+		t.Errorf("windows, LOCALAPPDATA unset: %q, want absent, never PATH's copy", got)
+	}
+}

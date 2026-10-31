@@ -145,3 +145,27 @@ func TestCheckShadowedCatalogTools_NamesAnUnreadableCatalog(t *testing.T) {
 		}
 	})
 }
+
+// hive on Windows installs itself (packages.json self_install), so a second
+// hive on PATH is another channel's: a uv copy the install probe never reads
+// (#2991). It is named, with the launcher hive owns; the launcher alone is quiet.
+func TestCheckShadowedCatalogTools_NamesACopyBesideASelfInstalledTool(t *testing.T) {
+	repo, local := t.TempDir(), t.TempDir()
+	writeFile(t, filepath.Join(repo, "packages.json"), `{"tools":[{"name":"hive","version":"4.4.2","profile":"full","source":{"type":"uv-tool","package":"hive-vault","self_install":{"platforms":["windows"],"args":["self-upgrade","{version}"],"launcher":"%LOCALAPPDATA%/hive/bin/hive.cmd"}}}]}`)
+	own, uv := filepath.Join(local, "hive", "bin"), filepath.Join(t.TempDir(), ".local", "bin")
+	writeExec(t, filepath.Join(own, "hive.cmd"))
+	writeExec(t, filepath.Join(uv, "hive.exe"))
+	run := func(path string) string {
+		sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo, "LOCALAPPDATA": local, "PATH": path}, nil, nil)
+		sys.GOOS = "windows"
+		var buf bytes.Buffer
+		checkShadowedCatalogTools(sys, &Config{DotfilesDir: t.TempDir()}, capture(&buf))
+		return buf.String()
+	}
+	if out := run(uv + string(os.PathListSeparator) + own); !strings.Contains(out, "[WARN]") || !strings.Contains(out, uv) || !strings.Contains(out, "uv tool uninstall hive-vault") {
+		t.Errorf("a uv copy beside the launcher must be named with its removal\n%s", out)
+	}
+	if out := run(own); strings.Contains(out, "hive") {
+		t.Errorf("the launcher alone is hive's own install\n%s", out)
+	}
+}

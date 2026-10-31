@@ -57,6 +57,22 @@ func ProbeVersion(name string, run Runner) string {
 	return ProbeVersionArgs(name, run, "--version")
 }
 
+// ProbeTool is the version t answers with on goos, read where its installer
+// puts it: the launcher on an OS where t installs itself, `<name>` on PATH
+// otherwise. A second copy on PATH, such as a uv one beside hive's own layout
+// on Windows, never answers for a self-installed tool (#2991). converge,
+// `dotf tools version` and the doctor read it, so they agree on such a machine.
+func ProbeTool(t Tool, goos string, getenv func(string) string, run Runner) string {
+	if !t.Source.SelfInstalls(goos) {
+		return ProbeVersion(t.Name, run)
+	}
+	launcher := t.Source.SelfInstall.LauncherPath(getenv)
+	if launcher == "" {
+		return ""
+	}
+	return ProbeVersion(launcher, run)
+}
+
 // ProbeVersionArgs is ProbeVersion for a tool that reports its version some
 // other way than `--version` (kubectl's `version --client`, kubeconform's
 // `-v`): the same extraction over `<name> <args>`.
