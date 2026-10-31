@@ -28,6 +28,10 @@ setup() {
     grep -qE '^ExecStart=%h/\.local/bin/dotf secrets run .* -- %h/\.local/bin/hive serve$' "$DROPIN"
 }
 
+@test "#3005: a locked vault does not stop the daemon, only its worker key" {
+    grep -qE '^ExecStart=%h/\.local/bin/dotf secrets run .*--skip-locked.* -- %h/\.local/bin/hive serve$' "$DROPIN"
+}
+
 # A second ExecStart on a Type=simple unit is a load-time ERROR unless the list
 # is reset first. Without the empty assignment the drop-in does not override the
 # base unit -- systemd refuses to load it, and the daemon keeps running with no
