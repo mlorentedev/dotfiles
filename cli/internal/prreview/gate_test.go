@@ -240,7 +240,8 @@ func portedGateCases() []gateCase {
 	}
 }
 
-// edgeGateCases pin what the script's jq does where no bats case looks.
+// edgeGateCases pin what the script's jq does where no bats case looks. Their
+// expected output is edgeGateWants, in gate_edge_test.go.
 func edgeGateCases() []gateCase {
 	bot := func(body string, then ...func(*gateFixture)) func(*gateFixture) {
 		return func(f *gateFixture) {
