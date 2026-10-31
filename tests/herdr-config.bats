@@ -116,7 +116,11 @@ setup() {
     # name `dotf herdr explorer` once that pin has reached the release that added
     # it and the toggle fix for a press from inside the explorer (0.77.0,
     # #2854, lesson 373). Past it, the pin only moves forward.
-    block=$(grep -A6 'key = "prefix+f"' "$SRC")
+    # `run`, not `$(...)`: a renamed key makes grep exit 1, and under set -e a
+    # bare assignment would abort before the message below could say why.
+    run grep -A6 'key = "prefix+f"' "$SRC"
+    block="$output"
+    [ "$status" -eq 0 ] || { echo "no custom binding names prefix+f"; false; }
     [[ "$block" == *'type = "shell"'* ]] || { echo "prefix+f is not a shell command: $block"; false; }
     [[ "$block" == *'command = "dotf herdr explorer"'* ]] || { echo "prefix+f does not run dotf herdr explorer: $block"; false; }
     dotf_pin=$(sed -n 's/^DOTF_VERSION=//p' "$REPO/versions.conf")
