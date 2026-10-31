@@ -416,15 +416,52 @@ func TestInspectRefusesADropInDirItCannotRead(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 		t.Skip("needs a mode bit that denies the reader: not on Windows, not as root")
 	}
-	m := newMachine(t)
-	dir := filepath.Dir(m.paths.DropIn)
-	m.write(filepath.Join(dir, "00-local.conf"), "PasswordAuthentication yes\n")
-	if err := os.Chmod(dir, 0o300); err != nil {
-		t.Fatal(err)
+	for name, setup := range map[string]func(m *machine, dir string) string{
+		// The default shape: the drop-in dir itself cannot be read.
+		"the drop-in dir": func(m *machine, dir string) string {
+			m.write(filepath.Join(dir, "00-local.conf"), "PasswordAuthentication yes\n")
+			return dir
+		},
+		// A wildcard in a directory component: a check that read only the
+		// pattern's literal parent saw "missing" and passed (PR #2987 review).
+		"a dir a wildcard component reaches": func(m *machine, dir string) string {
+			m.write(m.paths.SSHDConfig, "Include "+dir+"/*/*.conf\n")
+			sub := filepath.Join(dir, "00-local")
+			m.write(filepath.Join(sub, "a.conf"), "PasswordAuthentication yes\n")
+			return sub
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := newMachine(t)
+			locked := setup(m, filepath.Dir(m.paths.DropIn))
+			if err := os.Chmod(locked, 0o300); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+			if _, err := m.target().Inspect(); err == nil || !strings.Contains(err.Error(), "permission denied") {
+				t.Fatalf("Inspect = %v, want the unreadable dir refused", err)
+			}
+		})
 	}
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
-	if _, err := m.target().Inspect(); err == nil || !strings.Contains(err.Error(), "read the drop-ins the Include reaches") {
-		t.Fatalf("Inspect = %v, want the unreadable drop-in dir refused", err)
+}
+
+// globAll keeps filepath.Glob's matches and order where every dir is readable.
+func TestGlobAllMatchesGlob(t *testing.T) {
+	root := t.TempDir()
+	for _, p := range []string{"b/2.conf", "a/1.conf", "a/0.conf", "a/x.txt", "c.conf"} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, p)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, p), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, pattern := range []string{"*", "*.conf", "*/*.conf", "a/*", "missing/*", "c.conf", "none.conf", "c.conf/*"} {
+		want, _ := filepath.Glob(filepath.Join(root, pattern))
+		got, err := globAll(filepath.Join(root, pattern))
+		if err != nil || !slices.Equal(got, want) {
+			t.Errorf("globAll(%s) = %v, %v; want %v", pattern, got, err, want)
+		}
 	}
 }
 

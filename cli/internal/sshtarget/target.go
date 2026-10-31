@@ -689,15 +689,9 @@ func (t Target) includes(pattern, dir string) (string, bool) {
 // checkEarlierDropIns reads the drop-ins the Include reaches before ours:
 // glob order is lexical, the order sshd reads them in.
 func (t Target) checkEarlierDropIns(pattern string, ours map[string]bool) error {
-	// Glob drops the I/O error, so an unreadable drop-in dir read as holding
-	// nothing that shadows ours and the check passed without looking (#2812).
-	// Reading the dir first makes that a refusal; a missing one has no drop-ins.
-	if _, err := os.ReadDir(filepath.Dir(pattern)); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("read the drop-ins the Include reaches: %w", err)
-	}
-	matches, err := filepath.Glob(pattern) //nolint:forbidigo // the dir was read above, so Glob's dropped I/O error cannot hide one
+	matches, err := globAll(pattern)
 	if err != nil {
-		return fmt.Errorf("the include pattern %s: %w", pattern, err)
+		return fmt.Errorf("read the drop-ins the Include %s reaches: %w", pattern, err)
 	}
 	for _, m := range matches {
 		if m >= t.Paths.DropIn {
@@ -718,6 +712,55 @@ func (t Target) checkEarlierDropIns(pattern string, ours map[string]bool) error 
 		}
 	}
 	return nil
+}
+
+// globAll is filepath.Glob without its blind spot (#2812). Glob drops I/O
+// errors, so an unreadable directory anywhere on the pattern's path read as
+// holding no drop-in that shadows ours, and the check passed without looking.
+// Here a missing path matches nothing and any other error is returned. Each
+// directory is read in name order, so the matches keep Glob's lexical order.
+func globAll(pattern string) ([]string, error) {
+	if !strings.ContainsAny(pattern, `*?[`) {
+		if _, err := os.Lstat(pattern); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return []string{pattern}, nil
+	}
+	dir, file := filepath.Split(pattern)
+	dirs, err := globAll(filepath.Clean(dir))
+	if err != nil {
+		return nil, err
+	}
+	var matches []string
+	for _, d := range dirs {
+		info, err := os.Stat(d)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return nil, err
+		}
+		if !info.IsDir() {
+			continue
+		}
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			ok, err := filepath.Match(file, e.Name())
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				matches = append(matches, filepath.Join(d, e.Name()))
+			}
+		}
+	}
+	return matches, nil
 }
 
 func shadowed(where string, keys []string) error {
