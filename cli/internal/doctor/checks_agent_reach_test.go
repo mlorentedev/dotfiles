@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -307,6 +308,11 @@ func TestHiveBackendCanServe_StartedWhileLockedFails(t *testing.T) {
 // An unreadable trace directory is not "no trace": the check cannot tell
 // whether the daemon started keyless, so it warns instead of passing.
 func TestHiveBackendCanServe_UnreadableTraceWarns(t *testing.T) {
+	// The check runs only on systemd hosts, and Windows reports a file read as
+	// a directory as "not found", so this setup cannot make it unreadable there.
+	if runtime.GOOS == "windows" {
+		t.Skip("the trace directory is a systemd-host concern")
+	}
 	rt := t.TempDir()
 	getenv := func(k string) string { return map[string]string{"XDG_RUNTIME_DIR": rt}[k] }
 	dir := secrets.DegradedDir(getenv)
