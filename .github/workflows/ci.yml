@@ -691,8 +691,21 @@ jobs:
       #
       # Only what the install writes is cached: the package (npm nests its deps
       # inside it) and its three shims. Not the prefix, which also holds the
-      # image's own globals and the CLIs `dotf tools install` puts there.
-      - name: Resolve the pi CLI cache key
+      # image's own globals.
+      #
+      # #2059: the same cache holds the three npm CLIs `dotf tools install`
+      # pins in packages.json (bw, opencode, copilot). They were the largest
+      # uncached part of setup on a PR, ~90 s of a 228-309 s step (bw alone
+      # ~60 s), measured 2026-10-31 on three PR runs. packages.json and the
+      # installer's code join the key (cli/internal/tools, the platform and env
+      # packages it and `dotf tools` import, cli/internal/cmd/tools.go), so
+      # a pin bump or a PR that changes how they install misses and installs
+      # fresh: the install path stays covered on exactly the PRs that can break
+      # it, which is why #2050 had left these out. On a hit the installer's
+      # version probe skips them; a restored package that does not answer the
+      # probe is reinstalled, so a bad hit costs today's time, not a red job.
+      # yarn is not here: the runner image already ships it.
+      - name: Resolve the npm CLI cache key
         id: picli
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
@@ -705,9 +718,9 @@ jobs:
           "version=$($v.Trim())" >> $env:GITHUB_OUTPUT
           "prefix=$prefix" >> $env:GITHUB_OUTPUT
           "image=$env:ImageVersion" >> $env:GITHUB_OUTPUT
-          Write-Output "pi CLI cache: prefix=$prefix image=$env:ImageVersion version=$($v.Trim())"
+          Write-Output "npm CLI cache: prefix=$prefix image=$env:ImageVersion pi=$($v.Trim())"
 
-      - name: Restore the pinned pi CLI (pull requests; a lookup on main)
+      - name: Restore the pinned npm CLIs (pull requests; a lookup on main)
         id: picli-cache
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -718,7 +731,19 @@ jobs:
             ${{ steps.picli.outputs.prefix }}\pi
             ${{ steps.picli.outputs.prefix }}\pi.cmd
             ${{ steps.picli.outputs.prefix }}\pi.ps1
-          key: pi-cli-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
+            ${{ steps.picli.outputs.prefix }}\node_modules\@bitwarden\cli
+            ${{ steps.picli.outputs.prefix }}\bw
+            ${{ steps.picli.outputs.prefix }}\bw.cmd
+            ${{ steps.picli.outputs.prefix }}\bw.ps1
+            ${{ steps.picli.outputs.prefix }}\node_modules\opencode-ai
+            ${{ steps.picli.outputs.prefix }}\opencode
+            ${{ steps.picli.outputs.prefix }}\opencode.cmd
+            ${{ steps.picli.outputs.prefix }}\opencode.ps1
+            ${{ steps.picli.outputs.prefix }}\node_modules\@github\copilot
+            ${{ steps.picli.outputs.prefix }}\copilot
+            ${{ steps.picli.outputs.prefix }}\copilot.cmd
+            ${{ steps.picli.outputs.prefix }}\copilot.ps1
+          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('packages.json') }}-${{ hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go') }}-${{ hashFiles('setup-windows.ps1') }}
 
       # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
       # the binary built above survives setup. No DOTFILES_DIR override: the
@@ -916,7 +941,7 @@ jobs:
       # CI-010: the other half of the restore above. Last, so only a run whose
       # every step passed writes the cache. The first clause is every step's
       # guard (HARNESS-041); the rest narrows it to a miss on main.
-      - name: Save the pi CLI that main installed
+      - name: Save the npm CLIs that main installed
         if: (github.event_name == 'push' || needs.changes.outputs.code == 'true') && github.event_name == 'push' && steps.picli-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -925,7 +950,19 @@ jobs:
             ${{ steps.picli.outputs.prefix }}\pi
             ${{ steps.picli.outputs.prefix }}\pi.cmd
             ${{ steps.picli.outputs.prefix }}\pi.ps1
-          key: pi-cli-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
+            ${{ steps.picli.outputs.prefix }}\node_modules\@bitwarden\cli
+            ${{ steps.picli.outputs.prefix }}\bw
+            ${{ steps.picli.outputs.prefix }}\bw.cmd
+            ${{ steps.picli.outputs.prefix }}\bw.ps1
+            ${{ steps.picli.outputs.prefix }}\node_modules\opencode-ai
+            ${{ steps.picli.outputs.prefix }}\opencode
+            ${{ steps.picli.outputs.prefix }}\opencode.cmd
+            ${{ steps.picli.outputs.prefix }}\opencode.ps1
+            ${{ steps.picli.outputs.prefix }}\node_modules\@github\copilot
+            ${{ steps.picli.outputs.prefix }}\copilot
+            ${{ steps.picli.outputs.prefix }}\copilot.cmd
+            ${{ steps.picli.outputs.prefix }}\copilot.ps1
+          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('packages.json') }}-${{ hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go') }}-${{ hashFiles('setup-windows.ps1') }}
 
   integration:
     runs-on: ubuntu-latest
