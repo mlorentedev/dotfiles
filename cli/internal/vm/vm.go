@@ -5,6 +5,7 @@ package vm
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -21,8 +22,8 @@ import (
 //go:embed linux.yaml
 var LinuxTemplate []byte
 
-// Limactl runs `limactl args...`. A nil stdin reads nothing.
-type Limactl func(stdin io.Reader, stdout, stderr io.Writer, args ...string) error
+// Limactl runs `limactl args...` until ctx ends. A nil stdin reads nothing.
+type Limactl func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error
 
 // Options is one verification run.
 type Options struct {
@@ -48,7 +49,7 @@ const withToken = `IFS= read -r t || true; if [ -n "$t" ]; then export GITHUB_TO
 // Verify boots the guest, checks it shares nothing with the host, converges a
 // copy of o.Source with install.sh, and converges again: the first run must
 // end with no failed step and the second must change nothing.
-func Verify(l Limactl, o Options) (err error) {
+func Verify(ctx context.Context, l Limactl, o Options) (err error) {
 	if o.Source == "" {
 		return errors.New("no source archive to converge")
 	}
@@ -65,18 +66,18 @@ func Verify(l Limactl, o Options) (err error) {
 			step(o.Progress, "kept: limactl shell %s; remove with limactl delete --force %s", o.Name, o.Name)
 			return
 		}
-		if derr := l(nil, o.Out, o.Out, "delete", "--force", o.Name); derr != nil {
+		if derr := l(ctx, nil, o.Out, o.Out, "delete", "--force", o.Name); derr != nil {
 			err = errors.Join(err, fmt.Errorf("limactl delete %s: %w", o.Name, derr))
 		}
 	}()
 	step(o.Progress, "boot %s (Ubuntu 24.04, nothing shared with the host)", o.Name)
-	if err := l(nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl); err != nil {
+	if err := l(ctx, nil, o.Out, o.Out, "start", "--tty=false", "--name", o.Name, tmpl); err != nil {
 		return fmt.Errorf("limactl start: %w", err)
 	}
 
 	capture := func(args ...string) (string, error) {
 		var out bytes.Buffer
-		err := l(nil, &out, o.Out, append([]string{"shell", o.Name, "--"}, args...)...)
+		err := l(ctx, nil, &out, o.Out, append([]string{"shell", o.Name, "--"}, args...)...)
 		return strings.TrimSpace(out.String()), err
 	}
 	home, err := capture("printenv", "HOME")
@@ -101,7 +102,7 @@ func Verify(l Limactl, o Options) (err error) {
 	repo := home + "/Projects/dotfiles"
 	archive := home + "/dotf-src.tar.gz"
 	step(o.Progress, "copy a git archive of %s into the guest", o.Ref)
-	if err := l(nil, o.Out, o.Out, "copy", o.Source, o.Name+":"+archive); err != nil {
+	if err := l(ctx, nil, o.Out, o.Out, "copy", o.Source, o.Name+":"+archive); err != nil {
 		return fmt.Errorf("limactl copy: %w", err)
 	}
 	for _, args := range [][]string{
@@ -123,7 +124,7 @@ func Verify(l Limactl, o Options) (err error) {
 			return err
 		}
 		cmd := append([]string{"shell", "--workdir", repo, o.Name, "--", "bash", "-c", withToken, "_"}, args...)
-		runErr := l(strings.NewReader(o.Token+"\n"), o.Out, o.Out, cmd...)
+		runErr := l(ctx, strings.NewReader(o.Token+"\n"), o.Out, o.Out, cmd...)
 		raw, rerr := capture("cat", report)
 		if rerr != nil {
 			return errors.Join(runErr, fmt.Errorf("%s left no report: %w", label, rerr))
