@@ -107,7 +107,7 @@ Each slice PR fills its own section below and nothing else.
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-513-a-read-only-allowlist-that-names-a-code-runner-is-not-read-only.md (also lesson 507 and lesson 508)
-- [x] ADR-worthy decision for the repo's `docs/adr/`? (the per-thread store changes the layout of every project's `memory/`) yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md
+- [x] ADR-worthy decision for the repo's `docs/adr/`? yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md (the per-thread store changes the layout of every project's `memory/`)
 - [x] New pattern candidate for `00_meta/patterns/`? no: the store and the resume render are this repo's `dotf mem` contract, recorded in ADR-056; nothing in them generalises beyond it yet
 
 ## Archive checklist
@@ -225,9 +225,11 @@ The fourth review (`review-round-4.md`, at `dee3fe4f`, nan/deepseek-v4-flash) re
 
 | Finding | Disposition | Test |
 |---|---|---|
-| F-1: a prose (unbackticked) Verify command renders unmarked | **Owner decision** on #1689: mark every field with no backticked span, or drop the read-only promise and render one fixed note | UNTESTED until the shape is chosen |
+| F-1: a prose (unbackticked) Verify command renders unmarked | **Applied, decision B** (on #1689): the marker is retired. Verify renders as written under one fixed note, so nothing in it reads as safe; `readOnlyCommand` and its allowlist are deleted | `TestResumeKeepsVerifyProseBesideTheCommands`, `prose command` case; `TestResumeRendersVerifyAndAwaiting` (note exactly once) |
 | F-2: the candidate lines interpolate the thread key and `--agent` raw | **Applied.** Both are one shell word: as written when plain (`[A-Za-z0-9_./@+-]`), single-quoted otherwise | `TestMemResumeQuotesTheCandidateLine`; quoting removed from either the key or the agent turns it red |
-| F-3: `proposal.md` AC boxes and the `tasks.md` Closing block unticked | **Carried** with F-1: AC2 and the slice 3 box depend on the chosen shape | n/a |
+| F-3: `proposal.md` AC boxes and the `tasks.md` Closing block unticked | **Applied** with F-1: AC1-AC6 ticked, AC2, the risk control and the slice 3 box reworded to the retired marker, the 450 B cap stated beside "about 350 B"; the Closing review box waits for round 5 | n/a |
 | F-4: `features.json` states are `pending` | **Declined:** the states are harness-owned; the six commands exit 0, re-run by the reviewer | n/a |
-| F-5: the `context` render names the thread file's path, so AC1's "pure function of the thread file" is weaker than the code | **Carried** with F-1: the criterion wording moves with the contract set | n/a |
+| F-5: the `context` render names the thread file's path, so AC1's "pure function of the thread file" is weaker than the code | **Applied:** AC1 now says "of the thread file and the source path it names" | `TestResumeIsAPureRenderOfTheThreadFile` |
 | F-6: promotion candidates unanswered | **Applied** above | n/a |
+
+Mutations for decision B, each turning `go test ./internal/mem` red: the note dropped from the heading line, and the field cut to its first line. The six `features.json` commands exit 0 on the branch.

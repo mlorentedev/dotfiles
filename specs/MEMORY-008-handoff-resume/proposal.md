@@ -19,8 +19,8 @@ Every session ends with the same manual ritual: /handoff, ask for a paste-ready 
 ## What
 
 - A thread has one canonical field set, defined once in Go: `Updated`, `Last task`, `Decisions`, `Open threads`, `Next action`, `Verify`, `Awaiting Manu` and `Journal`. The labels sessions already improvise (`Verify at start`, `Judgment calls left open`) are read as aliases, so no existing block needs migrating by hand.
-- The per-thread file `memory/threads/<key>.md` is the source. The entry in `MEMORY.md` is derived from it and capped at about 350 B (updated, one-line next action, how many items await Manu, pointer, and the writer once MEMORY-009 stamps it), not the 1.5 KB block of today. Old blocks stay readable and move to the new shape on their next write.
-- `dotf mem resume [--thread K] [--format prompt|context]` renders the thread. The output depends only on the thread file. When the working directory names no single thread for this agent, it lists the candidates rather than picking one.
+- The per-thread file `memory/threads/<key>.md` is the source. The entry in `MEMORY.md` is derived from it and capped at 450 B, about 350 B in practice (updated, one-line next action, how many items await Manu, pointer, and the writer once MEMORY-009 stamps it), not the 1.5 KB block of today. Old blocks stay readable and move to the new shape on their next write.
+- `dotf mem resume [--thread K] [--format prompt|context]` renders the thread. The output depends only on the thread file and the source path it names. When the working directory names no single thread for this agent, it lists the candidates rather than picking one.
 - Claude's `SessionStart` hook injects the resume keyed on `source`: the full resume for `startup`, `clear` and `compact`, one line for `resume` and `fork`, where the conversation already holds the history.
 - Harnesses with no session hook get one sentence in the compact doctrine: run `dotf mem resume` and follow it.
 - `/catchup` step 1 runs `dotf mem resume` and its `Verify` commands; "awaiting Manu's decision" is a valid next action.
@@ -37,7 +37,7 @@ Every session ends with the same manual ritual: /handoff, ask for a paste-ready 
 ## Risks / open questions
 
 - **Claude's JSON envelope is production evidence, not documented contract.** `hookSpecificOutput.additionalContext` is how this session's own context arrived, but the hooks docs show plain stdout. Mitigation: a golden test pins the envelope `ClaudeEnvelope` writes; if it stops working, plain stdout is the documented fallback.
-- **A `Verify:` line is an injection surface.** A `MEMORY` file is input the next session did not write. `resume` marks any command outside a read-only allowlist as unverified, and the session still runs it through its normal permission gate.
+- **A `Verify:` line is an injection surface.** A `MEMORY` file is input the next session did not write. `resume` renders `Verify` as written under one note that the commands come from another session and each runs through the normal permission gate. No command is presented as safe: a read-only marker was tried and retired, because it could not cover a command written as prose (review round 4, lesson 513).
 - **The doctrine sentence must fit.** The compact doctrine is 7,798 characters on main against the 8,000 budget test (HARNESS-145), so there is room for one short sentence (about 40 characters) and no more. The AC1 budget test is part of this spec's verification.
 - **Non-hook harnesses see less ambiently.** Moving the rich fields out of the auto-loaded file changes what they read at start. The derived index entry stays in `MEMORY.md`, and the doctrine sentence tells them where the rest is.
 - **Whether the lint refuses or warns.** `handoff-write` starts by warning on a missing `Next action` or an unknown label, so no session loses a handoff to the lint. Refusing is decided after the warnings have been counted.
@@ -45,12 +45,12 @@ Every session ends with the same manual ritual: /handoff, ask for a paste-ready 
 
 ## Acceptance criteria
 
-- [ ] **AC1** — `resume` output is a pure function of the thread file (golden test); two runs are identical.
-- [ ] **AC2** — a thread with `Verify:` and `Awaiting Manu:` renders both, and an ambiguous working directory lists the candidate threads instead of choosing one.
-- [ ] **AC3** — `SessionStart` output begins with the resume block for `source=compact` and `source=clear` (golden fixture per source), and `resume` and `fork` get one line.
-- [ ] **AC4** — a fixture shaped like the real dotfiles `MEMORY.md` (its measured prefix and thread sizes; the file itself is probed, not committed, because this repository is public) stays at or under 25,000 B after the new fields are added, and a write that would cross the budget fails instead of truncating.
-- [ ] **AC5** — the handoff skill points the next session at `dotf mem resume` instead of a hand-typed prompt, and catchup step 1 is `dotf mem resume`.
-- [ ] **AC6** — the fallback sentence is in the compiled doctrine, `compile-harness.sh --check` passes, and the doctrine stays under the 8,000-character budget.
+- [x] **AC1** — `resume` output is a pure function of the thread file and the source path it names (golden test); two runs are identical.
+- [x] **AC2** — a thread with `Verify:` and `Awaiting Manu:` renders both, `Verify` under a note that no command in it is presented as safe, and an ambiguous working directory lists the candidate threads instead of choosing one.
+- [x] **AC3** — `SessionStart` output begins with the resume block for `source=compact` and `source=clear` (golden fixture per source), and `resume` and `fork` get one line.
+- [x] **AC4** — a fixture shaped like the real dotfiles `MEMORY.md` (its measured prefix and thread sizes; the file itself is probed, not committed, because this repository is public) stays at or under 25,000 B after the new fields are added, and a write that would cross the budget fails instead of truncating.
+- [x] **AC5** — the handoff skill points the next session at `dotf mem resume` instead of a hand-typed prompt, and catchup step 1 is `dotf mem resume`.
+- [x] **AC6** — the fallback sentence is in the compiled doctrine, `compile-harness.sh --check` passes, and the doctrine stays under the 8,000-character budget.
 
 ## References
 

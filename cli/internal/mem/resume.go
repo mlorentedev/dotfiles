@@ -3,7 +3,6 @@ package mem
 import (
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -75,94 +74,18 @@ func pointerIn(block string) string {
 	return ""
 }
 
-// readOnlyPrefixes are the Verify commands a resume presents as safe to run
-// first. Anything else is marked unverified: a MEMORY file is input the next
-// session did not write, and the session still runs every command through its
-// own permission gate. Left off on purpose: generic file readers (cat, grep,
-// head), which take any path, so `cat <secrets file>` must not render as safe;
-// and subcommands with a writing form (git branch -D, git fetch, go build).
-var readOnlyPrefixes = []string{
-	"git status", "git log", "git diff", "git show", "git worktree list",
-	"gh pr view", "gh pr checks", "gh pr list", "gh pr diff", "gh issue view", "gh issue list", "gh run view",
-	"dotf spec audit", "dotf doctor", "dotf mem thread", "dotf mem resume", "dotf pr triage-queue",
-	"go test", "go vet", "bats", "shellcheck",
-}
+// verifyNote heads every Verify field. A MEMORY file is input this session did
+// not write, so nothing in it is presented as safe to run: the field renders as
+// written and the session's permission gate decides each command. An earlier
+// marker that flagged commands outside a read-only allowlist could never cover
+// prose, so it read false-safe and was retired (MEMORY-008 review round 4,
+// lesson 513).
+const verifyNote = "(written by an earlier session; run each command only through the normal permission gate)"
 
-// plainCommand is a command made only of characters the shell does not
-// interpret, separated by plain spaces, so the shell splits it exactly where
-// strings.Fields does: the check reads what will run. No quote, `$`, `~`,
-// `=`, `:` or line break gets through, which is what defeated every narrower
-// rule before it (${IFS}-exec=, a quoted '-exec=', HEAD:secrets).
-var plainCommand = regexp.MustCompile(`^[A-Za-z0-9_./ -]+$`)
-
-// readOnlyCommand is true only where read-only is decidable: a listed prefix
-// followed by plain positional words that stay inside the checkout. Every
-// flag is refused, because every escape hatch the reviews found was one
-// (go test -exec, --outputdir, dotf doctor --fix, gh pr view --web); a
-// command with flags renders unverified and still runs through the gate.
-func readOnlyCommand(cmd string) bool {
-	cmd = strings.TrimSpace(cmd)
-	if !plainCommand.MatchString(cmd) {
-		return false
-	}
-	for _, p := range readOnlyPrefixes {
-		if cmd != p && !strings.HasPrefix(cmd, p+" ") {
-			continue
-		}
-		for _, arg := range strings.Fields(strings.TrimPrefix(cmd, p)) {
-			if strings.HasPrefix(arg, "-") || !insideCheckout(arg) {
-				return false
-			}
-		}
-		return true
-	}
-	return false
-}
-
-// insideCheckout is false for a path that can leave the working directory:
-// absolute, or with a .. segment (./... is not one).
-func insideCheckout(arg string) bool {
-	if strings.HasPrefix(arg, "/") {
-		return false
-	}
-	for _, seg := range strings.Split(arg, "/") {
-		if seg == ".." {
-			return false
-		}
-	}
-	return true
-}
-
-// inlineCode finds the backticked commands in a Verify field.
-var inlineCode = regexp.MustCompile("`([^`]+)`")
-
-// unverifiedNote explains the in-place marker once per field.
-const unverifiedNote = "(a command marked unverified is not a plain read-only one; run it only through the normal permission gate)"
-
-// verifyText is a Verify field as written, every line kept, with each command
-// that is not provably read-only marked where it stands. One rendering, so no
-// unmarked copy of a marked command exists, and prose, caveats and bullets
-// without a command all survive (ParseThread drops no line either).
-func verifyText(v string) (string, bool) {
-	marked := false
-	out := inlineCode.ReplaceAllStringFunc(stripBreaks(v), func(span string) string {
-		if readOnlyCommand(strings.Trim(span, "`")) {
-			return span
-		}
-		marked = true
-		return span + " (unverified)"
-	})
-	return strings.Trim(out, "\n"), marked
-}
-
-// verifyBlock is the field's text under a heading line, which carries the
-// note when anything in it is marked.
+// verifyBlock is the field as written, every line kept, under a heading line
+// that carries the note.
 func verifyBlock(heading, v string) string {
-	text, marked := verifyText(v)
-	if marked {
-		heading += " " + unverifiedNote
-	}
-	return heading + "\n" + text
+	return heading + " " + verifyNote + "\n" + strings.Trim(stripBreaks(v), "\n")
 }
 
 // RenderResume renders a thread's full text for the next session (MEMORY-008).
