@@ -39,6 +39,7 @@ func newPrCmd() *cobra.Command {
 	pr.AddCommand(newPrRouteCmd())
 	pr.AddCommand(newPrPreflightCmd())
 	pr.AddCommand(newPrGuardCmd())
+	pr.AddCommand(newPrGateCmd())
 	return pr
 }
 
