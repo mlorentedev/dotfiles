@@ -1,5 +1,5 @@
 ---
-id: "lesson-522-a-required-check-a-workflow-can-cancel-belongs-in-a-commit-status"
+id: "lesson-526-a-required-check-a-workflow-can-cancel-belongs-in-a-commit-status"
 type: lesson
 status: active
 title: "A required check that a workflow can cancel belongs in a commit status"
