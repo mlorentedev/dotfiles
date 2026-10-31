@@ -66,7 +66,19 @@ review, not per merge.
     only a measured `false` lets the second attempt run. Without `--probe` it
     is the final guard: exit 0 when this run published a review, 1 when not,
     naming the last attempt that ran. A usage error exits 2.
-- [ ] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract read (FAIL), implement (PASS)
+- [x] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract case (FAIL), implement (PASS)
+  - The script reads no value from `harness/pr-agent-upstream-contract.json`: it
+    cites the file in a comment, and the bats case is a text check on that. The
+    port keeps the citation and the check, and adds a test that the contract
+    pins the sources the rules mirror, so the case costs no production line. The
+    workflow's real read of the contract, `audited_ref` in the `reviewable` step,
+    is not the gate's and stays where it is.
+  - `Gate` is pure: it takes the two files as bytes, because the workflow fetches
+    them. A file it cannot read is nil, and nil means a full review.
+  - It keeps the script's output and exit codes, and a flag cobra rejects exits 2
+    here, as the script does. It departs from the script where the script's
+    input handling let a skip rest on no data, or let a comment write an output
+    line (lesson-522). `TestGate_Divergences` holds each one.
 
 ### A5. D: the workflow switches (one PR)
 
