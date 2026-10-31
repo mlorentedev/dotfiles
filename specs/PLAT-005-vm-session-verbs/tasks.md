@@ -30,14 +30,14 @@ created: "2026-10-22"
 
 ### PR 1b: `Session`, `Record` and the Linux verbs
 
-- [ ] [P] [AC9] `noGuest(t)` coverage for every new verb's refusals: failing test per verb, `go -C cli test ./internal/cmd/ -run TestVMVerbRefusals`
+- [x] [P] [AC9] `noGuest(t)` coverage for every new verb's refusals: failing test per verb, `go -C cli test ./internal/cmd/ -run TestVMVerbRefusals`
 - [x] [P] [AC2] Failing test for the record shape and the status, exit and process-code table in `cli/internal/vm/session_test.go`
 - [ ] [AC2] `Session` interface and `Record` type in `cli/internal/vm/session.go`; `--json` writes one record, empty lists are `[]`
 - [x] [AC1] Linux `up --session` over Lima (default name `<os>-<unix time>`); `status` lists what `limactl list` answers
 - [x] [AC1] `up` on a name whose guest is gone: `stale`, exit 2, names `down`
-- [ ] [AC2] Linux `exec` over `limactl shell` (argv, no shell) and `--script`
-- [ ] [AC3] stdin forwarded on Linux
-- [ ] [AC7] `exec --secret <registry-id>`: resolve through the catalog, write on the guest's stdin like `withToken`, key the redaction; a guest that echoes it yields a masked record
+- [x] [AC2] Linux `exec` over `limactl shell` (argv, no shell) and `--script`
+- [x] [AC3] stdin forwarded on Linux
+- [x] [AC7] `exec --secret <registry-id>`: resolve through the catalog, write on the guest's stdin like `withToken`, key the redaction; a guest that echoes it yields a masked record
 - [ ] [AC4] Linux `cp` both ways with `limactl copy`; the isolation tests stay green
 - [x] [AC11] Linux `down`: no instance and no state; `no-session` exit 3 for an unknown name; `timeout` exits 1
 - [ ] Description names `stale` as an additive status value (no `version` bump, ADR-055 decision 7) and lists the allow rules (#2859)

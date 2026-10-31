@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -25,7 +26,7 @@ func noLimactl(t *testing.T) {
 	linuxSessions = func() (vm.LinuxSessions, error) {
 		return vm.LinuxSessions{
 			Dir: dir,
-			L: func(_ io.Reader, _, _ io.Writer, args ...string) error {
+			L: func(_ context.Context, _ io.Reader, _, _ io.Writer, args ...string) error {
 				t.Errorf("a refusal reached the hypervisor: limactl %s", strings.Join(args, " "))
 				return errors.New("must not run")
 			},
@@ -58,6 +59,15 @@ func TestVMVerbRefusals(t *testing.T) {
 		{"down with no name", []string{"down", "--json"}, 2, ""},
 		{"down with a bad name", []string{"down", "--session", "../x", "--json"}, 2, ""},
 		{"down on an unknown session", []string{"down", "--session", "ghost", "--json"}, 3, "no-session"},
+		{"exec with no name", []string{"exec", "--json", "--", "true"}, 2, ""},
+		{"exec with a bad name", []string{"exec", "--session", "../x", "--", "true"}, 2, ""},
+		{"exec with nothing to run", []string{"exec", "--session", "ghost"}, 2, ""},
+		{"exec with a program before --", []string{"exec", "--session", "ghost", "true"}, 2, ""},
+		{"exec with a program and a script", []string{"exec", "--session", "ghost", "--script", "vm_exec.go", "--", "true"}, 2, ""},
+		{"exec with a script that is not there", []string{"exec", "--session", "ghost", "--script", "no-such-file.sh"}, 2, ""},
+		{"exec with a negative timeout", []string{"exec", "--session", "ghost", "--timeout", "-1s", "--", "true"}, 2, ""},
+		{"exec with an unknown secret", []string{"exec", "--session", "ghost", "--secret", "no-such-secret", "--", "true"}, 2, ""},
+		{"exec on an unknown session", []string{"exec", "--session", "ghost", "--json", "--", "true"}, 3, "no-session"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			noLimactl(t)
@@ -86,7 +96,7 @@ func TestVMStatusWithNoSessionsIsAnEmptyArray(t *testing.T) {
 	old := linuxSessions
 	t.Cleanup(func() { linuxSessions = old })
 	linuxSessions = func() (vm.LinuxSessions, error) {
-		return vm.LinuxSessions{Dir: dir, Now: time.Now, L: func(_ io.Reader, _, _ io.Writer, _ ...string) error { return nil }}, nil
+		return vm.LinuxSessions{Dir: dir, Now: time.Now, L: func(_ context.Context, _ io.Reader, _, _ io.Writer, _ ...string) error { return nil }}, nil
 	}
 	stdout, _, err := runVerb(t, "status", "--json")
 	if err != nil || stdout != "[]\n" {
@@ -101,7 +111,7 @@ func TestVMUpWritesProgressToStderrAndTheNameToStdout(t *testing.T) {
 	old := linuxSessions
 	t.Cleanup(func() { linuxSessions = old })
 	linuxSessions = func() (vm.LinuxSessions, error) {
-		return vm.LinuxSessions{Dir: dir, Now: time.Now, L: func(_ io.Reader, _, _ io.Writer, _ ...string) error { return nil }}, nil
+		return vm.LinuxSessions{Dir: dir, Now: time.Now, L: func(_ context.Context, _ io.Reader, _, _ io.Writer, _ ...string) error { return nil }}, nil
 	}
 	stdout, stderr, err := runVerb(t, "up", "--session", "proof")
 	if err != nil || stdout != "proof\n" || !strings.Contains(stderr, "==> boot dotf-proof") {
