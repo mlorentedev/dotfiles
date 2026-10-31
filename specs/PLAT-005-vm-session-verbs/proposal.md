@@ -50,6 +50,7 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - Resolved: `--timeout` acts on both ends. Killing `limactl shell` leaves the guest command running and its ssh holding the pipes (measured on Lima 2.2.1, lesson 524), so the guest runs under `timeout -k 5 <limit>`, the host deadline starts first and decides the status, and `execLimactl` sets `WaitDelay`. Windows needs its own answer in PR 1c.
 - Resolved: `--secret` takes one value per id (`ShowEntry`), so a file or multi-var secret is refused before anything is decrypted, and it is repeatable. A value shorter than redaction's 6-byte floor, or multi-line, is refused, because forwarding it would break AC7 in silence.
 - Known residual: `limactl shell` returns 255 both for a command killed by a signal and for ssh losing the guest, so that case reads `ok, exit: 255`. The check before the shell rules out a stopped guest; the verb's help states the rest.
+- Resolved: `cp` runs `limactl copy --backend=scp`. Lima's default rsync passes a guest path through a remote shell, which split `/tmp/a b` and wrote `/tmp/a`, and it copies a directory with no `-r` to nowhere with exit 0 (both measured on Lima 2.2.1). Over scp a path is literal and a directory is a loud failure, which is also the file-only contract Windows has.
 - No open question blocks `tasks.md`.
 
 ## Acceptance criteria

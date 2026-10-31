@@ -38,9 +38,9 @@ created: "2026-10-22"
 - [x] [AC2] Linux `exec` over `limactl shell` (argv, no shell) and `--script`
 - [x] [AC3] stdin forwarded on Linux
 - [x] [AC7] `exec --secret <registry-id>`: resolve through the catalog, write on the guest's stdin like `withToken`, key the redaction; a guest that echoes it yields a masked record
-- [ ] [AC4] Linux `cp` both ways with `limactl copy`; the isolation tests stay green
+- [x] [AC4] Linux `cp` both ways with `limactl copy`; the isolation tests stay green
 - [x] [AC11] Linux `down`: no instance and no state; `no-session` exit 3 for an unknown name; `timeout` exits 1
-- [ ] Description names `stale` as an additive status value (no `version` bump, ADR-055 decision 7) and lists the allow rules (#2859)
+- [x] Description names `stale` as an additive status value (no `version` bump, ADR-055 decision 7) and lists the allow rules (#2859)
 
 ### PR 1c: the Windows verbs
 

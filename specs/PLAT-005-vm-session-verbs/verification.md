@@ -15,8 +15,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
+- Test suite: `go -C cli test ./... -count=1` -> exit 0, 50 packages ok (Linux exec and cp, 2026-10-30).
+- Manual smoke test, Linux exec and cp, Lima 2.2.1 on macOS, session `plat005-probe`:
+  - AC2: `printf` with `a b`, `$HOME`, `;id` came back literal, `ok`, `exit: 0`; `exit 3` gave `ok`, `exit: 3`, process code 1.
+  - AC2: `--script` ran from a temporary guest path and left none behind.
+  - AC3: piped stdin reached the guest, on argv and on `--script`.
+  - AC4: a file went host to guest to host byte-identical through `/tmp/a b`; `findmnt` in the guest listed no share.
+  - AC7: the wire protocol ran on the guest with synthetic values only. The masking is proved by unit tests, never against a live store (lesson 261).
+  - AC11: `--timeout 2s` on `sleep 20` gave `timeout`, process code 1, in 2068 ms, with no `sleep` left in the guest; `no-session` exit 3; a stopped guest `stale` exit 2.
+  - Windows is not covered until PR 1c.
 - No regressions in existing test suite: yes / no (if no, document)
 
 ## Decisions made during implementation
