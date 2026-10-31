@@ -41,7 +41,7 @@ func sessionResume(source, memoryPath, key, agent string) string {
 		}
 		return out
 	}
-	return fmt.Sprintf("[resume] Thread %s has a handoff; `dotf mem resume --thread %s` renders it.\n", thread, thread)
+	return fmt.Sprintf("[resume] Thread %s has a handoff; `dotf mem resume --thread %s` renders it.\n", thread, ShellWord(thread))
 }
 
 // normaliseSource reads a hook's source as a harness may spell it: a payload

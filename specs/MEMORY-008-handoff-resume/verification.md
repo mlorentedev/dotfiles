@@ -81,18 +81,17 @@ Each slice PR fills its own section below and nothing else.
 
 - `dotf mem resume [--thread K] [--agent A] [--format prompt|context] [--memory PATH]` in `cli/internal/cmd/mem_resume.go`. The render is in `cli/internal/mem/resume.go`.
   - `RenderResume` is pure: `TestResumeIsAPureRenderOfTheThreadFile` renders a fixture twice per format and compares both renders with `testdata/resume/{context,prompt}.golden`. An unknown format is refused.
-  - Next action, Verify and Awaiting Manu render first. Verify commands are listed one per line, and one outside the read-only allowlist is marked unverified (`TestResumeRendersVerifyAndAwaiting`). The allowlist matches on a word boundary, and any chaining, pipe, redirection or substitution fails it (`TestReadOnlyCommand`).
+  - Next action, Verify and Awaiting Manu render first. Verify renders as written under one fixed note that every command in it was written by an earlier session and runs only through the permission gate (`TestResumeRendersVerifyAndAwaiting`, `TestResumeKeepsVerifyProseBesideTheCommands`). Until round 4 a read-only allowlist marked commands outside it unverified; decision B retired it (see Review round 4).
   - `SelectThread` takes the agent's fork of the key, then the key unless another agent's stamp is on it. Otherwise it picks none and returns every thread key (`TestResumeListsCandidatesWhenTheThreadIsAmbiguous`). The command lists those keys, each with its `--thread` flag (`TestMemResumeListsCandidates`).
   - `ThreadText` reads the stored file when the entry points at one, and the inline block otherwise. It also returns the source path (`TestThreadTextForKey`). Round trip through the command: `TestMemResumeRendersWhatHandoffWriteStored`.
 - `--memory` defaults to the checkout project's vault `MEMORY.md`, through `mem.ProjectMemory`. That helper was lifted out of `session-end`, which resolved the same path inline, so the layout is derived in one place.
-- The read-only allowlist leaves out generic file readers (`cat`, `grep`, `head` and the like), because they take any path and `cat <secrets file>` would render as safe. It also leaves out subcommands that have a writing form (`git branch`, `git fetch`, `go build`). A line break counts as shell control, and an argument that writes a file (`--output`, `-o`) fails the check (review of #2880).
+- Historical, retired in round 4: the read-only allowlist left out generic file readers (`cat`, `grep`, `head` and the like) and subcommands with a writing form (review of #2880). Rounds 1, 3 and 4 each found a command it rendered as safe, which is why it was deleted rather than patched again (lesson 513).
 - **Live run** on a copy of the real dotfiles `MEMORY.md` (inline blocks, 2026-10-21). `--thread feat-plat003-close@macmini --agent claude` rendered that thread's Next action. `--thread nope` listed all 8 threads.
 - **Mutation checks**, each reverted:
 
   | Mutation | Test that went red |
   |---|---|
-  | chaining allowed | `TestReadOnlyCommand` |
-  | prefix without a word boundary | `TestReadOnlyCommand` |
+  | Verify note dropped (after decision B) | `TestResumeRendersVerifyAndAwaiting`, `TestResumeKeepsVerifyProseBesideTheCommands` |
   | another agent's thread chosen | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
   | this agent's fork ignored | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
   | Verify not rendered first | `TestResumeIsAPureRenderOfTheThreadFile` |
@@ -233,3 +232,16 @@ The fourth review (`review-round-4.md`, at `dee3fe4f`, nan/deepseek-v4-flash) re
 | F-6: promotion candidates unanswered | **Applied** above | n/a |
 
 Mutations for decision B, each turning `go test ./internal/mem` red: the note dropped from the heading line, and the field cut to its first line. The six `features.json` commands exit 0 on the branch.
+
+### Review round 5 (FAIL): one sink of the round-4 F-2 class was left
+
+The fifth review (`review-round-5.md`, at `8e0b61bc`, nan/mimo-v2.6-flash) confirmed decision B landed whole, then returned FAIL on one REAL Major: the round-4 quoting reached the candidate lines but not the session-start one-liner.
+
+| Finding | Disposition | Test |
+|---|---|---|
+| F-1: `sessionResume`'s one line for `resume`/`fork` interpolates the thread key raw into a copyable command | **Applied.** `ShellWord`/`ShellQuote` move from `cmd` to `package mem` (one copy; `cmd` imports `mem`), and the one-liner's command goes through `ShellWord`. The prose "Thread <key>" stays as written: it is not a command. A sweep for `--thread` in non-test Go finds no third command sink | `TestSessionStartResumeQuotesTheOneLiner` (`wt-x;echo` quoted on `resume` and `fork`); the goldens keep the plain `wt-x` bare |
+| F-2: slice 3 evidence still described the allowlist and `TestReadOnlyCommand` as current | **Applied** above | n/a |
+| Question: a live `source=compact` SessionStart payload never observed | **Carried**, as in rounds 2-4 | n/a |
+| #2915: `handoff_resume` not declared in `session-start-config.json` | **Carried**, ticketed; next after the archive | n/a |
+
+Mutations, each reverted: `ShellWord` returning its input unquoted turns `TestSessionStartResumeQuotesTheOneLiner` and `TestMemResumeQuotesTheCandidateLine` red (the relocated helper still guards the candidate lines); the one-liner's call to `ShellWord` removed turns `TestSessionStartResumeQuotesTheOneLiner` red.
