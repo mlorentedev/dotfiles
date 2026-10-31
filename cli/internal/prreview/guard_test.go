@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -233,6 +234,35 @@ func TestGuard_ThePublishedReviewNamesItsAttempt(t *testing.T) {
 		func(in *GuardInputs) { in.Attempts = attempts("skipped", "failure", "success") })
 	r.passed(t, true)
 	r.has(t, "on hk")
+}
+
+// A full review carries the first marker, an incremental one the second
+// (TOOL-023). The deleted differential test was all that held this.
+func TestGuard_AReviewCarryingTheSecondMarkerCounts(t *testing.T) {
+	registry := b64(`{"reviewers":[{"login":"github-actions","review_markers":["PR Reviewer Guide","Incremental Guide"]}]}`)
+	comments := `[{"user":{"login":"github-actions[bot]"},"updated_at":"2026-10-07T10:00:00Z","body":"## Incremental Guide"}]`
+	runGuard(t, map[string]string{"BASE": registry, "COMMENTS": comments}, nil).passed(t, true)
+}
+
+// A review on the last page counts, so the listing must ask for every page: gh
+// prints one array per page, and the first alone can hold 30 older comments.
+func TestGuard_TheCommentListingAsksForEveryPage(t *testing.T) {
+	stub := &stubGH{answers: map[string]string{"BASE": guardRegistry, "COMMENTS": "[]\n" + guardReview}}
+	var listing []string
+	gh := func(ctx context.Context, args ...string) ([]byte, []byte, error) {
+		if len(args) > 1 && ghKey(args[1]) == "COMMENTS" {
+			listing = args
+		}
+		return stub.run(ctx, args...)
+	}
+	var out strings.Builder
+	err := Guard(context.Background(), guardInputs(), GuardEnv{Out: &out, GH: gh, Sleep: func(time.Duration) {}})
+	if err != nil {
+		t.Fatalf("Guard = %v:\n%s", err, out.String())
+	}
+	if !slices.Contains(listing, "--paginate") {
+		t.Errorf("comment listing %v does not ask for every page", listing)
+	}
 }
 
 func TestProbe(t *testing.T) {
