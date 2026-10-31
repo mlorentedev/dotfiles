@@ -1066,7 +1066,7 @@ steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 names = [s.get('name', s.get('uses', '')) for s in steps]
 build = names.index('Build dotf')
 decisions = [i for i, s in enumerate(steps) if 'dotf pr ' in s.get('run', '')]
-print(len(decisions), build < min(decisions), 'go build' in steps[build]['run'])
+print(len(decisions), build < min(decisions), steps[build]['working-directory'] == 'cli')
 "
     [ "$output" = "6 True True" ]
     run grep -c '\./scripts/pr-agent-' "$WF"
