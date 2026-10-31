@@ -11,7 +11,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] Criterion 1 -> superseded by `dotf pr triage-queue` (#1057, #1101); owner accepted it on #1062, 2026-10-10
 - [x] Criterion 2 -> `cli/internal/prtriage/prtriage.go` reads `harness/review-attestation.json`; test `TestTheRealRegistryServesBothConsumers`
-- [ ] Criterion 3 -> declaration and reader landed (`Classify`, tests `TestClassify`, `TestTheRealRegistryDeclaresTheClassificationMarker`, bats `pr-agent: the reviewer is asked for every class marker the registry declares`); the consumer landed with tests `TestUnclassifiedFindings`, `TestFetchReportsUnclassifiedInlineFindings`, `TestFetchReadsNoInlineFindingsWithoutADeclaration`, `TestFetchMarksUnreadInlineFindings`, `TestPrTriageQueue_NamesUnclassifiedFindings`; it reports only once the registry declares `classification.reviewers`
+- [x] Criterion 3 -> declaration and reader landed (`Classify`, tests `TestClassify`, `TestTheRealRegistryDeclaresTheClassificationMarker`, bats `pr-agent: the reviewer is asked for every class marker the registry declares`); the consumer landed with tests `TestUnclassifiedFindings`, `TestFetchReportsUnclassifiedInlineFindings`, `TestFetchReadsNoInlineFindingsWithoutADeclaration`, `TestFetchMarksUnreadInlineFindings`, `TestPrTriageQueue_NamesUnclassifiedFindings`; it reports only once the registry declares `classification.reviewers` (it does, for `github-actions`). Rerun 2026-10-30 at `37ecb8db`: f3, 5 of 5 named tests ok; the scope beyond PR-Agent is #2997
 
 ## Test status
 
@@ -43,17 +43,28 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The row quotes its command and escapes `|`. Dogfooding the gate on #2924 produced two rows whose quoted pattern lost its quotes, so the recorded command was not the one that ran; a pipe inside the row also splits the triage table's cell. The gate still reads such a row, since the disposition is the first cell after the naming one.
 - `classify` lost its `started` parameter: a mutation removing `!started` survived, because a check that never started keeps exit -1 and `exit < 0` already catches it. Deleted rather than kept as documentation, per the mutation discipline.
 
+## Review dispositions
+
+The adversarial review (`review.md`, PASS-WITH-GAPS at `a8fd02de`, `nan/mimo-v2.6-flash`), row by row:
+
+- Row 1 (REAL, promotion answers would refuse the archive): applied. Both lines are now `yes: <path>` or `no: <reason>`.
+- Row 2 (REAL, Criterion 3 box unticked): applied. It is ticked with the rerun evidence.
+- Row 3 (THEORETICAL, `rowFor` matches rows by base name): ticketed, #2996.
+- Row 4 (THEORETICAL, AC3 marker scope narrower than the AC's text): ticketed for the owner's decision, #2997. The narrowing is deliberate and recorded above; the archive does not wait for it.
+- Row 5 (SPECULATIVE, an inline finding after the triage is skipped): ticketed, #2996.
+- Recommended step 4 (re-run the PR-recorded mutation passes): declined. The review ran four mutations of its own, each landed and killed, and the PR records stand. The bats suite was run in full for the final verification (`tasks.md`).
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [x] Lesson for the repo's `docs/lessons.md`? yes, written: lesson 512 (a landing check reads paths and content in the frame the patch wrote them), from AC5
+- [x] Lesson for the repo's `docs/lessons.md`? yes: docs/lessons/lesson-512-a-landing-check-must-read-paths-in-the-frame-the-patch-wrote-them.md (from AC5; lesson 518, docs/lessons/lesson-518-a-negated-check-reads-could-not-run-as-a-pass.md, is the second)
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the decisions are the owner's rulings on #1062 (option A, the gate refuses, PR-level guard), recorded in this log and on the issue; none outlives the spec as an architectural choice
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. candidate, not yet: "a reviewer's class is a hypothesis; reproduce before apply" would apply to kubelab's PR-Agent too, but it has run in one repo only; decide at archive
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: "a reviewer's class is a hypothesis; reproduce before apply" has run in this repo only; it becomes a pattern when a second project (kubelab's PR-Agent is the likely one) adopts the gate
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/TOOL-017-deterministic-review-triage/` -> `specs/archive/TOOL-017-deterministic-review-triage/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/TOOL-017-deterministic-review-triage/` -> `specs/archive/TOOL-017-deterministic-review-triage/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #1062 closes with the archive PR (`Closes #1062`)
+- [x] Promotions above executed (if any)
