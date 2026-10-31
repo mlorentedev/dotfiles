@@ -34,7 +34,7 @@ func useSkipSeams(t *testing.T, unit string, restartErr error) (dir string, rest
 	dir = filepath.Join(t.TempDir(), "skipped-secrets")
 	calls := []string{}
 	oldCg, oldDir, oldCtl, oldHas, oldPID := selfCgroup, skippedSecretsDir, systemctlUser, hasSystemctl, unitMainPID
-	unitMainPID = func(string) int { return os.Getpid() }
+	unitMainPID = func(string) (int, error) { return os.Getpid(), nil }
 	selfCgroup = func() (string, error) {
 		return "0::/user.slice/user-1000.slice/user@1000.service/app.slice/" + unit + "\n", nil
 	}
@@ -126,7 +126,7 @@ func TestSkipLocked_ARunThatIsNotTheUnitsMainProcessLeavesNoTrace(t *testing.T) 
 	useTempRegistry(t, skipLockedRegistry)
 	useBwReader(t, lockedBW{})
 	dir, _ := useSkipSeams(t, "app-terminal.service", nil)
-	unitMainPID = func(string) int { return os.Getpid() + 1 }
+	unitMainPID = func(string) (int, error) { return os.Getpid() + 1, nil }
 
 	if _, _, err := resolveNan(t, true); err != nil {
 		t.Fatal(err)
@@ -220,5 +220,60 @@ func TestSecretsUnlock_RestartsUnitsThatSkippedTheirSecrets(t *testing.T) {
 	}
 	if len(*restarts) != 1 {
 		t.Fatalf("systemctl calls: %v", *restarts)
+	}
+}
+
+// A failed sync still fails the unlock, but the vault is unlocked, so the
+// units waiting for it restart anyway: leaving them keyless until a second
+// unlock is the state #3005 removes.
+func TestSecretsUnlock_AFailedSyncStillRestartsWaitingUnits(t *testing.T) {
+	status := "unlocked"
+	withFakeDaemonSync(t, &status, "", &fakeSync{fail: true})
+	dir, restarts := useSkipSeams(t, "", nil)
+	if err := secrets.MarkDegraded(dir, "hive.service", fixedNow); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := runUnlock(t); err == nil {
+		t.Fatal("a failed sync must still fail the unlock")
+	}
+	if len(*restarts) != 1 {
+		t.Fatalf("systemctl calls: %v", *restarts)
+	}
+}
+
+// Inside a unit whose main process cannot be confirmed, the run cannot leave a
+// trace, so it says so instead of letting doctor pass a keyless daemon.
+func TestSkipLocked_AnUnconfirmedUnitWarnsThatNothingWillRestartIt(t *testing.T) {
+	useTempRegistry(t, skipLockedRegistry)
+	useBwReader(t, lockedBW{})
+	useSkipSeams(t, "hive.service", nil)
+	unitMainPID = func(string) (int, error) { return 0, errors.New("no user bus") }
+
+	_, warning, err := resolveNan(t, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(warning, "no user bus") || !strings.Contains(warning, "systemctl --user restart hive.service") {
+		t.Errorf("warning does not name the failure and the manual restart: %q", warning)
+	}
+}
+
+func TestSkipLocked_ATraceThatCannotBeWrittenIsReported(t *testing.T) {
+	useTempRegistry(t, skipLockedRegistry)
+	useBwReader(t, lockedBW{})
+	useSkipSeams(t, "hive.service", nil)
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skippedSecretsDir = func() string { return filepath.Join(blocker, "skipped-secrets") }
+
+	_, warning, err := resolveNan(t, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(warning, "could not record") || !strings.Contains(warning, "systemctl --user restart hive.service") {
+		t.Errorf("warning does not report the lost trace: %q", warning)
 	}
 }

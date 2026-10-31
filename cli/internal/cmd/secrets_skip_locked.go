@@ -34,14 +34,13 @@ var (
 		b, err := os.ReadFile("/proc/self/cgroup")
 		return string(b), err
 	}
-	// unitMainPID is the unit's MainPID in the user manager, or 0 when unreadable.
-	unitMainPID = func(unit string) int {
+	// unitMainPID is the unit's MainPID in the user manager.
+	unitMainPID = func(unit string) (int, error) {
 		out, err := exec.Command("systemctl", "--user", "show", "-p", "MainPID", "--value", unit).Output()
 		if err != nil {
-			return 0
+			return 0, err
 		}
-		pid, _ := strconv.Atoi(strings.TrimSpace(string(out)))
-		return pid
+		return strconv.Atoi(strings.TrimSpace(string(out)))
 	}
 	skippedSecretsDir = func() string { return secrets.DegradedDir(os.Getenv) }
 	systemctlUser     = func(args ...string) error {
@@ -57,11 +56,12 @@ var (
 // vault only, returns none of it and records the unit that ran without it.
 func resolveOrSkipLocked(reg *secrets.Registry, sel map[string]bool, skipLocked bool, errOut io.Writer) ([]string, error) {
 	injected, err := resolveInjectedSecrets(reg, sel)
-	unit, dir := selfUnit(), skippedSecretsDir()
+	unit, unitErr := selfUnit()
+	dir := skippedSecretsDir()
 	if err == nil {
 		// A unit that resolves its secrets is no longer waiting for them, however
 		// the vault came to be unlocked.
-		if unit != "" && dir != "" {
+		if unit != "" && unitErr == nil && dir != "" {
 			_ = secrets.ClearDegraded(dir, unit)
 		}
 		return injected, nil
@@ -71,12 +71,26 @@ func resolveOrSkipLocked(reg *secrets.Registry, sel map[string]bool, skipLocked 
 	}
 	_, _ = fmt.Fprintf(errOut, "warning: Bitwarden is locked, so the command runs without %s "+
 		"(--skip-locked). Run `dotf secrets unlock`", selectionNames(sel))
-	if unit != "" && dir != "" {
-		if mErr := secrets.MarkDegraded(dir, unit, time.Now()); mErr == nil {
-			_, _ = fmt.Fprintf(errOut, ", which restarts %s with them", unit)
+	// Every way the trace can be lost is said out loud: without it the unlock
+	// restarts nothing and doctor passes a unit that has no secrets.
+	switch {
+	case unit == "":
+		_, _ = fmt.Fprintln(errOut, ".")
+	case unitErr != nil:
+		_, _ = fmt.Fprintf(errOut, ". This may be %s, but its main process could not be confirmed (%v), "+
+			"so the unlock will not restart it: run `systemctl --user restart %s` after it.\n", unit, unitErr, unit)
+	default:
+		mErr := errors.New("no XDG_RUNTIME_DIR")
+		if dir != "" {
+			mErr = secrets.MarkDegraded(dir, unit, time.Now())
 		}
+		if mErr != nil {
+			_, _ = fmt.Fprintf(errOut, ". It could not record that %s runs without them (%v), so the unlock "+
+				"will not restart it: run `systemctl --user restart %s` after it.\n", unit, mErr, unit)
+			break
+		}
+		_, _ = fmt.Fprintf(errOut, ", which restarts %s with them.\n", unit)
 	}
-	_, _ = fmt.Fprintln(errOut, ".")
 	return nil, nil
 }
 
@@ -84,16 +98,26 @@ func resolveOrSkipLocked(reg *secrets.Registry, sel map[string]bool, skipLocked 
 // Being in a unit's cgroup is not enough: a shell inside a terminal that runs
 // as a service is in that service's cgroup too, and `unlock` would restart the
 // terminal. Only the unit's own MainPID is the run the unit started.
-func selfUnit() string {
+//
+// An error names the unit it could not confirm, so the caller can say which
+// unit the unlock will not restart.
+func selfUnit() (string, error) {
 	cg, err := selfCgroup()
 	if err != nil {
-		return ""
+		return "", nil
 	}
 	unit := secrets.UnitFromCgroup(cg)
-	if unit == "" || unitMainPID(unit) != os.Getpid() {
-		return ""
+	if unit == "" {
+		return "", nil
 	}
-	return unit
+	pid, err := unitMainPID(unit)
+	if err != nil {
+		return unit, err
+	}
+	if pid != os.Getpid() {
+		return "", nil
+	}
+	return unit, nil
 }
 
 func selectionNames(sel map[string]bool) string {

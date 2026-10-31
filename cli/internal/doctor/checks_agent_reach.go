@@ -120,7 +120,13 @@ func checkHiveBackendCanServe(sys *System, rep *Report) {
 	// without the key when Bitwarden is locked, and the ExecStart above reads the
 	// same either way. That run leaves a trace, and this is the state the check
 	// was built for, so it fails the same way until the unlock restarts the unit.
-	if since := skippedSince(sys, "hive.service"); since != "" {
+	since, err := skippedSince(sys, "hive.service")
+	if err != nil {
+		rep.Warn("could not read the locked-vault traces (" + err.Error() + "), so whether hive.service " +
+			"started without the worker API key is unknown. If it did, `dotf secrets unlock` restarts it.")
+		return
+	}
+	if since != "" {
 		rep.Fail("hive.service started at " + since + " while Bitwarden was locked and runs without " +
 			"the worker API key, so the hive backend probes PRESENT and can serve nothing. " +
 			"Fix: `dotf secrets unlock`, which restarts it with the key.")
@@ -131,20 +137,21 @@ func checkHiveBackendCanServe(sys *System, rep *Report) {
 }
 
 // skippedSince is when unit started without its secrets, from the trace
-// `dotf secrets run --skip-locked` leaves, or "" when it did not.
-func skippedSince(sys *System, unit string) string {
+// `dotf secrets run --skip-locked` leaves, or "" when it did not. A trace
+// directory that exists but cannot be read is an error, never "no trace".
+func skippedSince(sys *System, unit string) (string, error) {
 	if sys.Getenv == nil {
-		return ""
+		return "", nil
 	}
 	dir := secrets.DegradedDir(sys.Getenv)
 	if dir == "" {
-		return ""
+		return "", nil
 	}
 	units, err := secrets.DegradedUnits(dir)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	return units[unit]
+	return units[unit], nil
 }
 
 // execArgv pulls the command line out of the record `systemctl show -p ExecStart`

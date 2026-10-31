@@ -95,11 +95,12 @@ func reportSynced(cmd *cobra.Command, d *secrets.BWServeDaemon, verb string) err
 // unlocked" restarts them too: the vault may have been unlocked by a path that
 // restarted nothing.
 func syncedThenRestart(cmd *cobra.Command, d *secrets.BWServeDaemon, verb string) error {
-	if err := reportSynced(cmd, d, verb); err != nil {
-		return err
-	}
+	// The restart does not wait on the sync: the vault is unlocked either way,
+	// and a unit left without its secrets until a second unlock is the state
+	// this exists to end. The sync error is still the command's verdict.
+	err := reportSynced(cmd, d, verb)
 	restartSkippedUnits(cmd.OutOrStdout())
-	return nil
+	return err
 }
 
 // newSecretsLockCmd re-locks the daemon (AC6) without stopping the process —

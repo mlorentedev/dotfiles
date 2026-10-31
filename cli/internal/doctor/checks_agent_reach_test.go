@@ -3,6 +3,8 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -299,5 +301,30 @@ func TestHiveBackendCanServe_StartedWhileLockedFails(t *testing.T) {
 	got := after.String()
 	if !strings.Contains(got, "can serve nothing") || !strings.Contains(got, "dotf secrets unlock") {
 		t.Fatalf("a daemon started while locked must fail and name the unlock, got: %s", got)
+	}
+}
+
+// An unreadable trace directory is not "no trace": the check cannot tell
+// whether the daemon started keyless, so it warns instead of passing.
+func TestHiveBackendCanServe_UnreadableTraceWarns(t *testing.T) {
+	rt := t.TempDir()
+	getenv := func(k string) string { return map[string]string{"XDG_RUNTIME_DIR": rt}[k] }
+	dir := secrets.DegradedDir(getenv)
+	if err := os.MkdirAll(filepath.Dir(dir), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir, nil, 0o600); err != nil { // a file where the directory belongs
+		t.Fatal(err)
+	}
+	sys := &System{
+		Getenv:        getenv,
+		LookPath:      lookPathFor("systemctl", "hive"),
+		CommandOutput: unitSeam(goodExecStart, goodEnv),
+	}
+
+	var out bytes.Buffer
+	checkHiveBackendCanServe(sys, capture(&out))
+	if strings.Contains(out.String(), "can reach its pool") || !strings.Contains(out.String(), "could not read") {
+		t.Fatalf("an unreadable trace must not pass, got: %s", out.String())
 	}
 }
