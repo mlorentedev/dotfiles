@@ -689,7 +689,13 @@ func (t Target) includes(pattern, dir string) (string, bool) {
 // checkEarlierDropIns reads the drop-ins the Include reaches before ours:
 // glob order is lexical, the order sshd reads them in.
 func (t Target) checkEarlierDropIns(pattern string, ours map[string]bool) error {
-	matches, err := filepath.Glob(pattern)
+	// Glob drops the I/O error, so an unreadable drop-in dir read as holding
+	// nothing that shadows ours and the check passed without looking (#2812).
+	// Reading the dir first makes that a refusal; a missing one has no drop-ins.
+	if _, err := os.ReadDir(filepath.Dir(pattern)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read the drop-ins the Include reaches: %w", err)
+	}
+	matches, err := filepath.Glob(pattern) //nolint:forbidigo // the dir was read above, so Glob's dropped I/O error cannot hide one
 	if err != nil {
 		return fmt.Errorf("the include pattern %s: %w", pattern, err)
 	}

@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -406,6 +407,24 @@ func TestInspectRefusesADirectiveSSHDReadsBeforeTheDropIn(t *testing.T) {
 				t.Fatalf("Inspect = %v, want the shadowing directive named", err)
 			}
 		})
+	}
+}
+
+// #2812: Glob drops the I/O error, so an unreadable drop-in dir read as holding
+// nothing that shadows ours, and Inspect passed without having looked.
+func TestInspectRefusesADropInDirItCannotRead(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs a mode bit that denies the reader: not on Windows, not as root")
+	}
+	m := newMachine(t)
+	dir := filepath.Dir(m.paths.DropIn)
+	m.write(filepath.Join(dir, "00-local.conf"), "PasswordAuthentication yes\n")
+	if err := os.Chmod(dir, 0o300); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if _, err := m.target().Inspect(); err == nil || !strings.Contains(err.Error(), "read the drop-ins the Include reaches") {
+		t.Fatalf("Inspect = %v, want the unreadable drop-in dir refused", err)
 	}
 }
 
