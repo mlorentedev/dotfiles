@@ -45,8 +45,9 @@ func TestAllowedIsExact(t *testing.T) {
 	}
 }
 
-// The workflow's worst-review test in the bats suite holds a second copy of the price rows. The two must be one table: a price changed in
-// one would bound the spend by a number the router does not use.
+// The workflow's worst-review test in the bats suite holds a second copy of the
+// price rows. The two must be one table: a price changed in one would bound the
+// spend by a number the router does not use.
 func TestAllowlistEqualsTheBatsPrices(t *testing.T) {
 	raw, err := os.ReadFile(repoFile("tests", "pr-agent-config.bats"))
 	if err != nil {
