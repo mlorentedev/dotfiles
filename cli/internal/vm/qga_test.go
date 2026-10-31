@@ -236,3 +236,26 @@ func TestQGA_ASilentAgentTimesOut(t *testing.T) {
 		t.Fatal("want a timeout from an agent that never answers")
 	}
 }
+
+// guest-set-time takes nanoseconds since the epoch, and guest-get-time
+// answers in the same unit.
+func TestQGA_SetsAndReadsTheGuestClock(t *testing.T) {
+	var set struct {
+		Time int64 `json:"time"`
+	}
+	q := newFakeQGA(t, &fakeAgent{handlers: map[string]func(json.RawMessage) any{
+		"guest-set-time": func(a json.RawMessage) any { _ = json.Unmarshal(a, &set); return map[string]any{} },
+		"guest-get-time": func(json.RawMessage) any { return set.Time },
+	}})
+	want := time.Date(2026, 10, 22, 7, 52, 0, 123, time.UTC)
+	if err := q.SetTime(want); err != nil {
+		t.Fatal(err)
+	}
+	if set.Time != want.UnixNano() {
+		t.Errorf("guest-set-time sent %d, want %d", set.Time, want.UnixNano())
+	}
+	got, err := q.Time()
+	if err != nil || !got.Equal(want) {
+		t.Errorf("Time = %v, %v; want %v", got, err, want)
+	}
+}

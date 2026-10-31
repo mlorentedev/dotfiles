@@ -11,10 +11,10 @@ import (
 )
 
 // errPending is returned (silently) when at least one pull request is awaiting
-// a disposition. main.go maps any non-nil error to exit status 1, which is the
-// whole exit contract this CLI has — so a caller distinguishes "pending" from
-// "could not answer" by reading the message, not the code. Inventing a second
-// code here would mean changing main.go's contract for one subcommand.
+// a disposition. It carries no exit code of its own, so main.go exits 1 for it,
+// the same status as "could not answer": a caller tells the two apart by reading
+// the message. A command that needs another status tags its error with
+// withExitCode (see exit.go), as `pr route` does for usage errors.
 var errPending = errors.New("pr triage-queue: reviewer output is awaiting a disposition")
 
 // triageFetch and triageFetchPR are the queue's two questions; variables so a
@@ -36,6 +36,9 @@ func newPrCmd() *cobra.Command {
 	pr.AddCommand(newTriageQueueCmd())
 	pr.AddCommand(newPrLandCmd())
 	pr.AddCommand(newPrReproduceCmd())
+	pr.AddCommand(newPrRouteCmd())
+	pr.AddCommand(newPrPreflightCmd())
+	pr.AddCommand(newPrGuardCmd())
 	return pr
 }
 

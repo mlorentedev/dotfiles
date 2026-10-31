@@ -22,25 +22,50 @@ created: "2026-10-21"
 
 ## Implementation
 
-### A1. D: `dotf pr route` (one PR)
+### A1. D: `dotf pr route` (three stacked PRs, each under the 300 executable-LOC cap)
 
-- [ ] [AC1] Go tests first, in `cli/internal/prreview/route_test.go`, ported from `tests/pr-agent-route.bats`:
-  - an exact share at every weight point;
-  - the risk route at 1500 lines and at 1499;
-  - the label route;
-  - the allowlist refusal;
-  - a missing price row or ceiling;
-  - the key on stdin;
-  - the summary lines.
+A1 is about 600 executable lines, so it ships as three PRs, each based on the previous one.
 
-  Expected: FAIL (package absent).
-- [ ] [AC1] Implement `cli/internal/prreview/route.go` and the embedded pool (`//go:embed` of a build-time copy of `harness/reviewer-pool.json`, with a test that the copy equals the source). `--pool embedded|<path>`, no implicit fallback. Expected: PASS.
-- [ ] [AC1] Wire `dotf pr route` in `cli/internal/cmd/pr.go` (`--changed-lines`, `--labels`, `--pool`, `--json`, with the GitHub outputs and step summary written when `GITHUB_OUTPUT` is set). Then a differential test: the bats fixture pools through the script and through `dotf pr route` give identical outputs.
+A1a landed alone as #2940. A1c (#2942) was merged into the A1b branch, so
+A1b and A1c reach `main` together through #2941: about 420 executable lines
+in one squash, each half of it reviewed as its own PR. The cap was kept per
+review, not per merge.
+
+- **A1a: the pieces the route reads and writes.**
+  - [x] [AC1] The shared pool parser reads the `pr_agent` blocks and `pr_agent_risk` (`spec.ParseReviewerPool`).
+  - [x] [AC1] The allowlist, with a price row and ceiling per model, and drift tests against the script's `ALLOWED_ANTHROPIC` and the bats `prices` dict.
+  - [x] [AC1] `--pool embedded|<path>` with no fallback, and a test that the embedded copy equals `harness/reviewer-pool.json`.
+  - [x] [AC1] `Probe` and `Verdict`. The key travels only in the `x-api-key` header, and no redirect is followed with any client.
+  - [x] [AC1] `Result`, with its outputs, summary and notice.
+- **A1b: the route.**
+  - [x] [AC1] `Route`: the weighted draw, the risk route, the overrides and the refusals, with the bats cases ported (`route_test.go`).
+  - [x] [AC1] A differential test: the script and `Route` on the same inputs and the same httptest server give identical outputs, warnings and probes.
+- **A1c: the command.**
+  - [x] [AC1] `dotf pr route` (`--changed-lines`, `--labels`, `--pool`, `--json`, `--print-allowlist`), with the outputs appended to `--output` (default stdout; the workflow passes `$GITHUB_OUTPUT`, as it does to the script) and the step summary when `GITHUB_STEP_SUMMARY` is set. Exit 0 routed, 1 refused, 2 usage error, as the script.
 
 ### A2 to A4. D: `preflight`, `guard`, `gate` (one PR each)
 
-- [ ] [P] [AC2] `dotf pr preflight`: port the `pr-agent-model-preflight.bats` cases to Go (FAIL), implement (PASS), keep the output names
-- [ ] [P] [AC2] `dotf pr guard`: port the `pr-agent-publish-guard.bats` cases (FAIL), implement (PASS)
+- [x] [P] [AC2] `dotf pr preflight`: port the `pr-agent-model-preflight.bats` cases to Go (FAIL), implement (PASS), keep the output names
+  - The route's probe and the NaN probe share one request path, `post` in
+    `probe.go`, which refuses every redirect so neither key can follow one to
+    another host. A differential test holds `Preflight` to the script, as A1b
+    does for `Route`.
+  - Exit 0 when a model answered, 1 when none did, 2 on a setup error,
+    including an unwritable `--output`. A setup error found before any probe
+    writes no job summary; an unwritable `--output` is found after the probes,
+    so their summary is already written.
+- [x] [P] [AC2] `dotf pr guard`: port the `pr-agent-publish-guard.bats` cases (FAIL), implement (PASS)
+  - It reaches GitHub through `gh api` with the script's own arguments (the
+    path, `--jq '.content'`, `--jq '.head.sha'`, `--paginate`), through an
+    injectable runner, so the differential test runs the script and the port
+    against one stub `gh` on PATH, the stub the bats suite uses.
+  - It keeps the script's API rules: a 404 is an answer and is not retried;
+    any other failure is retried three times, `GUARD_RETRY_SECONDS` apart, and
+    is then reported as an outage, never as a missing marker or review.
+  - `--probe --output FILE` appends `published=true|false|unknown` and exits 0;
+    only a measured `false` lets the second attempt run. Without `--probe` it
+    is the final guard: exit 0 when this run published a review, 1 when not,
+    naming the last attempt that ran. A usage error exits 2.
 - [ ] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract read (FAIL), implement (PASS)
 
 ### A5. D: the workflow switches (one PR)
@@ -55,7 +80,7 @@ created: "2026-10-21"
 - [ ] [AC3] Make one live run on a PR that changes a weight and link it in `verification.md`
 - [ ] Release: the owner merges the release-please PR, which ships `dotf pr …` in a tagged version
 
-### B. C: the thin reusable workflow (blocked on R5's repo)
+### B. C: the thin reusable workflow (R5's repo exists: `mlorentedev/ci-workflows`, empty)
 
 - [ ] [AC4] Bats tests first:
   - `on: workflow_call` only, with the declared secrets and no `inherit`;

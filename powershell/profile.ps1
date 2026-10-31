@@ -316,42 +316,42 @@ $env:NAN_BASE_URL = 'https://api.nan.builders/v1'
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
     # On Windows, dotf secrets run passes a pipe (no PTY support, Lesson 270)
     # which breaks Node TUIs like opencode and pi. We bypass dotf secrets run
-    # and temporarily inject/cleanup the environment so they retain the console.
-    function opencode {
-        $env_b64 = (dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- powershell -NoProfile -Command "[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((`"{0}::::{1}::::{2}`" -f `$env:NAN_API_KEY, `$env:OPENROUTER_API_KEY, `$env:OPENAI_API_KEY)))")
-        if ($env_b64) {
-            $keys = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env_b64)) -split '::::'
-            $env:NAN_API_KEY = $keys[0]
-            $env:OPENROUTER_API_KEY = $keys[1]
-            $env:OPENAI_API_KEY = $keys[2]
-        } else {
+    # and put the secrets into this session for as long as the app runs
+    # (SEC-009, #2296, replaces this with a pseudo-console child).
+    #
+    # Afterwards the session holds exactly what it held before: a variable the
+    # user had set keeps its value, one that was absent is removed (#2909). The
+    # cleanup used to remove every name, which deleted a key the user had set
+    # themselves. An absent name is removed with Remove-Item, not set to $null:
+    # PowerShell passes $null to a .NET string parameter as "", and on macOS and
+    # Linux that leaves the variable defined and empty.
+    function Invoke-WithSessionSecrets {
+        param([string[]]$Names, [string]$App, [object[]]$AppArgs)
+        $print = '[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((@(' +
+            (($Names | ForEach-Object { "`$env:$_" }) -join ', ') + ") -join '::::')))"
+        $env_b64 = (dotf secrets run --only ($Names -join ',') -- powershell -NoProfile -Command $print)
+        if (-not $env_b64) {
             Write-Error "Failed to resolve API keys (is the vault unlocked?). Run 'dotf secrets unlock' first."
             return
         }
+        $values = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env_b64)) -split '::::'
+        $prior = @{}
+        foreach ($n in $Names) { $prior[$n] = [Environment]::GetEnvironmentVariable($n) }
         try {
-            & (Get-Command opencode -CommandType Application | Select-Object -First 1) @args
+            for ($i = 0; $i -lt $Names.Count; $i++) { Set-Item -Path "Env:$($Names[$i])" -Value $values[$i] }
+            & (Get-Command $App -CommandType Application | Select-Object -First 1) @AppArgs
         } finally {
-            Remove-Item Env:\NAN_API_KEY -ErrorAction SilentlyContinue
-            Remove-Item Env:\OPENROUTER_API_KEY -ErrorAction SilentlyContinue
-            Remove-Item Env:\OPENAI_API_KEY -ErrorAction SilentlyContinue
+            foreach ($n in $Names) {
+                if ($null -eq $prior[$n]) { Remove-Item -Path "Env:$n" -ErrorAction SilentlyContinue }
+                else { Set-Item -Path "Env:$n" -Value $prior[$n] }
+            }
         }
     }
+    function opencode {
+        Invoke-WithSessionSecrets -Names NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -App opencode -AppArgs $args
+    }
     function pi {
-        $env_b64 = (dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- powershell -NoProfile -Command "[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((`"{0}::::{1}`" -f `$env:NAN_API_KEY, `$env:OPENROUTER_API_KEY)))")
-        if ($env_b64) {
-            $keys = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env_b64)) -split '::::'
-            $env:NAN_API_KEY = $keys[0]
-            $env:OPENROUTER_API_KEY = $keys[1]
-        } else {
-            Write-Error "Failed to resolve API keys (is the vault unlocked?). Run 'dotf secrets unlock' first."
-            return
-        }
-        try {
-            & (Get-Command pi -CommandType Application | Select-Object -First 1) @args
-        } finally {
-            Remove-Item Env:\NAN_API_KEY -ErrorAction SilentlyContinue
-            Remove-Item Env:\OPENROUTER_API_KEY -ErrorAction SilentlyContinue
-        }
+        Invoke-WithSessionSecrets -Names NAN_API_KEY,OPENROUTER_API_KEY -App pi -AppArgs $args
     }
     # agy is deliberately NOT wrapped. It authenticates with its own stored
     # credentials and reads no variable this registry exposes, verified against

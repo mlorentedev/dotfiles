@@ -278,6 +278,7 @@ func (e sweepEnv) knowledgeAndSecrets() []check {
 		{kind: kindMachine, run: func() { checkHiveDaemonAnswers(e.sys, e.cfg, e.rep) }},
 		{kind: kindIdentity, section: "Disaster recovery", restore: restoreAge, run: func() { checkDisasterRecovery(e.sys, e.cfg, e.rep) }},
 		{kind: kindIdentity, section: "PAT expiry", restore: restoreBW, run: func() { checkPATExpiry(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "GitHub token scopes", restore: restoreGH, run: func() { checkGHScopes(e.sys, e.rep) }},
 	}
 }
 

@@ -809,15 +809,19 @@ under --abandoned) and rewrite the proposal status to archived/abandoned.
 Mechanical only. A pre-flight refuses to
 archive while unresolved [AGENT-DRAFT]/[AGENT-SUGGESTION] tags remain. A second
 pre-flight refuses without a fresh, passing review.md from /adversarial-review, or
-a "review: waived" declaration with a reason in proposal.md. Freshness is decided
-by the content digests the review launcher recorded, so a squash-merge or rebase
-of the reviewed commit does not stale a review.
+a "review: waived" declaration with a reason in proposal.md. A waiver stands in
+for a review nobody ran: beside a signed review whose verdict is FAIL it is
+refused. Freshness is decided by the content digests the review launcher
+recorded, so a squash-merge or rebase of the reviewed commit does not stale a
+review.
 
 --force-with-drafts and --force-without-review override those checks. Both
 require --reason, and an override is RECORDED: the archived proposal.md gains a
 review_bypass: line naming the flags, what the skipped check would have refused,
 the reason and the date. The checks still run, so the record says what was
-overridden, not merely which flag was typed.
+overridden, not merely which flag was typed. This is also how a spec abandoned
+with a FAIL review archives: --abandoned with --force-without-review and a
+reason naming the ticket for its findings.
 
 A third pre-flight reads verification.md's "Promotion candidates": each line must
 be answered "yes: <path>", with the promoted lesson, ADR or pattern existing

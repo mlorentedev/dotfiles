@@ -40,6 +40,13 @@ except ImportError:  # pragma: no cover - environment defect, not a code path
 # this static scan cannot judge those and skips them explicitly.
 EXPANSION = "$"
 
+# The one `--only` argument that is not a list: the profile's helper forwarding
+# the names its callers pass with -Names, which are read at the call site.
+FORWARD = "($Names"
+
+# Prefix for an `--only` scope the scan cannot read; never a registry name.
+UNREADABLE = "unreadable --only scope: "
+
 # The surfaces a human launch actually goes through. Specs and archived docs are
 # prose about past states and are deliberately not scanned.
 SCAN_GLOBS = (".zsh/*.zsh", "scripts/*.sh", "systemd/**/*.conf")
@@ -89,15 +96,43 @@ def tokens_in(path):
     secret. Asking for the text instead of the invocation is the mistake this
     guard exists to catch.
     """
+    forward_line, call_site_tokens = 0, 0
     with open(path, encoding="utf-8", errors="replace") as handle:
         for lineno, line in enumerate(handle, 1):
-            if re.match(r"\s*(#|//)", line) or not re.search(r"secrets\s+run\b", line):
+            if re.match(r"\s*(#|//)", line):
                 continue
-            for match in re.finditer(r"--only[=\s]+([A-Za-z0-9_,${}]+)", line):
+            # The PowerShell wrappers name their scope at the call site and the
+            # helper forwards it (#2909); the list read here is that call site's.
+            # A call whose list is not on its own line (a continuation, a splat)
+            # is reported, not skipped.
+            if re.search(r"Invoke-WithSessionSecrets\b", line) and not re.search(r"\bfunction\s+Invoke-WithSessionSecrets\b", line):
+                names = re.search(r"-Names\s+([A-Za-z0-9_,]+)(\s|$)", line)
+                if not names:
+                    yield lineno, UNREADABLE + "an Invoke-WithSessionSecrets call without a -Names list on its line"
+                    continue
+                for token in names.group(1).split(","):
+                    if token.strip():
+                        call_site_tokens += 1
+                        yield lineno, token.strip()
+            if not re.search(r"secrets\s+run\b", line):
+                continue
+            for match in re.finditer(r"--only[=\s]+(\S+)", line):
+                if match.group(1) == FORWARD:
+                    forward_line = forward_line or lineno
+                    continue
+                if not re.fullmatch(r"[A-Za-z0-9_,${}]+", match.group(1)):
+                    # An argument this scan cannot read must not pass as checked:
+                    # the forward above was invisible to it until #2909.
+                    yield lineno, UNREADABLE + match.group(1)
+                    continue
                 for token in match.group(1).split(","):
                     token = token.strip()
                     if token and EXPANSION not in token:
                         yield lineno, token
+    # A forward is skipped because its call sites are read instead; with none
+    # read, the file would contribute nothing and the scan would still say OK.
+    if forward_line and not call_site_tokens:
+        yield forward_line, UNREADABLE + "a forwarded --only list with no call site read in this file"
 
 
 def main():

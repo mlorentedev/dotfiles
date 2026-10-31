@@ -396,3 +396,36 @@ func TestEveryCommandGroupRefusesAnUnknownSubcommand(t *testing.T) {
 		t.Fatal("found no command groups; the walk is broken")
 	}
 }
+
+// `dotf pr route` reports a usage error as 2 and a refusal as 1 through the
+// process's real exit mapping, which is how the workflow tells a caller mistake
+// from a deliberate stop. A flag cobra itself rejects stays 1 (see above).
+func TestRunExitsWithTheCodePrRouteCarries(t *testing.T) {
+	t.Setenv("PR_AGENT_PROVIDER", "nan_only")
+	for name, tc := range map[string]struct {
+		args []string
+		code int
+		err  string
+	}{
+		"no pool source":  {[]string{"pr", "route"}, 2, "--pool is required"},
+		"a refused route": {[]string{"pr", "route", "--pool", "embedded"}, 1, ""},
+		"the allowlist":   {[]string{"pr", "route", "--print-allowlist"}, 0, ""},
+		"an unknown flag": {[]string{"pr", "route", "--no-such-flag"}, 1, "unknown flag"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rootCmd := cmd.New("dev", "")
+			rootCmd.SetArgs(tc.args)
+			rootCmd.SetOut(&bytes.Buffer{})
+			var stderr bytes.Buffer
+			if code := run(rootCmd, &stderr); code != tc.code {
+				t.Errorf("exit code = %d, want %d; stderr: %s", code, tc.code, stderr.String())
+			}
+			if !strings.Contains(stderr.String(), tc.err) {
+				t.Errorf("stderr = %q, want it to mention %q", stderr.String(), tc.err)
+			}
+			if tc.err == "" && stderr.Len() != 0 {
+				t.Errorf("stderr = %q, want none", stderr.String())
+			}
+		})
+	}
+}

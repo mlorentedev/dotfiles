@@ -60,7 +60,7 @@ Run on 2026-09-25 in `dotfiles-wt-protection-apply` (branch `feat/protection-app
 - [x] **Mutation battery**: 9 mutants, one per run, each killed by a test failure: `restrictions` made omitempty, the re-read check disabled, `--dry-run` ignored, the preflight disabled, the source app ignored, unmerged pull requests counted, the 5-PR window unbounded, the signatures call dropped, an unprotected branch not counted as a change.
 - [x] **Live, read-only**, before the declaration changed: `dotf forge protection apply --dry-run` over all 14 declared repositories reported `changed=0 (0 applied, 0 planned), 9 unchanged, 5 skipped, 0 refused, 0 failed`, exit 0. The declaration and the forge agree on every field of every protected repository.
 - [x] **Live, read-only**, after declaring `spec-gate` on `mlorentedev/dotfiles`: the same command plans exactly one field, `required_status_checks.checks`, adding `spec-gate@15368`, and the preflight passes, because `spec-gate` reported on the recent merged pull requests. Exit 0; nothing was written.
-- [ ] **AC6**, owner-run after merge: `dotf forge protection apply --repo mlorentedev/dotfiles`, then `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'` includes `spec-gate`, and a second `apply --dry-run` reports `changed=0`. Until then, `dotf forge protection check` and `dotf doctor` report that one field as drift, which is the declaration being ahead of the forge on purpose.
+- [x] **AC6**, owner-run after merge (done; measured below): `dotf forge protection apply --repo mlorentedev/dotfiles`, then `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'` includes `spec-gate`, and a second `apply --dry-run` reports `changed=0`. Until then, `dotf forge protection check` and `dotf doctor` report that one field as drift, which is the declaration being ahead of the forge on purpose.
 
 ## Test status: PR-B
 
@@ -78,17 +78,35 @@ On 2026-10-15 the owner ran `apply` and `check` from a main checkout that predat
 - `go vet` and `GOOS=windows go vet` on `internal/forge` and `internal/cmd`: clean. `go test ./...`: ok. `golangci-lint run` (pinned) on both packages: 0 issues.
 - [x] After the #2557 review (PR-Agent, three findings): `forge.LandedDeclaration` compares without fetching, and `dotf doctor` WARNs when the declaration differs from origin's default branch as last fetched (`TestCheckBranchProtectionWarnsOnADeclarationThatHasNotLanded`: a stale checkout whose old declaration still matches the forge, which PASSed before). The sweep does not fetch, and an unanswerable comparison draws nothing there: the gate is `check`/`apply`. `apply --unmerged` refuses without `--dry-run` (`TestForgeProtectionApplyUnmergedNeedsDryRun`), so an unlanded declaration is never written. The fetch is bounded at 60 s. Mutations on the doctor WARN, the `--unmerged` guard and the comparison (always "same") are each killed.
 
+## Review dispositions (2026-10-22, agy/gemini-3.8-flash-high, PASS WITH GAPS)
+
+- Promotion candidates held placeholders: applied, answered below.
+- `proposal.md` showed AC5 and AC6 unticked: applied, both ticked (checkbox state is outside the contract digest).
+- PR-Agent on #2959: f6 piped `dotf` into `grep`, so a non-zero `dotf` exit with `changed=0` in its output still passed. Applied after the review: the output is captured first, so `dotf`'s exit status gates the check. The criterion f6 verifies is unchanged; only its command was tightened.
+- f6 needs network and `gh` auth: declined. AC6 is defined as a live check against the forge, so an offline command could not prove it; f6 is run by hand, as the other live evidence in this file was.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes / no - one line of what>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes / no - one line of what>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes / no - one line>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-442-a-declaration-read-from-a-checkout-is-only-as-current-as-the-checkout.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the one policy decision, D-1 (no required approvals), is recorded in proposal.md and pinned by TestProtectionApprovalsRationalePinned
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: forge protection is declared once, in dotfiles, for every repository; no other project carries its own
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/GUARD-017-protection-as-code/` -> `specs/archive/GUARD-017-protection-as-code/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/GUARD-017-protection-as-code/` -> `specs/archive/GUARD-017-protection-as-code/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
+
+## Evidence: AC6 and closing (2026-10-22)
+
+Run from `chore/guard-017-ac6-close`, base `origin/main` `d9700c74`.
+
+- [x] **AC6**, live: `gh api repos/mlorentedev/dotfiles/branches/main/protection -q '.required_status_checks.contexts'` returns `lint`, `lint-powershell`, `test`, `test-windows`, `review-attestation`, `cli-gate`, `spec-gate`, `changes`, `knowledge-gate` and `from-zero-gate`; `spec-gate` is at index 6.
+- [x] `dotf forge protection apply --dry-run` over the whole declaration: `12 repositories: changed=0 (0 applied, 0 planned), 9 unchanged, 3 skipped, 0 refused, 0 failed`, exit 0.
+- [x] `dotf forge protection check`: `12 repositories: 9 ok, 0 drift, 3 declared state, 0 unanswerable`, exit 0, `[OK] mlorentedev/dotfiles`. The drift that PR-B left on purpose is gone.
+- [x] `features.json` gains f5 (AC4, `TestProtectionSchema*`) and f6 (AC6, the live check above). Each of f1-f6's verification commands exits 0.
+- `go build ./... && go vet ./... && GOOS=windows go vet ./...`: clean. `go test ./internal/forge/... ./internal/cmd/... ./internal/doctor/... -count=1`: ok. `golangci-lint run` at the pinned 2.12.2 on those packages: `0 issues.`
+- The declaration names 12 repositories, not the 14 of PR-B: #2200 (`7b067099`) removed `fae-brain` and `openkm-brain` when they moved to Gitea. Both were `unavailable` state entries, so no protected repository left the declaration: PR-B skipped 5 and this run skips 3, while the protected repositories are 9 in both.
