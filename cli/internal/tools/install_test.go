@@ -901,7 +901,7 @@ func TestPythonSeries(t *testing.T) {
 func hiveSelfTool() Tool {
 	return Tool{Name: "hive", Version: "4.4.1", Profile: "full", Source: Source{
 		Type: "uv-tool", Package: "hive-vault",
-		SelfInstall: &SelfInstall{Platforms: []string{"windows"}, Args: []string{"self-upgrade", "{version}"}},
+		SelfInstall: &SelfInstall{Platforms: []string{"windows"}, Args: []string{"self-upgrade", "{version}"}, Launcher: `%LOCALAPPDATA%\hive\bin\hive.cmd`},
 	}}
 }
 
@@ -969,45 +969,66 @@ func TestInstallUvTool_SelfInstallRunsOnThePinnedPython(t *testing.T) {
 	}
 }
 
-// hive puts its launcher dir on the per-user PATH, which the process that
-// runs dotf read before the install. Probing only the process PATH reads an
-// installed hive as absent: the run would fail its own post-check, and a
-// later run would `self-upgrade` a newer hive down to the pin.
-func TestInstallUvTool_SelfInstallProbesThePersistentPath(t *testing.T) {
-	dir := t.TempDir()
-	launcher := filepath.Join(dir, "hive.cmd")
-	probe := func(version string) Runner {
-		return func(name string, _ ...string) ([]byte, error) {
-			if name == launcher && version != "" {
-				return []byte("hive-vault " + version), nil
+// The self install is probed at the launcher it writes and nowhere else
+// (#2991). A uv copy of hive-vault on PATH is another channel's: reading it
+// would leave a box that holds one at the pin on the uv layout for good, since
+// the self install would never run. A launcher above the pin is never
+// downgraded, and off a self_install OS the tool is still probed on PATH.
+func TestInstallUvTool_SelfInstallProbesOnlyTheLauncher(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", `C:\Users\u\AppData\Local`)
+	const launcher = `C:\Users\u\AppData\Local\hive\bin\hive.cmd`
+	cases := []struct {
+		name, goos, atLauncher, onPath string
+		calls                          int
+		res                            Result
+	}{
+		{"no launcher, a uv copy at the pin on PATH", "windows", "", "4.4.1", 1, Installed},
+		{"launcher at the pin, a uv copy below it", "windows", "4.4.1", "4.3.0", 0, Skipped},
+		{"launcher above the pin", "windows", "4.5.0", "", 0, Skipped},
+		{"linux reads PATH", "linux", "", "4.4.1", 0, Skipped},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			atLauncher := tc.atLauncher
+			var rec []string
+			in := &Installer{
+				GOOS: tc.goos, GOARCH: "amd64", Out: io.Discard,
+				HasCommand: func(string) bool { return true },
+				PathCopies: func(string) []string { return nil },
+				Probe: func(name string, _ ...string) ([]byte, error) {
+					switch {
+					case name == launcher && atLauncher != "":
+						return []byte("hive-vault " + atLauncher), nil
+					case name == "hive" && tc.onPath != "":
+						return []byte("hive-vault " + tc.onPath), nil
+					}
+					return nil, errors.New("not found")
+				},
+				Run: func(name string, args ...string) error {
+					rec = append(rec, name+" "+strings.Join(args, " "))
+					atLauncher = "4.4.1"
+					return nil
+				},
 			}
-			return nil, errors.New("not found")
-		}
+			res, err := in.Install(hiveSelfTool())
+			if err != nil || res != tc.res || len(rec) != tc.calls {
+				t.Errorf("Install = %v, %v, calls %v; want %v after %d runs", res, err, rec, tc.res, tc.calls)
+			}
+		})
 	}
-	newIn := func(version string, rec *[]string) *Installer {
-		return &Installer{
-			GOOS: "windows", GOARCH: "arm64", Out: io.Discard,
-			Probe:          probe(version),
-			HasCommand:     func(string) bool { return true },
-			PathCopies:     func(string) []string { return nil },
-			RegisteredPath: func() ([]string, error) { return []string{dir}, nil },
-			Run: func(name string, args ...string) error {
-				*rec = append(*rec, name+" "+strings.Join(args, " "))
-				return os.WriteFile(launcher, []byte("@echo off\r\n"), 0o644)
-			},
-		}
-	}
+}
 
+// A launcher that names an unset variable reads the tool as absent, and the
+// post-check says which variable, rather than guessing where hive lives.
+func TestInstallUvTool_SelfInstallWithAnUnsetLauncherVariable(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", "")
 	var rec []string
-	if res, err := newIn("4.4.1", &rec).Install(hiveSelfTool()); err != nil || res != Installed || len(rec) != 1 {
-		t.Fatalf("a fresh install = %v, %v, calls %v; want Installed after one run, verified on the persistent PATH", res, err, rec)
-	}
-	rec = nil
-	if res, err := newIn("4.5.0", &rec).Install(hiveSelfTool()); err != nil || res != Skipped || len(rec) != 0 {
-		t.Errorf("a newer hive on the persistent PATH = %v, %v, calls %v; want Skipped, never downgraded", res, err, rec)
-	}
-	if p := newIn("4.5.0", &rec).Plan(hiveSelfTool()); p.Installed != "4.5.0" || p.Action != PlanSkip {
-		t.Errorf("Plan = %+v, want the persistent-PATH version and a skip", p)
+	in := newNpmInstaller("", &rec, nil)
+	in.GOOS, in.CurrentVersion = "windows", nil
+	in.Probe = func(string, ...string) ([]byte, error) { return []byte("hive-vault 4.4.1"), nil }
+	_, err := in.Install(hiveSelfTool())
+	if err == nil || len(rec) != 1 || !strings.Contains(err.Error(), "unset variable") {
+		t.Errorf("Install = %v, calls %v; want one self install, then a failure naming the unset variable", err, rec)
 	}
 }
 
@@ -1019,30 +1040,7 @@ func TestInstallUvTool_SelfInstallThatPlacesNothingFails(t *testing.T) {
 	in.GOOS = "windows"
 	in.CurrentVersion = func(string) string { return "" }
 	_, err := in.Install(hiveSelfTool())
-	if err == nil || !strings.Contains(err.Error(), "hive self-upgrade 4.4.1 exited 0") || !strings.Contains(err.Error(), "per-user PATH") {
-		t.Errorf("Install = %v, want the self install and the per-user PATH named", err)
-	}
-}
-
-// A registered PATH that cannot be read could hold a hive newer than the pin,
-// and reading it as absent would self-upgrade that hive down to the pin. Install
-// and Plan both refuse instead, with the same reason.
-func TestInstallUvTool_SelfInstallRefusesAnUnreadableRegisteredPath(t *testing.T) {
-	var rec []string
-	in := newNpmInstaller("", &rec, nil)
-	in.GOOS = "windows"
-	in.CurrentVersion = nil
-	in.Probe = func(string, ...string) ([]byte, error) { return nil, errors.New("not found") }
-	in.RegisteredPath = func() ([]string, error) { return nil, errors.New("access denied") }
-	if _, err := in.Install(hiveSelfTool()); err == nil || !strings.Contains(err.Error(), "access denied") || len(rec) != 0 {
-		t.Errorf("Install = %v with calls %v, want a refusal naming the read error and no run", err, rec)
-	}
-	if p := in.Plan(hiveSelfTool()); p.Action != PlanRefused || !strings.Contains(p.Note, "access denied") {
-		t.Errorf("Plan = %+v, want %q naming the read error", p, PlanRefused)
-	}
-	in.GOOS = "linux"
-	rec = nil
-	if _, err := in.Install(hiveSelfTool()); len(rec) != 1 || err != nil && strings.Contains(err.Error(), "access denied") {
-		t.Errorf("off a self_install OS the registered PATH is never read: %v, calls %v", err, rec)
+	if err == nil || !strings.Contains(err.Error(), "hive self-upgrade 4.4.1 exited 0") || !strings.Contains(err.Error(), `hive\bin\hive.cmd`) {
+		t.Errorf("Install = %v, want the self install and the launcher named", err)
 	}
 }

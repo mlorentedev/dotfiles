@@ -106,7 +106,7 @@ OS decides the mechanism, not the owner of each machine:
 |---|---|---|
 | Who owns the layout | uv (`uv tool`), ADR-036 | hive itself: `versions/<v>`, a `current` junction under `%LOCALAPPDATA%\hive\runtime`, and its launcher `%LOCALAPPDATA%\hive\bin\hive.cmd` (hive ADR-015, ADR-019) |
 | What the catalog runs | `uv tool install --force --refresh-package hive-vault [--python <series>] hive-vault==<pin>` | `uv tool run --refresh-package hive-vault --no-build-package cryptography --from hive-vault==<pin> [--python <series>] hive self-upgrade <pin>`: the `self_install` field, ADR-036 amendment 2026-10-21. Nothing stays in uv's tool dir |
-| When it runs | below the pin, or absent, probed on PATH | the same, probed on the process PATH and then the registered per-user PATH, so a hive newer than the pin is never `self-upgrade`d down |
+| When it runs | below the pin, or absent, probed on PATH | the same, probed only at the launcher the catalog declares (`self_install.launcher`, ADR-036 amendment 2026-10-31), so another copy on PATH never answers for it and a hive newer than the pin is never `self-upgrade`d down |
 | Daemon | `hive service install` from setup, a `systemd --user` unit; this repo owns only the drop-in `systemd/hive.service.d/` | `hive service install` from setup, a Scheduled Task |
 
 **Upgrades are a pin raise, nothing else.** Nothing upgrades hive on a schedule or on hive's own
@@ -119,7 +119,10 @@ them, and a second run changes nothing.
 **A missing hive is the tools step's to report.** `dotf doctor`'s hive-daemon section names
 `dotf tools install hive` as the fix on every OS. On Windows, a `uv tool` copy of `hive-vault` is
 the layout ADR-019 rules out. It appears when a dotf older than the catalog's `self_install` field
-(0.77.0 and earlier) converges this catalog (#1675). Recovering such a machine is #2991.
+(0.77.0 and earlier) converges this catalog (#1675). Such a machine heals on its first converge with a dotf that carries #2991: the
+probe reads only hive's launcher, so `hive self-upgrade` runs and hive's bin dir goes first on PATH.
+The uv copy stays where it is, and `dotf doctor` names it for removal (#2991). dotf never deletes a
+copy it did not install.
 
 The decision trail is `specs/AI-028-hive-install-model-migration/` (#791).
 
