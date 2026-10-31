@@ -54,7 +54,7 @@ created: "2026-09-25"
 - [x] Type checks and lint pass
 - [x] No unrelated changes in any slice
 - [x] `verification.md` filled in
-- [ ] Independent review before archiving (a change that closes a spec)
+- [x] Independent review before archiving (a change that closes a spec)
 
 ## Machine-readable features
 
