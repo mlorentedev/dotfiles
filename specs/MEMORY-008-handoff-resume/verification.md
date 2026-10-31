@@ -81,18 +81,17 @@ Each slice PR fills its own section below and nothing else.
 
 - `dotf mem resume [--thread K] [--agent A] [--format prompt|context] [--memory PATH]` in `cli/internal/cmd/mem_resume.go`. The render is in `cli/internal/mem/resume.go`.
   - `RenderResume` is pure: `TestResumeIsAPureRenderOfTheThreadFile` renders a fixture twice per format and compares both renders with `testdata/resume/{context,prompt}.golden`. An unknown format is refused.
-  - Next action, Verify and Awaiting Manu render first. Verify commands are listed one per line, and one outside the read-only allowlist is marked unverified (`TestResumeRendersVerifyAndAwaiting`). The allowlist matches on a word boundary, and any chaining, pipe, redirection or substitution fails it (`TestReadOnlyCommand`).
+  - Next action, Verify and Awaiting Manu render first. Verify renders as written under one fixed note that every command in it was written by an earlier session and runs only through the permission gate (`TestResumeRendersVerifyAndAwaiting`, `TestResumeKeepsVerifyProseBesideTheCommands`). Until round 4 a read-only allowlist marked commands outside it unverified; decision B retired it (see Review round 4).
   - `SelectThread` takes the agent's fork of the key, then the key unless another agent's stamp is on it. Otherwise it picks none and returns every thread key (`TestResumeListsCandidatesWhenTheThreadIsAmbiguous`). The command lists those keys, each with its `--thread` flag (`TestMemResumeListsCandidates`).
   - `ThreadText` reads the stored file when the entry points at one, and the inline block otherwise. It also returns the source path (`TestThreadTextForKey`). Round trip through the command: `TestMemResumeRendersWhatHandoffWriteStored`.
 - `--memory` defaults to the checkout project's vault `MEMORY.md`, through `mem.ProjectMemory`. That helper was lifted out of `session-end`, which resolved the same path inline, so the layout is derived in one place.
-- The read-only allowlist leaves out generic file readers (`cat`, `grep`, `head` and the like), because they take any path and `cat <secrets file>` would render as safe. It also leaves out subcommands that have a writing form (`git branch`, `git fetch`, `go build`). A line break counts as shell control, and an argument that writes a file (`--output`, `-o`) fails the check (review of #2880).
+- Historical, retired in round 4: the read-only allowlist left out generic file readers (`cat`, `grep`, `head` and the like) and subcommands with a writing form (review of #2880). Rounds 1, 3 and 4 each found a command it rendered as safe, which is why it was deleted rather than patched again (lesson 513).
 - **Live run** on a copy of the real dotfiles `MEMORY.md` (inline blocks, 2026-10-21). `--thread feat-plat003-close@macmini --agent claude` rendered that thread's Next action. `--thread nope` listed all 8 threads.
 - **Mutation checks**, each reverted:
 
   | Mutation | Test that went red |
   |---|---|
-  | chaining allowed | `TestReadOnlyCommand` |
-  | prefix without a word boundary | `TestReadOnlyCommand` |
+  | Verify note dropped (after decision B) | `TestResumeRendersVerifyAndAwaiting`, `TestResumeKeepsVerifyProseBesideTheCommands` |
   | another agent's thread chosen | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
   | this agent's fork ignored | `TestResumeListsCandidatesWhenTheThreadIsAmbiguous` |
   | Verify not rendered first | `TestResumeIsAPureRenderOfTheThreadFile` |
@@ -107,7 +106,7 @@ Each slice PR fills its own section below and nothing else.
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-513-a-read-only-allowlist-that-names-a-code-runner-is-not-read-only.md (also lesson 507 and lesson 508)
-- [x] ADR-worthy decision for the repo's `docs/adr/`? (the per-thread store changes the layout of every project's `memory/`) yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md
+- [x] ADR-worthy decision for the repo's `docs/adr/`? yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md (the per-thread store changes the layout of every project's `memory/`)
 - [x] New pattern candidate for `00_meta/patterns/`? no: the store and the resume render are this repo's `dotf mem` contract, recorded in ADR-056; nothing in them generalises beyond it yet
 
 ## Archive checklist
@@ -137,7 +136,7 @@ Each slice PR fills its own section below and nothing else.
 - **Decisions:**
   - `startup` gets the full block. tasks.md lists it with `clear` and `compact`; AC3 names only the last two. A fresh session has no conversation either.
   - `session_id` is not parsed. Nothing reads it, and a field with no reader is dead weight.
-  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up: #2915.
+  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up: #2915, since closed: the config declares it, the bats counts 12, and `TestCommittedConfigDeclaresTheInjectorsTheAdapterReads` pins the committed file to `resumeInjector`.
 
 ### Refusal fix (#1477 follow-up): mutations
 
@@ -225,9 +224,39 @@ The fourth review (`review-round-4.md`, at `dee3fe4f`, nan/deepseek-v4-flash) re
 
 | Finding | Disposition | Test |
 |---|---|---|
-| F-1: a prose (unbackticked) Verify command renders unmarked | **Owner decision** on #1689: mark every field with no backticked span, or drop the read-only promise and render one fixed note | UNTESTED until the shape is chosen |
+| F-1: a prose (unbackticked) Verify command renders unmarked | **Applied, decision B** (on #1689): the marker is retired. Verify renders as written under one fixed note, so nothing in it reads as safe; `readOnlyCommand` and its allowlist are deleted | `TestResumeKeepsVerifyProseBesideTheCommands`, `prose command` case; `TestResumeRendersVerifyAndAwaiting` (note exactly once) |
 | F-2: the candidate lines interpolate the thread key and `--agent` raw | **Applied.** Both are one shell word: as written when plain (`[A-Za-z0-9_./@+-]`), single-quoted otherwise | `TestMemResumeQuotesTheCandidateLine`; quoting removed from either the key or the agent turns it red |
-| F-3: `proposal.md` AC boxes and the `tasks.md` Closing block unticked | **Carried** with F-1: AC2 and the slice 3 box depend on the chosen shape | n/a |
+| F-3: `proposal.md` AC boxes and the `tasks.md` Closing block unticked | **Applied** with F-1: AC1-AC6 ticked, AC2, the risk control and the slice 3 box reworded to the retired marker, the 450 B cap stated beside "about 350 B"; the Closing review box waits for round 5 | n/a |
 | F-4: `features.json` states are `pending` | **Declined:** the states are harness-owned; the six commands exit 0, re-run by the reviewer | n/a |
-| F-5: the `context` render names the thread file's path, so AC1's "pure function of the thread file" is weaker than the code | **Carried** with F-1: the criterion wording moves with the contract set | n/a |
+| F-5: the `context` render names the thread file's path, so AC1's "pure function of the thread file" is weaker than the code | **Applied:** AC1 now says "of the thread file and the source path it names" | `TestResumeIsAPureRenderOfTheThreadFile` |
 | F-6: promotion candidates unanswered | **Applied** above | n/a |
+
+Mutations for decision B, each turning `go test ./internal/mem` red: the note dropped from the heading line, and the field cut to its first line. The six `features.json` commands exit 0 on the branch.
+
+### Review round 5 (FAIL): one sink of the round-4 F-2 class was left
+
+The fifth review (`review-round-5.md`, at `8e0b61bc`, nan/mimo-v2.6-flash) confirmed decision B landed whole, then returned FAIL on one REAL Major: the round-4 quoting reached the candidate lines but not the session-start one-liner.
+
+| Finding | Disposition | Test |
+|---|---|---|
+| F-1: `sessionResume`'s one line for `resume`/`fork` interpolates the thread key raw into a copyable command | **Applied.** `ShellWord`/`ShellQuote` move from `cmd` to `package mem` (one copy; `cmd` imports `mem`), and the one-liner's command goes through `ShellWord`. The prose "Thread <key>" stays as written: it is not a command. A sweep for `--thread` in non-test Go finds no third command sink | `TestSessionStartResumeQuotesTheOneLiner` (`wt-x;echo` quoted on `resume` and `fork`); the goldens keep the plain `wt-x` bare |
+| F-2: slice 3 evidence still described the allowlist and `TestReadOnlyCommand` as current | **Applied** above | n/a |
+| Question: a live `source=compact` SessionStart payload never observed | **Carried**, as in rounds 2-4 | n/a |
+| #2915: `handoff_resume` not declared in `session-start-config.json` | **Applied** after round 5, in the change that closes #2915 | `TestCommittedConfigDeclaresTheInjectorsTheAdapterReads`; `tests/session-start-config.bats` |
+
+Mutations, each reverted: `ShellWord` returning its input unquoted turns `TestSessionStartResumeQuotesTheOneLiner` and `TestMemResumeQuotesTheCandidateLine` red (the relocated helper still guards the candidate lines); the one-liner's call to `ShellWord` removed turns `TestSessionStartResumeQuotesTheOneLiner` red.
+
+### Review round 6 (FAIL): a label carried twice rendered once
+
+The sixth review (`review-round-6.md`, at `0ecee6e3`, nan/deepseek-v4-flash) returned FAIL on one REAL Major, in a class no earlier round covered.
+
+| Finding | Disposition | Test |
+|---|---|---|
+| M-1: a thread carrying a canonical label and its alias (`Verify` + `Verify at start`, `Awaiting Manu` + `Judgment calls left open`) renders only the first, in both formats | **Applied.** `Thread.All` joins the non-blank values of every field under a label, and both renderers read through it. `Get` keeps its first-match meaning for its other callers (`ThreadWarnings`, the index summary, `handoff-write`) | `TestResumeRendersEveryFieldOfALabel` (both pairs, both formats, the note once) |
+| m-1: `ShellWord` leaves a dash-leading key bare, so cobra reads `--thread -x` as a flag | **Ticketed**, #3002. Quoting cannot fix it; `--thread=<key>` at both sinks does | n/a |
+| m-2: the context render says nothing when Next action is blank | **Ticketed**, #3003 | n/a |
+| q-1: `features.json` states are `pending` at archive | **Not blocking:** `dotf spec archive` reads no feature state; the review digests the contract files only (`cli/internal/spec/review.go` `contractFiles`) | n/a |
+| q-2: a live `source=compact` payload never observed | **Carried** | n/a |
+| q-3: the launcher's base range spans 811 commits | **Recorded**, harness-owned, as in round 1 | n/a |
+
+Mutation, reverted: `All` cut to its first value turns `TestResumeRendersEveryFieldOfALabel` red on four assertions.

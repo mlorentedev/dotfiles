@@ -40,10 +40,16 @@ splits it exactly where `strings.Fields` does, and the check reads what will run
 `:` all render unverified, and the session's permission gate still runs them. The cost is real and accepted:
 `go test ./... -run X` and `gh pr view 1 --json state` no longer render as safe.
 
+The fourth review found the hole that rule could not close: only backticked spans were checked, so a command
+written as prose (`run go test ./... then rm -rf /tmp/x`) rendered with no marker and no note. Making the marker
+total would mean parsing prose as shell. The marker was retired instead: `Verify` renders as written under one fixed
+note that its commands come from another session and each runs through the permission gate, which already decided
+every command.
+
 ## Rule
 
-An allowlist of "safe" commands is an allowlist of command *shapes*, and a shape is only checkable where the
-checker and the shell agree on how to split it. Restrict the verified set to strings with no shell metacharacter,
-and refuse flags outright instead of listing the safe ones: every escape hatch three reviews found was a flag or a
-character the shell interprets. When each fix narrows the hole instead of closing it, stop patching and move the
-claim to where it can be decided.
+A "safe" label over text you do not fully parse cannot be made total, and a partial one reads false-safe: the
+unlabelled command looks vetted. Where a gate already decides each command, delete the label rather than narrow it
+again. If a label must stay, restrict it to strings the checker and the shell split identically (no shell
+metacharacter, no flags), and treat everything else, prose included, as unlabelled. When each fix narrows the hole
+instead of closing it, stop patching and move or drop the claim.

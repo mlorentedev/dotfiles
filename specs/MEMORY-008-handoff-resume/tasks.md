@@ -32,7 +32,7 @@ created: "2026-09-25"
 
 - [x] [AC1] Failing golden test: `resume --format prompt` and `--format context` on a fixture thread; two runs are byte-identical
 - [x] [AC1] Implement `dotf mem resume` as a pure render of the thread file
-- [x] [AC2] Failing test, then implementation: `Verify` and `Awaiting Manu` both render; a `Verify` command outside the read-only allowlist is marked unverified
+- [x] [AC2] Failing test, then implementation: `Verify` and `Awaiting Manu` both render; `Verify` renders as written under one note, no command presented as safe (the read-only marker first built here was retired after review round 4)
 - [x] [AC2] Failing test, then implementation: a working directory that names no single thread for this agent lists the candidates and picks none
 
 ## Slice 4 - SessionStart by source (depends on slice 3)
@@ -49,11 +49,11 @@ created: "2026-09-25"
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks and lint pass
-- [ ] No unrelated changes in any slice
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Type checks and lint pass
+- [x] No unrelated changes in any slice
+- [x] `verification.md` filled in
 - [ ] Independent review before archiving (a change that closes a spec)
 
 ## Machine-readable features

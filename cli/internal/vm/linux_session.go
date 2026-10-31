@@ -3,6 +3,7 @@ package vm
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,9 +47,9 @@ type lima struct {
 	Status string `json:"status"`
 }
 
-func (s LinuxSessions) instances() (map[string]lima, error) {
+func (s LinuxSessions) instances(ctx context.Context) (map[string]lima, error) {
 	var out bytes.Buffer
-	if err := s.L(nil, &out, io.Discard, "list", "--json"); err != nil {
+	if err := s.L(ctx, nil, &out, io.Discard, "list", "--json"); err != nil {
 		return nil, fmt.Errorf("limactl list: %w", err)
 	}
 	found := map[string]lima{}
@@ -78,7 +79,7 @@ func (s LinuxSessions) rec(name string, st Status, start time.Time, msg string) 
 
 // Up creates a session, named name or linux-<unix time>, and keeps it until
 // Down. limactl's own output goes to out, never to the record.
-func (s LinuxSessions) Up(name string, progress, out io.Writer) Record {
+func (s LinuxSessions) Up(ctx context.Context, name string, progress, out io.Writer) Record {
 	start := time.Now()
 	if name == "" {
 		name = fmt.Sprintf("linux-%d", s.Now().Unix())
@@ -87,7 +88,7 @@ func (s LinuxSessions) Up(name string, progress, out io.Writer) Record {
 		return s.rec(name, StatusFailed, start, err.Error())
 	}
 	down := fmt.Sprintf("dotf vm linux down --session %s", name)
-	found, err := s.instances()
+	found, err := s.instances(ctx)
 	if err != nil {
 		return s.rec(name, StatusFailed, start, err.Error())
 	}
@@ -104,9 +105,9 @@ func (s LinuxSessions) Up(name string, progress, out io.Writer) Record {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return s.rec(name, StatusFailed, start, err.Error())
 	}
-	if err := s.start(instanceOf(name), progress, out); err != nil {
+	if err := s.start(ctx, instanceOf(name), progress, out); err != nil {
 		// A start that fails partway can leave the instance and its disk behind.
-		err = errors.Join(err, s.L(nil, out, out, "delete", "--force", instanceOf(name)), os.RemoveAll(dir))
+		err = errors.Join(err, s.L(ctx, nil, out, out, "delete", "--force", instanceOf(name)), os.RemoveAll(dir))
 		return s.rec(name, StatusFailed, start, err.Error())
 	}
 	r := s.rec(name, StatusOK, start, "")
@@ -114,14 +115,14 @@ func (s LinuxSessions) Up(name string, progress, out io.Writer) Record {
 	return r
 }
 
-func (s LinuxSessions) start(instance string, progress, out io.Writer) error {
+func (s LinuxSessions) start(ctx context.Context, instance string, progress, out io.Writer) error {
 	tmpl, cleanup, err := writeTemplate()
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 	step(progress, "boot %s (Ubuntu 24.04, nothing shared with the host)", instance)
-	if err := s.L(nil, out, out, "start", "--tty=false", "--name", instance, tmpl); err != nil {
+	if err := s.L(ctx, nil, out, out, "start", "--tty=false", "--name", instance, tmpl); err != nil {
 		return fmt.Errorf("limactl start: %w", err)
 	}
 	return nil
@@ -129,17 +130,17 @@ func (s LinuxSessions) start(instance string, progress, out io.Writer) error {
 
 // Down deletes the session's guest and its state, and clears a stale one. It
 // acts only on a session dotf holds, never on a Lima instance it did not make.
-func (s LinuxSessions) Down(name string, out io.Writer) Record {
+func (s LinuxSessions) Down(ctx context.Context, name string, out io.Writer) Record {
 	start := time.Now()
 	if ValidSessionName(name) != nil || !s.held(name) {
 		return s.rec(name, StatusNoSession, start, fmt.Sprintf("no session %s", name))
 	}
-	found, err := s.instances()
+	found, err := s.instances(ctx)
 	if err != nil {
 		return s.rec(name, StatusFailed, start, err.Error())
 	}
 	if _, there := found[instanceOf(name)]; there {
-		if err := s.L(nil, out, out, "delete", "--force", instanceOf(name)); err != nil {
+		if err := s.L(ctx, nil, out, out, "delete", "--force", instanceOf(name)); err != nil {
 			return s.rec(name, StatusFailed, start, fmt.Sprintf("limactl delete %s: %v", instanceOf(name), err))
 		}
 	}
@@ -155,8 +156,8 @@ func (s LinuxSessions) Down(name string, out io.Writer) Record {
 // List answers what the hypervisor says about each session dotf holds: ok for
 // a running guest, stale for a record whose guest is gone or stopped. It is
 // never nil, so --json writes [].
-func (s LinuxSessions) List() ([]Record, error) {
-	found, err := s.instances()
+func (s LinuxSessions) List(ctx context.Context) ([]Record, error) {
+	found, err := s.instances(ctx)
 	if err != nil {
 		return nil, err
 	}

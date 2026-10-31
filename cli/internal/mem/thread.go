@@ -119,6 +119,20 @@ func ThreadWarnings(body string) []string {
 	return out
 }
 
+// All joins the non-blank values of every field under a canonical label, in
+// order. A thread can carry a label twice, as itself and as an alias, and a
+// render that reads only the first loses the second without a word
+// (MEMORY-008 review round 6).
+func (t Thread) All(label string) string {
+	var vs []string
+	for _, f := range t.Fields {
+		if f.Label == label && strings.TrimSpace(f.Value) != "" {
+			vs = append(vs, strings.Trim(f.Value, "\n"))
+		}
+	}
+	return strings.Join(vs, "\n")
+}
+
 // Get returns the value under a canonical label, and whether the thread has it.
 func (t Thread) Get(label string) (string, bool) {
 	for _, f := range t.Fields {
