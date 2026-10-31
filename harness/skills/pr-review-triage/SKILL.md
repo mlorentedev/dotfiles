@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 78f30b67d04b39aa
+generated_sha: 8caa08e3c9c33dc0
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -147,13 +147,23 @@ Both calls: the first returns issue-level review bodies, the second the inline t
 
 ### 5. Give every comment a disposition
 
-Three exits, and every comment takes exactly one. A comment you neither applied nor recorded is a comment you silently overruled.
+Three exits, and every comment takes exactly one; a REAL finding has a fourth, **refuted**, below. A comment you neither applied nor recorded is a comment you silently overruled.
 
 | Disposition | When | What it costs you |
 |---|---|---|
 | **apply** | Correct, and small enough to belong in this PR's scope | A commit on the branch, in the same voice as the change |
 | **defer** | Correct, but out of this PR's scope, or it needs a decision | A ticket with the root cause and a link back to the comment |
 | **skip** | Wrong, irrelevant, or right in general but not here | One line saying why. Reply on the PR only when someone is waiting on the answer — a human reviewer, or a thread the next reader will hit. Noise gets a row in your table and nothing else |
+
+**A finding marked `Class: REAL` is reproduced before it is applied** (TOOL-017; the owner's ruling on #1062). A reproduction is a committed failing test, or a command whose non-zero exit is recorded; anything else, your own judgement included, is not one. Run the check with `dotf pr reproduce -- <cmd>` (add `--probe <patch>` for a mutation that removes a fix) and paste the line it prints into that finding's row:
+
+| Its reproduction | Its disposition |
+|---|---|
+| `Reproduction: reproduced …` | **apply**, or **defer** |
+| `Reproduction: did-not-reproduce …` | **refuted**: the claim is wrong, recorded with its evidence. It is not a skip, because the probe may still have found something real |
+| `could-not-run`, `did-not-land`, or none | **defer** to a human |
+
+A REAL finding is never **skip**ped. `dotf pr triage-queue` holds a PR whose record breaks this, and `dotf pr land` then refuses it. It finds a finding's row by `path:line` (the base name will do), and reads the disposition from the first cell after that one which opens with apply, defer, refuted or skip. THEORETICAL and SPECULATIVE findings are not gated.
 
 Two judgements this table does not make for you:
 
@@ -184,6 +194,7 @@ A disposition that lives only in this conversation evaporates when the session e
 | #12 `src/deploy.sh:44` | apply | the guard misses the CRLF case, real defect |
 | #13 `tests/foo.bats:8` | defer | valid, but a second behaviour → filed as #NNN |
 | #14 `README.md:2` | skip | suggests a convention ADR-012 decided against |
+| #15 `cli/x.go:9` (REAL) | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli/x -run TestY` |
 
 Reviewer output dispositioned: <reviewer login>, <timestamp of their newest comment>.
 ```

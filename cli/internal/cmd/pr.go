@@ -95,6 +95,9 @@ cannot be read or is not open.`,
 				if line := findingsLine(st); line != "" {
 					_, _ = fmt.Fprintf(c.OutOrStdout(), "         %s\n", line)
 				}
+				for _, u := range st.Unreproduced {
+					_, _ = fmt.Fprintf(c.OutOrStdout(), "         REAL %s:%d: %s\n", u.Finding.Path, u.Finding.Line, u.Problem)
+				}
 			}
 			if len(reg.Classification.Reviewers) == 0 {
 				_, _ = fmt.Fprintln(c.OutOrStdout(),
