@@ -3,8 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -70,10 +68,10 @@ func runMemResume(cmd *cobra.Command, memoryPath, thread, agent, format string) 
 	if chosen == "" {
 		var carry string
 		if cmd.Flags().Changed("memory") {
-			carry += " --memory " + shellQuote(memoryPath)
+			carry += " --memory " + mem.ShellQuote(memoryPath)
 		}
 		if agent != "" {
-			carry += " --agent " + shellWord(agent)
+			carry += " --agent " + mem.ShellWord(agent)
 		}
 		return listCandidates(cmd, key, agent, carry, candidates)
 	}
@@ -110,27 +108,7 @@ func listCandidates(cmd *cobra.Command, key, agent, carry string, candidates []s
 		_, _ = fmt.Fprintln(out, "  (none)")
 	}
 	for _, c := range candidates {
-		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread %s%s\n", shellWord(c), carry)
+		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread %s%s\n", mem.ShellWord(c), carry)
 	}
 	return nil
-}
-
-// shellQuote quotes a path for a command the user copies: a single-quoted
-// word, with any single quote inside it closed, escaped and reopened.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-// plainWord is a word the shell reads as itself, so it needs no quotes.
-var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./@+-]+$`)
-
-// shellWord is s as one shell word: as written when it is plain, quoted when
-// not. A thread key comes from MEMORY.md, input this session did not write, so
-// a heading cannot put a `;` into the line the operator copies (MEMORY-008
-// review round 4).
-func shellWord(s string) string {
-	if plainWord.MatchString(s) {
-		return s
-	}
-	return shellQuote(s)
 }
