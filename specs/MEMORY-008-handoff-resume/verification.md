@@ -107,7 +107,7 @@ Each slice PR fills its own section below and nothing else.
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-513-a-read-only-allowlist-that-names-a-code-runner-is-not-read-only.md (also lesson 507 and lesson 508)
-- [x] ADR-worthy decision for the repo's `docs/adr/`? (the per-thread store changes the layout of every project's `memory/`) yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md
+- [x] ADR-worthy decision for the repo's `docs/adr/`? yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md (the per-thread store changes the layout of every project's `memory/`)
 - [x] New pattern candidate for `00_meta/patterns/`? no: the store and the resume render are this repo's `dotf mem` contract, recorded in ADR-056; nothing in them generalises beyond it yet
 
 ## Archive checklist

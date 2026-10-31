@@ -22,7 +22,7 @@ func newMemResumeCmd() *cobra.Command {
 		Short: "Render this checkout's handoff thread for the next session",
 		Long: `resume renders one handoff thread: the thread file a MEMORY.md entry points at,
 or the inline block an older release wrote. The output depends only on that
-text, so two runs print the same bytes.
+text and the path it was read from, so two runs print the same bytes.
 
 --format prompt (the default) is the paste-ready instruction a session used to
 type by hand; --format context is the block a session-start hook injects. Both

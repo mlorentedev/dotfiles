@@ -20,7 +20,7 @@ Every session ends with the same manual ritual: /handoff, ask for a paste-ready 
 
 - A thread has one canonical field set, defined once in Go: `Updated`, `Last task`, `Decisions`, `Open threads`, `Next action`, `Verify`, `Awaiting Manu` and `Journal`. The labels sessions already improvise (`Verify at start`, `Judgment calls left open`) are read as aliases, so no existing block needs migrating by hand.
 - The per-thread file `memory/threads/<key>.md` is the source. The entry in `MEMORY.md` is derived from it and capped at 450 B, about 350 B in practice (updated, one-line next action, how many items await Manu, pointer, and the writer once MEMORY-009 stamps it), not the 1.5 KB block of today. Old blocks stay readable and move to the new shape on their next write.
-- `dotf mem resume [--thread K] [--format prompt|context]` renders the thread. The output depends only on the thread file. When the working directory names no single thread for this agent, it lists the candidates rather than picking one.
+- `dotf mem resume [--thread K] [--format prompt|context]` renders the thread. The output depends only on the thread file and the source path it names. When the working directory names no single thread for this agent, it lists the candidates rather than picking one.
 - Claude's `SessionStart` hook injects the resume keyed on `source`: the full resume for `startup`, `clear` and `compact`, one line for `resume` and `fork`, where the conversation already holds the history.
 - Harnesses with no session hook get one sentence in the compact doctrine: run `dotf mem resume` and follow it.
 - `/catchup` step 1 runs `dotf mem resume` and its `Verify` commands; "awaiting Manu's decision" is a valid next action.
