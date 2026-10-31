@@ -336,12 +336,28 @@ func TestExecScript(t *testing.T) {
 	}
 	want := []string{
 		"shell dotf-x -- mktemp /tmp/dotf-exec-XXXXXX",
-		"copy " + script + " dotf-x:/tmp/dotf-exec-abc",
+		"copy --backend=scp " + script + " dotf-x:/tmp/dotf-exec-abc",
 		"shell dotf-x -- sh /tmp/dotf-exec-abc",
 		"shell dotf-x -- rm -f /tmp/dotf-exec-abc",
 	}
 	if got := shellCalls(f); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("calls:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// The wrappers nest in one order: the guest's timeout outside, so it stops
+// everything; the secret's bash next, so the script inherits the variable.
+func TestExecWrapsScriptSecretAndTimeoutInOrder(t *testing.T) {
+	f := scriptLima(t, "")
+	o := execOpts()
+	o.Script, o.Timeout = "s.sh", time.Minute
+	o.Secrets = func() ([]string, error) { return []string{"API_TOKEN=" + fakeSecret}, nil }
+	if r := heldSession(t, f).Exec(context.Background(), o); r.Status != StatusOK {
+		t.Fatalf("Exec = %+v", r)
+	}
+	want := "shell dotf-x -- timeout -k 5 60.000 bash -c " + forwardEnv + " _ API_TOKEN -- sh /tmp/dotf-exec-abc"
+	if got := shellCalls(f); len(got) != 4 || got[2] != want {
+		t.Errorf("calls = %q, want third %q", got, want)
 	}
 }
 

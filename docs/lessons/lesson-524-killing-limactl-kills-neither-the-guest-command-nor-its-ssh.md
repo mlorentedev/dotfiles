@@ -34,8 +34,11 @@ host deadline starts first, so it fires first and decides the status, and a comm
 read as a timeout. `cmd.WaitDelay` bounds the wait on the orphan's pipes. Liveness is checked with `limactl list`
 before the shell, so a stopped guest is `stale`, not exit 1. The 255 stays ambiguous and the verb's help says so.
 
+`limactl copy` has the same shape of problem. Its default rsync sends a guest path through a remote shell and copies a
+directory with no `-r` to nowhere with exit 0. `--backend=scp` makes the path literal and the directory a failure.
+
 ## Rule
 
 A deadline around a remote client bounds the client, not the remote work. Measure what killing the client leaves on
 both ends, and give the remote side its own limit. Any `exec.CommandContext` with a writer that is not an `*os.File`
-needs `WaitDelay`, or a surviving grandchild outlives the deadline.
+needs `WaitDelay`, or a surviving grandchild outlives the deadline. Run a wrapped tool on the awkward input too: a space in a path, a directory, a value it may expand.

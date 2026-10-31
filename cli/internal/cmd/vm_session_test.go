@@ -68,6 +68,12 @@ func TestVMVerbRefusals(t *testing.T) {
 		{"exec with a negative timeout", []string{"exec", "--session", "ghost", "--timeout", "-1s", "--", "true"}, 2, ""},
 		{"exec with an unknown secret", []string{"exec", "--session", "ghost", "--secret", "no-such-secret", "--", "true"}, 2, ""},
 		{"exec on an unknown session", []string{"exec", "--session", "ghost", "--json", "--", "true"}, 3, "no-session"},
+		{"cp with one path", []string{"cp", "ghost:/tmp/f"}, 2, ""},
+		{"cp with no guest side", []string{"cp", "vm_session.go", "other.go"}, 2, ""},
+		{"cp with two guest sides", []string{"cp", "ghost:/a", "other:/b"}, 2, ""},
+		{"cp from a host file that is not there", []string{"cp", "no-such-file", "ghost:/tmp/f"}, 2, ""},
+		{"cp to an unknown session", []string{"cp", "vm_session.go", "ghost:/tmp/f", "--json"}, 3, "no-session"},
+		{"cp from an unknown session", []string{"cp", "ghost:/tmp/f", "./f", "--json"}, 3, "no-session"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			noLimactl(t)
