@@ -245,3 +245,18 @@ The fifth review (`review-round-5.md`, at `8e0b61bc`, nan/mimo-v2.6-flash) confi
 | #2915: `handoff_resume` not declared in `session-start-config.json` | **Applied** after round 5, in the change that closes #2915 | `TestCommittedConfigDeclaresTheInjectorsTheAdapterReads`; `tests/session-start-config.bats` |
 
 Mutations, each reverted: `ShellWord` returning its input unquoted turns `TestSessionStartResumeQuotesTheOneLiner` and `TestMemResumeQuotesTheCandidateLine` red (the relocated helper still guards the candidate lines); the one-liner's call to `ShellWord` removed turns `TestSessionStartResumeQuotesTheOneLiner` red.
+
+### Review round 6 (FAIL): a label carried twice rendered once
+
+The sixth review (`review-round-6.md`, at `0ecee6e3`, nan/deepseek-v4-flash) returned FAIL on one REAL Major, in a class no earlier round covered.
+
+| Finding | Disposition | Test |
+|---|---|---|
+| M-1: a thread carrying a canonical label and its alias (`Verify` + `Verify at start`, `Awaiting Manu` + `Judgment calls left open`) renders only the first, in both formats | **Applied.** `Thread.All` joins the non-blank values of every field under a label, and both renderers read through it. `Get` keeps its first-match meaning for its other callers (`ThreadWarnings`, the index summary, `handoff-write`) | `TestResumeRendersEveryFieldOfALabel` (both pairs, both formats, the note once) |
+| m-1: `ShellWord` leaves a dash-leading key bare, so cobra reads `--thread -x` as a flag | **Ticketed**, #3002. Quoting cannot fix it; `--thread=<key>` at both sinks does | n/a |
+| m-2: the context render says nothing when Next action is blank | **Ticketed**, #3003 | n/a |
+| q-1: `features.json` states are `pending` at archive | **Not blocking:** `dotf spec archive` reads no feature state; the review digests the contract files only (`cli/internal/spec/review.go` `contractFiles`) | n/a |
+| q-2: a live `source=compact` payload never observed | **Carried** | n/a |
+| q-3: the launcher's base range spans 811 commits | **Recorded**, harness-owned, as in round 1 | n/a |
+
+Mutation, reverted: `All` cut to its first value turns `TestResumeRendersEveryFieldOfALabel` red on four assertions.

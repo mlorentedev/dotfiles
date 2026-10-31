@@ -111,7 +111,7 @@ func renderContext(th Thread, source string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Resume: thread %s\n\nSource: %s\n", th.Key, source)
 	for _, label := range firstFields {
-		if v, ok := th.Get(label); ok && strings.TrimSpace(v) != "" {
+		if v := th.All(label); v != "" {
 			writeField(&b, label, v)
 		}
 	}
@@ -149,14 +149,14 @@ func isFirstField(label string) bool {
 func renderPrompt(th Thread, source string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Resume thread %s. Its full handoff is %s; read it before acting.\n", th.Key, source)
-	if v, ok := th.Get("Verify"); ok && strings.TrimSpace(v) != "" {
+	if v := th.All("Verify"); v != "" {
 		fmt.Fprintf(&b, "\n%s\n", verifyBlock("First confirm the state it describes:", v))
 	}
-	if v, ok := th.Get("Awaiting Manu"); ok && strings.TrimSpace(v) != "" {
+	if v := th.All("Awaiting Manu"); v != "" {
 		fmt.Fprintf(&b, "\nThese wait on Manu; ask, do not decide them:\n%s\n", stripBreaks(v))
 	}
 	next := "none recorded: ask what to work on"
-	if v, ok := th.Get("Next action"); ok && strings.TrimSpace(v) != "" {
+	if v := th.All("Next action"); v != "" {
 		next = stripBreaks(v)
 	}
 	fmt.Fprintf(&b, "\nNext action: %s\n", next)
