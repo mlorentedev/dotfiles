@@ -136,7 +136,7 @@ Each slice PR fills its own section below and nothing else.
 - **Decisions:**
   - `startup` gets the full block. tasks.md lists it with `clear` and `compact`; AC3 names only the last two. A fresh session has no conversation either.
   - `session_id` is not parsed. Nothing reads it, and a field with no reader is dead weight.
-  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up: #2915.
+  - `session-start-config.json` does not declare `handoff_resume` yet. That file and its bats (which counts 11 injectors) are outside this run's write scope. The injector is on by default, so behaviour does not depend on it. Follow-up: #2915, since closed: the config declares it, the bats counts 12, and `TestCommittedConfigDeclaresTheInjectorsTheAdapterReads` pins the committed file to `resumeInjector`.
 
 ### Refusal fix (#1477 follow-up): mutations
 
@@ -242,6 +242,6 @@ The fifth review (`review-round-5.md`, at `8e0b61bc`, nan/mimo-v2.6-flash) confi
 | F-1: `sessionResume`'s one line for `resume`/`fork` interpolates the thread key raw into a copyable command | **Applied.** `ShellWord`/`ShellQuote` move from `cmd` to `package mem` (one copy; `cmd` imports `mem`), and the one-liner's command goes through `ShellWord`. The prose "Thread <key>" stays as written: it is not a command. A sweep for `--thread` in non-test Go finds no third command sink | `TestSessionStartResumeQuotesTheOneLiner` (`wt-x;echo` quoted on `resume` and `fork`); the goldens keep the plain `wt-x` bare |
 | F-2: slice 3 evidence still described the allowlist and `TestReadOnlyCommand` as current | **Applied** above | n/a |
 | Question: a live `source=compact` SessionStart payload never observed | **Carried**, as in rounds 2-4 | n/a |
-| #2915: `handoff_resume` not declared in `session-start-config.json` | **Carried**, ticketed; next after the archive | n/a |
+| #2915: `handoff_resume` not declared in `session-start-config.json` | **Applied** after round 5, in the change that closes #2915 | `TestCommittedConfigDeclaresTheInjectorsTheAdapterReads`; `tests/session-start-config.bats` |
 
 Mutations, each reverted: `ShellWord` returning its input unquoted turns `TestSessionStartResumeQuotesTheOneLiner` and `TestMemResumeQuotesTheCandidateLine` red (the relocated helper still guards the candidate lines); the one-liner's call to `ShellWord` removed turns `TestSessionStartResumeQuotesTheOneLiner` red.
