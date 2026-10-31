@@ -20,6 +20,7 @@
     "knowledge_health": { "enabled": true, "comment": "MEMORY.md size + crystallize staleness (thresholds: memory_md_max_lines, crystallize_max_days)" },
     "vault_baseline": { "enabled": true, "comment": "Canonical artifact integrity check (SKILL.md, patterns/_index.md, AGENTS.md...)" },
     "memory_temperature": { "enabled": true, "comment": "HOT/WARM/COLD/ARCHIVE buckets via memory_temp_*_days thresholds" },
-    "claude_json_size": { "enabled": true, "comment": "Warn if ~/.claude/.claude.json drops below claude_json_min_bytes (upstream truncation bug)" }
+    "claude_json_size": { "enabled": true, "comment": "Warn if ~/.claude/.claude.json drops below claude_json_min_bytes (upstream truncation bug)" },
+    "handoff_resume": { "enabled": true, "comment": "Resume block for this checkout's handoff thread on startup/clear/compact, one line on resume/fork (MEMORY-008)" }
   }
 }
