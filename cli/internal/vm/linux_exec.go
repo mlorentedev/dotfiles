@@ -200,7 +200,7 @@ func (s LinuxSessions) pushScript(ctx context.Context, instance, host string, st
 		defer cancel()
 		_ = s.L(ctx, nil, io.Discard, stderr, "shell", instance, "--", "rm", "-f", guest)
 	}
-	if err := s.L(ctx, nil, io.Discard, stderr, "copy", host, instance+":"+guest); err != nil {
+	if err := s.L(ctx, nil, io.Discard, stderr, "copy", copyBackend, host, instance+":"+guest); err != nil {
 		remove()
 		return "", nil, fmt.Errorf("limactl copy %s: %v", host, err)
 	}

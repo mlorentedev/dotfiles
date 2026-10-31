@@ -40,7 +40,7 @@ const sessionVerbs = "A session is a named guest that `up` holds until `down`. W
 	"3 no such session. Progress goes to stderr."
 
 func addSessionVerbs(linux *cobra.Command) {
-	linux.AddCommand(newVMUpCmd(), newVMDownCmd(), newVMStatusCmd(), newVMExecCmd())
+	linux.AddCommand(newVMUpCmd(), newVMDownCmd(), newVMStatusCmd(), newVMExecCmd(), newVMCpCmd())
 }
 
 func sessionFlags(c *cobra.Command, session *string, asJSON *bool, usage string) {
