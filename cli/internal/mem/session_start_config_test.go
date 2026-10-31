@@ -43,6 +43,21 @@ func TestLoadAdapterConfig(t *testing.T) {
 	})
 }
 
+// The committed config declares every injector flag the adapter reads, so an
+// owner can turn each one off where the file says it can be. The bats pins the
+// file's keys; this pins them to the flag the code reads (#2915).
+func TestCommittedConfigDeclaresTheInjectorsTheAdapterReads(t *testing.T) {
+	cfg := loadAdapterConfig(filepath.Join("..", "..", "..", "session-start-config.json"))
+	if len(cfg.Injectors) == 0 {
+		t.Fatal("the repo-root session-start-config.json did not load")
+	}
+	for _, key := range []string{resumeInjector} {
+		if inj, ok := cfg.Injectors[key]; !ok || inj.Enabled == nil {
+			t.Errorf("session-start-config.json does not declare injectors.%s.enabled", key)
+		}
+	}
+}
+
 func TestLoadAdapterConfigMissingFileUsesDefaults(t *testing.T) {
 	cfg := loadAdapterConfig(filepath.Join(t.TempDir(), "absent.json"))
 	if got := cfg.threshold("memory_md_max_lines", 150); got != 150 {
