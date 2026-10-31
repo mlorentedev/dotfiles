@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/crystallize/SKILL.md
-generated_sha: b7dc73847131d408
+generated_sha: 9e882ec50469d6dc
 id: crystallize-skill
 type: skill
 status: active
@@ -71,7 +71,7 @@ tags: [tag1, tag2]
 **Problem:** <what went wrong or what decision was needed>
 **Solution:** <what fixed it or what was decided>
 **Why:** <root cause or rationale>
-**Evidence:** <commit SHA, PR/issue #N, test output, or session journal path (causal bucket: helped | hurt)>
+**Evidence:** <commit SHA, PR/issue #N, test output, or session journal path (causal bucket: helped | hurt | no observed effect; a confounded candidate is NO_ENTRY)>
 ```
 
 ### Step 5 — Pattern & Harness Promotion (Five-Tier Lever Cost Hierarchy)
