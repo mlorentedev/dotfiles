@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 78f30b67d04b39aa
+generated_sha: 8caa08e3c9c33dc0
 id: pr-review-triage-skill
 type: skill
 status: active
