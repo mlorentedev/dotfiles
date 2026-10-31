@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -17,9 +18,10 @@ type listLima struct {
 	calls     []string
 	failStart bool
 	failDel   bool
+	guest     func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args []string) error // shell and copy
 }
 
-func (f *listLima) run(_ io.Reader, stdout, _ io.Writer, args ...string) error {
+func (f *listLima) run(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
 	f.calls = append(f.calls, strings.Join(args, " "))
 	switch args[0] {
 	case "list":
@@ -32,6 +34,10 @@ func (f *listLima) run(_ io.Reader, stdout, _ io.Writer, args ...string) error {
 			line := strings.Replace(string(b), `"name":"dotf-measure"`, `"name":"`+name+`"`, 1)
 			line = strings.Replace(line, `"status":"Running"`, `"status":"`+status+`"`, 1)
 			_, _ = io.WriteString(stdout, strings.TrimSpace(line)+"\n")
+		}
+	case "shell", "copy":
+		if f.guest != nil {
+			return f.guest(ctx, stdin, stdout, stderr, args)
 		}
 	case "start":
 		if f.failStart {
@@ -76,7 +82,7 @@ func TestValidSessionName(t *testing.T) {
 func TestUpCreatesTheSessionAndNamesIt(t *testing.T) {
 	f := &listLima{instances: map[string]string{}}
 	s := newSessions(t, f)
-	rec := s.Up("", io.Discard, io.Discard)
+	rec := s.Up(context.Background(), "", io.Discard, io.Discard)
 	if rec.Status != StatusOK || rec.Session != "linux-1700000000" || rec.OS != "linux" || rec.ProcessCode() != 0 {
 		t.Fatalf("Up = %+v, want ok under the default name", rec)
 	}
@@ -91,8 +97,8 @@ func TestUpCreatesTheSessionAndNamesIt(t *testing.T) {
 func TestUpOnAHeldNameIsBusy(t *testing.T) {
 	f := &listLima{instances: map[string]string{}}
 	s := newSessions(t, f)
-	s.Up("held", io.Discard, io.Discard)
-	rec := s.Up("held", io.Discard, io.Discard)
+	s.Up(context.Background(), "held", io.Discard, io.Discard)
+	rec := s.Up(context.Background(), "held", io.Discard, io.Discard)
 	if rec.Status != StatusBusy || rec.ProcessCode() != 2 || !strings.Contains(rec.Stderr, "down --session held") {
 		t.Errorf("second Up = %+v, want busy, exit 2, naming down", rec)
 	}
@@ -102,7 +108,7 @@ func TestUpOnAHeldNameIsBusy(t *testing.T) {
 // over, and not one to delete either.
 func TestUpRefusesAnInstanceItDidNotCreate(t *testing.T) {
 	f := &listLima{instances: map[string]string{"dotf-mine": "Running"}}
-	rec := newSessions(t, f).Up("mine", io.Discard, io.Discard)
+	rec := newSessions(t, f).Up(context.Background(), "mine", io.Discard, io.Discard)
 	if rec.Status != StatusBusy {
 		t.Errorf("Up = %+v, want busy", rec)
 	}
@@ -116,9 +122,9 @@ func TestUpRefusesAnInstanceItDidNotCreate(t *testing.T) {
 func TestUpOnAGoneGuestIsStale(t *testing.T) {
 	f := &listLima{instances: map[string]string{}}
 	s := newSessions(t, f)
-	s.Up("gone", io.Discard, io.Discard)
+	s.Up(context.Background(), "gone", io.Discard, io.Discard)
 	delete(f.instances, "dotf-gone")
-	rec := s.Up("gone", io.Discard, io.Discard)
+	rec := s.Up(context.Background(), "gone", io.Discard, io.Discard)
 	if rec.Status != StatusStale || rec.ProcessCode() != 2 || !strings.Contains(rec.Stderr, "down --session gone") {
 		t.Errorf("Up = %+v, want stale, exit 2, naming down", rec)
 	}
@@ -127,7 +133,7 @@ func TestUpOnAGoneGuestIsStale(t *testing.T) {
 func TestUpThatFailsLeavesNothingBehind(t *testing.T) {
 	f := &listLima{instances: map[string]string{}, failStart: true}
 	s := newSessions(t, f)
-	rec := s.Up("bad", io.Discard, io.Discard)
+	rec := s.Up(context.Background(), "bad", io.Discard, io.Discard)
 	if rec.Status != StatusFailed || rec.ProcessCode() != 1 {
 		t.Errorf("Up = %+v, want failed", rec)
 	}
@@ -142,8 +148,8 @@ func TestUpThatFailsLeavesNothingBehind(t *testing.T) {
 func TestDownRemovesTheInstanceAndTheState(t *testing.T) {
 	f := &listLima{instances: map[string]string{}}
 	s := newSessions(t, f)
-	s.Up("x", io.Discard, io.Discard)
-	rec := s.Down("x", io.Discard)
+	s.Up(context.Background(), "x", io.Discard, io.Discard)
+	rec := s.Down(context.Background(), "x", io.Discard)
 	if rec.Status != StatusOK || rec.ProcessCode() != 0 {
 		t.Fatalf("Down = %+v", rec)
 	}
@@ -158,9 +164,9 @@ func TestDownRemovesTheInstanceAndTheState(t *testing.T) {
 func TestDownClearsAStaleSession(t *testing.T) {
 	f := &listLima{instances: map[string]string{}}
 	s := newSessions(t, f)
-	s.Up("x", io.Discard, io.Discard)
+	s.Up(context.Background(), "x", io.Discard, io.Discard)
 	delete(f.instances, "dotf-x")
-	if rec := s.Down("x", io.Discard); rec.Status != StatusOK {
+	if rec := s.Down(context.Background(), "x", io.Discard); rec.Status != StatusOK {
 		t.Errorf("Down on a stale session = %+v, want ok", rec)
 	}
 	if _, err := os.Stat(filepath.Join(s.Dir, "x")); err == nil {
@@ -170,7 +176,7 @@ func TestDownClearsAStaleSession(t *testing.T) {
 
 func TestDownOnAnUnknownNameIsNoSession(t *testing.T) {
 	f := &listLima{instances: map[string]string{"dotf-theirs": "Running"}}
-	rec := newSessions(t, f).Down("theirs", io.Discard)
+	rec := newSessions(t, f).Down(context.Background(), "theirs", io.Discard)
 	if rec.Status != StatusNoSession || rec.ProcessCode() != 3 {
 		t.Errorf("Down = %+v, want no-session, exit 3", rec)
 	}
@@ -182,9 +188,9 @@ func TestDownOnAnUnknownNameIsNoSession(t *testing.T) {
 func TestDownThatFailsKeepsTheState(t *testing.T) {
 	f := &listLima{instances: map[string]string{}}
 	s := newSessions(t, f)
-	s.Up("x", io.Discard, io.Discard)
+	s.Up(context.Background(), "x", io.Discard, io.Discard)
 	f.failDel = true
-	if rec := s.Down("x", io.Discard); rec.Status != StatusFailed {
+	if rec := s.Down(context.Background(), "x", io.Discard); rec.Status != StatusFailed {
 		t.Errorf("Down = %+v, want failed", rec)
 	}
 	if _, err := os.Stat(filepath.Join(s.Dir, "x")); err != nil {
@@ -198,10 +204,10 @@ func TestDownThatFailsKeepsTheState(t *testing.T) {
 func TestListReportsWhatTheHypervisorAnswers(t *testing.T) {
 	f := &listLima{instances: map[string]string{"dotf-theirs": "Running"}}
 	s := newSessions(t, f)
-	s.Up("a", io.Discard, io.Discard)
-	s.Up("b", io.Discard, io.Discard)
+	s.Up(context.Background(), "a", io.Discard, io.Discard)
+	s.Up(context.Background(), "b", io.Discard, io.Discard)
 	delete(f.instances, "dotf-b")
-	got, err := s.List()
+	got, err := s.List(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +217,7 @@ func TestListReportsWhatTheHypervisorAnswers(t *testing.T) {
 }
 
 func TestListWithNoSessionsIsEmptyNotNil(t *testing.T) {
-	got, err := newSessions(t, &listLima{instances: map[string]string{}}).List()
+	got, err := newSessions(t, &listLima{instances: map[string]string{}}).List(context.Background())
 	if err != nil || got == nil || len(got) != 0 {
 		t.Errorf("List = %#v, %v; want an empty non-nil slice (JSON [])", got, err)
 	}
@@ -221,9 +227,9 @@ func TestListWithNoSessionsIsEmptyNotNil(t *testing.T) {
 func TestListTreatsAStoppedInstanceAsStale(t *testing.T) {
 	f := &listLima{instances: map[string]string{}}
 	s := newSessions(t, f)
-	s.Up("a", io.Discard, io.Discard)
+	s.Up(context.Background(), "a", io.Discard, io.Discard)
 	f.instances["dotf-a"] = "Stopped"
-	got, _ := s.List()
+	got, _ := s.List(context.Background())
 	if len(got) != 1 || got[0].Status != StatusStale {
 		t.Errorf("List = %+v, want a stale", got)
 	}
