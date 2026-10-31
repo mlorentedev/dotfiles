@@ -54,7 +54,7 @@ setup() {
     WF="$REPO/.github/workflows/pr-agent.yml"
     # The publication guard's logic, shared by the final guard and the probe that
     # gates the fallback outside NaN (AI-045 AC9).
-    GUARD="$REPO/scripts/pr-agent-publish-guard.sh"
+    GUARD="$REPO/cli/internal/prreview/guard.go"
 }
 
 @test "pr-agent: the config and workflow both exist" {
@@ -740,13 +740,13 @@ if bad:
 
 @test "pr-agent: the guard only counts comments authored by github-actions[bot]" {
     # On a public repository anyone can paste the marker text into a comment.
-    grep -q 'select(.user.login == "github-actions\[bot\]"' "$GUARD"
+    grep -q 'c.User.Login != "github-actions\[bot\]"' "$GUARD"
 }
 
 @test "pr-agent: the guard binds the marker to this run's start stamp" {
     grep -q 'id: start' "$WF"
     grep -q 'STARTED: \${{ steps.start.outputs.started }}' "$WF"
-    grep -q '(.updated_at >= $started)' "$GUARD"
+    grep -q 'c.UpdatedAt < started' "$GUARD"
 }
 
 @test "pr-agent: a missing NAN_API_KEY fails before the reviewer runs, naming the remedy" {
@@ -756,13 +756,13 @@ if bad:
 }
 
 @test "pr-agent: the guard reads the marker from the PR head when the base has no registry yet" {
-    grep -q 'read_markers "${BASE_REF}"' "$GUARD"
-    grep -q 'read_markers "${HEAD_SHA}"' "$GUARD"
+    grep -q 'g.markers = g.readMarkers(ctx, g.in.BaseRef)' "$GUARD"
+    grep -q 'g.readMarkers(ctx, g.in.HeadSHA) != nil' "$GUARD"
 }
 
 @test "pr-agent: the guard counts comments across all pages, not per page" {
-    grep -q -- '/comments" --paginate)' "$GUARD"
-    grep -q 'jq -s --arg started' "$GUARD"
+    grep -q 'g.api(ctx, path, "--paginate")' "$GUARD"
+    grep -q 'countReviews(comments, g.in.Started, g.markers)' "$GUARD"
 }
 
 @test "pr-agent: the model travels in the workflow env so bootstrap PRs do not fall back to upstream defaults" {
@@ -799,7 +799,7 @@ print('; '.join(bad)); sys.exit(1 if bad else 0)
     [ "$status" -eq 0 ] || { echo "no step with id models (AI-045)" >&2; false; }
     local models_if
     models_if=$(printf '%s' "$output" | tr -s ' \n' ' ')
-    grep -q 'scripts/pr-agent-model-preflight.sh' "$WF"
+    grep -q 'dotf pr preflight' "$WF"
     # The draw runs wherever the preflight does, whatever the preflight's outcome.
     run _step_if "s.get('id') == 'route'"
     local route_if
@@ -837,7 +837,7 @@ print('echo \"exit=\${rc}\" >> \"\$GITHUB_OUTPUT\"' in m['run'], m['run'].rstrip
 }
 
 @test "pr-agent: the head-ref fallback also works for issue_comment runs" {
-    grep -q 'HEAD_SHA=$(gh_api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq' "$GUARD"
+    grep -q '"/pulls/"+g.in.PR, "--jq", ".head.sha")' "$GUARD"
 }
 
 @test "pr-agent: the guard reads the registry from the default branch, never from base.ref" {
@@ -847,8 +847,8 @@ print('echo \"exit=\${rc}\" >> \"\$GITHUB_OUTPUT\"' in m['run'], m['run'].rstrip
 }
 
 @test "pr-agent: the head-ref fallback never takes the marker text from the PR" {
-    grep -q "markers='\\[\"PR Reviewer Guide\"\\]'" "$GUARD"
-    run grep -c 'markers=$(read_markers "${HEAD_SHA}")' "$GUARD"
+    grep -q 'g.markers = \[\]string{"PR Reviewer Guide"}' "$GUARD"
+    run grep -c 'g.markers = g.readMarkers(ctx, g.in.HeadSHA)' "$GUARD"
     [ "$output" = "0" ]
 }
 
@@ -1027,7 +1027,7 @@ print('PR_AGENT_REF' not in filter_step['env'])
 }
 
 # TOOL-023: a push is reviewed only past a threshold of new commits, and the
-# decision is made BEFORE PR-Agent starts, by scripts/pr-agent-push-gate.sh, so
+# decision is made BEFORE PR-Agent starts, by `dotf pr gate`, so
 # that a skipped push is not mistaken by the guard for a failed inference.
 # The three PR-Agent steps, in execution order: Anthropic drawn first, NaN,
 # Anthropic after NaN.
@@ -1047,19 +1047,30 @@ print(s.get('if', ''))
     run _step_if "s.get('id') == 'push_gate'"
     [ "$status" -eq 0 ] || { echo "no step with id push_gate" >&2; false; }
     [[ "$output" == *"github.event.action == 'synchronize'"* ]] || false
-    grep -q 'scripts/pr-agent-push-gate.sh' "$WF"
-    # The job has no full checkout; the gate script, the model preflight
-    # (AI-045, which runs on every event) and the publication guard (AC9) are
-    # the only files checked out.
-    run _step_if "'checkout' in s.get('uses', '') and 'pr-agent-push-gate' in str(s.get('with', {}))"
-    [ "$status" -eq 0 ] || { echo "no sparse checkout of the gate script" >&2; false; }
+    grep -q 'dotf pr gate' "$WF"
+    # The job has no full checkout: dotf's source and the pool are the only
+    # files checked out.
     run python3 -c "
 import yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 co = next(s for s in steps if 'checkout' in s.get('uses', ''))
 print(co['with']['sparse-checkout'].split())
 "
-    [ "$output" = "['harness/reviewer-pool.json', 'scripts/pr-agent-push-gate.sh', 'scripts/pr-agent-model-preflight.sh', 'scripts/pr-agent-route.sh', 'scripts/pr-agent-publish-guard.sh']" ]
+    [ "$output" = "['harness/reviewer-pool.json', 'cli/']" ]
+}
+
+@test "pr-agent: dotf is built from the PR before the first decision, and no script decides" {
+    run python3 -c "
+import yaml
+steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
+names = [s.get('name', s.get('uses', '')) for s in steps]
+build = names.index('Build dotf')
+decisions = [i for i, s in enumerate(steps) if 'dotf pr ' in s.get('run', '')]
+print(len(decisions), build < min(decisions), 'go build' in steps[build]['run'])
+"
+    [ "$output" = "6 True True" ]
+    run grep -c '\./scripts/pr-agent-' "$WF"
+    [ "$output" = "0" ]
 }
 
 @test "pr-agent: below the push gate's threshold, neither PR-Agent nor the guard runs" {
@@ -1092,10 +1103,8 @@ for sid in '$PA_IDS'.split() + ['published_after_anthropic', 'published_after_na
 }
 
 @test "pr-agent: the guard accepts every marker the registry declares, not only the first" {
-    run grep -c 'review_markers\[0\]' "$GUARD"
-    [ "$output" = "0" ]
-    grep -q -- '--argjson markers' "$GUARD"
-    grep -q 'any($markers\[\]' "$GUARD"
+    grep -q 'for _, m := range markers' "$GUARD"
+    grep -q 'markers = append(markers, r.ReviewMarkers...)' "$GUARD"
 }
 
 # AI-045: timeouts must not be mislabeled as concurrency (#1107); failures
@@ -1118,10 +1127,10 @@ print(guard['env']['ROUTE_OUTCOME'])
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "True" ]
     [ "${lines[1]}" = "True" ]
-    [ "${lines[2]}" = '${{ steps.route.outputs.note }} ./scripts/pr-agent-publish-guard.sh' ]
+    [ "${lines[2]}" = '${{ steps.route.outputs.note }} dotf pr guard' ]
     # A failed draw must reach the guard, or it reads as a pool with no answer.
     [ "${lines[3]}" = '${{ steps.route.outcome }}' ]
-    grep -q '    cancelled|failure)' "$GUARD"
+    grep -q 'case "cancelled", "failure":' "$GUARD"
 }
 
 # AI-045: the guard blamed every silent run on concurrency (#1107). Run
@@ -1131,8 +1140,7 @@ print(guard['env']['ROUTE_OUTCOME'])
 # wrong one.
 @test "pr-agent: the no-review guard names both measured causes, not concurrency alone" {
     grep -q '#1107' "$GUARD"
-    grep -q 'non-streamed answer.*#1858\|#1858.*non-streamed' "$GUARD" \
-        || grep -A2 'non-streamed answer' "$GUARD" | grep -q '#1858'
+    grep -A2 'non-streamed answer' "$GUARD" | grep -q '#1858'
 }
 
 # A failed Action is not a classified model failure: a second run could publish
@@ -1176,8 +1184,8 @@ print(steps['pr_agent']['if'].count(\"steps.published_after_anthropic.outputs.pu
       steps['pr_agent_anthropic_second']['if'].count(\"steps.published_after_nan.outputs.published == 'false'\"))
 "
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = './scripts/pr-agent-publish-guard.sh --probe --output "$GITHUB_OUTPUT"' ]
-    [ "${lines[1]}" = './scripts/pr-agent-publish-guard.sh --probe --output "$GITHUB_OUTPUT"' ]
+    [ "${lines[0]}" = 'dotf pr guard --probe --output "$GITHUB_OUTPUT"' ]
+    [ "${lines[1]}" = 'dotf pr guard --probe --output "$GITHUB_OUTPUT"' ]
     [ "${lines[2]}" = "1 1" ]
     # PR-Agent's own tool errors still fail the attempt rather than pass silently.
     run python3 -c "
@@ -1270,16 +1278,16 @@ print(all(any(c == x or c.endswith('/' + x) for c in chain) for x in listed))
 import json, math, re, yaml
 job = yaml.safe_load(open('$WF'))['jobs']['review']
 by = {s.get('id'): s for s in job['steps']}
-def knob(name, script):
+def knob(name, source, const):
     for s in job['steps']:
         if name in (s.get('env') or {}):
             return int(s['env'][name])
-    m = re.search(r'\\$\{' + name + r':-([0-9]+)\}', open('$REPO/scripts/' + script).read())
+    m = re.search(const + r' = ([0-9]+)', open('$REPO/cli/internal/prreview/' + source).read())
     return int(m.group(1))
 pair = by['pr_agent']['timeout-minutes'] + max(by[i]['timeout-minutes'] for i in ('pr_agent_anthropic_first', 'pr_agent_anthropic_second'))
 chain = 1 + len(json.loads(by['models']['env']['DECLARED_FALLBACK_MODELS']))
-probes = math.ceil((knob('PREFLIGHT_TIMEOUT', 'pr-agent-model-preflight.sh') * chain
-                    + knob('ROUTE_PROBE_TIMEOUT', 'pr-agent-route.sh')) / 60)
+probes = math.ceil((knob('PREFLIGHT_TIMEOUT', 'preflight.go', 'defaultPreflightSecond') * chain
+                    + knob('ROUTE_PROBE_TIMEOUT', 'probe.go', 'defaultProbeTimeout')) / 60)
 after = len([s for s in job['steps'] if s.get('id') in ('published_after_anthropic', 'published_after_nan')
              or s.get('name') == 'Fail if no review was published'])
 print(after == 3 and job['timeout-minutes'] > pair + probes + 3 + after, job['timeout-minutes'], pair, probes, after)
@@ -1289,8 +1297,8 @@ print(after == 3 and job['timeout-minutes'] > pair + probes + 3 + after, job['ti
 }
 
 # AI-045 AC9 (#1923): what the key outside NaN may spend. The Claude Console
-# cannot restrict a key to a model, so the allowlist is ALLOWED_ANTHROPIC in
-# scripts/pr-agent-route.sh, and this test is what makes it a rule rather than a
+# cannot restrict a key to a model, so the allowlist is in
+# cli/internal/prreview/allowlist.go, and this test is what makes it a rule rather than a
 # line anyone can edit: every allowed model needs a price row below, and its
 # worst review under the caps must stay under that row's ceiling.
 @test "pr-agent: the Anthropic attempts run the routed model, allowlisted, with bounded input and output" {
@@ -1306,9 +1314,8 @@ print(e['CONFIG__MODEL'] == e['CONFIG__MODEL_WEAK'] == routed,
       e['CONFIG__REASONING_EFFORT'] == '\${{ steps.route.outputs.anthropic_effort }}')
 # Both copies are one attempt: identical in every key and the action pin.
 print(a1['env'] == a2['env'] and a1['uses'] == a2['uses'] and a1['timeout-minutes'] == a2['timeout-minutes'])
-# The allowlist, read from the script that enforces it.
-m = re.search(r'^ALLOWED_ANTHROPIC=\"([^\"]*)\"$', open('$REPO/scripts/pr-agent-route.sh').read(), re.M)
-allowed = m.group(1).split()
+# The allowlist, read from the source that enforces it.
+allowed = re.findall(r'\"(anthropic/[^\"]+)\"', open('$REPO/cli/internal/prreview/allowlist.go').read())
 print(allowed)
 # Every Anthropic model the pool gives PR-Agent is allowed, with a known effort.
 pool = json.load(open('$REPO/harness/reviewer-pool.json'))['pool']
@@ -1349,7 +1356,7 @@ cfg = tomllib.load(open('$REPO/.pr_agent.toml', 'rb'))['config']
 pinned = sorted(k for k, v in cfg.items() if k.startswith('model') and isinstance(v, str) and '/' in v)
 print(pinned, all(e.get('CONFIG__' + k.upper()) == routed for k in pinned))
 # The guard names the model each Anthropic attempt ran, from the same output.
-guard = next(s for s in steps if s.get('run', '').strip() == './scripts/pr-agent-publish-guard.sh')
+guard = next(s for s in steps if s.get('run', '').strip() == 'dotf pr guard')
 lines = guard['env']['ATTEMPTS'].strip().splitlines()
 print(lines[0].endswith(routed) and lines[2].endswith(routed))
 "

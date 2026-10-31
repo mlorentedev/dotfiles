@@ -29,7 +29,7 @@
     "PR-Agent reads this file too (AI-045 AC9, #1923): each `pr_agent` block is that",
     "member's PR-Agent model, its weight in the CI draw, and its reasoning effort.",
     "`route: risk` is not drawn: it reviews first when a PR crosses `pr_agent_risk`",
-    "(changed lines, or the label). scripts/pr-agent-route.sh holds the allowlist of",
+    "(changed lines, or the label). `dotf pr route` holds the allowlist of",
     "Anthropic models CI may spend on, so an edit here cannot route CI onto another.",
     "",
     "Entries are model IDS, not tool names, and that distinction is load-bearing:",
