@@ -5,5 +5,19 @@
     "verification": "cd cli && go test ./internal/tools/ ./internal/cmd/ ./internal/doctor/ -run 'TestInstallUvTool|TestInstallUvTool_MissingUvIsANamedSkip|TestInstall_PlatformsGateIsASkipNotAFailure|TestInstallerPlan|TestInstall_DefaultProbeKeepsAVersionPrintedBeforeAFailingExit|TestLoad_Platforms|TestTheRepoCatalogDeclaresHiveSelfInstalledOnWindows|TestLoad_SelfInstall|TestListAsset|SelfInstall|TestHiveDaemon_NotInstalledFixFollowsTheOS'",
     "state": "passing",
     "evidence": "verification exit 0 (2026-10-22, PR6 #2901: the self_install leg, mutation-checked on the registered-PATH probe and the unreadable-PATH refusal; first measured 2026-10-03). Mutations killed 6/6: the PATH probe for uv-tool, the platforms gate in Install and in Plan, the unknown-platform check, the ==pin in the argv, the Upgraded result"
+  },
+  {
+    "id": "AI-028-hive-install-model-migration-f4",
+    "behavior": "On Windows no setup or converge step infers hive from `uv tool list`: both setups gate the daemon on `dotf tools version hive`, and the script that grepped `uv tool list` is gone",
+    "verification": "bats tests/hive-daemon-gate.bats",
+    "state": "passing",
+    "evidence": "verification exit 0, 2 tests (2026-10-30, on 37ecb8db). The catalog half (no uv copy on Windows) is f8's SelfInstall tests"
+  },
+  {
+    "id": "AI-028-hive-install-model-migration-f9",
+    "behavior": "No timer, task or hook upgrades hive unattended; hive-upgrade-retire removes hive-upgrade.timer, the DotfilesHiveUpgrade task and its script copy from a machine that has them, and a second run changes nothing",
+    "verification": "bats tests/hive-daemon-gate.bats && cd cli && go test ./internal/converge/ -run TestHiveUpgradeRetire",
+    "state": "passing",
+    "evidence": "verification exit 0 (2026-10-30): 2 bats tests, 7 TestHiveUpgradeRetire tests. Live on msi from its converge records: [CHANGE] at 20261025T044811Z, [ OK ] at 20261025T050456Z and 20261026T192529Z (verification.md). The Windows half is unmeasured"
   }
 ]

@@ -158,12 +158,25 @@ So on x64, V2 and V3 flip in one setup run. That job was red for another reason:
 
 The first attempt at 07:10Z failed for an unrelated reason. The guest clock runs 2 hours behind, and registry.npmjs.org's certificate was then under 2 hours old, so all four npm installs failed with `certificate is not yet valid`. The hive rows were the same in that attempt. Filed as #2932; the rerun after the certificate passed 2 hours of age is the run above.
 
+## AC9 on msi (Linux, 2026-10-25)
+
+Measured from msi's converge run records (`~/.local/state/dotfiles/converge/runs/`), read on 2026-10-30. The runs were full `dotf converge` runs on released dotf 0.77.0, the first release carrying the retire step (`git tag --contains ec5170ff`). They were not `--only` runs, and this session did not start them.
+
+| Run | `hive-upgrade-retire` |
+|---|---|
+| `20261025T044811Z` | `[CHANGE] hive-upgrade-retire  687ms  removed: hive-upgrade.timer in /home/manu/.config/systemd/user (hive ADR-020: nothing upgrades hive unattended)` |
+| `20261025T050456Z` | `[ OK ]   hive-upgrade-retire   10ms  no unattended hive upgrade is installed` |
+| `20261026T192529Z` | `[ OK ]   hive-upgrade-retire    9ms  no unattended hive upgrade is installed` |
+
+msi's user journal shows the timer's last run and its stop: `hive-upgrade.service` finished at 22:45:56 local time on 2026-10-24, and `Stopped hive-upgrade.timer` followed at 22:50:12, which is the 04:48Z run. `~/.config/systemd/user/` no longer holds a `hive-upgrade*` unit. The Windows half (the `DotfilesHiveUpgrade` task on the work-lab box, elevated) is still unmeasured.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
 - **Split into AI-028 + AI-029 rather than one ticket** (2026-08-07). The install model and the multi-client registration SSOT are separate failures with separate blast radii; the repo's own precedent is #574 being split out of #551 for atomic-PR discipline.
 - **Resumed and re-scoped, not abandoned** (owner, 2026-10-21). It was triaged as an abandon candidate to free a WIP slot (12 active against ADR-043's 10, with PLAT-005 waiting). Baseline 2 then showed hive is never installed on the Arm64 guest while converge stays green, and that the guest removes the hardware gate that had stalled it. PLAT-005 waits a cycle. *Narrowed the same day:* the diagnostic run (V6) traced the guest's failure to a missing `win_arm64` wheel, so the "every fresh Windows machine" reading that informed the decision holds for Arm64 only. The x64 shape, a uv copy that ADR-019 rules out, is inferred, not measured. RESUME still rests on AC4's uv-on-Windows, AC9 and #1993. The owner re-confirmed it the same day, and decided the three open questions: PR6 is a `hive-self` catalog source, Arm64 is fixed in hive (hive#515), and the retire step is a converge step.
+- **#2956 runs against this model, and is ticketed as #2991** (2026-10-30). It deletes `%LOCALAPPDATA%\hive\bin\hive.cmd` as a "legacy shim" when it shadows a uv copy. That file is the launcher hive ADR-019 makes hive own. Its code is dead for hive in every release that carries it, because `selfInstall` returns before `verifyOnPath`. The harm is in the recovery it suggests: a box that keeps the uv copy at the pin never self-installs. The owner chooses the recovery shape (A/B/C on #2991) before this spec archives.
 - **PR1 sequenced before the model change.** The loud-vs-quiet fix does not depend on resolving the bootstrap question, and it is what makes the next recurrence visible. Shipping it first means the session produces a durable improvement even if the model migration proves deeper than expected.
 
 ## Promotion candidates
