@@ -100,6 +100,18 @@ Decided by the owner on 2026-10-21: a catalog source, as a `self_install` field 
 - [x] Failing test: the not-installed fix follows the OS; Windows never gets `dotf tools install hive` (`TestHiveDaemon_NotInstalledFixFollowsTheOS`, landed in #2869, `c213ae90`). *Superseded by PR6*, where that command installs hive on Windows too
 - [x] `hiveInstallRemedy`: the catalog pin on Linux and macOS, hive's own bootstrap on Windows (#2869, `c213ae90`, closes #2856)
 
+### PR8 — probe only hive's launcher on Windows (AC4, #2991) — added 2026-10-31
+
+Owner: "lo que recomiende el advisor", which was C on #2991. A box holding a `uv tool` hive-vault at the pin never self-installed, because the probe read PATH. #2956 deleted hive's launcher instead.
+
+- [x] Failing tests: a uv copy at the pin with no launcher still self-installs; a launcher at or above the pin is a no-op whatever PATH holds; Linux still reads PATH (`TestInstallUvTool_SelfInstallProbesOnlyTheLauncher`, `TestProbeTool`)
+- [x] `self_install.launcher`, required by `Load`, with `%NAME%` expanded and an unset name read as absent (`TestLoad_SelfInstall`, `TestSelfInstall_LauncherPath`, `TestInstallUvTool_SelfInstallWithAnUnsetLauncherVariable`)
+- [x] `dotf tools version` and the installer share `tools.ProbeTool`. The registered-PATH probe and its refusal are deleted
+- [x] The doctor names a copy outside the launcher's directory, and dotf never removes it (`TestCheckShadowedCatalogTools_NamesACopyBesideASelfInstalledTool`)
+- [x] `legacyshim.go`, its test and the `verifyOnPath` hook are deleted (#2956)
+- [x] ADR-036 amendment 2026-10-31, `docs/architecture.md`, lesson 528
+- [ ] Live: egw-len029 (uv copy at the pin, launcher deleted by hand) converges onto hive's layout with a dotf that carries this PR, and doctor names the uv copy
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

@@ -76,7 +76,7 @@ func newToolsInstallCmd() *cobra.Command {
 // share, so a tool installed by hand runs on the same Python as one converge
 // installed.
 func toolsInstaller(dest string, out io.Writer) *tools.Installer {
-	return &tools.Installer{Dest: dest, Out: out, RegisteredPath: env.RegisteredPath, Python: func() string {
+	return &tools.Installer{Dest: dest, Out: out, Python: func() string {
 		return pinnedPython(env.ResolveVersionsPath(), out)
 	}}
 }
@@ -244,6 +244,18 @@ func listAsset(t tools.Tool, goos, goarch string) string {
 // toolsVersionRunner is the exec seam for `dotf tools version`; tests inject a fake.
 var toolsVersionRunner tools.Runner = tools.ProbeRunner
 
+// versionTool is the catalog entry for name, or a bare tool probed on PATH
+// when the catalog has none or cannot be read: the command answers for any
+// tool, and the catalog only says where a self-installed one lives.
+func versionTool(name string) tools.Tool {
+	if cat, err := loadToolsCatalog(); err == nil {
+		if sel, err := selectTools(cat, name); err == nil && len(sel) == 1 {
+			return sel[0]
+		}
+	}
+	return tools.Tool{Name: name}
+}
+
 func newToolsVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version <name>",
@@ -252,11 +264,13 @@ func newToolsVersionCmd() *cobra.Command {
 			"the one extraction every caller shares, so no script parses version output\n" +
 			"itself (a tool that prints `locked.` is not read as a version).\n" +
 			"Exits 1 with nothing on stdout when the tool is absent or prints no version,\n" +
-			"so a shell caller can test either.",
+			"so a shell caller can test either.\n" +
+			"A catalog tool that installs itself on this OS is probed at the launcher\n" +
+			"it writes, as `dotf tools install` probes it, not on PATH.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			v := tools.ProbeVersion(args[0], toolsVersionRunner)
+			v := tools.ProbeTool(versionTool(args[0]), runtime.GOOS, os.Getenv, toolsVersionRunner)
 			if v == "" {
 				return fmt.Errorf("%s: no version found on PATH", args[0])
 			}
