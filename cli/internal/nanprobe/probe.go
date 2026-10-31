@@ -4,7 +4,7 @@
 // NaN retired `mimo-v2.5` on 2026-09-30 without notice at the call site. For
 // hours it accepted requests and never answered, then it answered 401. Seven
 // files bound it, and it was found because PRs got green review jobs with no
-// review. The PR-path preflight (scripts/pr-agent-model-preflight.sh) skips a
+// review. The PR-path preflight (dotf pr preflight) skips a
 // dead model in one PR's chain; this finds the retirement before any PR does,
 // for every model bound anywhere.
 //

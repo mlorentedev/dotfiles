@@ -10,9 +10,8 @@ import (
 )
 
 // The bats cases of tests/pr-agent-push-gate.bats, ported, plus the edge cases
-// that pin what jq does. gateCases is also the differential test's table, so
-// every case here runs against the script too. What the port does differently
-// on purpose is in TestGate_Divergences, which only this file runs.
+// that pin what jq does. What the port does differently on purpose is in
+// TestGate_Divergences.
 
 const (
 	guideFull        = "## PR Reviewer Guide \xf0\x9f\x94\x8d\n\n<!-- pr-agent:review:full -->\n\nfindings"
@@ -350,8 +349,6 @@ func edgeGateCases() []gateCase {
 		{name: "a threshold of zero always runs", build: bot(guideFull), zero: true},
 	}
 }
-
-func gateCases() []gateCase { return append(portedGateCases(), edgeGateCases()...) }
 
 func runGateCase(t *testing.T, c gateCase) string {
 	t.Helper()

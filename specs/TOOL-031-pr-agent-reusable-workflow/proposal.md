@@ -67,7 +67,7 @@ ADR-042's classes place each piece. No new rule is needed.
 
   A dotf release follows A5, then B (ci-workflows), then C and D (hive). Relief for hive#503 arrives only after the release.
 - **R2: embedded pool versus HARNESS-180.** The owner's 10-18 text names HARNESS-180 as the delivery mechanism. This spec adds `--pool embedded` for consumers that have no file. Each choice is explicit and named in the job summary. The owner reviews it with the criteria. [AGENT-DRAFT — review before archive]
-- **R3: installing `dotf` in CI.** The workflow needs a pinned binary on `ubuntu-latest`. A checksum-verified release download is preferred to `setup-go` plus a build, which would add both to every review. Check `dotf`'s release assets and any installer precedent before PR-B.
+- **R3: installing `dotf` in CI.** The workflow needs a pinned binary on `ubuntu-latest`. A checksum-verified release download is preferred to `setup-go` plus a build, which would add both to every review. Check `dotf`'s release assets and any installer precedent before PR-B. Answered 2026-10-31: v0.77.0 publishes `checksums.txt` and `linux_amd64` archives, so the download works, and ci-workflows' shape test requires it.
 - **R4: `vars.PR_AGENT_PROVIDER` in a called workflow** is not asserted. It becomes a smoke row on hive's first run, and an input if that row fails.
 - **R5: owner actions.**
   - Create the repository: `gh repo create mlorentedev/ci-workflows --public`.
