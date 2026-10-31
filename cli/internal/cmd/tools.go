@@ -277,8 +277,12 @@ func newToolsVersionCmd() *cobra.Command {
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			v := tools.ProbeTool(versionTool(args[0]), toolsVersionGOOS, os.Getenv, toolsVersionRunner)
+			t := versionTool(args[0])
+			v := tools.ProbeTool(t, toolsVersionGOOS, os.Getenv, toolsVersionRunner)
 			if v == "" {
+				if t.Source.SelfInstalls(toolsVersionGOOS) {
+					return fmt.Errorf("%s: no version found at its launcher %s", args[0], t.Source.SelfInstall.Launcher)
+				}
 				return fmt.Errorf("%s: no version found on PATH", args[0])
 			}
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), v)

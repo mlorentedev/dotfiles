@@ -99,4 +99,14 @@ func TestToolsVersion_ReadsASelfInstalledToolAtItsLauncher(t *testing.T) {
 	if err := c.Execute(); err != nil || strings.TrimSpace(out.String()) != "4.4.2" {
 		t.Errorf("tools version hive = %q, %v; want the launcher's 4.4.2", out.String(), err)
 	}
+
+	// Absent, the error names the launcher it read, not PATH it never read.
+	toolsVersionRunner = func(string, ...string) ([]byte, error) { return nil, errors.New("not found") }
+	c = newToolsVersionCmd()
+	c.SetOut(&bytes.Buffer{})
+	c.SetErr(&bytes.Buffer{})
+	c.SetArgs([]string{"hive"})
+	if err := c.Execute(); err == nil || !strings.Contains(err.Error(), "launcher") || strings.Contains(err.Error(), "PATH") {
+		t.Errorf("absent hive: err = %v, want the launcher named and not PATH", err)
+	}
 }
