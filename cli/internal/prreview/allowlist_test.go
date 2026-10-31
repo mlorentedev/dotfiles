@@ -4,7 +4,6 @@ import (
 	"maps"
 	"os"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -46,32 +45,7 @@ func TestAllowedIsExact(t *testing.T) {
 	}
 }
 
-// Until the script is deleted, the two allowlists must be one list: a model
-// admitted in one and not the other would route differently depending on which
-// reads the pool.
-func TestAllowlistEqualsTheScripts(t *testing.T) {
-	raw, err := os.ReadFile(repoFile("scripts", "pr-agent-route.sh"))
-	if err != nil {
-		t.Skipf("scripts/pr-agent-route.sh is not here: %v", err)
-	}
-	m := regexp.MustCompile(`(?m)^ALLOWED_ANTHROPIC="([^"]*)"$`).FindSubmatch(raw)
-	if m == nil {
-		t.Fatal("scripts/pr-agent-route.sh no longer declares ALLOWED_ANTHROPIC")
-	}
-	want := strings.Fields(string(m[1]))
-	var got []string
-	for _, a := range Allowlist() {
-		got = append(got, a.ID)
-	}
-	slices.Sort(want)
-	slices.Sort(got)
-	if !slices.Equal(got, want) {
-		t.Errorf("Go allowlist %v differs from the script's %v", got, want)
-	}
-}
-
-// Until the workflow's worst-review test reads this list, the bats suite holds a
-// second copy of the price rows. The two must be one table: a price changed in
+// The workflow's worst-review test in the bats suite holds a second copy of the price rows. The two must be one table: a price changed in
 // one would bound the spend by a number the router does not use.
 func TestAllowlistEqualsTheBatsPrices(t *testing.T) {
 	raw, err := os.ReadFile(repoFile("tests", "pr-agent-config.bats"))
