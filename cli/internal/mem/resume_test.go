@@ -69,6 +69,28 @@ func TestResumeRendersVerifyAndAwaiting(t *testing.T) {
 	}
 }
 
+// AC2: a thread that carries a field under its canonical label and again under
+// an alias renders both, in both formats (MEMORY-008 review round 6).
+func TestResumeRendersEveryFieldOfALabel(t *testing.T) {
+	text := "### thread: x\n\n**Next action:** n.<br>\n" +
+		"**Verify:** `go test ./a`<br>\n**Verify at start:** `gh pr view 1`<br>\n" +
+		"**Awaiting Manu:** - one<br>\n**Judgment calls left open:** - two<br>\n"
+	for _, format := range []string{"context", "prompt"} {
+		out, err := RenderResume(text, "f", format)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"`go test ./a`", "`gh pr view 1`", "- one", "- two"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: lacks %q:\n%s", format, want, out)
+			}
+		}
+		if n := strings.Count(out, verifyNote); n != 1 {
+			t.Errorf("%s: the note appears %d times, want 1:\n%s", format, n, out)
+		}
+	}
+}
+
 // AC2: a working directory that names no single thread for this agent lists
 // the candidates and picks none.
 func TestResumeListsCandidatesWhenTheThreadIsAmbiguous(t *testing.T) {
