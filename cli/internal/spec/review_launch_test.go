@@ -614,7 +614,8 @@ func TestReviewPromptStatesTheInitialScope(t *testing.T) {
 	}
 }
 
-// An ordinary scope must leave the existing prompt byte-for-byte unchanged.
+// An ordinary scope must produce the same prompt through both entry points,
+// and keep its triple-dot diff.
 func TestReviewPromptKeepsTheTripleDotScopeForAnOrdinaryBase(t *testing.T) {
 	scoped := ReviewPromptForScope(FirstSigner, "AI-001-x", "/repo", "nan/x", "pi", "/skill.md", ReviewScope{BaseSHA: "basebasebase"})
 	plain := ReviewPromptIn(FirstSigner, "AI-001-x", "/repo", "nan/x", "pi", "/skill.md", "basebasebase")
