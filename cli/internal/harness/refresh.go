@@ -1,7 +1,6 @@
 package harness
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -26,7 +25,7 @@ import (
 // Whether the vault is current enough to refresh from is the caller's question
 // (`dotf harness refresh`, #2162); this reads whatever vault it is given.
 func Refresh(repoRoot, vault string) ([]string, error) {
-	m, err := loadRefreshManifest(repoRoot)
+	m, err := loadCheckManifest(repoRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func Refresh(repoRoot, vault string) ([]string, error) {
 // and every target file. The caller guards them for uncommitted work and
 // reports what the refresh changed in them.
 func RefreshPaths(repoRoot string) ([]string, error) {
-	m, err := loadRefreshManifest(repoRoot)
+	m, err := loadCheckManifest(repoRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -84,38 +83,6 @@ func RefreshPaths(repoRoot string) ([]string, error) {
 		paths = append(paths, t.File)
 	}
 	return paths, nil
-}
-
-type recordKind struct {
-	VaultSubpath string `json:"vault_subpath"`
-	RecordDir    string `json:"record_dir"`
-	Schema       string `json:"schema"`
-}
-
-type refreshManifest struct {
-	VaultSubpath string `json:"vault_subpath"`
-	Enforced     []struct {
-		ID     string `json:"id"`
-		Source string `json:"source"`
-	} `json:"enforced"`
-	Targets []struct {
-		File   string   `json:"file"`
-		Inject []string `json:"inject"`
-	} `json:"targets"`
-	Skills *recordKind `json:"skills"`
-	Agents *recordKind `json:"agents"`
-}
-
-func loadRefreshManifest(repoRoot string) (*refreshManifest, error) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(ManifestFile))) //nolint:gosec // repo-relative, fixed name
-	if err != nil {
-		return nil, fmt.Errorf("manifest not found: %w", err)
-	}
-	var m refreshManifest
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", ManifestFile, err)
-	}
-	return &m, nil
 }
 
 // checkTriggerPatterns refuses a refresh while harness/triggers.json names a

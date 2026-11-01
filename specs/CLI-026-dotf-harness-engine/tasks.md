@@ -61,9 +61,16 @@ created: "2026-06-21"
 
 ## Slice 7 — `refresh` in Go and deletion (AC7, AC9)
 
+> Split 2026-11-01 into three PRs, because the render, the vault compare and the deletion are three reviews:
+> 7a renders in Go with the script kept as its oracle, 7b makes `--against-vault` compare renders, 7c deletes.
+> 7a is over the executable-line cap with no functional seam (declared on its PR). 7c touches `ci.yml` and the
+> harness schemas, so the owner lands it.
+
 - [x] Render half of `--refresh` in Go behind the existing gate (`harness.Refresh`, `tests/harness-refresh-parity.bats`); every check runs before the first write, and the dirty-paths guard reads the manifest's targets (lesson 529)
   - [ ] With the render in Go, `--against-vault` also renders each vault source and compares it with the committed record, so a record edited without its vault source is caught before a refresh reverts it (the other half of #1545; the stamp compare sees only the vault side)
 - [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
+  - [ ] The five `harness-*-parity.bats` oracles go with the script; `harness-doctrine-records.bats` and `harness-refresh-announce.bats` move to `dotf harness refresh --vault`
+  - [ ] Before closing #2884 with it, each of its three cases has a Go-side test, or gets one here
   - [ ] Close #1733 with it: the shell render is the last reader of `targets:` by substring, and the deploy and doctor already use `harness.SkillTargetsAgent`
 
 ## Closing

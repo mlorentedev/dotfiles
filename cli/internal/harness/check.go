@@ -25,8 +25,10 @@ type CheckLine struct {
 
 // checkManifest is the part of the manifest the check reads.
 type checkManifest struct {
-	Enforced []struct {
+	VaultSubpath string `json:"vault_subpath"`
+	Enforced     []struct {
 		ID     string            `json:"id"`
+		Source string            `json:"source"`
 		OptOut map[string]string `json:"opt_out"`
 	} `json:"enforced"`
 	Targets []struct {
@@ -36,16 +38,28 @@ type checkManifest struct {
 	Doctrine *struct {
 		Inject []string `json:"inject"`
 	} `json:"doctrine"`
-	Skills *struct {
-		VaultSubpath string `json:"vault_subpath"`
-		RecordDir    string `json:"record_dir"`
-		Schema       string `json:"schema"`
-	} `json:"skills"`
-	Agents *struct {
-		VaultSubpath string `json:"vault_subpath"`
-		RecordDir    string `json:"record_dir"`
-		Schema       string `json:"schema"`
-	} `json:"agents"`
+	Skills *recordKind `json:"skills"`
+	Agents *recordKind `json:"agents"`
+}
+
+// recordKind is a manifest's skills or agents block: where the vault keeps the
+// sources, where the checkout keeps the records, and the schema they meet.
+type recordKind struct {
+	VaultSubpath string `json:"vault_subpath"`
+	RecordDir    string `json:"record_dir"`
+	Schema       string `json:"schema"`
+}
+
+func loadCheckManifest(repoRoot string) (*checkManifest, error) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(ManifestFile))) //nolint:gosec // repo-relative, fixed name
+	if err != nil {
+		return nil, fmt.Errorf("manifest not found: %w", err)
+	}
+	var m checkManifest
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", ManifestFile, err)
+	}
+	return &m, nil
 }
 
 // doctrineSurface is the coverage surface name of doctrine.inject.
@@ -55,15 +69,11 @@ const doctrineSurface = "doctrine"
 // coverage, then each target region, then the skill and agent records. Drift is
 // any line with Problem set; an error means the manifest could not be read.
 func CheckDrift(repoRoot string) ([]CheckLine, error) {
-	raw, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(ManifestFile))) //nolint:gosec // repo-relative, fixed name
+	m, err := loadCheckManifest(repoRoot)
 	if err != nil {
-		return nil, fmt.Errorf("manifest not found: %w", err)
+		return nil, err
 	}
-	var m checkManifest
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", ManifestFile, err)
-	}
-	out := checkCoverage(&m)
+	out := checkCoverage(m)
 	for _, t := range m.Targets {
 		out = append(out, checkTarget(repoRoot, t.File, t.Inject))
 	}
