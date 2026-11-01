@@ -404,7 +404,7 @@ func TestTheRepoCatalogDeclaresGiteaTeaWithoutApt(t *testing.T) {
 // refusal is a catalog that would install something other than the pin, or
 // nothing, without saying so.
 func TestLoad_SelfInstall(t *testing.T) {
-	const ok = `{"tools":[{"name":"hive","version":"4.4.1","profile":"full","source":{"type":"uv-tool","package":"hive-vault","self_install":{"platforms":["windows"],"args":["self-upgrade","{version}"]}}}]}`
+	const ok = `{"tools":[{"name":"hive","version":"4.4.1","profile":"full","source":{"type":"uv-tool","package":"hive-vault","self_install":{"platforms":["windows"],"args":["self-upgrade","{version}"],"launcher":"%LOCALAPPDATA%\\hive\\bin\\hive.cmd"}}}]}`
 	c, err := Load(writeCatalog(t, ok))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -423,7 +423,10 @@ func TestLoad_SelfInstall(t *testing.T) {
 		"no args":             {`"args":["self-upgrade","{version}"]`, `"args":[]`, "args"},
 		"a misspelt platform": {`["windows"]`, `["win"]`, "win"},
 		"no platform":         {`"platforms":["windows"],`, ``, "platforms"},
-		"not a uv tool":       {`"type":"uv-tool"`, `"type":"npm"`, "uv-tool"},
+		// Without it the probe has nowhere to look but PATH, where a uv copy
+		// answers for an install that never happened (#2991).
+		"no launcher":   {`,"launcher":"%LOCALAPPDATA%\\hive\\bin\\hive.cmd"`, ``, "launcher"},
+		"not a uv tool": {`"type":"uv-tool"`, `"type":"npm"`, "uv-tool"},
 		// The entry's own platforms exclude the OS, so the field never runs.
 		// An empty name would reach uv as a bare --no-build-package.
 		"an empty no_build name": {`"args":`, `"no_build":[""],"args":`, "no_build"},
@@ -438,5 +441,18 @@ func TestLoad_SelfInstall(t *testing.T) {
 				t.Errorf("Load = %v, want an error naming %q", err, tc.want)
 			}
 		})
+	}
+}
+
+// The launcher expands %NAME% from the environment, and a name that is unset
+// leaves no path at all rather than a guess.
+func TestSelfInstall_LauncherPath(t *testing.T) {
+	si := SelfInstall{Launcher: `%LOCALAPPDATA%\hive\bin\hive.cmd`}
+	env := map[string]string{"LOCALAPPDATA": `C:\Users\u\AppData\Local`}
+	if got, want := si.LauncherPath(func(k string) string { return env[k] }), `C:\Users\u\AppData\Local\hive\bin\hive.cmd`; got != want {
+		t.Errorf("LauncherPath = %q, want %q", got, want)
+	}
+	if got := si.LauncherPath(func(string) string { return "" }); got != "" {
+		t.Errorf("LauncherPath with LOCALAPPDATA unset = %q, want \"\"", got)
 	}
 }

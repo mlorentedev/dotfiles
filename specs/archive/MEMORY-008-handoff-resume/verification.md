@@ -111,10 +111,10 @@ Each slice PR fills its own section below and nothing else.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/MEMORY-008-handoff-resume/` -> `specs/archive/MEMORY-008-handoff-resume/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/MEMORY-008-handoff-resume/` -> `specs/archive/MEMORY-008-handoff-resume/`
 - [ ] Bitácora board ticket moved to Done / closed with the closing PR (ADR-018)
-- [ ] Promotions above executed
+- [x] Promotions above executed
 
 ## Slice 4 evidence
 
@@ -260,3 +260,14 @@ The sixth review (`review-round-6.md`, at `0ecee6e3`, nan/deepseek-v4-flash) ret
 | q-3: the launcher's base range spans 811 commits | **Recorded**, harness-owned, as in round 1 | n/a |
 
 Mutation, reverted: `All` cut to its first value turns `TestResumeRendersEveryFieldOfALabel` red on four assertions.
+
+### Review round 7 (PASS)
+
+The seventh review (`review.md`, at `b08c8665`, nan/glm5.3-flash) returned PASS: no Blocker, no REAL Major.
+
+| Finding | Disposition |
+|---|---|
+| Minor (THEORETICAL): `deriveEntry` counts `Awaiting Manu` from the first field, so the alias pair undercounts in the MEMORY.md entry | **Ticketed**, #3009 |
+| Minor (SPECULATIVE): `ThreadWarnings` reads `Next action` from the first field | **Ticketed**, #3009 |
+| Question: a live `source=compact` payload never observed | **Carried**: observe on the next real compaction, and ticket if the hook does not fire |
+| Question: ticket states unverifiable (API rate limit) | Re-checked at archive: #2915 is closed; #3002, #3003 and #3009 are open |

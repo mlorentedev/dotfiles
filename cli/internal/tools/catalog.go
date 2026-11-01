@@ -113,10 +113,34 @@ type Source struct {
 // resolves them before the tool starts, so the tool's own guard cannot reach
 // them (hive#523: cryptography has no win_arm64 wheel, and its build needs a
 // linker a fresh Windows does not have).
+// Launcher is the file the tool writes as its entry point, the one place the
+// install is probed (ADR-036 PR6 rule 3). %NAME% expands from the environment.
+// A copy elsewhere on PATH, such as a `uv tool` one, is not the tool's install
+// and never answers for it (#2991).
 type SelfInstall struct {
 	Platforms []string `json:"platforms"`
 	Args      []string `json:"args"`
 	NoBuild   []string `json:"no_build,omitempty"`
+	Launcher  string   `json:"launcher"`
+}
+
+// launcherVarRE matches a %NAME% reference in a self_install launcher.
+var launcherVarRE = regexp.MustCompile(`%([A-Za-z_][A-Za-z0-9_]*)%`)
+
+// LauncherPath expands the launcher's %NAME% references through getenv. It is
+// "" when any of them is unset: a guessed path could find nothing and read an
+// installed tool as absent, or find another file and read it as installed.
+func (si SelfInstall) LauncherPath(getenv func(string) string) string {
+	unset := false
+	p := launcherVarRE.ReplaceAllStringFunc(si.Launcher, func(ref string) string {
+		v := getenv(ref[1 : len(ref)-1])
+		unset = unset || v == ""
+		return v
+	})
+	if unset {
+		return ""
+	}
+	return p
 }
 
 // SelfInstalls reports whether the source installs itself on goos.
@@ -144,6 +168,9 @@ func validateSelfInstall(t Tool) error {
 	}
 	if len(si.Args) == 0 {
 		return fmt.Errorf("tool %q: self_install declares no args", t.Name)
+	}
+	if si.Launcher == "" {
+		return fmt.Errorf("tool %q: self_install declares no launcher, so nothing says where the install is probed", t.Name)
 	}
 	if slices.Contains(si.NoBuild, "") {
 		return fmt.Errorf("tool %q: self_install no_build lists an empty package name", t.Name)

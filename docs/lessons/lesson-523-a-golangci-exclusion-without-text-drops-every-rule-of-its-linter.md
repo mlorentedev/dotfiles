@@ -1,5 +1,5 @@
 ---
-id: "lesson-522-a-golangci-exclusion-without-text-drops-every-rule-of-its-linter"
+id: "lesson-523-a-golangci-exclusion-without-text-drops-every-rule-of-its-linter"
 type: lesson
 status: active
 title: "A golangci exclusion without text drops every rule of its linter"

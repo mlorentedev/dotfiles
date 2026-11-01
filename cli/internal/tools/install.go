@@ -179,11 +179,6 @@ type Installer struct {
 	// so the first is the one that answers. Nil means a scan of $PATH; tests
 	// inject the machine's answer.
 	PathCopies func(name string) []string
-	// RegisteredPath is the PATH Windows hands a new process (env.RegisteredPath):
-	// the machine's and the user's registry Path, expanded. A self-installing
-	// tool writes its launcher dir to the user's, which this process's PATH
-	// predates, so its probe reads both. Nil means the process PATH alone.
-	RegisteredPath func() ([]string, error)
 }
 
 func (in *Installer) defaults() {
@@ -231,8 +226,8 @@ func (in *Installer) defaults() {
 // current resolves the installed version of t, dispatching the default probe by
 // source type when CurrentVersion is not injected: a github-release tool is
 // probed at Dest/<bin> (where the installer places it), an npm or uv tool on
-// PATH (where npm/scoop/choco place globals and uv links its tools). "" means
-// absent/unparseable.
+// PATH (where npm/scoop/choco place globals and uv links its tools), and a
+// self-installing one at its launcher (ProbeTool). "" means absent/unparseable.
 func (in *Installer) current(t Tool) string {
 	if t.Source.Type == "system" {
 		// Presence, not a version: the pin seams do not apply (see system.go).
@@ -242,30 +237,9 @@ func (in *Installer) current(t Tool) string {
 		return in.CurrentVersion(t.Name)
 	}
 	if t.Source.Type == "npm" || t.Source.Type == "uv-tool" {
-		if v := in.pathVersion(t.Name); v != "" || !t.Source.SelfInstalls(in.GOOS) {
-			return v
-		}
-		return in.registeredVersion(t.Name)
+		return ProbeTool(t, in.GOOS, os.Getenv, in.Probe)
 	}
 	return in.installedVersion(t.Name)
-}
-
-// registeredVersion probes the first copy of name on the registered PATH.
-// Missing it would read an installed tool as absent, and a self install below
-// the version that is there downgrades it (`hive self-upgrade <older>` does).
-func (in *Installer) registeredVersion(name string) string {
-	if in.RegisteredPath == nil {
-		return ""
-	}
-	dirs, err := in.RegisteredPath()
-	if err != nil {
-		return "" // refusal reports it, so the install never acts on this answer
-	}
-	copies := copiesOnPath(name, in.GOOS, strings.Join(dirs, string(os.PathListSeparator)), os.Getenv("PATHEXT"))
-	if len(copies) == 0 {
-		return ""
-	}
-	return ProbeVersion(copies[0], in.Probe)
 }
 
 // Install converges the tool to its pinned version, dispatching on source type.
@@ -352,13 +326,6 @@ func (in *Installer) refusal(t Tool) string {
 	case "npm", "uv-tool":
 		if t.Source.Package == "" {
 			return t.Source.Type + " source declares no package"
-		}
-		// An unreadable registered PATH could hold a copy above the pin, which
-		// the self install would downgrade: refuse rather than read it as absent.
-		if t.Source.SelfInstalls(in.GOOS) && in.RegisteredPath != nil {
-			if _, err := in.RegisteredPath(); err != nil {
-				return "cannot read the registered PATH (" + err.Error() + "), where an installed " + t.Name + " may be; refusing a self install that could downgrade it"
-			}
 		}
 	}
 	return ""
@@ -579,7 +546,11 @@ func (in *Installer) selfInstall(t Tool, act action) (Result, error) {
 		return Skipped, fmt.Errorf("%s: uv %s: %w", t.Name, strings.Join(args, " "), err)
 	}
 	self := t.Name + " " + strings.Join(selfArgs, " ")
-	if err := checkProbed(t, in.current(t), self+" exited 0, but "+t.Name+" runs from neither this process's PATH nor the registered PATH a new shell reads (the per-user PATH it writes its launcher to)"); err != nil {
+	launcher := t.Source.SelfInstall.LauncherPath(os.Getenv)
+	if launcher == "" {
+		launcher = t.Source.SelfInstall.Launcher + ", which names an unset variable"
+	}
+	if err := checkProbed(t, in.current(t), self+" exited 0, but the launcher it writes does not run: "+launcher); err != nil {
 		return Skipped, err
 	}
 	res := Installed
@@ -597,15 +568,6 @@ func (in *Installer) skipMissingManager(t Tool) bool {
 		_, _ = fmt.Fprintf(in.Out, "%s: %s is not on PATH; skipping (the next run installs it once %s is there)\n", t.Name, manager, manager)
 	}
 	return manager != ""
-}
-
-// pathVersion is the npm default version probe: `<name> --version`, resolving
-// the binary on PATH (where npm/scoop/choco place globals — not in Dest). It
-// shares ProbeVersion with `dotf tools version` and the doctor, so all three
-// agree on what is installed. "" means absent or unparseable, which
-// decideAction treats as below the pin.
-func (in *Installer) pathVersion(name string) string {
-	return ProbeVersion(name, in.Probe)
 }
 
 // fetchVerifyPlace runs the download → verify → place pipeline and returns res
@@ -684,19 +646,6 @@ func (in *Installer) verifyOnPath(t Tool, manager string) error {
 		return err
 	}
 	copies := in.PathCopies(t.Name)
-	moved, rerr := retireLegacyShims(t.Name, copies)
-	if rerr != nil {
-		return fmt.Errorf("%w; %v", err, rerr)
-	}
-	if len(moved) > 0 {
-		if checkProbed(t, in.current(t), absent) == nil {
-			dropShims(moved)
-			_, _ = fmt.Fprintf(in.Out, "%s: removed the legacy launcher that shadowed the %s install\n", t.Name, manager)
-			return nil
-		}
-		restoreShims(moved)
-		copies = in.PathCopies(t.Name)
-	}
 	switch len(copies) {
 	case 0:
 		return err

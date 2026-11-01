@@ -82,13 +82,20 @@ review, not per merge.
 
 ### A5. D: the workflow switches (one PR)
 
-- [ ] [AC3] `tests/pr-agent-config.bats`, test first:
+- [x] [AC3] `tests/pr-agent-config.bats`, test first:
   - no `./scripts/pr-agent-*` invocation remains;
   - the job builds `dotf` from the PR head before the first decision;
   - the output names are unchanged.
 
   Expected: FAIL.
-- [ ] [AC3] Change `.github/workflows/pr-agent.yml` (PASS), then delete the four scripts and their bats suites
+- [x] [AC3] Change `.github/workflows/pr-agent.yml` (PASS), then delete the four scripts and their bats suites
+  - The sparse checkout is `harness/reviewer-pool.json` and `cli/`, and `setup-go`
+    with `go build` puts `dotf` on `GITHUB_PATH` before the first decision. The
+    job timeout rises from 32 to 34 minutes for that build.
+  - The differential tests go with the scripts. The gate's edge cases survive in
+    `gate_edge_test.go`; route, preflight and guard keep their ported unit tests.
+  - `pr-agent-config.bats` reads `guard.go`, `allowlist.go` and the timeout
+    constants where it read the scripts. The rules it pins are unchanged.
 - [ ] [AC3] Make one live run on a PR that changes a weight and link it in `verification.md`
 - [ ] Release: the owner merges the release-please PR, which ships `dotf pr …` in a tagged version
 
