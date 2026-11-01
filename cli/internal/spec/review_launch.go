@@ -345,7 +345,8 @@ func writeReviewScope(b *strings.Builder, scope ReviewScope) {
 			"WHOLE change, not the delta since any previous review round — a late fix has to be\n"+
 			"judged against the early ones it may interact with. If the branch merged main after\n"+
 			"that base, the range also holds other work that arrived through the merge:\n"+
-			"`git log --first-parent --no-merges %s..HEAD` lists the commits this branch authored.\n"+
+			"`git log --first-parent --no-merges %s..HEAD` lists the commits made on the branch\n"+
+			"itself, not those a merge brought in (a sub-branch merged into it is a merge too).\n"+
 			"Judge what the spec names first, and the rest only where it interacts.\n\n", scope.BaseSHA, scope.BaseSHA)
 	}
 }
