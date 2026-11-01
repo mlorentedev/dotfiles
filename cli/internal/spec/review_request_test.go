@@ -496,3 +496,33 @@ func TestProvenanceAcceptsAnInitialScope(t *testing.T) {
 		t.Fatalf("a launcher-written initial scope with a fresh verdict must pass: %v", err)
 	}
 }
+
+// #3019: the scope check is slot-generic, so the second signer's request is
+// held to it too, and a refusal names that slot's own files.
+func TestProvenanceChecksTheInitialScopeInTheSecondSlot(t *testing.T) {
+	seed := func(t *testing.T, scope ReviewScope) string {
+		t.Helper()
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, SecondSigner.Review), []byte("old content"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := WriteReviewRequestScoped(dir, SecondSigner, launchedSHA, "nan/deepseek-v4-flash", scope, ""); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, SecondSigner.Review), []byte(provenanceReviewDoc), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+
+	ok := seed(t, ReviewScope{BaseTree: initialTree, RootSHA: initialRoot})
+	if err := checkReviewProvenanceIn(ok, SecondSigner, launchedReview); err != nil {
+		t.Fatalf("a launcher-written initial scope in the second slot must pass: %v", err)
+	}
+
+	bad := seed(t, ReviewScope{BaseTree: initialTree})
+	err := checkReviewProvenanceIn(bad, SecondSigner, launchedReview)
+	if err == nil || !strings.Contains(err.Error(), SecondSigner.Request) || !strings.Contains(err.Error(), "--initial --second") {
+		t.Fatalf("an initial scope without its root must be refused in the second slot's terms, got %v", err)
+	}
+}

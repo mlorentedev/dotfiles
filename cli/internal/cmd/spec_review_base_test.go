@@ -200,3 +200,59 @@ func TestRecordReviewRequestWritesTheInitialScope(t *testing.T) {
 		t.Errorf("the request does not record the initial scope: %+v", req)
 	}
 }
+
+// launchInitialForeground runs `spec review --initial` with the runner stubbed
+// out and returns the request the given slot ended up with.
+func launchInitialForeground(t *testing.T, root string, slot spec.ReviewSlot, args ...string) spec.ReviewRequest {
+	t.Helper()
+	withReviewBase(t, spec.ReviewBase{Refusal: spec.BaseRootCommit, RootSHA: "rootrootroot"}, "headheadhead")
+	withEmptyTree(t, "treetreetree")
+	prev := runForeground
+	runForeground = func(string, []string, string) error { return nil }
+	t.Cleanup(func() { runForeground = prev })
+
+	// The stub writes no verdict, so the launch ends refused for that and only
+	// that; any earlier refusal would mean the request was never written.
+	argv := append([]string{"spec", "review", "AI-001-x", "--initial", "--foreground"}, args...)
+	if stdout, stderr, err := execute(t, argv...); err != nil && !strings.Contains(err.Error(), "exited without writing "+slot.Review) {
+		t.Fatalf("%v: %v\n%s", argv, err, stdout+stderr)
+	}
+	req, found, err := spec.ReadReviewRequestIn(filepath.Join(root, "specs", "AI-001-x"), slot)
+	if err != nil || !found {
+		t.Fatalf("no %s was written: found=%v err=%v", slot.Request, found, err)
+	}
+	if req.Scope != spec.ScopeInitial || req.RootSHA != "rootrootroot" || req.BaseTree != "treetreetree" || req.BaseSHA != "" {
+		t.Errorf("%s does not record the initial scope: %+v", slot.Request, req)
+	}
+	return req
+}
+
+// #3019: the second slot writes its request through the same scoped writer, so
+// an initial second signature must record the initial scope in its own file.
+func TestSpecReviewInitialSecondRecordsTheInitialScope(t *testing.T) {
+	root := makeRepo(t)
+	seedSignerPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\nrisk: high\n---\n# AI-001-x\n")
+	specDir := filepath.Join(root, "specs", "AI-001-x")
+	first := spec.ReviewScope{BaseTree: "treetreetree", RootSHA: "rootrootroot"}
+	if err := spec.WriteReviewRequestScoped(specDir, spec.FirstSigner, "headheadhead", "nan/deepseek-v4-flash", first, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	req := launchInitialForeground(t, root, spec.SecondSigner, "--second")
+	if req.Reviewer != "anthropic-review/claude-sonnet-5-5" {
+		t.Errorf("the second slot did not launch the second signer: %+v", req)
+	}
+}
+
+// #3019: a fallback launch records its reason and the initial scope together.
+func TestSpecReviewInitialFallbackRecordsTheInitialScopeAndItsReason(t *testing.T) {
+	root := makeRepo(t)
+	seedSignerPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+
+	req := launchInitialForeground(t, root, spec.FirstSigner, "--fallback-reason", "rate-limit")
+	if req.Reviewer != "anthropic-review/claude-haiku-5-5" || req.FallbackReason != "rate-limit" {
+		t.Errorf("want the fallback and its reason recorded with the initial scope, got %+v", req)
+	}
+}
