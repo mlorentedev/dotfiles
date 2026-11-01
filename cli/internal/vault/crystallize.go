@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/fsread"
 	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
 )
 
@@ -383,7 +384,7 @@ func CrystallizeAll(w io.Writer, home, today string) error {
 	emit(w, "[INFO] Discovering all projects in %s...\n", projectsDir)
 	emit(w, "\n")
 
-	matches, unreadable, err := childFiles(projectsDir, filepath.Join("memory", "MEMORY.md"))
+	matches, unreadable, err := fsread.ChildFiles(projectsDir, filepath.Join("memory", "MEMORY.md"))
 	if err != nil {
 		return fmt.Errorf("discovering projects: %w", err)
 	}
