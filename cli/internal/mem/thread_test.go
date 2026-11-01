@@ -134,9 +134,8 @@ func TestThreadReadersTakeEveryFieldUnderALabel(t *testing.T) {
 	if !strings.Contains(entry, "**Next action:** n.") {
 		t.Errorf("a blank first Next action hid the second:\n%s", entry)
 	}
-	for _, w := range ThreadWarnings(body) {
-		if strings.Contains(w, "no Next action") {
-			t.Errorf("warned about a Next action the body carries: %q", w)
-		}
+	// Every label in the body is canonical or an alias, so nothing is warned.
+	if w := ThreadWarnings(body); len(w) != 0 {
+		t.Errorf("want no warning for a body that carries a Next action, got %q", w)
 	}
 }
