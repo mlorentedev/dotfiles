@@ -177,10 +177,10 @@ jobs:
     # measurements and the final guard after them (each up to three API calls with
     # retry sleeps). The second attempt runs only when the first published nothing
     # (AI-045 AC9), so a day without trouble holds the one-at-a-time lane no
-    # longer than before. The sum is 31 minutes, and the bound exceeds it rather
+    # longer than before. The sum is 33 minutes, two of them building dotf, and the bound exceeds it rather
     # than equals it (AC7), so a probe that runs to its last second still leaves
     # the final guard time to report.
-    timeout-minutes: 32
+    timeout-minutes: 34
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
@@ -350,24 +350,34 @@ jobs:
           else
             echo "reviewable=true" >> "$GITHUB_OUTPUT"
           fi
-      # The job has no full checkout: only the scripts that decide whether
-      # PR-Agent runs (TOOL-023's push gate), on which model (AI-045's
-      # preflight and the pool draw), and whether it published (the guard,
-      # which also gates the second attempt), plus the pool whose weights the
-      # draw reads. They are fetched from the PR's merge ref, the same
-      # trust as this workflow file, and forks never reach this job.
-      - name: Check out the reviewer's scripts
+      # The job has no full checkout: only dotf's source, whose `dotf pr` verbs
+      # decide whether PR-Agent runs (TOOL-023's push gate), on which model
+      # (AI-045's preflight and the pool draw), and whether it published (the
+      # guard, which also gates the second attempt), plus the pool whose weights
+      # the draw reads. They are fetched from the PR's merge ref, the same trust
+      # as this workflow file, and forks never reach this job.
+      - name: Check out dotf and the pool
         if: steps.reviewable.outputs.reviewable != 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: |
             harness/reviewer-pool.json
-            scripts/pr-agent-push-gate.sh
-            scripts/pr-agent-model-preflight.sh
-            scripts/pr-agent-route.sh
-            scripts/pr-agent-publish-guard.sh
+            cli/
           sparse-checkout-cone-mode: false
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        if: steps.reviewable.outputs.reviewable != 'false'
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      # Built from the PR, not a release, so a PR that changes a decision runs
+      # its own version (TOOL-031). A consumer installs a pinned release instead.
+      - name: Build dotf
+        if: steps.reviewable.outputs.reviewable != 'false'
+        working-directory: cli
+        run: |
+          go build -o "$RUNNER_TEMP/bin/dotf" ./cmd/dotf
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       # TOOL-023: the push gate decides BEFORE PR-Agent starts. A push PR-Agent
       # skipped would publish nothing, and the guard below would read that as a
       # failed inference.
@@ -389,13 +399,13 @@ jobs:
             | jq -s 'add // []' > "$dir/comments.json" || rm -f "$dir/comments.json"
           gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/commits" --paginate \
             | jq -s 'add // []' > "$dir/commits.json" || rm -f "$dir/commits.json"
-          ./scripts/pr-agent-push-gate.sh --comments "$dir/comments.json" \
+          dotf pr gate --comments "$dir/comments.json" \
             --commits "$dir/commits.json" --sender-type "${SENDER_TYPE}" | tee -a "$GITHUB_OUTPUT"
       # AI-045: ask NaN which model of the declared chain answers, BEFORE the
       # review. NaN retired mimo-v2.5 on 2026-09-30. It first hung, so PR-Agent
       # published nothing and the job still went green, then it answered 401.
       # PR-Agent's own fallback catches a refusal but not a hang, and neither
-      # case tells anyone the declared model is dead. The script probes each
+      # case tells anyone the declared model is dead. `dotf pr preflight` probes each
       # model once, passes on the ones that answer, in declared order, and names
       # every one that did not in a warning and in the job summary. It never
       # admits a model outside the chain; the draw below picks among the rest.
@@ -420,7 +430,7 @@ jobs:
         # continue-on-error leaves only `outcome`, which is `failure` for both.
         run: |
           rc=0
-          ./scripts/pr-agent-model-preflight.sh --model "${DECLARED_MODEL}" \
+          dotf pr preflight --model "${DECLARED_MODEL}" \
             --fallbacks "${DECLARED_FALLBACK_MODELS}" --output "$GITHUB_OUTPUT" || rc=$?
           echo "exit=${rc}" >> "$GITHUB_OUTPUT"
           exit "$rc"
@@ -434,8 +444,8 @@ jobs:
       # second attempt, which runs only on a measured absence of a published
       # review. `vars.PR_AGENT_PROVIDER` overrides the draw (draw, nan,
       # anthropic, nan-only); `nan-only` stops all spending on the Anthropic key
-      # without a PR. The script's header has the rules, including the
-      # allowlist of Anthropic models; the job summary names the member drawn.
+      # without a PR. `dotf pr route --help` has the rules, and
+      # cli/internal/prreview/allowlist.go the allowlist of Anthropic models; the job summary names the member drawn.
       #
       # The size and labels are read here rather than from the event, because
       # an `issue_comment` event carries neither. A failed read leaves them
@@ -465,7 +475,7 @@ jobs:
             PR_CHANGED_LINES="" PR_LABELS="[]"
           fi
           export PR_CHANGED_LINES PR_LABELS
-          ./scripts/pr-agent-route.sh --output "$GITHUB_OUTPUT"
+          dotf pr route --pool harness/reviewer-pool.json --output "$GITHUB_OUTPUT"
       # The Anthropic attempt. It appears twice, first and second, because steps
       # cannot be reordered at run time; a test holds the two identical.
       # Everything that shapes its cost is stated here and pinned by tests,
@@ -475,7 +485,7 @@ jobs:
       #   with no fallback chain: Haiku when drawn, Sonnet on the risk route.
       #   The API key cannot be restricted to a model in the Claude Console
       #   (workspaces carry spend and rate limits, not an allowlist), so the
-      #   allowlist is ALLOWED_ANTHROPIC in scripts/pr-agent-route.sh, which
+      #   allowlist is in cli/internal/prreview/allowlist.go, which
       #   fails the draw on any other model, and the test that pins it. Haiku
       #   5.5 costs $0.10 / $0.50 per million input / output tokens for prompts
       #   up to 100,000 tokens, and five times that above it; Sonnet 5.5 costs
@@ -579,7 +589,7 @@ jobs:
           BASE_REF: ${{ github.event.repository.default_branch }}
           STARTED: ${{ steps.start.outputs.started }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
-        run: ./scripts/pr-agent-publish-guard.sh --probe --output "$GITHUB_OUTPUT"
+        run: dotf pr guard --probe --output "$GITHUB_OUTPUT"
       - name: PR-Agent
         id: pr_agent
         if: >
@@ -740,7 +750,7 @@ jobs:
           BASE_REF: ${{ github.event.repository.default_branch }}
           STARTED: ${{ steps.start.outputs.started }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
-        run: ./scripts/pr-agent-publish-guard.sh --probe --output "$GITHUB_OUTPUT"
+        run: dotf pr guard --probe --output "$GITHUB_OUTPUT"
       # The Anthropic attempt again, second this time; see its first copy above.
       - name: PR-Agent on Anthropic, after NaN published nothing
         id: pr_agent_anthropic_second
@@ -780,8 +790,8 @@ jobs:
           github_action_config.auto_improve: "false"
           github_action_config.fail_on_tool_errors: "true"
       # A review that did not happen must not report success (#1107). The logic
-      # lives in scripts/pr-agent-publish-guard.sh, which the probe above shares,
-      # so "published" has one definition; its header records the bindings
+      # lives in `dotf pr guard`, which the probe above shares, so "published"
+      # has one definition; cli/internal/prreview/guard.go records the bindings
       # (author, start stamp, marker from the default branch) and why each exists.
       #
       # `fallback_models` names a second NaN model for CONCURRENCY (per-model
@@ -828,4 +838,4 @@ jobs:
           # A failed draw writes no outputs, so every attempt reads skipped; this
           # tells that apart from a pool where no member answered.
           ROUTE_OUTCOME: ${{ steps.route.outcome }}
-        run: ./scripts/pr-agent-publish-guard.sh
+        run: dotf pr guard

@@ -3,8 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -22,13 +20,13 @@ func newMemResumeCmd() *cobra.Command {
 		Short: "Render this checkout's handoff thread for the next session",
 		Long: `resume renders one handoff thread: the thread file a MEMORY.md entry points at,
 or the inline block an older release wrote. The output depends only on that
-text, so two runs print the same bytes.
+text and the path it was read from, so two runs print the same bytes.
 
 --format prompt (the default) is the paste-ready instruction a session used to
 type by hand; --format context is the block a session-start hook injects. Both
-put the Next action, the Verify commands and what awaits Manu first. A Verify
-command outside a read-only allowlist, or one that chains, pipes or redirects,
-is marked unverified: the file was written by another session.
+put the Next action, the Verify commands and what awaits Manu first. Verify
+renders as written under one note: the file was written by another session, so
+no command in it is presented as safe, and each runs through the permission gate.
 
 The thread is this checkout's (see handoff-write), or this agent's fork of it.
 When the working directory names no single thread for this agent, resume picks
@@ -70,10 +68,10 @@ func runMemResume(cmd *cobra.Command, memoryPath, thread, agent, format string) 
 	if chosen == "" {
 		var carry string
 		if cmd.Flags().Changed("memory") {
-			carry += " --memory " + shellQuote(memoryPath)
+			carry += " --memory " + mem.ShellQuote(memoryPath)
 		}
 		if agent != "" {
-			carry += " --agent " + shellWord(agent)
+			carry += " --agent " + mem.ShellWord(agent)
 		}
 		return listCandidates(cmd, key, agent, carry, candidates)
 	}
@@ -110,27 +108,7 @@ func listCandidates(cmd *cobra.Command, key, agent, carry string, candidates []s
 		_, _ = fmt.Fprintln(out, "  (none)")
 	}
 	for _, c := range candidates {
-		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread %s%s\n", shellWord(c), carry)
+		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread %s%s\n", mem.ShellWord(c), carry)
 	}
 	return nil
-}
-
-// shellQuote quotes a path for a command the user copies: a single-quoted
-// word, with any single quote inside it closed, escaped and reopened.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-// plainWord is a word the shell reads as itself, so it needs no quotes.
-var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./@+-]+$`)
-
-// shellWord is s as one shell word: as written when it is plain, quoted when
-// not. A thread key comes from MEMORY.md, input this session did not write, so
-// a heading cannot put a `;` into the line the operator copies (MEMORY-008
-// review round 4).
-func shellWord(s string) string {
-	if plainWord.MatchString(s) {
-		return s
-	}
-	return shellQuote(s)
 }

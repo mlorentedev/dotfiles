@@ -96,8 +96,39 @@ flowchart LR
     GATE -- "neither" --> FAIL["CI red"]:::sink
 ```
 
+## hive install model
+
+hive (the `hive-vault` package) is a catalog tool. It has one pin, `packages.json`'s `version`, and
+`dotf tools install` (converge's `tools` step) is the only thing that installs or upgrades it. The
+OS decides the mechanism, not the owner of each machine:
+
+| | Linux, macOS | Windows |
+|---|---|---|
+| Who owns the layout | uv (`uv tool`), ADR-036 | hive itself: `versions/<v>`, a `current` junction under `%LOCALAPPDATA%\hive\runtime`, and its launcher `%LOCALAPPDATA%\hive\bin\hive.cmd` (hive ADR-015, ADR-019) |
+| What the catalog runs | `uv tool install --force --refresh-package hive-vault [--python <series>] hive-vault==<pin>` | `uv tool run --refresh-package hive-vault --no-build-package cryptography --from hive-vault==<pin> [--python <series>] hive self-upgrade <pin>`: the `self_install` field, ADR-036 amendment 2026-10-21. Nothing stays in uv's tool dir |
+| When it runs | below the pin, or absent, probed on PATH | the same, probed only at the launcher the catalog declares (`self_install.launcher`, ADR-036 amendment 2026-10-31), so another copy on PATH never answers for it and a hive newer than the pin is never `self-upgrade`d down |
+| Daemon | `hive service install` from setup, a `systemd --user` unit; this repo owns only the drop-in `systemd/hive.service.d/` | `hive service install` from setup, a Scheduled Task |
+
+**Upgrades are a pin raise, nothing else.** Nothing upgrades hive on a schedule or on hive's own
+initiative (hive ADR-020: hive notifies, the owner applies). A new version reaches a machine when
+`packages.json`'s pin moves and converge runs. The 15-minute timers that did this before
+(`hive-upgrade.timer`, the `DotfilesHiveUpgrade` task) are deleted. The `hive-upgrade-retire`
+converge step (`cli/internal/converge/hiveupgrade.go`) removes them from a machine that still has
+them, and a second run changes nothing.
+
+**A missing hive is the tools step's to report.** `dotf doctor`'s hive-daemon section names
+`dotf tools install hive` as the fix on every OS. On Windows, a `uv tool` copy of `hive-vault` is
+the layout ADR-019 rules out. It appears when a dotf older than the catalog's `self_install` field
+(0.77.0 and earlier) converges this catalog (#1675). Such a machine heals on its first converge with a dotf that carries #2991: the
+probe reads only hive's launcher, so `hive self-upgrade` runs and hive's bin dir goes first on PATH.
+The uv copy stays where it is, and `dotf doctor` names it for removal (#2991). dotf never deletes a
+copy it did not install.
+
+The decision trail is `specs/AI-028-hive-install-model-migration/` (#791).
+
 ## References
 
 - [ADR-020](adr/adr-020-tooling-cli-go-convergence.md) — Go CLI convergence (drives this structure)
 - [ADR-018](adr/adr-018-de-vault-task-placement.md) — task state lives in GitHub, not the vault
 - [ADR-012](adr/adr-012-deploy-strategy-copy-with-drift-assertion.md) — deploy = copy + drift assertion
+- [ADR-036](adr/adr-036-install-channels.md) — one install channel per tool; `self_install` (hive install model)

@@ -24,10 +24,10 @@ protect the behavior that depends on PR-Agent internals.
 |---|---|
 | `.github/workflows/pr-agent.yml` | when it fires, what credential it gets |
 | `.pr_agent.toml` | which model, what it reads, what it must check, what it must never see |
-| `scripts/pr-agent-push-gate.sh` | bounded push-review decision (ADR-040) |
-| `scripts/pr-agent-model-preflight.sh` | probe the declared NaN chain; pass on the models that answer |
-| `scripts/pr-agent-route.sh` | probe the Anthropic member and draw who reviews first from the pool |
-| `scripts/pr-agent-publish-guard.sh` | did this run publish a review: the probe before a second attempt, and the final guard |
+| `dotf pr gate` | bounded push-review decision (ADR-040) |
+| `dotf pr preflight` | probe the declared NaN chain; pass on the models that answer |
+| `dotf pr route` | probe the Anthropic member and draw who reviews first from the pool |
+| `dotf pr guard` | did this run publish a review: the probe before a second attempt, and the final guard |
 | `harness/pr-agent-upstream-contract.json` | approved upstream source identities |
 
 The action itself is `The-PR-Agent/pr-agent`, a public **Docker action** pulled
@@ -93,7 +93,7 @@ Seven things now stand between that and a silent green:
    moves on to the next instead of being retried
    (`CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"`).
 4. **A model preflight (AI-045)**: before PR-Agent starts,
-   `scripts/pr-agent-model-preflight.sh` sends one minimal call to each model of
+   `dotf pr preflight` sends one minimal call to each model of
    the declared chain. Only the ones that answer enter the review pool's draw;
    every one that did not is a `::warning::` and a row in the job summary. It exists because NaN retired `mimo-v2.5` on
    2026-09-30: it hung for hours (PR-Agent's fallback does not catch a hang, so
@@ -136,7 +136,7 @@ so each member's share is a declared number:
 | `anthropic/claude-sonnet-5-5` | Anthropic | risk route | the pool, effort `medium`; never drawn |
 
 Tests hold the pool's NaN models equal to the preflight's chain, and the draw's
-share of every member equal to its weight. `scripts/pr-agent-route.sh` draws the
+share of every member equal to its weight. `dotf pr route` draws the
 member that reviews first and writes it to the job summary. A member that
 refused, hung or was over quota is not in the draw, and its weight is shared out
 among the rest for that run.
@@ -171,7 +171,7 @@ NaN closes the stream at 60,000 reasoning characters and publishes nothing
 a model LiteLLM does not know only when it is listed. The setting covers the
 whole NaN attempt; deepseek accepts it and ignores it, mimo never receives it.
 
-The second attempt runs only when `pr-agent-publish-guard.sh --probe` measures
+The second attempt runs only when `dotf pr guard --probe` measures
 that nothing was published. The Anthropic step appears twice in the workflow
 (first and second), because steps cannot be reordered at run time; a test holds
 the copies identical.
@@ -206,7 +206,7 @@ The key is funded from the owner's plan credits, with no card and no
 auto-reload, under a spend limit in the Console; the monthly budget is $60-65,
 shared with the local adversarial review, which reads the same Bitwarden item as
 `REVIEW_ANTHROPIC_API_KEY`. The Console has no per-key model allowlist, so
-`ALLOWED_ANTHROPIC` in `scripts/pr-agent-route.sh` is the allowlist (Haiku and
+`cli/internal/prreview/allowlist.go` holds the allowlist (Haiku and
 Sonnet): a pool naming any other model fails the draw. `tests/pr-agent-config.bats`
 pins it and each of these settings:
 

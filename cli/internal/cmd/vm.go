@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"debug/pe"
 	"errors"
 	"fmt"
@@ -270,7 +271,7 @@ func newVMLinuxCmd() *cobra.Command {
 				return withExitCode(2, err)
 			}
 			defer func() { _ = os.Remove(src) }()
-			return vm.Verify(execLimactl, vm.Options{
+			return vm.Verify(cmd.Context(), execLimactl, vm.Options{
 				Ref:      ref,
 				Source:   src,
 				Name:     fmt.Sprintf("dotf-linux-%d", time.Now().Unix()),
@@ -287,10 +288,23 @@ func newVMLinuxCmd() *cobra.Command {
 	return cmd
 }
 
-func execLimactl(stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
-	c := exec.Command("limactl", args...)
+// limactlGrace bounds the wait for limactl's pipes once it has exited or been
+// killed. A variable so a test does not spend the real one.
+var limactlGrace = 5 * time.Second
+
+// execLimactl runs limactl until ctx ends. Killing it does not kill its ssh
+// child (measured on Lima 2.2.1), and that child holds stdout and stderr, so
+// Wait alone would outlive any deadline; a blocked stdin copy would do the same
+// to a command that exited without reading it. Pipes still open after the grace
+// are abandoned, and on a clean exit that is not a failure of the command.
+func execLimactl(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
+	c := exec.CommandContext(ctx, "limactl", args...)
 	c.Stdin, c.Stdout, c.Stderr = stdin, stdout, stderr
-	return c.Run()
+	c.WaitDelay = limactlGrace
+	if err := c.Run(); !errors.Is(err, exec.ErrWaitDelay) {
+		return err
+	}
+	return nil
 }
 
 // windowsArm64 refuses a --dotf the guest would not run as the box does: the

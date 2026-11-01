@@ -1,0 +1,70 @@
+{
+  "spec": "TOOL-017-deterministic-review-triage",
+  "issue": "mlorentedev/dotfiles#1062",
+  "features": [
+    {
+      "id": "f1",
+      "ac": 1,
+      "behavior": "Triage is pulled from the queue, not left to an agent electing to look: a PR whose reviewer spoke after its last triage is pending, and one triaged afterwards is clear. The push trigger was superseded by the pull-based dotf pr triage-queue (#1057, #1101), accepted by the owner on #1062 (2026-10-10).",
+      "verification": "cd cli && go test -count=1 ./internal/prtriage/ -run '^(TestEvaluate|TestFetchReviewTriagedAfterwardsIsClear)$'",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db): 2 of 2 named tests ran and passed."
+    },
+    {
+      "id": "f2",
+      "ac": 2,
+      "behavior": "Review-vs-notice is read from harness/review-attestation.json; adding a reviewer changes behaviour with no code edit, and an undeclared author does not clear the queue.",
+      "verification": "cd cli && go test -count=1 ./internal/prtriage/ -run '^(TestTheRealRegistryServesBothConsumers|TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue)$'",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db): 2 of 2 named tests ran and passed."
+    },
+    {
+      "id": "f3",
+      "ac": 3,
+      "behavior": "A finding's class comes from a declared marker; an absent marker yields unclassified, never a prose parse.",
+      "verification": "cd cli && go test -count=1 ./internal/prtriage/ -run '^(TestClassify|TestClassify_WithoutADeclarationEverythingIsUnclassified|TestFetchReportsUnclassifiedInlineFindings|TestTheRealRegistryDeclaresTheClassificationMarker|TestUnclassifiedFindings)$'",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db): 5 of 5 named tests ran and passed. Mutation pass on #2845/#2863."
+    },
+    {
+      "id": "f4",
+      "ac": 4,
+      "behavior": "A REAL finding is not applied until its claimed defect reproduces: an apply without a 'Reproduction: reproduced' row holds the PR in the triage queue, and an unreadable finding list holds it too.",
+      "verification": "cd cli && go test -count=1 ./internal/prtriage/ ./internal/cmd/ -run '^(TestUnreproducedFindings|TestFetchHoldsATriagedPRWithAnUnreproducedRealFinding|TestFetchClearsATriagedPRWhoseRealFindingWasReproduced|TestFetchHoldsATriagedPRWhoseFindingsCannotBeRead|TestPrTriageQueue_NamesUnreproducedFindings)$'",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db): 5 of 5 named tests ran and passed. Mutations killed 16/16 on #2924."
+    },
+    {
+      "id": "f5",
+      "ac": 5,
+      "behavior": "dotf pr reproduce reports four states: a probe that does not land is did-not-land, distinct from did-not-reproduce; a dirty tree is refused; an inverted check (--defect-when-passes) never reads could-not-run as a pass; the printed command can be run again.",
+      "verification": "cd cli && go test -count=1 ./internal/reproduce/ ./internal/cmd/ -run '^(TestClassify|TestClassifyAnInvertedCheck|TestRunRefusesADirtyTree|TestRunWithAProbeThatDoesNotLand|TestRunWithAnInvertedCheck|TestPrReproduce_AProbeThatDoesNotLandHasNoVerdict|TestPrReproduce_NamesAnInvertedCheck|TestCommandLineCanBeRunAgain)$'",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db): 8 of 8 named tests ran and passed. Mutations killed 15/15 on #2903; #2935's pass killed its mutations and deleted the one equivalent survivor."
+    },
+    {
+      "id": "f6",
+      "ac": 6,
+      "behavior": "A refuted REAL finding is recorded as refuted with a 'Reproduction: did-not-reproduce' row, distinct from a skip; a REAL finding that is skipped or declined holds the PR.",
+      "verification": "cd cli && go test -count=1 ./internal/prtriage/ -run '^TestUnreproducedFindings$/^(refuted_with_its_evidence|refuted_without_it|skipped|declined|applied_on_a_refutation)$'",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db): 5 of 5 named cases ran and passed. Replayed against #1059's real payload at 1719024f: the REAL finding comes back did-not-reproduce (tasks.md, Verification)."
+    },
+    {
+      "id": "f7",
+      "ac": 7,
+      "behavior": "Closing guard at PR level (owner option B): dotf pr land refuses a PR the triage queue lists, and an unanswerable queue is a refusal, not a pass.",
+      "verification": "cd cli && go test -count=1 ./internal/prtriage/ ./internal/prland/ -run '^(TestEvaluate|TestLand_RefusesAnUntriagedPR|TestLand_AnUnanswerableTriageQueueIsARefusalNotAPass)$'",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db): 3 of 3 named tests ran and passed."
+    },
+    {
+      "id": "f8",
+      "ac": 8,
+      "behavior": "Every check above has a red-direction test, asserted rather than assumed: each slice ran a mutation pass with each mutation confirmed landed by checksum, and every equivalent survivor had its guard deleted.",
+      "verification": "cd cli && go test -count=1 ./internal/prtriage/ ./internal/reproduce/ ./internal/prland/ ./internal/cmd/",
+      "state": "passing",
+      "evidence": "exit 0 (2026-10-30, at 37ecb8db). Mutation passes: AC3 #2845/#2863, AC5 15/15 #2903 and #2935, AC4/AC6 16/16 #2924."
+    }
+  ]
+}

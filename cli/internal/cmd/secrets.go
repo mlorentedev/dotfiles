@@ -521,8 +521,9 @@ func newSecretsRenderCmd() *cobra.Command {
 
 func newSecretsRunCmd() *cobra.Command {
 	var only string
+	var skipLocked bool
 	c := &cobra.Command{
-		Use:   "run [--only VAR,...] -- <cmd> [args...]",
+		Use:   "run [--only VAR,...] [--skip-locked] -- <cmd> [args...]",
 		Short: "Decrypt mapped secrets and run <cmd> with them in its environment only",
 		Long: "run decrypts the mapped secrets (secrets/registry.yaml, over the age store)\n" +
 			"and launches <cmd> with them added to ITS environment — the parent shell is\n" +
@@ -530,7 +531,9 @@ func newSecretsRunCmd() *cobra.Command {
 			"and VAR points at the path. --only scopes the injection to named vars. Backend\n" +
 			"unlock credentials (e.g. BW_SESSION) are stripped from the child env, so <cmd>\n" +
 			"gets only the granted secrets, not the key to the whole vault. The child's exit\n" +
-			"code is propagated.\n\n" +
+			"code is propagated. --skip-locked runs <cmd> without the selected secrets\n" +
+			"when Bitwarden is locked (any other failure still refuses), and a systemd\n" +
+			"unit that did so is restarted with them by `dotf secrets unlock`.\n\n" +
 			"Everything after -- is the command to run, e.g.:\n" +
 			"  dotf secrets run -- goreleaser release\n" +
 			"  dotf secrets run --only OPENAI_API_KEY -- python yt_metrics.py",
@@ -556,7 +559,7 @@ func newSecretsRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			injected, err := resolveInjectedSecrets(reg, sel)
+			injected, err := resolveOrSkipLocked(reg, sel, skipLocked, cmd.ErrOrStderr())
 			if err != nil {
 				return err
 			}
@@ -594,6 +597,8 @@ func newSecretsRunCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&only, "only", "", "comma-separated registry ids or env-var names to inject (default: all mapped)")
+	c.Flags().BoolVar(&skipLocked, "skip-locked", false,
+		"when Bitwarden is locked, run <cmd> without the selected secrets; a systemd unit is restarted with them at `dotf secrets unlock`")
 	return c
 }
 

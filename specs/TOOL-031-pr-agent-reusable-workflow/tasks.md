@@ -66,17 +66,36 @@ review, not per merge.
     only a measured `false` lets the second attempt run. Without `--probe` it
     is the final guard: exit 0 when this run published a review, 1 when not,
     naming the last attempt that ran. A usage error exits 2.
-- [ ] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract read (FAIL), implement (PASS)
+- [x] [P] [AC2] `dotf pr gate`: port the `pr-agent-push-gate.bats` cases, including the upstream-contract case (FAIL), implement (PASS)
+  - The script reads no value from `harness/pr-agent-upstream-contract.json`: it
+    cites the file in a comment, and the bats case is a text check on that. The
+    port keeps the citation and the check, and adds a test that the contract
+    pins the sources the rules mirror, so the case costs no production line. The
+    workflow's real read of the contract, `audited_ref` in the `reviewable` step,
+    is not the gate's and stays where it is.
+  - `Gate` is pure: it takes the two files as bytes, because the workflow fetches
+    them. A file it cannot read is nil, and nil means a full review.
+  - It keeps the script's output and exit codes, and a flag cobra rejects exits 2
+    here, as the script does. It departs from the script where the script's
+    input handling let a skip rest on no data, or let a comment write an output
+    line (lesson-522). `TestGate_Divergences` holds each one.
 
 ### A5. D: the workflow switches (one PR)
 
-- [ ] [AC3] `tests/pr-agent-config.bats`, test first:
+- [x] [AC3] `tests/pr-agent-config.bats`, test first:
   - no `./scripts/pr-agent-*` invocation remains;
   - the job builds `dotf` from the PR head before the first decision;
   - the output names are unchanged.
 
   Expected: FAIL.
-- [ ] [AC3] Change `.github/workflows/pr-agent.yml` (PASS), then delete the four scripts and their bats suites
+- [x] [AC3] Change `.github/workflows/pr-agent.yml` (PASS), then delete the four scripts and their bats suites
+  - The sparse checkout is `harness/reviewer-pool.json` and `cli/`, and `setup-go`
+    with `go build` puts `dotf` on `GITHUB_PATH` before the first decision. The
+    job timeout rises from 32 to 34 minutes for that build.
+  - The differential tests go with the scripts. The gate's edge cases survive in
+    `gate_edge_test.go`; route, preflight and guard keep their ported unit tests.
+  - `pr-agent-config.bats` reads `guard.go`, `allowlist.go` and the timeout
+    constants where it read the scripts. The rules it pins are unchanged.
 - [ ] [AC3] Make one live run on a PR that changes a weight and link it in `verification.md`
 - [ ] Release: the owner merges the release-please PR, which ships `dotf pr …` in a tagged version
 

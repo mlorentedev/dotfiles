@@ -287,3 +287,4 @@ Wire `dotf pr triage-queue` into any session-start hook the harness offers.
 - **No sycophancy:** Challenge assumptions, give counterarguments before validating.
 - **Feature flags:** Use feature flags for decouple / external-gating — never blank config or delete code to hide work.
 - **POSIX by default:** Scripts must run under bash + zsh (ShellCheck enforced). Hardware debugging follows evidence first (`debug-hardware` skill).
+- **Endpoint security wins:** If endpoint security blocks a tool, do not retry, install, rebuild, wrap, or invoke an equivalent execution path (`go run`, another binary path) without explicit owner approval. Use CI as authoritative and run only permitted local checks. The owner had to repeat this three times in two weeks because it lived only in session journals.

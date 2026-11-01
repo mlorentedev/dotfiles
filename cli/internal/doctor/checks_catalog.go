@@ -73,6 +73,10 @@ func checkShadowedCatalogTools(sys *System, cfg *Config, rep *Report) {
 		rep.Warn(fmt.Sprintf("%v — pins are read from %s instead", err, from))
 	}
 	for _, t := range cat.Tools {
+		if t.Source.SelfInstalls(sys.GOOS) {
+			checkSelfInstalledCopies(sys, t, rep)
+			continue
+		}
 		if t.Source.Type != "npm" {
 			continue
 		}
@@ -81,6 +85,29 @@ func checkShadowedCatalogTools(sys *System, cfg *Config, rep *Report) {
 			rep.Warn(fmt.Sprintf("%s resolves from %d PATH directories (%s) — `dotf tools install` converges the npm copy only; remove the other channel's copy",
 				t.Name, len(dirs), strings.Join(dirs, ", ")))
 		}
+	}
+}
+
+// checkSelfInstalledCopies names a copy of a self-installed tool that runs
+// from anywhere but the launcher's directory. hive on Windows owns its layout
+// (hive ADR-019), so a `uv tool` hive-vault beside it is another channel's: the
+// install probe never reads it (#2991), and while it is first on PATH it is the
+// hive a shell runs. dotf did not install it, so dotf does not remove it.
+func checkSelfInstalledCopies(sys *System, t tools.Tool, rep *Report) {
+	launcher := t.Source.SelfInstall.LauncherPath(sys.Getenv)
+	if launcher == "" {
+		return
+	}
+	own := filepath.Dir(launcher)
+	var others []string
+	for _, d := range sys.dirsProviding(t.Name) {
+		if !samePath(d, own) {
+			others = append(others, d)
+		}
+	}
+	if len(others) > 0 {
+		rep.Warn(fmt.Sprintf("%s also runs from %s, outside the launcher it installs itself at (%s) — `dotf tools install` reads only that launcher; remove the other channel's copy (for a uv one, `uv tool uninstall %s`)",
+			t.Name, strings.Join(others, ", "), launcher, t.Source.Package))
 	}
 }
 

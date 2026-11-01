@@ -29,11 +29,13 @@ width = "90%"
 height = "90%"
 
 # The worktree's files (HERDR-001), two ways over one tool. prefix+e is yazi in a
-# popup over the focused pane, in its directory. prefix+shift+e is the same
+# popup over the focused pane, in its directory. prefix+f is the same
 # explorer docked as a split on the right: `dotf herdr explorer` toggles it, so
 # pressing the key again closes it. Nothing here installs yazi -- YAZI_VERSION
 # in versions.conf does, through `dotf tools sync`. The docked key runs the
 # pinned dotf, so it needs a release that carries the subcommand and its toggle fix (0.77.0).
+# The docked key is a plain letter on purpose: on the owner's Mac prefix+shift+e
+# opened the prefix+e popup, so a chord that needs shift is not relied on.
 [[keys.command]]
 key = "prefix+e"
 type = "popup"
@@ -43,7 +45,7 @@ width = "90%"
 height = "90%"
 
 [[keys.command]]
-key = "prefix+shift+e"
+key = "prefix+f"
 type = "shell"
 command = "dotf herdr explorer"
 description = "yazi docked on the right of this pane (press again to close)"

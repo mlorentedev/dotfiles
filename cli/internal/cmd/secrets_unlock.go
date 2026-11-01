@@ -49,7 +49,7 @@ func newSecretsUnlockCmd() *cobra.Command {
 				return err
 			}
 			if st == "unlocked" {
-				return reportSynced(cmd, d, "already unlocked")
+				return syncedThenRestart(cmd, d, "already unlocked")
 			}
 			_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Bitwarden master password: ")
 			pw, err := readPassword()
@@ -61,7 +61,7 @@ func newSecretsUnlockCmd() *cobra.Command {
 			if err := d.Unlock(string(pw)); err != nil {
 				return err
 			}
-			return reportSynced(cmd, d, "unlocked")
+			return syncedThenRestart(cmd, d, "unlocked")
 		},
 	}
 	c.Flags().DurationVar(&startTimeout, "start-timeout", 15*time.Second,
@@ -87,6 +87,20 @@ func reportSynced(cmd *cobra.Command, d *secrets.BWServeDaemon, verb string) err
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s, vault cache synced at %s (%s)\n",
 		verb, st.LastSync.UTC().Format(time.RFC3339), d.Trace())
 	return nil
+}
+
+// syncedThenRestart is reportSynced, then a restart of every unit that ran
+// without its secrets while the vault was locked (`secrets run --skip-locked`),
+// so the unlock is the only step the operator takes (dotfiles#3005). "Already
+// unlocked" restarts them too: the vault may have been unlocked by a path that
+// restarted nothing.
+func syncedThenRestart(cmd *cobra.Command, d *secrets.BWServeDaemon, verb string) error {
+	// The restart does not wait on the sync: the vault is unlocked either way,
+	// and a unit left without its secrets until a second unlock is the state
+	// this exists to end. The sync error is still the command's verdict.
+	err := reportSynced(cmd, d, verb)
+	restartSkippedUnits(cmd.OutOrStdout())
+	return err
 }
 
 // newSecretsLockCmd re-locks the daemon (AC6) without stopping the process —

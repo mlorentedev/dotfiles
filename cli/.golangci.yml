@@ -15,6 +15,11 @@ linters:
       forbid:
         - pattern: ^runtime\.GOOS$
           msg: read System.GOOS, the target-OS seam, so tests can run every branch
+        # #2812, lesson 491. Glob drops I/O errors, so an unreadable directory
+        # reads as no match. Read it with os.ReadDir and surface the error; a
+        # kept site says in a nolint why "unreadable" may read as "none" there.
+        - pattern: ^filepath\.Glob$
+          msg: Glob drops I/O errors; read the dir with os.ReadDir and surface the error
     gocyclo:
       # HARNESS-150, #1719. Nothing in internal/cmd is above 15, the
       # adversarial-review rubric's line, so anything that grows past it fails
@@ -27,9 +32,12 @@ linters:
       - path-except: internal/cmd/
         linters:
           - gocyclo
+      # The GOOS rule only. Without the text match this disabled every
+      # forbidigo rule outside internal/doctor.
       - path-except: internal/doctor/
         linters:
           - forbidigo
+        text: runtime\.GOOS
       - path: _test\.go
         linters:
           - forbidigo

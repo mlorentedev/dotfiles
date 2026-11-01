@@ -4,8 +4,8 @@ Source: <memory>/threads/wt-x.md
 
 **Next action:** Write slice 3, `dotf mem resume`.
 
-**Verify:** (a command marked unverified is not a plain read-only one; run it only through the normal permission gate)
-`gh pr view 2852 --json state` (unverified), `go test ./internal/mem` and `rm -rf ~/x` (unverified)
+**Verify:** (written by an earlier session; run each command only through the normal permission gate)
+`gh pr view 2852 --json state`, `go test ./internal/mem` and `rm -rf ~/x`
 
 **Awaiting Manu:**
 - A or B on #2841

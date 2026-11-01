@@ -39,7 +39,7 @@ created: "2026-08-07"
 - ~~[AC3] `windows/hive-upgrade.ps1`: drop the A1 stop-before-upgrade orchestration.~~ *Withdrawn with AC3:* PR5 deletes the script.
 - [x] [AC4] `setup-windows.ps1`: replace the `uv tool list` version gate before `hive service install` with a check against the resolved install.
       *Done unticked:* `016bf1a8` (#1311, 2026-08-27). The gate is `dotf tools version hive` on both OSes, held by the parity test in `tests/hive-upgrade-timer.bats` (moves to `tests/hive-daemon-gate.bats` in PR5).
-- [ ] [P] [AC4] Write failing test: no Windows-path mechanism greps `uv tool list` to decide whether hive exists. *Still open:* `windows/hive-upgrade.ps1:72` does. PR5 deletes it, and PR5's guard asserts no setup installs an unattended upgrade.
+- [x] [P] [AC4] Write failing test: no Windows-path mechanism greps `uv tool list` to decide whether hive exists. *Done by PR5 (#2876):* `windows/hive-upgrade.ps1`, the last reader, is deleted. `tests/hive-daemon-gate.bats` holds both halves: the parity test refuses the `uv tool list` gate in either setup, and the second test refuses the script and the timer. On main the only `uv tool list` left on the Windows path is a comment (`setup-windows.ps1:532`).
 - ~~[AC2] Real-hardware validation on the currently-broken box.~~ *Withdrawn with AC7:* the guest run in PR6 replaces it.
 
 ### PR3 — decision reconciliation + docs (AC5, AC6) — independent of PR2
@@ -48,7 +48,8 @@ created: "2026-08-07"
 - [x] [AC5] Add a forward pointer in `specs/archive/AI-023-hive-auto-upgrade-timer/` to this spec.
 - [x] [AC6] Record the Linux decision explicitly (resolved: Linux keeps `uv tool`) in this spec and in the amended `AI-022`.
 - [x] Update `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`: either retire it (if the new model makes the failure unreachable) or point it at the new install model and at #574 for repair.
-- [ ] **Deferred to PR2 (deliberately).** Document the install model in one place — what owns the layout, what bootstraps it, what triggers upgrades, and which OS uses which mechanism. Writing it now would document the A1 state that PR2 replaces; the doc lands with the change it describes.
+- [x] **Deferred to PR2 (deliberately).** Document the install model in one place — what owns the layout, what bootstraps it, what triggers upgrades, and which OS uses which mechanism. Writing it now would document the A1 state that PR2 replaces; the doc lands with the change it describes.
+      *Done after PR6:* `docs/architecture.md`, "hive install model".
 
 ### PR4 — POSIX install pinned in the catalog (AC8, #1993) — independent of PR2
 
@@ -71,7 +72,8 @@ Two halves. The deletion needs no decision; the retire step on live machines doe
 - [x] [AC9] Failing guard: no setup script installs `hive-upgrade`, `DotfilesHiveUpgrade` or a `uv tool upgrade hive-vault`, and the units and script are gone (`tests/hive-daemon-gate.bats`).
 - [x] [AC9] Delete `systemd/hive-upgrade.{service,timer}`, `windows/hive-upgrade.ps1`, the two setup blocks that install them, `Register-HiveScheduledTask` (its only caller was the task) and `tests/hive-upgrade-timer.bats`; the daemon-gate parity test moves to `tests/hive-daemon-gate.bats`
 - [x] [AC9] Failing tests, then the `hive-upgrade-retire` converge step (owner, 2026-10-21: converge, not `doctor --fix`). It removes `hive-upgrade.timer`, the `DotfilesHiveUpgrade` task and the script copy at `~/.claude/scripts/hive-upgrade.ps1` from a machine that has them, unmanaged as they are, and a second run changes nothing (`TestHiveUpgradeRetire_*`, `cli/internal/converge/hiveupgrade.go`)
-- [ ] [AC9] Live: `dotf converge --only hive-upgrade-retire` twice on msi (1 change, then 0), after a release carrying it
+- [x] [AC9] Live: `dotf converge --only hive-upgrade-retire` twice on msi (1 change, then 0), after a release carrying it
+      *Measured from msi's run records, not from `--only` runs:* full converges on 0.77.0, `[CHANGE]` removed `hive-upgrade.timer` at `20261025T044811Z`, then `[ OK ]` at `20261025T050456Z` and `20261026T192529Z` (verification.md, "AC9 on msi")
 - [ ] [AC9] Live on the work-lab box, elevated (the task an elevated setup registered is S4U): the same two runs remove `DotfilesHiveUpgrade` and the script
 - [x] [AC9] Edit the stale mentions outside the deletion: `docs/architecture.md:27,29` and the comments in `systemd/hive.service.d/10-dotf-secrets.conf:8,58`, plus `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`, which now calls the timer historical
 - [x] State in the PR: until #1993 retires `prerequisite_command`, Windows setup still runs `uv tool install --upgrade hive-vault` on every run
@@ -91,12 +93,24 @@ Decided by the owner on 2026-10-21: a catalog source, as a `self_install` field 
 - [x] [AC2] Raise the hive pin to the release carrying hive#523 (4.4.2), so the install hive runs inside `self-upgrade` is guarded too
 - [x] [AC2] Guest run: `dotf vm windows --ref <PR6 ref>` flips V2, V4 and V5, and the second converge changes nothing. The second converge runs in a new process, which is HIVE-328's AC7 fresh-shell check. Passed 2026-10-22 on `68ed76db` (Arm64, hive 4.4.2 plus `no_build`): verification.md, "Guest run on Arm64"
 - [x] [AC4] V3 flips in the run that installs hive. `setup-windows.ps1` calls `Sync-SessionPath` right after `dotf tools install`, so the `Get-Command hive` gate at line 584 sees the launcher. Measured on #2901's `test-windows` (x64 runner, run 39721972641): `hive self-upgrade: switched none -> 4.4.1`, then `[SUCCESS] Installed hive daemon service (Scheduled Task, v4.4.1)` in the same setup run. An earlier draft of this line said it stayed dark: that was inferred, not measured
-- [ ] Document the install model in one place, as deferred in PR3: what owns the layout, what installs it, that nothing upgrades it unattended (ADR-020), and which OS uses which mechanism
+- [x] Document the install model in one place, as deferred in PR3: what owns the layout, what installs it, that nothing upgrades it unattended (ADR-020), and which OS uses which mechanism (`docs/architecture.md`, "hive install model")
 
 ### PR7 — doctor names the right fix on Windows (#2856) — added 2026-10-21
 
 - [x] Failing test: the not-installed fix follows the OS; Windows never gets `dotf tools install hive` (`TestHiveDaemon_NotInstalledFixFollowsTheOS`, landed in #2869, `c213ae90`). *Superseded by PR6*, where that command installs hive on Windows too
 - [x] `hiveInstallRemedy`: the catalog pin on Linux and macOS, hive's own bootstrap on Windows (#2869, `c213ae90`, closes #2856)
+
+### PR8 — probe only hive's launcher on Windows (AC4, #2991) — added 2026-10-31
+
+Owner: "lo que recomiende el advisor", which was C on #2991. A box holding a `uv tool` hive-vault at the pin never self-installed, because the probe read PATH. #2956 deleted hive's launcher instead.
+
+- [x] Failing tests: a uv copy at the pin with no launcher still self-installs; a launcher at or above the pin is a no-op whatever PATH holds; Linux still reads PATH (`TestInstallUvTool_SelfInstallProbesOnlyTheLauncher`, `TestProbeTool`)
+- [x] `self_install.launcher`, required by `Load`, with `%NAME%` expanded and an unset name read as absent (`TestLoad_SelfInstall`, `TestSelfInstall_LauncherPath`, `TestInstallUvTool_SelfInstallWithAnUnsetLauncherVariable`)
+- [x] `dotf tools version` and the installer share `tools.ProbeTool`. The registered-PATH probe and its refusal are deleted
+- [x] The doctor names a copy outside the launcher's directory, and dotf never removes it (`TestCheckShadowedCatalogTools_NamesACopyBesideASelfInstalledTool`)
+- [x] `legacyshim.go`, its test and the `verifyOnPath` hook are deleted (#2956)
+- [x] ADR-036 amendment 2026-10-31, `docs/architecture.md`, lesson 528
+- [ ] Live: egw-len029 (uv copy at the pin, launcher deleted by hand) converges onto hive's layout with a dotf that carries this PR, and doctor names the uv copy
 
 ## Closing
 

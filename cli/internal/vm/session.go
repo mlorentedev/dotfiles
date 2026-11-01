@@ -60,6 +60,12 @@ func (r Record) ProcessCode() int {
 
 // Summary is one line for the error a non-zero process code carries.
 func (r Record) Summary() string {
+	if r.Status == StatusOK && r.Exit != nil {
+		return fmt.Sprintf("%s: the guest command exited %d", r.Session, *r.Exit)
+	}
+	if r.Status == StatusTimeout {
+		return r.Session + ": timed out"
+	}
 	msg := r.Stderr
 	if msg == "" {
 		msg = string(r.Status)

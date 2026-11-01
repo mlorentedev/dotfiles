@@ -59,13 +59,15 @@ The install model stops being "a uv tool that dotfiles upgrades in place" and be
 
 - [x] **AC1** — `windows/hive-upgrade.ps1` emits a distinguishable, non-empty message when no hive install is found, and stays silent when the install is present and already current. Asserted by `tests/hive-upgrade-timer.bats`, not by convention.
   *Superseded 2026-10-21:* delivered by #796, and its subject goes away with AC9: the script and its tests are deleted with the timer (#2857). The class it fixed (quiet when broken) is AC4's second half on the setup path.
-- [ ] **AC2** — ~~On a machine with no hive install and no `hive` on PATH, setup bootstraps a working install; `hive --version` succeeds from a fresh shell afterwards.~~
+- [x] **AC2** — ~~On a machine with no hive install and no `hive` on PATH, setup bootstraps a working install; `hive --version` succeeds from a fresh shell afterwards.~~
   *Rewritten 2026-10-21:* on a clean Windows 11 guest with no hive (`dotf vm windows --ref <ref>`), converge installs hive through hive's own layout (ADR-019). In the second converge, a new process, `hive` resolves on PATH and `dotf doctor`'s hive-daemon section no longer reports it missing. The second converge changes nothing.
   **Gated:** the PLAT-003 guest is Arm64, where hive cannot install today (V6). The guest proof waits on a hive release carrying hive#515. Without one, the proof is a clean x64 Windows machine.
+  *Met 2026-10-22:* hive 4.4.2 (hive#523) plus the catalog's `no_build: ["cryptography"]` installs on the Arm64 guest. The two-converge run is in `verification.md`, "Guest run on Arm64".
 - ~~**AC3** — The steady-state upgrade trigger is a bare `hive self-upgrade` with no daemon stop/start orchestration, and re-running it when already current is a no-op.~~
   *Withdrawn 2026-10-21:* hive ADR-020 forbids any timer, service or hook from running `hive self-upgrade` on the user's behalf. AC9 replaces it.
-- [ ] **AC4** — ~~No mechanism in this repo infers "hive is installed" from `uv tool list` alone on the Windows path.~~
+- [x] **AC4** — ~~No mechanism in this repo infers "hive is installed" from `uv tool list` alone on the Windows path.~~
   *Rewritten 2026-10-21:* on Windows, no setup or converge step creates a `uv tool` install of `hive-vault` or infers hive from `uv tool list`. When `hive` is missing, setup says so instead of skipping the daemon in silence: on main the whole daemon block is skipped with no output (baseline V3).
+  *Met in the tree, not yet in the pinned release:* PR6 (#2901) and the guards in `tests/hive-daemon-gate.bats`. Released dotf 0.77.0, which `versions.conf` still pins, does not read `self_install`, so it still runs `uv tool install hive-vault` on Windows (#1675; #2955 is a box where it did). Release 0.78.0 (#2911) closes the gap. A box that already holds the uv copy heals on its next converge once the probe reads only hive's launcher (#2991, PR8).
 - [x] **AC5** — `AI-022`'s A1 decision is reconciled with hive's shipped A3, and archived `AI-023` carries a forward pointer; ADR-015 is referenced consistently.
 - [x] **AC6** — The Linux path is explicitly decided and documented, not left implicit.
 - [x] **AC8** — *Added 2026-10-03 (#1993).* On Linux and macOS, `dotf tools install` installs `hive-vault` at the version pinned in `packages.json`. It upgrades a lower version and never downgrades a higher one. On Windows the tool is reported as unsupported, never installed and never failed.

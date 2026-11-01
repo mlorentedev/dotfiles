@@ -13,6 +13,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] Criterion 2 -> commit `<hash>` / test `<name>`
 - [ ] Criterion 3 -> commit `<hash>` / test `<name>`
 
+- AC3, partly -> PR #3015, run 41232841929: `Build dotf`, the preflight, the draw, the guard probe and the final guard all ran from the PR and passed; the risk route drew Sonnet, which published. The push gate was skipped on `ready_for_review`. No weight changed in that PR, so the task's run on a weight change is still open.
+
 ## Test status
 
 - Test suite: `<command> -> <output / coverage %>`
