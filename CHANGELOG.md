@@ -1,5 +1,68 @@
 # Changelog
 
+## [0.78.0](https://github.com/mlorentedev/dotfiles/compare/v0.77.0...v0.78.0) (2026-11-01)
+
+
+### Features
+
+* **converge:** deploy the harness with the Go engine in process ([#2902](https://github.com/mlorentedev/dotfiles/issues/2902)) ([99b5235](https://github.com/mlorentedev/dotfiles/commit/99b5235e9f67b05afbb5415ccad262a8ff84b558))
+* **doctor:** check the gh token carries the board scopes ([#2946](https://github.com/mlorentedev/dotfiles/issues/2946)) ([90a4834](https://github.com/mlorentedev/dotfiles/commit/90a48346e430ab4d77312cf312ea1853b86c4481))
+* **doctor:** run the harness drift gate in process on every OS ([#2921](https://github.com/mlorentedev/dotfiles/issues/2921)) ([88bbf5b](https://github.com/mlorentedev/dotfiles/commit/88bbf5b4909ca0b0aafd44a0142ac7c56575db1c))
+* **env:** declare a machine's identity with dotf env identity set and report it in doctor ([#2925](https://github.com/mlorentedev/dotfiles/issues/2925)) ([3679ebc](https://github.com/mlorentedev/dotfiles/commit/3679ebccb144bb6f1c0afdd356e7960a3203bd14))
+* **harness:** compare committed records with their vault source in dotf harness check ([#2936](https://github.com/mlorentedev/dotfiles/issues/2936)) ([7ce9085](https://github.com/mlorentedev/dotfiles/commit/7ce90850716f0c080ef6b9291d9473faeb1819ca))
+* **herdr:** dock the explorer on prefix+shift+e ([#2847](https://github.com/mlorentedev/dotfiles/issues/2847)) ([4a70ad7](https://github.com/mlorentedev/dotfiles/commit/4a70ad7dab62d0c681697882ad9063358acba802))
+* **lessons:** add dotf lessons renumber ([#2938](https://github.com/mlorentedev/dotfiles/issues/2938)) ([0fd77c1](https://github.com/mlorentedev/dotfiles/commit/0fd77c1b5e516e5867a084858dfeb226d23524fa))
+* **pr-agent:** decide with dotf pr built from the PR, and delete the scripts ([#3015](https://github.com/mlorentedev/dotfiles/issues/3015)) ([db96a2c](https://github.com/mlorentedev/dotfiles/commit/db96a2c59bc7303dbfc5a9ac6cd8f98bf587f1fc))
+* **pr:** add pr reproduce, the check that decides a reviewer finding ([#2903](https://github.com/mlorentedev/dotfiles/issues/2903)) ([b252382](https://github.com/mlorentedev/dotfiles/commit/b252382826ea1a868d729930792d5d7d2b8d1050)), closes [#1062](https://github.com/mlorentedev/dotfiles/issues/1062)
+* **prreview:** add dotf pr gate, the decision to review a push ([#2983](https://github.com/mlorentedev/dotfiles/issues/2983)) ([53b1d21](https://github.com/mlorentedev/dotfiles/commit/53b1d21b9fdeba991f70c5d2da44f0ad57119c5d))
+* **prreview:** add dotf pr guard, the check that a run published a review ([#2960](https://github.com/mlorentedev/dotfiles/issues/2960)) ([ed3c10a](https://github.com/mlorentedev/dotfiles/commit/ed3c10a360743ed73f9e1a20a8356a0ba6a49667))
+* **prreview:** add dotf pr preflight, the NaN chain probe ([#2943](https://github.com/mlorentedev/dotfiles/issues/2943)) ([f300e0b](https://github.com/mlorentedev/dotfiles/commit/f300e0bdb49a872e17ea60b14345ebf5d5678d41))
+* **prreview:** add dotf pr route, with the weighted, risk and provider routing ([#2941](https://github.com/mlorentedev/dotfiles/issues/2941)) ([d5dfc9e](https://github.com/mlorentedev/dotfiles/commit/d5dfc9e92551f685731a04762f9a17d97548edb5))
+* **prreview:** read the pool, allowlist and probe for dotf pr route ([#2940](https://github.com/mlorentedev/dotfiles/issues/2940)) ([bb5bb80](https://github.com/mlorentedev/dotfiles/commit/bb5bb802de5ada35287b29d474a90f1baa97c2c6))
+* **prtriage:** hold a PR whose REAL finding lacks its reproduction ([#2924](https://github.com/mlorentedev/dotfiles/issues/2924)) ([37ecb8d](https://github.com/mlorentedev/dotfiles/commit/37ecb8db34528398015e4a256cb114c760029499))
+* **setup:** deploy the harness with dotf harness deploy on Linux ([#2912](https://github.com/mlorentedev/dotfiles/issues/2912)) ([260816b](https://github.com/mlorentedev/dotfiles/commit/260816b424e1006ef3cd0445e97f5e435392fe2b))
+* **setup:** deploy the harness with dotf harness deploy on Windows ([#2914](https://github.com/mlorentedev/dotfiles/issues/2914)) ([c07b51a](https://github.com/mlorentedev/dotfiles/commit/c07b51ae1205ed278285e02964bc47249e32059e))
+* **spec:** review a root-commit spec with --initial ([#2977](https://github.com/mlorentedev/dotfiles/issues/2977)) ([b10d31d](https://github.com/mlorentedev/dotfiles/commit/b10d31dbbc81f0a7c18a6e6ac317806bda90d6df))
+* **tools:** install hive on Windows through its own self-upgrade ([#2901](https://github.com/mlorentedev/dotfiles/issues/2901)) ([a4e46b1](https://github.com/mlorentedev/dotfiles/commit/a4e46b1e3f82946f0168b306b51dc660c1b150d5))
+* **vm:** a session record and the Linux session store over Lima ([#2947](https://github.com/mlorentedev/dotfiles/issues/2947)) ([08a4ef7](https://github.com/mlorentedev/dotfiles/commit/08a4ef7a7d5a46dec6985d0c82576ddd4caa7788))
+* **vm:** copy a file between the host and a Linux session with cp ([#2999](https://github.com/mlorentedev/dotfiles/issues/2999)) ([df550f4](https://github.com/mlorentedev/dotfiles/commit/df550f48b28b7d7fdc919dea98faeef4b87c8d77))
+* **vm:** run a command in a Linux session with exec ([#2995](https://github.com/mlorentedev/dotfiles/issues/2995)) ([d3e4852](https://github.com/mlorentedev/dotfiles/commit/d3e4852a3a0d207e6d40b0855e64926068394936))
+* **vm:** up, down and status for Linux sessions ([#2950](https://github.com/mlorentedev/dotfiles/issues/2950)) ([dfaf286](https://github.com/mlorentedev/dotfiles/commit/dfaf286790eead77e1ba9427aad1aaf558521b8b))
+
+
+### Bug Fixes
+
+* **ci:** leave a Blocked or Done issue alone when it is assigned ([#2904](https://github.com/mlorentedev/dotfiles/issues/2904)) ([6ee4620](https://github.com/mlorentedev/dotfiles/commit/6ee4620daf09451078b494d0ca21582d1a0a1dc8))
+* **ci:** report spec-gate as a commit status a cancelled run cannot block ([#2984](https://github.com/mlorentedev/dotfiles/issues/2984)) ([b5c0c16](https://github.com/mlorentedev/dotfiles/commit/b5c0c16936834d4469252e459ffe003188df0803)), closes [#2866](https://github.com/mlorentedev/dotfiles/issues/2866)
+* **cli:** refuse an unreadable sshd drop-in dir and forbid filepath.Glob ([#2987](https://github.com/mlorentedev/dotfiles/issues/2987)) ([59f6956](https://github.com/mlorentedev/dotfiles/commit/59f6956c1c7bbfc1f5de7292708cef999751bdab))
+* **docs:** renumber two lessons that collided on 522 ([#3008](https://github.com/mlorentedev/dotfiles/issues/3008)) ([958ceec](https://github.com/mlorentedev/dotfiles/commit/958ceec1eb758c39cf8aef38dd7fe881415a5b23))
+* **doctor:** predict agent tiers with the Go render's own predicates ([#2945](https://github.com/mlorentedev/dotfiles/issues/2945)) ([6615f35](https://github.com/mlorentedev/dotfiles/commit/6615f35c39553bb880949b239ae87ac738900359))
+* **herdr:** dock the explorer on prefix+f, not prefix+shift+e ([#2992](https://github.com/mlorentedev/dotfiles/issues/2992)) ([b08c866](https://github.com/mlorentedev/dotfiles/commit/b08c866593b4dcf36e3a431ab8078b1261a94fbd))
+* **hooks:** fail the deploy when lib/ cannot be read instead of skipping its chmod ([#2934](https://github.com/mlorentedev/dotfiles/issues/2934)) ([f8ba5e1](https://github.com/mlorentedev/dotfiles/commit/f8ba5e12c09fe213a72c86cab1feae3239a1f36c)), closes [#2812](https://github.com/mlorentedev/dotfiles/issues/2812)
+* **mem:** close the resume allowlist and ownership gaps the spec review found ([#2916](https://github.com/mlorentedev/dotfiles/issues/2916)) ([2e8777c](https://github.com/mlorentedev/dotfiles/commit/2e8777c62e7ec24c5780fcafd40fc5207cd96699))
+* **mem:** declare the handoff_resume injector in session-start-config.json ([#3001](https://github.com/mlorentedev/dotfiles/issues/3001)) ([0ecee6e](https://github.com/mlorentedev/dotfiles/commit/0ecee6e371b0696c38d5e6df690f17e1e388e3d0))
+* **mem:** keep a Verify field's prose in the resume render ([#2917](https://github.com/mlorentedev/dotfiles/issues/2917)) ([4f19d07](https://github.com/mlorentedev/dotfiles/commit/4f19d07d06799ba376fe888e29a07a303895d66f)), closes [#1689](https://github.com/mlorentedev/dotfiles/issues/1689)
+* **mem:** quote the thread key and agent in resume's candidate lines ([#2944](https://github.com/mlorentedev/dotfiles/issues/2944)) ([f38a294](https://github.com/mlorentedev/dotfiles/commit/f38a294ca2ec8e9d6e827da0180dbcdb5d8c1f70))
+* **mem:** quote the thread key in the session-start resume line ([#3000](https://github.com/mlorentedev/dotfiles/issues/3000)) ([280d7d1](https://github.com/mlorentedev/dotfiles/commit/280d7d1a03a92d1abf67b035ed2c52e1a0ab9090))
+* **mem:** render every field under a label, alias included ([#3004](https://github.com/mlorentedev/dotfiles/issues/3004)) ([1f867b6](https://github.com/mlorentedev/dotfiles/commit/1f867b69ca15cf4bbf84dca8274db13e742440d7))
+* **mem:** render Verify as written under one note, with no read-only marker ([#2990](https://github.com/mlorentedev/dotfiles/issues/2990)) ([8e0b61b](https://github.com/mlorentedev/dotfiles/commit/8e0b61bcdf08538e02724852f07dbe78d60ee2c6))
+* **mem:** verify only plain flagless commands, and render Verify in place ([#2927](https://github.com/mlorentedev/dotfiles/issues/2927)) ([dee3fe4](https://github.com/mlorentedev/dotfiles/commit/dee3fe4f31aeccdd7abeddd7e3d6bbc9b40fb60a)), closes [#1689](https://github.com/mlorentedev/dotfiles/issues/1689)
+* **powershell:** restore the session's own secrets after pi and opencode ([#2964](https://github.com/mlorentedev/dotfiles/issues/2964)) ([b224f7a](https://github.com/mlorentedev/dotfiles/commit/b224f7a7defded835ee713fc4a1a43b5a41f7f18))
+* **pr-agent:** stop clipping the PR body to 500 tokens before review ([#2961](https://github.com/mlorentedev/dotfiles/issues/2961)) ([fb22c6f](https://github.com/mlorentedev/dotfiles/commit/fb22c6f6f44eab8060484ff9ba9f1438d2896e6b)), closes [#2954](https://github.com/mlorentedev/dotfiles/issues/2954)
+* **prland:** name dotf lessons renumber in the taken-number refusal ([#2968](https://github.com/mlorentedev/dotfiles/issues/2968)) ([4770213](https://github.com/mlorentedev/dotfiles/commit/477021375638251105e040d51cb85937a0714d35))
+* **reproduce:** invert a check without turning could-not-run into a refutation ([#2935](https://github.com/mlorentedev/dotfiles/issues/2935)) ([eb272d1](https://github.com/mlorentedev/dotfiles/commit/eb272d103a64b481a1e451823f0ad93a85658e4a)), closes [#2926](https://github.com/mlorentedev/dotfiles/issues/2926)
+* **secrets:** start hive without its worker key while Bitwarden is locked ([#3006](https://github.com/mlorentedev/dotfiles/issues/3006)) ([17061c2](https://github.com/mlorentedev/dotfiles/commit/17061c2307484c20d7fbaafda7a34ab03ab67b07))
+* **spec:** do not fail a zombie the default branch already archived ([#2920](https://github.com/mlorentedev/dotfiles/issues/2920)) ([acfcbce](https://github.com/mlorentedev/dotfiles/commit/acfcbce201a3806f40e78a1f0903d3f5af32f2ef))
+* **spec:** refuse a review waiver beside a signed FAIL verdict ([#2952](https://github.com/mlorentedev/dotfiles/issues/2952)) ([3b5d1d2](https://github.com/mlorentedev/dotfiles/commit/3b5d1d2785e3914b1ff19047e27789eca39ac3d1)), closes [#1644](https://github.com/mlorentedev/dotfiles/issues/1644)
+* **spec:** report a 404 from another repository as not verified ([#2949](https://github.com/mlorentedev/dotfiles/issues/2949)) ([89d1ee7](https://github.com/mlorentedev/dotfiles/commit/89d1ee70f7c53f5aa4d6a51fa827494b6394ba93))
+* **ssh:** pin rpi4's lab LAN address and point rpi4-lan at it ([#2973](https://github.com/mlorentedev/dotfiles/issues/2973)) ([055467a](https://github.com/mlorentedev/dotfiles/commit/055467ab8395be40f473cfce68d437a495a272dc))
+* **tools:** never build cryptography from source in hive's Windows bootstrap ([#2922](https://github.com/mlorentedev/dotfiles/issues/2922)) ([b491851](https://github.com/mlorentedev/dotfiles/commit/b491851ed1d31da903d45b15909089d860dfea4e))
+* **tools:** probe a self-installed tool only at its declared launcher ([#3013](https://github.com/mlorentedev/dotfiles/issues/3013)) ([0054b54](https://github.com/mlorentedev/dotfiles/commit/0054b54b957dd7e8e95cd040cff8ec0115ae369d))
+* **tools:** retire the legacy hive.cmd shim that shadows the uv install ([#2956](https://github.com/mlorentedev/dotfiles/issues/2956)) ([f6925c4](https://github.com/mlorentedev/dotfiles/commit/f6925c4a5963e6ee30808471e70c499f953a8fca))
+* **vm:** set the Windows guest clock from the host before a run ([#2963](https://github.com/mlorentedev/dotfiles/issues/2963)) ([0c20858](https://github.com/mlorentedev/dotfiles/commit/0c208588228ed287d24fcdff9191af58977757da))
+* **worktree:** hold the worktree lock from the held-issue scan to the lease write ([#2897](https://github.com/mlorentedev/dotfiles/issues/2897)) ([cb8230c](https://github.com/mlorentedev/dotfiles/commit/cb8230c7dd26e31597b1e238510af1554bcec6d2))
+* **worktree:** say why list and sweep could not ask the forge ([#2937](https://github.com/mlorentedev/dotfiles/issues/2937)) ([f5c9f79](https://github.com/mlorentedev/dotfiles/commit/f5c9f79db5e7e3737ed566d2e9e873ecd72de932))
+
 ## [0.77.0](https://github.com/mlorentedev/dotfiles/compare/v0.76.0...v0.77.0) (2026-10-22)
 
 
