@@ -51,6 +51,9 @@ func TestUnreproducedFindings(t *testing.T) {
 		{"a longer line number is another row", finding("REAL", "cli/a.go", 4), "| `cli/a.go:40` | apply | " + reproduced + " |", "no row"},
 		{"a row with no disposition", finding("REAL", "cli/a.go", 4), "| `cli/a.go:4` | see above | x |", "no disposition"},
 		{"named by its base name", finding("REAL", "cli/internal/a.go", 4), "| `a.go:4` | apply | " + reproduced + " |", ""},
+		{"named from the root with ./", finding("REAL", "cli/a.go", 4), "| `./cli/a.go:4` | apply | " + reproduced + " |", ""},
+		{"named from the root with /", finding("REAL", "cli/a.go", 4), "| `/cli/a.go:4` | apply | " + reproduced + " |", ""},
+		{"a dotted directory is not a ./ prefix", finding("REAL", "cli/a.go", 4), "| `.cli/a.go:4` | apply | " + reproduced + " |", "no row"},
 		{"a disposition word in the item cell is not the disposition", finding("REAL", "cli/a.go", 4), "| Skipped lines in `cli/a.go:4` | defer | filed #9 |", ""},
 		{"a THEORETICAL finding needs no reproduction", finding("THEORETICAL", "cli/a.go", 4), "| `cli/a.go:4` | apply | fine |", ""},
 		{"an unclassified finding is not gated here", finding("REAL?", "cli/a.go", 4), "| `cli/a.go:4` | apply | fine |", ""},
@@ -83,12 +86,55 @@ func TestUnreproducedFindingsReadsOnlyTheStandingRecord(t *testing.T) {
 	if got := UnreproducedFindings(pr, []Comment{f}, classifyingRegistry()); len(got) != 1 {
 		t.Fatalf("a record without standing cleared the finding: %+v", got)
 	}
-	late := f
-	late.CreatedAt = triageAt.Add(time.Hour)
-	if got := UnreproducedFindings(triagedWith("| x | apply | y |"), []Comment{late}, classifyingRegistry()); len(got) != 0 {
-		t.Fatalf("a finding newer than the record was judged against it: %+v", got)
-	}
 	if got := UnreproducedFindings(PR{Number: 7}, []Comment{f}, classifyingRegistry()); len(got) != 0 {
 		t.Fatalf("a PR with no record was judged: %+v", got)
+	}
+}
+
+// An inline finding added or edited after the triage can arrive without a new
+// counted review, so nothing else makes the PR pending: it is judged like any
+// other, and a record that cannot have seen it has no row for it (#2996).
+func TestUnreproducedFindingsJudgesAFindingNewerThanTheRecord(t *testing.T) {
+	late := finding("REAL", "cli/a.go", 4)
+	late.CreatedAt = triageAt.Add(time.Hour)
+	got := UnreproducedFindings(triagedWith("| `cli/b.go:1` | defer | filed #9 |"), []Comment{late}, classifyingRegistry())
+	if len(got) != 1 || !strings.Contains(got[0].Problem, "newer than the triage record") {
+		t.Fatalf("a late REAL finding went unjudged: %+v", got)
+	}
+	edited := finding("REAL", "cli/a.go", 4)
+	edited.UpdatedAt = triageAt.Add(time.Hour)
+	got = UnreproducedFindings(triagedWith("| `cli/a.go:4` | apply | looks right |"), []Comment{edited}, classifyingRegistry())
+	if len(got) != 1 || !strings.Contains(got[0].Problem, "reproduced") {
+		t.Fatalf("a finding edited after the triage escaped its row's check: %+v", got)
+	}
+}
+
+// Two findings at one line of same-named files must not read each other's
+// row: when a base name is shared, only the full path names a finding (#2996).
+func TestUnreproducedFindingsTellsSameNamedFilesApart(t *testing.T) {
+	a, b := finding("REAL", "a/util.go", 4), finding("REAL", "b/util.go", 4)
+	const reproduced = "Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./x`"
+	pr := triagedWith("| `b/util.go:4` | apply | " + reproduced + " |\n| `a/util.go:4` | apply | looks right |")
+	got := UnreproducedFindings(pr, []Comment{a, b}, classifyingRegistry())
+	if len(got) != 1 || got[0].Finding.Path != "a/util.go" {
+		t.Fatalf("got %+v, want only a/util.go held", got)
+	}
+	pr = triagedWith("| `util.go:4` | apply | " + reproduced + " |")
+	if got := UnreproducedFindings(pr, []Comment{a, b}, classifyingRegistry()); len(got) != 2 {
+		t.Fatalf("a shared base name cleared both findings: %+v", got)
+	}
+	pr = triagedWith("| `x/a/util.go:4` | apply | " + reproduced + " |\n| `b/util.go:4` | defer | filed #9 |")
+	if got := UnreproducedFindings(pr, []Comment{a, b}, classifyingRegistry()); len(got) != 1 || got[0].Finding.Path != "a/util.go" {
+		t.Fatalf("a longer path cleared a/util.go: %+v", got)
+	}
+	// The look-alike need not be a finding: a row naming another directory
+	// never names this one, whatever else the PR carries.
+	pr = triagedWith("| `b/util.go:4` | apply | " + reproduced + " |")
+	if got := UnreproducedFindings(pr, []Comment{a}, classifyingRegistry()); len(got) != 1 {
+		t.Fatalf("a row for b/util.go cleared the only finding, a/util.go: %+v", got)
+	}
+	pr = triagedWith("| `internal/a.go:4` | apply | " + reproduced + " |")
+	if got := UnreproducedFindings(pr, []Comment{finding("REAL", "cli/internal/a.go", 4)}, classifyingRegistry()); len(got) != 0 {
+		t.Fatalf("a row naming the path's tail did not clear it: %+v", got)
 	}
 }

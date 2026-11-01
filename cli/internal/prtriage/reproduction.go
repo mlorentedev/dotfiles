@@ -35,32 +35,52 @@ var dispositions = map[string]string{
 // and the gate refuses). A REAL finding is applied only with a row showing
 // it was reproduced, and refuted only with a row showing it was not; it is
 // never skipped, because a failed reproduction is not a skip (#1059). It may
-// be deferred. Other classes, and findings newer than the record, are not
-// judged here: the second already make the PR pending.
+// be deferred. Other classes are not judged here.
 //
-// A finding's row is the first table row naming its path and line, the base
-// name standing for the path. The disposition is the first cell, after the
-// one naming the finding, whose first word is a disposition.
+// Findings newer than the record are judged too: an inline comment added or
+// edited after it need not move the counted channel that makes a PR pending.
+//
+// A finding's row is the first table row naming its path, or a tail of it, and
+// its line. The bare base name counts unless another finding shares it
+// (#2996). The disposition is the first cell, after the one
+// naming the finding, whose first word is a disposition.
 func UnreproducedFindings(pr PR, inline []Comment, reg Registry) []Unreproduced {
 	record, ok := triageRecord(pr, reg)
 	if !ok {
 		return nil
 	}
 	rows := tableRows(record.Body)
+	shared := sharedBaseNames(inline)
 	var out []Unreproduced
 	for _, f := range inline {
-		if f.Spoken().After(record.CreatedAt) || Classify(f.Body, reg) != "REAL" {
+		if Classify(f.Body, reg) != "REAL" {
 			continue
 		}
-		if problem := judge(f, rows); problem != "" {
+		if problem := judge(f, rows, shared[path.Base(f.Path)]); problem != "" {
+			if f.Spoken().After(record.CreatedAt) {
+				problem += "; it is newer than the triage record"
+			}
 			out = append(out, Unreproduced{Finding: f, Problem: problem})
 		}
 	}
 	return out
 }
 
-func judge(f Comment, rows [][]string) string {
-	cells, at := rowFor(f, rows)
+// sharedBaseNames reports the base names that more than one path carries.
+func sharedBaseNames(inline []Comment) map[string]bool {
+	last, shared := map[string]string{}, map[string]bool{}
+	for _, f := range inline {
+		base := path.Base(f.Path)
+		if p, seen := last[base]; seen && p != f.Path {
+			shared[base] = true
+		}
+		last[base] = f.Path
+	}
+	return shared
+}
+
+func judge(f Comment, rows [][]string, baseShared bool) string {
+	cells, at := rowFor(f, rows, baseShared)
 	if cells == nil {
 		return "the triage record has no row for it"
 	}
@@ -102,15 +122,22 @@ func tableRows(body string) [][]string {
 
 // rowFor returns the first row naming f, and the index of the cell that
 // does. A name is bounded on both sides, so a.go:4 is not ba.go:4 or a.go:40.
-func rowFor(f Comment, rows [][]string) ([]string, int) {
+// It is f's path or a tail of it at a directory, so a/util.go:4 is neither
+// b/util.go:4 nor x/a/util.go:4, and the bare base name counts only when
+// baseShared is false.
+func rowFor(f Comment, rows [][]string, baseShared bool) ([]string, int) {
 	if f.Path == "" || f.Line == 0 {
 		return nil, 0
 	}
-	name := regexp.MustCompile(`(^|[^\w.\-])` + regexp.QuoteMeta(path.Base(f.Path)) + fmt.Sprintf(`:%d(\D|$)`, f.Line))
+	name := regexp.MustCompile(`(?:^|[^\w.\-/])([\w.\-/]*` + regexp.QuoteMeta(path.Base(f.Path)) + fmt.Sprintf(`):%d(?:\D|$)`, f.Line))
 	for _, cells := range rows {
 		for i, c := range cells {
-			if name.MatchString(c) {
-				return cells, i
+			for _, m := range name.FindAllStringSubmatch(c, -1) {
+				named := strings.TrimPrefix(path.Clean(m[1]), "/") // ./cli/a.go and /cli/a.go are cli/a.go
+				tail := strings.HasSuffix(f.Path, "/"+named) && (strings.Contains(named, "/") || !baseShared)
+				if named == f.Path || tail {
+					return cells, i
+				}
 			}
 		}
 	}
