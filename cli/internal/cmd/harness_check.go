@@ -29,9 +29,12 @@ func newHarnessCheckCmd() *cobra.Command {
 			"for it. Each target's GENERATED region must equal the enforced records it\n" +
 			"injects. Each skill and agent record must open with frontmatter holding every\n" +
 			"key its schema requires. Any failure is printed on stderr and exits non-zero.\n\n" +
-			"--against-vault also compares each skill and agent record with the vault source\n" +
-			"it was refreshed from, by the generated_sha it carries: a vault edit nobody\n" +
-			"refreshed, a source that is gone, or a record with no provenance is drift.\n" +
+			"--against-vault also compares each record with the vault source it comes from.\n" +
+			"A skill or agent record whose generated_sha is behind its source is stale; one\n" +
+			"whose sha matches but whose files differ from what a refresh renders was edited\n" +
+			"in the checkout, and the next refresh reverts that edit. Each enforced record\n" +
+			"is held to its vault section. A source that is gone, or a record with no\n" +
+			"provenance, is drift too.\n" +
 			"It needs a vault, so it is not part of the offline check CI runs.",
 		Example:      "  dotf harness check\n  dotf harness check --repo-root /path/to/checkout\n  dotf harness check --against-vault",
 		Args:         cobra.NoArgs,
@@ -60,7 +63,7 @@ func newHarnessCheckCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "checkout holding harness/manifest.json (default: DOTFILES_REPO_DIR or the cwd walk-up)")
-	cmd.Flags().BoolVar(&againstVault, "against-vault", false, "also compare each skill and agent record with its vault source")
+	cmd.Flags().BoolVar(&againstVault, "against-vault", false, "also compare each record with what a refresh renders from the vault")
 	cmd.Flags().StringVar(&vault, "vault", "", "vault for --against-vault (default: $VAULT_PATH, then machine.json, then the env-contract default)")
 	return cmd
 }

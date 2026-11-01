@@ -66,6 +66,24 @@ func TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit(t *testing.T) {
 	}
 }
 
+// #1545: a record edited in the checkout, with its vault source unchanged,
+// fails the check: the next refresh would revert the edit.
+func TestHarnessCheck_AgainstVaultFlagsARecordEditedWithoutItsSource(t *testing.T) {
+	repo, vault := againstVaultFixture(t)
+	rec := filepath.Join(repo, "harness", "skills", "demo", "SKILL.md")
+	b, err := os.ReadFile(rec) //nolint:gosec // a test fixture
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rec, append(b, "an edit made only here\n"...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runCheck(t, "--repo-root", repo, "--against-vault", "--vault", vault)
+	if !errors.Is(err, errHarnessDrift) || !strings.Contains(out, "[EDITED] harness/skills/demo") {
+		t.Fatalf("want drift naming skills/demo as edited, got %v\n%s", err, out)
+	}
+}
+
 func TestHarnessCheck_AgainstVaultRefusesWithoutAVault(t *testing.T) {
 	repo, _ := againstVaultFixture(t)
 	_, err := runCheck(t, "--repo-root", repo, "--against-vault", "--vault", filepath.Join(t.TempDir(), "absent"))

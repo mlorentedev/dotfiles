@@ -43,13 +43,17 @@ func checkSkillRecordsAgainstVault(sys *System, rep *Report) {
 		rep.Warn(fmt.Sprintf("%d committed harness record(s) carry no generated_from/generated_sha, so they cannot be compared with the vault: %s "+
 			"(run `dotf harness refresh` in a worktree and open a PR)", len(unstamped), strings.Join(unstamped, ", ")))
 	}
+	if len(d.Edited) > 0 {
+		rep.Warn(fmt.Sprintf("%d committed harness record(s) differ from the render of a vault source that has not changed: %s. "+
+			"The next refresh reverts that edit: carry it to the vault source, then run `dotf harness refresh`", len(d.Edited), strings.Join(d.Edited, ", ")))
+	}
 	if len(stale) > 0 {
 		rep.Warn(fmt.Sprintf("%d committed harness record(s) differ from their vault source: %s. "+
 			"If the vault is the newer side, run `dotf harness refresh` in a worktree and open a PR; "+
 			"if the records are, pull the vault", len(stale), strings.Join(stale, ", ")))
 		return
 	}
-	if checked > 0 && len(unstamped) == 0 && len(unread) == 0 {
+	if checked > 0 && len(d.Edited) == 0 && len(unstamped) == 0 && len(unread) == 0 {
 		rep.Pass(fmt.Sprintf("%d committed records match their vault source", checked))
 	}
 }

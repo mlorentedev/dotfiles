@@ -23,6 +23,10 @@ func writeRecord(t *testing.T, repo, rel, src, sha string) {
 	}
 }
 
+// recordSource is a vault source whose stamped render is exactly the body
+// writeRecord writes, so a record written from its sha is also its render.
+const recordSource = "---\nid: x\n---\n\nbody\n"
+
 // writeSource writes a vault source and returns the 16-hex sha compile-harness.sh records for it.
 func writeSource(t *testing.T, vault, rel, content string) string {
 	t.Helper()
@@ -49,8 +53,8 @@ func TestCheckSkillRecordsAgainstVault(t *testing.T) {
 
 	t.Run("records refreshed from the current vault pass", func(t *testing.T) {
 		repo, vault := t.TempDir(), t.TempDir()
-		writeRecord(t, repo, "harness/skills/teardown/SKILL.md", skillSrc, writeSource(t, vault, skillSrc, "v1\n"))
-		writeRecord(t, repo, "harness/agents/builder/AGENT.md", agentSrc, writeSource(t, vault, agentSrc, "a1\n"))
+		writeRecord(t, repo, "harness/skills/teardown/SKILL.md", skillSrc, writeSource(t, vault, skillSrc, recordSource))
+		writeRecord(t, repo, "harness/agents/builder/AGENT.md", agentSrc, writeSource(t, vault, agentSrc, recordSource))
 		out, rep := run(t, map[string]string{"DOTFILES_REPO_DIR": repo, "VAULT_PATH": vault})
 		if rep.Warnings() != 0 || rep.Failures() != 0 {
 			t.Fatalf("want a clean pass\n%s", out)
@@ -76,6 +80,20 @@ func TestCheckSkillRecordsAgainstVault(t *testing.T) {
 		}
 	})
 
+	t.Run("a record edited without its vault source warns and names the record", func(t *testing.T) {
+		repo, vault := t.TempDir(), t.TempDir()
+		writeRecord(t, repo, "harness/skills/teardown/SKILL.md", skillSrc, writeSource(t, vault, skillSrc, recordSource+"an edit made only in the vault\n"))
+		out, rep := run(t, map[string]string{"DOTFILES_REPO_DIR": repo, "VAULT_PATH": vault})
+		if rep.Warnings() != 1 || strings.Contains(out, "[ OK ]") {
+			t.Fatalf("want one warning and no pass\n%s", out)
+		}
+		for _, want := range []string{"skills/teardown", "carry it to the vault source"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("want %q in the warning\n%s", want, out)
+			}
+		}
+	})
+
 	t.Run("a record whose vault source is gone warns as such", func(t *testing.T) {
 		repo, vault := t.TempDir(), t.TempDir()
 		writeRecord(t, repo, "harness/agents/builder/AGENT.md", agentSrc, "0123456789abcdef")
@@ -87,7 +105,7 @@ func TestCheckSkillRecordsAgainstVault(t *testing.T) {
 
 	t.Run("a record without provenance warns instead of being skipped", func(t *testing.T) {
 		repo, vault := t.TempDir(), t.TempDir()
-		writeRecord(t, repo, "harness/skills/teardown/SKILL.md", skillSrc, writeSource(t, vault, skillSrc, "v1\n"))
+		writeRecord(t, repo, "harness/skills/teardown/SKILL.md", skillSrc, writeSource(t, vault, skillSrc, recordSource))
 		p := filepath.Join(repo, "harness", "skills", "bare", "SKILL.md")
 		mkdirAll(t, filepath.Dir(p))
 		if err := os.WriteFile(p, []byte("---\nid: bare\n---\n\nbody\n"), 0o644); err != nil {
@@ -118,7 +136,7 @@ func TestCheckSkillRecordsNamesAnUnreadableRecordsDir(t *testing.T) {
 	}
 	repo, vault := t.TempDir(), t.TempDir()
 	const src = "00_meta/agents/definitions/builder/AGENT.md"
-	writeRecord(t, repo, "harness/agents/builder/AGENT.md", src, writeSource(t, vault, src, "a1\n"))
+	writeRecord(t, repo, "harness/agents/builder/AGENT.md", src, writeSource(t, vault, src, recordSource))
 	writeRecord(t, repo, "harness/skills/teardown/SKILL.md", "00_meta/skills/teardown/SKILL.md", "0123456789abcdef")
 	locked := filepath.Join(repo, "harness", "skills")
 	if err := os.Chmod(locked, 0o000); err != nil {
