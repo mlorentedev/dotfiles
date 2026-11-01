@@ -5,10 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
 // gitIn runs git in dir and returns trimmed stdout, failing the test on error.
@@ -39,19 +40,26 @@ func writeCommit(t *testing.T, dir, rel, body string) {
 
 // refreshFixture is the shape #2162 was measured on: an upstream vault at v2,
 // a local clone of it one commit behind at v1, and a dotfiles checkout whose
-// committed record already holds v2. Its compile-harness.sh stand-in renders
-// the record from $VAULT_PATH, so a refresh from the stale clone reverts it.
+// committed record already holds v2. The record is cut from the vault's
+// pattern, so a refresh from the stale clone reverts it. The checkout has two
+// targets, so a guard that reads a fixed list instead of the manifest misses
+// the second (it missed ai/orca/ORCA.md).
 type refreshFixture struct {
 	upstream, vault, repo string
 }
 
 const refreshPattern = "00_meta/patterns/pattern-x.md"
 
+func refreshPatternBody(v string) string { return "# Rule\n" + v + "\n" }
+
+const refreshManifest = `{"version": 1, "vault_subpath": "00_meta/patterns",
+  "enforced": [{"id": "demo", "source": "pattern-x.md#rule"}],
+  "targets": [{"file": "TARGET.md", "inject": ["demo"]}, {"file": "ai/OTHER.md", "inject": ["demo"]}]}`
+
+const refreshTarget = "intro\n<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED -->\noutro\n"
+
 func newRefreshFixture(t *testing.T) refreshFixture {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("the compile-harness.sh stand-in is a POSIX script")
-	}
 	root := t.TempDir()
 	f := refreshFixture{
 		upstream: filepath.Join(root, "upstream.git"),
@@ -60,24 +68,27 @@ func newRefreshFixture(t *testing.T) refreshFixture {
 	}
 	gitIn(t, root, "init", "-q", "--bare", f.upstream)
 	gitIn(t, root, "clone", "-q", f.upstream, f.vault)
-	writeCommit(t, f.vault, refreshPattern, "v1\n")
+	writeCommit(t, f.vault, refreshPattern, refreshPatternBody("v1"))
 	gitIn(t, f.vault, "push", "-q", "origin", "HEAD")
 
 	other := filepath.Join(root, "other")
 	gitIn(t, root, "clone", "-q", f.upstream, other)
-	writeCommit(t, other, refreshPattern, "v2\n")
+	writeCommit(t, other, refreshPattern, refreshPatternBody("v2"))
 	gitIn(t, other, "push", "-q", "origin", "HEAD")
 
 	if err := os.MkdirAll(f.repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	gitIn(t, f.repo, "init", "-q")
-	writeCommit(t, f.repo, "harness/record.md", "v2\n")
-	script := "#!/bin/sh\ncat \"$VAULT_PATH/" + refreshPattern + "\" > harness/record.md\n"
-	writeCommit(t, f.repo, "scripts/compile-harness.sh", script)
-	if err := os.Chmod(filepath.Join(f.repo, "scripts", "compile-harness.sh"), 0o755); err != nil {
+	writeCommit(t, f.repo, "harness/manifest.json", refreshManifest)
+	writeCommit(t, f.repo, "TARGET.md", refreshTarget)
+	writeCommit(t, f.repo, "ai/OTHER.md", refreshTarget)
+	// The committed state is the v2 render, as the checkout holds it.
+	if _, err := harness.Refresh(f.repo, other); err != nil {
 		t.Fatal(err)
 	}
+	gitIn(t, f.repo, "add", "-A")
+	gitIn(t, f.repo, "commit", "-q", "-m", "refresh v2")
 	return f
 }
 
@@ -90,7 +101,7 @@ func (f refreshFixture) run(t *testing.T) (stdout, stderr string, err error) {
 
 func (f refreshFixture) record(t *testing.T) string {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(f.repo, "harness", "record.md"))
+	b, err := os.ReadFile(filepath.Join(f.repo, "harness", "enforced", "demo.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +151,7 @@ func TestHarnessRefresh_ADivergedVaultIsNotRefreshedFromAndStaysUntouched(t *tes
 func TestHarnessRefresh_AnAheadVaultIsRefreshedFromAndItsChangeAnnounced(t *testing.T) {
 	f := newRefreshFixture(t)
 	gitIn(t, f.vault, "pull", "-q", "--ff-only")
-	writeCommit(t, f.vault, refreshPattern, "v3\n")
+	writeCommit(t, f.vault, refreshPattern, refreshPatternBody("v3"))
 
 	_, stderr, err := f.run(t)
 
@@ -150,7 +161,7 @@ func TestHarnessRefresh_AnAheadVaultIsRefreshedFromAndItsChangeAnnounced(t *test
 	if got := f.record(t); got != "v3\n" {
 		t.Errorf("record = %q, want v3 from the vault's unpushed commit", got)
 	}
-	for _, want := range []string{"Harness records changed by --refresh", "harness/record.md", "chore(harness): refresh records from vault"} {
+	for _, want := range []string{"Harness records changed by --refresh", "harness/enforced/demo.md", "chore(harness): refresh records from vault"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("drift report lacks %q:\n%s", want, stderr)
 		}
@@ -171,20 +182,23 @@ func TestHarnessRefresh_WithoutAVaultTheCommittedRecordsStand(t *testing.T) {
 	}
 }
 
-func TestHarnessRefresh_AFailedScriptIsAnErrorWithItsOutput(t *testing.T) {
+func TestHarnessRefresh_AFailedRenderIsAnErrorAndWritesNothing(t *testing.T) {
 	f := newRefreshFixture(t)
-	script := filepath.Join(f.repo, "scripts", "compile-harness.sh")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho 'marker missing' >&2\nexit 3\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	// The second target loses its END marker; the first is fine and comes
+	// first, so a refresh that wrote as it went would have rewritten it.
+	writeCommit(t, f.repo, "ai/OTHER.md", "intro\n<!-- BEGIN HARNESS GENERATED -->\n")
+	before := gitIn(t, f.repo, "rev-parse", "HEAD:TARGET.md")
 
-	_, stderr, err := f.run(t)
+	_, _, err := f.run(t)
 
-	if err == nil {
-		t.Fatal("a failed compile-harness run returned nil")
+	if err == nil || !strings.Contains(err.Error(), "END") {
+		t.Fatalf("err = %v, want the marker error", err)
 	}
-	if !strings.Contains(stderr, "marker missing") {
-		t.Errorf("the script's own output was not relayed:\n%s", stderr)
+	if got := f.record(t); got != "v2\n" {
+		t.Errorf("record = %q: a failed refresh wrote it", got)
+	}
+	if dirt := gitIn(t, f.repo, "status", "--porcelain"); dirt != "" {
+		t.Errorf("a failed refresh left changes (TARGET.md was %s):\n%s", before, dirt)
 	}
 }
 
@@ -209,7 +223,7 @@ func TestHarnessRefresh_ADirtyVaultIsNotRefreshedFromAndTheWarningNamesItsPaths(
 
 func TestHarnessRefresh_UncommittedWorkInTheRecordsIsNeitherOverwrittenNorAnnounced(t *testing.T) {
 	f := newRefreshFixture(t)
-	if err := os.WriteFile(filepath.Join(f.repo, "harness", "record.md"), []byte("wip\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(f.repo, "harness", "enforced", "demo.md"), []byte("wip\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -226,7 +240,27 @@ func TestHarnessRefresh_UncommittedWorkInTheRecordsIsNeitherOverwrittenNorAnnoun
 	}
 	// The six-space indent, then the porcelain line with its index column
 	// intact: a line, not a substring, so a trimmed column fails it (#2177).
-	if !slices.Contains(strings.Split(stderr, "\n"), "       M harness/record.md") {
+	if !slices.Contains(strings.Split(stderr, "\n"), "       M harness/enforced/demo.md") {
 		t.Errorf("the warning does not name the uncommitted path in porcelain form:\n%s", stderr)
+	}
+}
+
+func TestHarnessRefresh_UncommittedWorkInAnyManifestTargetStopsTheRefresh(t *testing.T) {
+	f := newRefreshFixture(t)
+	other := filepath.Join(f.repo, "ai", "OTHER.md")
+	if err := os.WriteFile(other, []byte(refreshTarget+"wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, stderr, err := f.run(t)
+
+	if err != nil {
+		t.Fatalf("a skip is not an error: %v", err)
+	}
+	if b, _ := os.ReadFile(other); !strings.HasSuffix(string(b), "wip\n") {
+		t.Errorf("the refresh overwrote uncommitted work in a target the old fixed list did not name:\n%s", b)
+	}
+	if !slices.Contains(strings.Split(stderr, "\n"), "       M ai/OTHER.md") {
+		t.Errorf("the warning does not name the second target:\n%s", stderr)
 	}
 }
