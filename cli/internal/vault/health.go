@@ -46,6 +46,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/fsread"
 )
 
 // HealthOptions configures a `vault health` run. VaultDir/VaultName are already
@@ -750,7 +752,7 @@ func (h *healthRun) section7Backlog() {
 		return
 	}
 
-	matches, unreadable, err := childFiles(filepath.Join(vd, "10_projects"), "11-tasks.md")
+	matches, unreadable, err := fsread.ChildFiles(filepath.Join(vd, "10_projects"), "11-tasks.md")
 	if err != nil {
 		h.fail("Backlog integrity: cannot read 10_projects: %v", err)
 		return

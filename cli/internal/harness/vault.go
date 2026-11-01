@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/fsread"
 )
 
 // VaultDrift is how the committed harness records compare with the vault
@@ -99,24 +99,13 @@ func CompareWithVault(repoRoot, vault string) VaultDrift {
 // check passed over it (#2797). A dir that does not exist holds no records;
 // any other failure to read it, or to check one of its entries, is returned.
 func recordFiles(dir, file string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
+	found, unreadable, err := fsread.ChildFiles(dir, file)
 	if err != nil {
 		return nil, err
 	}
-	var found []string
-	var errs []error
-	for _, e := range entries {
-		p := filepath.Join(dir, e.Name(), file)
-		switch _, err := os.Lstat(p); {
-		case err == nil:
-			found = append(found, p)
-		case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
-		default:
-			errs = append(errs, err)
-		}
+	errs := make([]error, len(unreadable))
+	for i, pe := range unreadable {
+		errs[i] = pe
 	}
 	return found, errors.Join(errs...)
 }

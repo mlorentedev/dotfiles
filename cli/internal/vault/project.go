@@ -1,15 +1,14 @@
 package vault
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/fsread"
 )
 
 // projectEntryFiles maps an embedded template to its path under the personal-
@@ -171,7 +170,7 @@ func trackedSlug(vaultPath, url string) (string, error) {
 	if want == "" {
 		return "", nil
 	}
-	contexts, unreadable, err := childFiles(filepath.Join(vaultPath, "10_projects"), "context.md")
+	contexts, unreadable, err := fsread.ChildFiles(filepath.Join(vaultPath, "10_projects"), "context.md")
 	if err != nil {
 		return "", fmt.Errorf("cannot tell whether the vault already tracks %s: %w", want, err)
 	}
@@ -189,37 +188,6 @@ func trackedSlug(vaultPath, url string) (string, error) {
 		match = filepath.Base(filepath.Dir(ctx))
 	}
 	return match, nil
-}
-
-// childFiles is filepath.Glob(root/*/rel) without its blind spot: Glob drops
-// I/O errors, so an unreadable root or entry read as holding nothing (#2797).
-// It returns the paths that exist (a directory there counts, as with Glob),
-// sorted, the entries whose path could not be checked, and an error when root
-// itself cannot be read. A root that does not exist holds nothing.
-func childFiles(root, rel string) (found []string, unreadable []*fs.PathError, err error) {
-	entries, err := os.ReadDir(root)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil, nil
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, e := range entries {
-		p := filepath.Join(root, e.Name(), rel)
-		_, err := os.Lstat(p)
-		var pe *fs.PathError
-		switch {
-		case err == nil:
-			found = append(found, p)
-		case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
-			// not a project, or a project without the file
-		case errors.As(err, &pe):
-			unreadable = append(unreadable, pe)
-		default:
-			unreadable = append(unreadable, &fs.PathError{Op: "lstat", Path: p, Err: err})
-		}
-	}
-	return found, unreadable, nil
 }
 
 // normalizeRepoURL reduces the SSH, scp-like and HTTPS spellings of one
