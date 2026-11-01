@@ -1,7 +1,7 @@
 ---
 id: "CLI-132-root-commit-review"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-30"
 issue: "mlorentedev/dotfiles#2566"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, review, adversarial-review]
@@ -90,3 +90,5 @@ rewrite history, guess a base, or hand-author provenance.
   `cli/internal/spec/review_launch.go`, `cli/internal/spec/review.go`,
   `cli/internal/cmd/spec.go`
 - Pattern: `00_meta/patterns/pattern-verification-fails-toward-unproven.md`
+
+<!-- archived 2026-11-01 — PR: https://github.com/mlorentedev/dotfiles/pull/2977 -->

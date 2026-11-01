@@ -112,7 +112,7 @@ written, and the target checkout stayed clean (hashes of its `review.md` and
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-132-root-commit-review/` -> `specs/archive/CLI-132-root-commit-review/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-132-root-commit-review/` -> `specs/archive/CLI-132-root-commit-review/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
