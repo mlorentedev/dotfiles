@@ -133,8 +133,9 @@ func rowFor(f Comment, rows [][]string, baseShared bool) ([]string, int) {
 	for _, cells := range rows {
 		for i, c := range cells {
 			for _, m := range name.FindAllStringSubmatch(c, -1) {
-				tail := strings.HasSuffix(f.Path, "/"+m[1]) && (strings.Contains(m[1], "/") || !baseShared)
-				if m[1] == f.Path || tail {
+				named := strings.TrimPrefix(path.Clean(m[1]), "/") // ./cli/a.go and /cli/a.go are cli/a.go
+				tail := strings.HasSuffix(f.Path, "/"+named) && (strings.Contains(named, "/") || !baseShared)
+				if named == f.Path || tail {
 					return cells, i
 				}
 			}
