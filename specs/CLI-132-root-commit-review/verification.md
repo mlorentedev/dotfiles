@@ -97,11 +97,18 @@ written, and the target checkout stayed clean (hashes of its `review.md` and
 - The command seam `resolveReviewBase` now returns `spec.ReviewBase`, and
   `emptyTreeOf` joins it, so command tests can drive every resolver answer.
 
+## Review dispositions (2026-11-01, nan/mimo-v2.6-flash, PASS)
+
+- F1, the ordinary-scope prompt does not warn about merged-in work: ticketed as #3018. It is outside CLI-132's scope, because the proposal leaves ordinary behaviour unchanged.
+- F2, `spec-gate` red while the spec is unarchived: applied, the spec is archived in this PR.
+- F3, `--initial` combined with `--second` or `--fallback-reason` is untested: ticketed as #3019.
+- F4, promotion candidates held placeholders: applied, answered below.
+
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? no: the two lost review rounds came from the review environment and are tracked in #2979 and on #1649; the change itself taught nothing new
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the opt-in `--initial` scope is recorded in proposal.md and keeps BUG-108's default refusal
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: specific to dotf's spec review
 
 ## Archive checklist
 
