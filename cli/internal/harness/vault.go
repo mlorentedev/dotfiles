@@ -18,16 +18,20 @@ import (
 // sources they were refreshed from. Each record carries `generated_from` (the
 // vault path) and `generated_sha` (the first 16 hex of the source's sha256), so
 // a vault edit nobody refreshed shows as a sha that no longer matches (#1545).
+// The stamp sees only the vault side, so each record whose stamp matches is also
+// compared with the render of its source: a record edited without its source
+// is reverted by the next refresh (#1545), and Edited names it.
 type VaultDrift struct {
 	Checked   int
 	Stale     []string // kind/name, with " (source gone)" when the source is missing
+	Edited    []string // kind/name of a record that differs from the render of its unchanged source
 	Unstamped []string // records carrying no provenance, which cannot be compared
 	Unread    []string // records directories that could not be read
 }
 
 // HasDrift reports whether any record failed to match or could not be compared.
 func (d VaultDrift) HasDrift() bool {
-	return len(d.Stale)+len(d.Unstamped)+len(d.Unread) > 0
+	return len(d.Stale)+len(d.Edited)+len(d.Unstamped)+len(d.Unread) > 0
 }
 
 // Lines renders the comparison as check lines, problems first.
@@ -36,6 +40,10 @@ func (d VaultDrift) Lines() []CheckLine {
 	for _, n := range d.Stale {
 		out = append(out, CheckLine{Problem: true, Text: "[STALE] harness/" + n + " differs from its vault source",
 			Detail: []string{"      -> if the vault is the newer side, run dotf harness refresh in a worktree; if the record is, carry the edit to the vault"}})
+	}
+	for _, n := range d.Edited {
+		out = append(out, CheckLine{Problem: true, Text: "[EDITED] harness/" + n + " differs from the render of its vault source, which has not changed",
+			Detail: []string{"      -> carry the edit to the vault source, then run dotf harness refresh; a refresh reverts an edit made only to the record"}})
 	}
 	for _, n := range d.Unstamped {
 		out = append(out, CheckLine{Problem: true, Text: "[UNSTAMPED] harness/" + n + " carries no generated_from/generated_sha, so it cannot be compared with the vault"})
@@ -74,10 +82,14 @@ func CompareWithVault(repoRoot, vault string) VaultDrift {
 				d.Stale = append(d.Stale, name+" (source gone)")
 			case got != sha:
 				d.Stale = append(d.Stale, name)
+			default:
+				d.compareRender(name, filepath.Dir(rec), filepath.Join(vault, filepath.FromSlash(from)), from, sha)
 			}
 		}
 	}
+	d.compareEnforced(repoRoot, vault)
 	sort.Strings(d.Stale)
+	sort.Strings(d.Edited)
 	sort.Strings(d.Unstamped)
 	return d
 }

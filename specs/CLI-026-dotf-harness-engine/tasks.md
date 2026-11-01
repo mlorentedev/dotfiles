@@ -67,7 +67,17 @@ created: "2026-06-21"
 > harness schemas, so the owner lands it.
 
 - [x] Render half of `--refresh` in Go behind the existing gate (`harness.Refresh`, `tests/harness-refresh-parity.bats`); every check runs before the first write, and the dirty-paths guard reads the manifest's targets (lesson 529)
-  - [ ] With the render in Go, `--against-vault` also renders each vault source and compares it with the committed record, so a record edited without its vault source is caught before a refresh reverts it (the other half of #1545; the stamp compare sees only the vault side)
+  - [x] With the render in Go, `--against-vault` also renders each vault source and compares it with the committed record, so a record edited without its vault source is caught before a refresh reverts it (the other half of #1545; the stamp compare sees only the vault side)
+    - [x] Skill and agent records whose sha matches are rendered from the source dir and compared file by file
+      (`VaultDrift.Edited`, `[EDITED]`); a file the vault does not have, or one missing, is an edit too
+    - [x] Enforced records, which carry no stamp, are held to the vault section they are cut from; a section
+      that is gone is stale
+    - [x] Line endings compare as LF, so a CRLF vault checkout is not an edit
+    - [x] A record dir's own dotfiles are skipped on both sides, as the refresh skips them, so a `.DS_Store`
+      Finder leaves there is not an edit
+    - [x] doctor's vault check warns on an edited record and names the remedy (carry the edit to the vault)
+    - [x] Real vault at origin/master: 50 records level; a one-line edit to `skills/helm` and to an enforced
+      record each fails the check
 - [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
   - [ ] The five `harness-*-parity.bats` oracles go with the script; `harness-doctrine-records.bats` and `harness-refresh-announce.bats` move to `dotf harness refresh --vault`
   - [ ] Before closing #2884 with it, each of its three cases has a Go-side test, or gets one here
