@@ -628,3 +628,18 @@ func TestReviewPromptKeepsTheTripleDotScopeForAnOrdinaryBase(t *testing.T) {
 		t.Errorf("an ordinary review must not be described as initial:\n%s", scoped)
 	}
 }
+
+// A branch that merged main after its base carries other PRs' work in the
+// range: CLI-132's round read 163 files, 14 of them authored (#3018). The
+// ordinary prompt must say how to tell the two apart, as the initial one does.
+func TestReviewPromptWarnsTheOrdinaryScopeAboutMergedInWork(t *testing.T) {
+	p := ReviewPromptForScope(FirstSigner, "AI-001-x", "/repo", "nan/x", "pi", "/skill.md", ReviewScope{BaseSHA: "basebasebase"})
+	for _, want := range []string{
+		"`git log --first-parent --no-merges basebasebase..HEAD`",
+		"Judge what the spec names first",
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("the ordinary-scope prompt must carry %q:\n%s", want, p)
+		}
+	}
+}
