@@ -136,7 +136,7 @@ func sectionOf(path, slug string) (string, error) {
 	}
 	var b strings.Builder
 	capLevel := 0
-	for _, l := range recordLines(raw) {
+	for _, l := range recordLines(normalizeLF(raw)) {
 		if headingLine.MatchString(l) {
 			level := len(l) - len(strings.TrimLeft(l, "#"))
 			if capLevel > 0 && level <= capLevel {
@@ -189,7 +189,7 @@ func refreshedTarget(repoRoot, file string, ids []string, records map[string]str
 	if err != nil {
 		return "", err
 	}
-	lines := recordLines(raw)
+	lines := recordLines(normalizeLF(raw))
 	if msg := regionMarkerError(lines); msg != "" {
 		return "", fmt.Errorf("%s: %s", path, msg)
 	}

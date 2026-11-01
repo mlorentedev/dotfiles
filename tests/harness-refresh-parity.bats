@@ -116,7 +116,7 @@ refresh_both() {
     mkdir -p "$skills/zz-new/scripts"
     printf -- '---\nid: zz-new\ntype: skill\nstatus: active\ncreated: x\nowner: t\nname: zz-new\ndescription: a new skill\n---\n\nbody\n' >"$skills/zz-new/SKILL.md"
     printf '#!/bin/sh\necho hi\n' >"$skills/zz-new/scripts/run.sh"
-    chmod +x "$skills/zz-new/scripts/run.sh"
+    chmod 755 "$skills/zz-new/scripts/run.sh"
     rm -rf "$skills/handoff"
     printf '\none more line\n' >>"$VAULT/00_meta/agents/definitions/builder/AGENT.md"
     vault_commit
@@ -148,7 +148,8 @@ assert_go_wrote_nothing() {
     pat="$(jq -r --slurpfile m "$FX/harness/manifest.json" \
         '[.triggers[].pattern // empty | select((. + ".md") as $p | [$m[0].enforced[].source | split("#")[0]] | index($p) | not)][0]' \
         "$FX/harness/triggers.json")"
-    [ -n "$pat" ] && [ "$pat" != null ]
+    [ -n "$pat" ]
+    [ "$pat" != null ]
     rm "$VAULT/00_meta/patterns/$pat.md"
     vault_commit
     refresh_both

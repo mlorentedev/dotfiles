@@ -96,3 +96,18 @@ func TestRefreshedTarget_ATargetOverItsLineCapIsRefused(t *testing.T) {
 		t.Fatalf("100 lines in a file capped at 100: %v", err)
 	}
 }
+
+// A vault checked out with CRLF (git's autocrlf on Windows) still yields LF
+// records, the one line ending every committed record carries.
+func TestSectionOf_ACRLFPatternYieldsAnLFRecord(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "p.md")
+	if err := os.WriteFile(p, []byte("# Rule\r\n- one\r\n# Next\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := sectionOf(p, "rule")
+
+	if err != nil || got != "- one\n" {
+		t.Errorf("section = %q, %v; want %q", got, err, "- one\n")
+	}
+}
