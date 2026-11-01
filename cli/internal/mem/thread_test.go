@@ -37,7 +37,7 @@ func TestParseThreadReadsEveryCanonicalLabel(t *testing.T) {
 		t.Fatalf("the test covers %d labels, the canonical set has %d", len(want), len(ThreadLabels))
 	}
 	for _, label := range ThreadLabels {
-		got, ok := th.Get(label)
+		got, ok := th.All(label), th.Has(label)
 		if !ok || got != want[label] {
 			t.Errorf("%s = %q (present %v), want %q", label, got, ok, want[label])
 		}
@@ -51,10 +51,10 @@ func TestParseThreadReadsEveryCanonicalLabel(t *testing.T) {
 // fields they meant, so no existing block needs migrating by hand.
 func TestParseThreadReadsTheImprovisedLabelsAsTheirFields(t *testing.T) {
 	th := ParseThread("**Verify at start:** `git log -1`\n**Judgment calls left open:** keep the alias or drop it.\n")
-	if v, _ := th.Get("Verify"); v != "`git log -1`" {
+	if v := th.All("Verify"); v != "`git log -1`" {
 		t.Errorf("Verify = %q", v)
 	}
-	if v, _ := th.Get("Awaiting Manu"); v != "keep the alias or drop it." {
+	if v := th.All("Awaiting Manu"); v != "keep the alias or drop it." {
 		t.Errorf("Awaiting Manu = %q", v)
 	}
 }
@@ -67,7 +67,7 @@ func TestParseThreadKeepsAnUnknownLabel(t *testing.T) {
 	if len(u) != 2 || u[0] != (Field{"Trap", "the vault auto-commits."}) || u[1] != (Field{"Decisions (Manu, 2026-09-24)", "y."}) {
 		t.Errorf("unknown fields = %+v", u)
 	}
-	if _, ok := th.Get("Decisions"); ok {
+	if th.Has("Decisions") {
 		t.Error("a qualified label was read as the canonical one, losing its qualifier")
 	}
 }
@@ -87,11 +87,11 @@ func TestParseThreadDropsNoLine(t *testing.T) {
 	if len(th.Fields) == 0 || th.Fields[0] != (Field{"", "Written before the labels settled."}) {
 		t.Errorf("the text before the first label was not kept: %+v", th.Fields)
 	}
-	open, _ := th.Get("Open threads")
+	open := th.All("Open threads")
 	if open != "- (1) #1705 release\n- (2) #1709 digest\n\n### Next Actions" {
 		t.Errorf("Open threads = %q", open)
 	}
-	if next, _ := th.Get("Next action"); next != "merge #1705." {
+	if next := th.All("Next action"); next != "merge #1705." {
 		t.Errorf("Next action = %q", next)
 	}
 }
@@ -99,10 +99,10 @@ func TestParseThreadDropsNoLine(t *testing.T) {
 // A bold Updated and a blockquoted Journal are the same fields.
 func TestParseThreadReadsEitherFormOfTheDateAndJournal(t *testing.T) {
 	th := ParseThread("**Updated:** 2026-09-05\n> Journal: sessions/x.md\n")
-	if v, _ := th.Get("Updated"); v != "2026-09-05" {
+	if v := th.All("Updated"); v != "2026-09-05" {
 		t.Errorf("Updated = %q", v)
 	}
-	if v, _ := th.Get("Journal"); v != "sessions/x.md" {
+	if v := th.All("Journal"); v != "sessions/x.md" {
 		t.Errorf("Journal = %q", v)
 	}
 	if strings.Contains(ParseThread("Note: prose, not a field.\n").Fields[0].Label, "Note") {
@@ -119,5 +119,23 @@ func TestThreadWarningsNameOnlyWhatIsMissingOrUnknown(t *testing.T) {
 	w := ThreadWarnings("**Last task:** x.\n**Next action:**\n**Trap:** y.\n")
 	if len(w) != 2 || !strings.Contains(w[0], "Next action") || !strings.Contains(w[1], `"Trap"`) {
 		t.Errorf("warnings = %q, want the empty Next action and the unknown Trap", w)
+	}
+}
+
+// A label can repeat, as itself and as an alias. Every reader takes all of its
+// fields: the MEMORY.md entry counted only the first, so it said 1 decision
+// awaited Manu while the thread held 2 (#3009).
+func TestThreadReadersTakeEveryFieldUnderALabel(t *testing.T) {
+	body := "**Next action:**\n**Awaiting Manu:**\n- one\n**Judgment calls left open:**\n- two\n**Next action:** n.\n"
+	entry := deriveEntry(body, "threads/x.md")
+	if !strings.Contains(entry, "**Awaiting Manu:** 2, see the thread") {
+		t.Errorf("the entry undercounts the alias pair:\n%s", entry)
+	}
+	if !strings.Contains(entry, "**Next action:** n.") {
+		t.Errorf("a blank first Next action hid the second:\n%s", entry)
+	}
+	// Every label in the body is canonical or an alias, so nothing is warned.
+	if w := ThreadWarnings(body); len(w) != 0 {
+		t.Errorf("want no warning for a body that carries a Next action, got %q", w)
 	}
 }

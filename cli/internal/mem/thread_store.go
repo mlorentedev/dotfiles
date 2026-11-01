@@ -105,16 +105,16 @@ func threadFileName(key string) (string, error) {
 func deriveEntry(body, pointer string) string {
 	th := ParseThread(body)
 	var out []string
-	if v, ok := th.Get("Updated"); ok {
+	if v := th.All("Updated"); v != "" {
 		out = append(out, "> Updated: "+entryLine(v, entryUpdatedMax)+"<br>")
 	}
-	if v, ok := th.Get("Next action"); ok && strings.TrimSpace(v) != "" {
+	if v := th.All("Next action"); v != "" {
 		out = append(out, "**Next action:** "+entryLine(v, entryNextActionMax)+"<br>")
 	}
-	if v, ok := th.Get("Awaiting Manu"); ok && strings.TrimSpace(v) != "" {
+	if v := th.All("Awaiting Manu"); v != "" {
 		out = append(out, fmt.Sprintf("**Awaiting Manu:** %d, see the thread<br>", countItems(v)))
 	}
-	if v, ok := th.Get("Journal"); ok {
+	if v := th.All("Journal"); v != "" {
 		out = append(out, "Journal: "+entryLine(v, entryJournalMax))
 	}
 	return strings.Join(append(out, "[full thread]("+pointer+")"), "\n")
@@ -248,7 +248,7 @@ func threadsByAge(content string) ([]threadAge, []string) {
 		th := ParseThread(block)
 		var date string
 		for _, label := range []string{"Updated", "Journal"} {
-			if v, ok := th.Get(label); ok {
+			if v := th.All(label); v != "" {
 				if m := isoDate.FindStringSubmatch(v); m != nil {
 					date = m[1]
 					break

@@ -110,7 +110,7 @@ func fieldLine(line string) (string, string, bool) {
 func ThreadWarnings(body string) []string {
 	th := ParseThread(body)
 	var out []string
-	if v, ok := th.Get("Next action"); !ok || strings.TrimSpace(v) == "" {
+	if th.All("Next action") == "" {
 		out = append(out, "no Next action, so the next session has no first step")
 	}
 	for _, f := range th.Unknown() {
@@ -133,14 +133,16 @@ func (t Thread) All(label string) string {
 	return strings.Join(vs, "\n")
 }
 
-// Get returns the value under a canonical label, and whether the thread has it.
-func (t Thread) Get(label string) (string, bool) {
+// Has reports whether the thread carries a canonical label, blank or not. There
+// is no first-match read: every value goes through All, so a repeated label
+// can never be read as its first field alone (#3009).
+func (t Thread) Has(label string) bool {
 	for _, f := range t.Fields {
 		if f.Label == label {
-			return f.Value, true
+			return true
 		}
 	}
-	return "", false
+	return false
 }
 
 // Unknown returns the labelled fields outside the canonical set, in order.

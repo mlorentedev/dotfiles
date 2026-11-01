@@ -324,9 +324,7 @@ func legacyBlock(lines []string, start, end int) (int, int, bool) {
 // items below" pointing at nothing. Text without the fields stays where it is.
 func isHandoffShaped(lines []string) bool {
 	th := ParseThread(strings.Join(lines, "\n"))
-	_, last := th.Get("Last task")
-	_, next := th.Get("Next action")
-	return last || next
+	return th.Has("Last task") || th.Has("Next action")
 }
 
 // legacyThreadKey names the moved block by its own Updated date, so the thread
