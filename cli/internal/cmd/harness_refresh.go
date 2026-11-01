@@ -3,20 +3,15 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
-
-// refreshPaths are the files `compile-harness.sh --refresh` rewrites in the
-// checkout: the harness records and the two generated blocks (ADR-013).
-var refreshPaths = []string{"harness/", "AGENTS.md", "ai/claude/CLAUDE.md"}
 
 // newHarnessRefreshCmd re-renders the committed harness records from the vault,
 // but only from a vault that is level with its upstream (#2162). The refresh
@@ -29,16 +24,16 @@ func newHarnessRefreshCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "refresh",
 		Short: "Re-render the harness records from the vault, once the vault is level with its upstream",
-		Long: "refresh fast-forwards the vault to its upstream and then runs\n" +
-			"scripts/compile-harness.sh --refresh against it, which regenerates the\n" +
-			"committed harness records and the generated blocks in AGENTS.md and\n" +
-			"ai/claude/CLAUDE.md. Any change that leaves in the checkout is listed, with\n" +
-			"the commit that records it.\n\n" +
+		Long: "refresh fast-forwards the vault to its upstream and then re-renders\n" +
+			"from it the committed harness records and the generated block of every\n" +
+			"target the manifest names (AGENTS.md, ai/claude/CLAUDE.md, ...). Any\n" +
+			"change that leaves in the checkout is listed, with the commit that\n" +
+			"records it.\n\n" +
 			"A vault that cannot be confirmed current (diverged, dirty, offline, no\n" +
 			"upstream) is not refreshed from: the committed records are kept, and the\n" +
 			"reason is printed. A vault that is ahead of its upstream is refreshed from,\n" +
 			"since its extra commits are the newer state. Neither case is an error; a\n" +
-			"failed compile-harness run is.\n\n" +
+			"failed render is, and it writes nothing.\n\n" +
 			"Without a vault (no <vault>/00_meta/patterns) there is nothing to refresh\n" +
 			"from and the committed records stand.",
 		Args:         cobra.NoArgs,
@@ -81,8 +76,13 @@ func runHarnessRefresh(stdout, stderr io.Writer, repo, vault string) error {
 
 	// The refresh overwrites the records, and its drift report reads the same
 	// paths. Uncommitted work there would be clobbered and then announced as the
-	// vault's change, inviting a commit that folds it in, so it stops here.
-	if wip, err := refreshPathsDirt(repo); err != nil {
+	// vault's change, inviting a commit that folds it in, so it stops here. The
+	// paths come from the manifest: a fixed list missed ai/orca/ORCA.md.
+	paths, err := harness.RefreshPaths(repo)
+	if err != nil {
+		return err
+	}
+	if wip, err := refreshPathsDirt(repo, paths); err != nil {
 		return err
 	} else if wip != "" {
 		_, _ = fmt.Fprintln(stderr, "WARNING: harness refresh skipped, the checkout has uncommitted changes the refresh would overwrite:")
@@ -91,28 +91,22 @@ func runHarnessRefresh(stdout, stderr io.Writer, repo, vault string) error {
 		return nil
 	}
 
-	c := exec.Command(filepath.Join(repo, "scripts", "compile-harness.sh"), "--refresh") //nolint:gosec // the checkout's own script
-	c.Dir = repo
-	// The script reads $VAULT_PATH. Pin it to the clone just checked, so the
-	// refresh cannot read a different one than the check vouched for.
-	c.Env = append(os.Environ(), "VAULT_PATH="+vault)
-	if out, err := c.CombinedOutput(); err != nil {
-		_, _ = stderr.Write(out)
-		return fmt.Errorf("compile-harness.sh --refresh failed: %w; the committed harness records stand", err)
+	if _, err := harness.Refresh(repo, vault); err != nil {
+		return fmt.Errorf("harness refresh failed, nothing was written: %w", err)
 	}
 	_, _ = fmt.Fprintln(stdout, "harness refresh: override blocks and records re-rendered from the vault")
-	return reportRefreshDrift(stderr, repo)
+	return reportRefreshDrift(stderr, repo, paths)
 }
 
 // refreshPathsDirt returns `git status --porcelain` over the paths the refresh
 // writes, or "" when the checkout is not a repo: the deploy mirror is not one
 // (ADR-005), and there is no work in it to protect or commit.
-func refreshPathsDirt(repo string) (string, error) {
+func refreshPathsDirt(repo string, paths []string) (string, error) {
 	git := gitRunner(repo)
 	if _, err := git("rev-parse", "--git-dir"); err != nil {
 		return "", nil
 	}
-	dirt, err := git(append([]string{"status", "--porcelain", "--"}, refreshPaths...)...)
+	dirt, err := git(append([]string{"status", "--porcelain", "--"}, paths...)...)
 	if err != nil {
 		return "", fmt.Errorf("cannot read git status of the harness records in %s: %w", repo, err)
 	}
@@ -124,15 +118,15 @@ func refreshPathsDirt(repo string) (string, error) {
 // announced loudly rather than left to read as a parallel session's work
 // (#295). The paths were clean before the refresh ran, so all of it is the
 // refresh's.
-func reportRefreshDrift(stderr io.Writer, repo string) error {
-	drift, err := refreshPathsDirt(repo)
+func reportRefreshDrift(stderr io.Writer, repo string, paths []string) error {
+	drift, err := refreshPathsDirt(repo, paths)
 	if err != nil || drift == "" {
 		return err
 	}
 	_, _ = fmt.Fprintln(stderr, "WARNING: Harness records changed by --refresh from the vault -- commit them:")
 	printIndented(stderr, drift)
 	_, _ = fmt.Fprintf(stderr, "  git add %s && git commit -m 'chore(harness): refresh records from vault'\n",
-		strings.Join(refreshPaths, " "))
+		strings.Join(paths, " "))
 	return nil
 }
 
