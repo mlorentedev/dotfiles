@@ -1,1 +1,1 @@
-[resume] Thread wt-x has a handoff; `dotf mem resume --thread wt-x` renders it.
+[resume] Thread wt-x has a handoff; `dotf mem resume --thread=wt-x` renders it.

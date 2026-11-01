@@ -43,7 +43,7 @@ func TestMemResumeListsCandidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := runMemResumeT(t, "--memory", memory, "--thread", "feat-a", "--agent", "claude")
-	if !strings.Contains(out, "No single thread") || !strings.Contains(out, "dotf mem resume --thread feat-a --memory '"+memory+"' --agent claude\n") {
+	if !strings.Contains(out, "No single thread") || !strings.Contains(out, "dotf mem resume --thread=feat-a --memory='"+memory+"' --agent=claude\n") {
 		t.Errorf("want the candidates listed:\n%s", out)
 	}
 }
@@ -57,8 +57,28 @@ func TestMemResumeQuotesTheCandidateLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := runMemResumeT(t, "--memory", memory, "--thread", "nope", "--agent", "claude --x")
-	want := "dotf mem resume --thread 'x;echo${IFS}pwned' --memory '" + memory + "' --agent 'claude --x'\n"
+	want := "dotf mem resume --thread='x;echo${IFS}pwned' --memory='" + memory + "' --agent='claude --x'\n"
 	if !strings.Contains(out, want) {
 		t.Errorf("want %q in:\n%s", want, out)
+	}
+}
+
+// Quoting cannot keep a dash-leading value from being read as a flag: '-x'
+// reaches cobra as -x. The = form binds the value to its flag (#3002).
+func TestMemResumeCandidateLineRunsForADashLeadingKey(t *testing.T) {
+	memory := filepath.Join(t.TempDir(), "MEMORY.md")
+	doc := "# M\n\n## Session Handoff\n\n### thread: -x (writer: pi)\n\n**Next action:** a.\n"
+	if err := os.WriteFile(memory, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := runMemResumeT(t, "--memory", memory, "--thread", "nope", "--agent", "pi")
+	want := "dotf mem resume --thread=-x --memory='" + memory + "' --agent=pi"
+	if !strings.Contains(out, want+"\n") {
+		t.Fatalf("want %q in:\n%s", want, out)
+	}
+	// Run the line as printed, its quotes removed as a shell would.
+	args := strings.Fields(strings.ReplaceAll(strings.TrimPrefix(want, "dotf mem resume "), "'", ""))
+	if got := runMemResumeT(t, args...); strings.Contains(got, "No single thread") {
+		t.Errorf("the printed line did not select thread -x:\n%s", got)
 	}
 }

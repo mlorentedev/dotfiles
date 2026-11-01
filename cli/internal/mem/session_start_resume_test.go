@@ -89,7 +89,20 @@ func TestSessionStartResumeQuotesTheOneLiner(t *testing.T) {
 	mustWrite(t, memory, "# M\n\n## Session Handoff\n\n### thread: wt-x;echo (writer: claude)\n\n**Next action:** a.\n")
 	for _, source := range []string{"resume", "fork"} {
 		got := sessionResume(source, memory, "wt-x;echo", "claude")
-		if want := "`dotf mem resume --thread 'wt-x;echo'`"; !strings.Contains(got, want) {
+		if want := "`dotf mem resume --thread='wt-x;echo'`"; !strings.Contains(got, want) {
+			t.Errorf("source %s: want %s in %q", source, want, got)
+		}
+	}
+}
+
+// A dash-leading key, quoted or not, reaches cobra as a flag; the = form keeps
+// it the value of --thread (#3002).
+func TestSessionStartResumeBindsADashLeadingKey(t *testing.T) {
+	memory := filepath.Join(t.TempDir(), "MEMORY.md")
+	mustWrite(t, memory, "# M\n\n## Session Handoff\n\n### thread: -x (writer: claude)\n\n**Next action:** a.\n")
+	for _, source := range []string{"resume", "fork"} {
+		got := sessionResume(source, memory, "-x", "claude")
+		if want := "`dotf mem resume --thread=-x`"; !strings.Contains(got, want) {
 			t.Errorf("source %s: want %s in %q", source, want, got)
 		}
 	}

@@ -68,10 +68,10 @@ func runMemResume(cmd *cobra.Command, memoryPath, thread, agent, format string) 
 	if chosen == "" {
 		var carry string
 		if cmd.Flags().Changed("memory") {
-			carry += " --memory " + mem.ShellQuote(memoryPath)
+			carry += " --memory=" + mem.ShellQuote(memoryPath)
 		}
 		if agent != "" {
-			carry += " --agent " + mem.ShellWord(agent)
+			carry += " --agent=" + mem.ShellWord(agent)
 		}
 		return listCandidates(cmd, key, agent, carry, candidates)
 	}
@@ -107,8 +107,10 @@ func listCandidates(cmd *cobra.Command, key, agent, carry string, candidates []s
 	if len(candidates) == 0 {
 		_, _ = fmt.Fprintln(out, "  (none)")
 	}
+	// Every value is bound with =: quoting keeps shell syntax out, but '-x'
+	// still reaches cobra as a flag (#3002).
 	for _, c := range candidates {
-		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread %s%s\n", mem.ShellWord(c), carry)
+		_, _ = fmt.Fprintf(out, "  dotf mem resume --thread=%s%s\n", mem.ShellWord(c), carry)
 	}
 	return nil
 }
