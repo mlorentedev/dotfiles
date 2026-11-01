@@ -164,6 +164,30 @@ func TestResumeRendersAOneItemListAsABlock(t *testing.T) {
 	}
 }
 
+// A block with no first step says so in both formats: a compacted session reads
+// the context one, and silence there reads as nothing to do (#3003).
+func TestResumeSaysWhenNoNextActionIsRecorded(t *testing.T) {
+	for name, field := range map[string]string{
+		"absent": "",
+		"blank":  "**Next action:** <br>\n",
+		"empty":  "**Next action:**\n",
+	} {
+		text := "### thread: feat-a\n\n" + field + "**Decisions:** d.<br>\n"
+		for format, want := range map[string]string{
+			"context": "\n**Next action:** " + noNextAction + "\n",
+			"prompt":  "\nNext action: " + noNextAction + "\n",
+		} {
+			out, err := RenderResume(text, "src", format)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out, want) {
+				t.Errorf("%s, %s: want %q in:\n%s", name, format, want, out)
+			}
+		}
+	}
+}
+
 // A Verify field renders as written, every line and the prose beside the
 // commands, under one note. A command written as prose gets the same note as a
 // backticked one: nothing in the field reads as safe (MEMORY-008 review

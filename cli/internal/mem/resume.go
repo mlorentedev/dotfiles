@@ -107,10 +107,27 @@ func RenderResume(text, source, format string) (string, error) {
 // session does before it reads anything else.
 var firstFields = []string{"Next action", "Verify", "Awaiting Manu"}
 
+// noNextAction stands in for a Next action that is absent or blank, in both
+// formats: silence there reads as nothing to do (#3003).
+const noNextAction = "none recorded: ask what to work on"
+
+// nextAction is the thread's first step with its breaks dropped, or
+// noNextAction when the block records none.
+func nextAction(th Thread) string {
+	if v := stripBreaks(th.All("Next action")); strings.TrimSpace(v) != "" {
+		return v
+	}
+	return noNextAction
+}
+
 func renderContext(th Thread, source string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Resume: thread %s\n\nSource: %s\n", th.Key, source)
 	for _, label := range firstFields {
+		if label == "Next action" {
+			writeField(&b, label, nextAction(th))
+			continue
+		}
 		if v := th.All(label); v != "" {
 			writeField(&b, label, v)
 		}
@@ -155,11 +172,7 @@ func renderPrompt(th Thread, source string) string {
 	if v := th.All("Awaiting Manu"); v != "" {
 		fmt.Fprintf(&b, "\nThese wait on Manu; ask, do not decide them:\n%s\n", stripBreaks(v))
 	}
-	next := "none recorded: ask what to work on"
-	if v := th.All("Next action"); v != "" {
-		next = stripBreaks(v)
-	}
-	fmt.Fprintf(&b, "\nNext action: %s\n", next)
+	fmt.Fprintf(&b, "\nNext action: %s\n", nextAction(th))
 	return b.String()
 }
 
