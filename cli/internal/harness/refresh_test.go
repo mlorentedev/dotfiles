@@ -58,6 +58,25 @@ func TestStampProvenance_InsertsAfterTheOpeningFenceOnly(t *testing.T) {
 	}
 }
 
+// #2884 case 3: an END line with a tail passes the marker count but never
+// closes the region. The shell rewrote the file without every line after it.
+func TestRefreshedTarget_AnEndLineWithATailIsRefusedNotTruncated(t *testing.T) {
+	repo := t.TempDir()
+	src := "<!-- BEGIN HARNESS GENERATED -->\n<!-- END HARNESS GENERATED --> tail\nthe user's line\n"
+	if err := os.WriteFile(filepath.Join(repo, "T.md"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := refreshedTarget(repo, "T.md", []string{"r"}, map[string]string{"r": "- rule\n"}, "v")
+
+	if err == nil {
+		t.Fatalf("an END line with a tail was accepted; the render was:\n%s", got)
+	}
+	if !strings.Contains(err.Error(), "never closes") {
+		t.Errorf("err = %v, want it to say the region never closes", err)
+	}
+}
+
 func TestRefreshedTarget_ATargetOverItsLineCapIsRefused(t *testing.T) {
 	repo := t.TempDir()
 	file := "ai/claude/CLAUDE.md"

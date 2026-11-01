@@ -216,6 +216,12 @@ func refreshedTarget(repoRoot, file string, ids []string, records map[string]str
 		b.WriteString(l + "\n")
 		n++
 	}
+	if skip {
+		// The END line carries text after the marker: it passed the marker
+		// count, which matches by substring, and never closed the region. The
+		// shell wrote this out and lost every line after it (#2884).
+		return "", fmt.Errorf("%s: the END marker line has text after %s, so the region never closes; fix the line, then refresh", path, GeneratedEndMarker)
+	}
 	if limit := targetLineCaps[file]; limit > 0 && n > limit {
 		return "", fmt.Errorf("%s would be %d lines after injection (cap %d)", file, n, limit)
 	}
