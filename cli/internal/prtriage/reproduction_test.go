@@ -124,4 +124,14 @@ func TestUnreproducedFindingsTellsSameNamedFilesApart(t *testing.T) {
 	if got := UnreproducedFindings(pr, []Comment{a, b}, classifyingRegistry()); len(got) != 1 || got[0].Finding.Path != "a/util.go" {
 		t.Fatalf("a longer path cleared a/util.go: %+v", got)
 	}
+	// The look-alike need not be a finding: a row naming another directory
+	// never names this one, whatever else the PR carries.
+	pr = triagedWith("| `b/util.go:4` | apply | " + reproduced + " |")
+	if got := UnreproducedFindings(pr, []Comment{a}, classifyingRegistry()); len(got) != 1 {
+		t.Fatalf("a row for b/util.go cleared the only finding, a/util.go: %+v", got)
+	}
+	pr = triagedWith("| `internal/a.go:4` | apply | " + reproduced + " |")
+	if got := UnreproducedFindings(pr, []Comment{finding("REAL", "cli/internal/a.go", 4)}, classifyingRegistry()); len(got) != 0 {
+		t.Fatalf("a row naming the path's tail did not clear it: %+v", got)
+	}
 }
