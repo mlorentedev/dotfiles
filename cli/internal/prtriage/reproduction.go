@@ -40,9 +40,9 @@ var dispositions = map[string]string{
 // Findings newer than the record are judged too: an inline comment added or
 // edited after it need not move the counted channel that makes a PR pending.
 //
-// A finding's row is the first table row naming its path and line. The base
-// name stands for the path unless another finding shares it, when only the
-// full path does (#2996). The disposition is the first cell, after the one
+// A finding's row is the first table row naming its path, or a tail of it, and
+// its line. The bare base name counts unless another finding shares it
+// (#2996). The disposition is the first cell, after the one
 // naming the finding, whose first word is a disposition.
 func UnreproducedFindings(pr PR, inline []Comment, reg Registry) []Unreproduced {
 	record, ok := triageRecord(pr, reg)
@@ -79,8 +79,8 @@ func sharedBaseNames(inline []Comment) map[string]bool {
 	return shared
 }
 
-func judge(f Comment, rows [][]string, fullPath bool) string {
-	cells, at := rowFor(f, rows, fullPath)
+func judge(f Comment, rows [][]string, baseShared bool) string {
+	cells, at := rowFor(f, rows, baseShared)
 	if cells == nil {
 		return "the triage record has no row for it"
 	}
@@ -121,21 +121,22 @@ func tableRows(body string) [][]string {
 }
 
 // rowFor returns the first row naming f, and the index of the cell that
-// does. A name is bounded on both sides, so a.go:4 is not ba.go:4 or a.go:40,
-// and with fullPath a/util.go:4 is neither b/util.go:4 nor x/a/util.go:4.
-func rowFor(f Comment, rows [][]string, fullPath bool) ([]string, int) {
+// does. A name is bounded on both sides, so a.go:4 is not ba.go:4 or a.go:40.
+// It is f's path or a tail of it at a directory, so a/util.go:4 is neither
+// b/util.go:4 nor x/a/util.go:4, and the bare base name counts only when
+// baseShared is false.
+func rowFor(f Comment, rows [][]string, baseShared bool) ([]string, int) {
 	if f.Path == "" || f.Line == 0 {
 		return nil, 0
 	}
-	ident, before := path.Base(f.Path), `(^|[^\w.\-])`
-	if fullPath {
-		ident, before = f.Path, `(^|[^\w.\-/])`
-	}
-	name := regexp.MustCompile(before + regexp.QuoteMeta(ident) + fmt.Sprintf(`:%d(\D|$)`, f.Line))
+	name := regexp.MustCompile(`(?:^|[^\w.\-/])([\w.\-/]*` + regexp.QuoteMeta(path.Base(f.Path)) + fmt.Sprintf(`):%d(?:\D|$)`, f.Line))
 	for _, cells := range rows {
 		for i, c := range cells {
-			if name.MatchString(c) {
-				return cells, i
+			for _, m := range name.FindAllStringSubmatch(c, -1) {
+				tail := strings.HasSuffix(f.Path, "/"+m[1]) && (strings.Contains(m[1], "/") || !baseShared)
+				if m[1] == f.Path || tail {
+					return cells, i
+				}
 			}
 		}
 	}
