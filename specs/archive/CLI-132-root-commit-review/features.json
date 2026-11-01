@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-132-root-commit-review-f1",
+    "behavior": "ResolveReviewBaseDetail classifies resolved, not committed, root-commit (direct and renamed), and untraceable specs",
+    "verification": "cd cli && go test ./internal/spec/ -run TestResolveReviewBase -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-132-root-commit-review-f2",
+    "behavior": "spec review --initial launches only for a root-commit spec; every other base state is refused before a request or reviewer exists; the default refusal names --initial",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestSpecReview -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-132-root-commit-review-f3",
+    "behavior": "The initial scope covers the root implementation and later corrections, and the prompt states a two-dot diff from the empty tree",
+    "verification": "cd cli && go test ./internal/spec/ -run 'TestEmptyTree|TestInitialScope|TestReviewPrompt' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-132-root-commit-review-f4",
+    "behavior": "review-request.json records scope, root_sha, and base_tree for an initial launch; dry-run prints the scope and writes nothing",
+    "verification": "cd cli && go test ./internal/spec/ -run TestReviewRequestRecords -count=1 && go test ./internal/cmd/ -run TestSpecReviewInitial -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-132-root-commit-review-f5",
+    "behavior": "Archive provenance refuses an unknown scope or an incomplete initial scope and still accepts ordinary and pre-scope requests",
+    "verification": "cd cli && go test ./internal/spec/ -run TestProvenance -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

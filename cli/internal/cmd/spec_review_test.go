@@ -56,7 +56,7 @@ func TestSpecReviewForegroundDoesNotShellOut(t *testing.T) {
 
 func TestSpecReviewForegroundRejectsMalformedReview(t *testing.T) {
 	seedReviewFixture(t)
-	withReviewBase(t, "basebasebase", "headheadhead")
+	withReviewBase(t, spec.ReviewBase{SHA: "basebasebase"}, "headheadhead")
 
 	prev := runForeground
 	runForeground = func(dir string, _ []string, _ string) error {
@@ -87,7 +87,7 @@ FAIL
 // of distrusting the model. The stub writes the capped run's last events only.
 func TestSpecReviewForegroundNamesATurnCap(t *testing.T) {
 	seedReviewFixture(t)
-	withReviewBase(t, "basebasebase", "headheadhead")
+	withReviewBase(t, spec.ReviewBase{SHA: "basebasebase"}, "headheadhead")
 
 	prev := runForeground
 	runForeground = func(_ string, _ []string, transcript string) error {

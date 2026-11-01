@@ -323,19 +323,44 @@ func ReviewPrompt(specID, repoRoot, reviewerID, runner, skillPath, baseSHA strin
 	return ReviewPromptIn(FirstSigner, specID, repoRoot, reviewerID, runner, skillPath, baseSHA)
 }
 
+// writeReviewScope states what the reviewer diffs. An ordinary review reads
+// `<base>...HEAD`. An initial review has no base commit: its baseline is the
+// empty tree, which has no merge base, so it reads the two-dot `<tree> HEAD`.
+// That holds the root commit's implementation and every later correction, and
+// may hold unrelated files the root commit also added, which the reviewer is
+// told rather than left to discover.
+func writeReviewScope(b *strings.Builder, scope ReviewScope) {
+	switch {
+	case scope.Initial():
+		fmt.Fprintf(b, "Review scope: initial review, `git diff %s HEAD`. This spec was first added in\n"+
+			"the repository's root commit %s, so no commit precedes the work; the baseline is the\n"+
+			"empty tree, resolved by the launcher. Use exactly that two-dot diff: a tree has no merge\n"+
+			"base, so `...` does not apply, and do NOT substitute `main` or guess a commit. It holds the\n"+
+			"initial implementation and every later correction (`git log %s..HEAD`), and may hold\n"+
+			"files the root commit added for other work: judge what the spec names first, and the\n"+
+			"rest only where it interacts.\n\n", scope.BaseTree, scope.RootSHA, scope.RootSHA)
+	case scope.BaseSHA != "":
+		fmt.Fprintf(b, "Review scope: `git diff %s...HEAD`. That base is the commit this spec's work\n"+
+			"starts from, resolved by the launcher; do NOT substitute `main` or guess one. It is the\n"+
+			"WHOLE change, not the delta since any previous review round — a late fix has to be\n"+
+			"judged against the early ones it may interact with.\n\n", scope.BaseSHA)
+	}
+}
+
 // ReviewPromptIn is ReviewPrompt for one signer's slot. The second signer is
 // told where its verdict goes and that the first verdict is not its input: two
 // signatures are worth more than one only while neither has read the other.
 func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPath, baseSHA string) string {
+	return ReviewPromptForScope(slot, specID, repoRoot, reviewerID, runner, skillPath, ReviewScope{BaseSHA: baseSHA})
+}
+
+// ReviewPromptForScope is ReviewPromptIn for a scope that may be an initial
+// review (CLI-132), whose baseline is the empty tree rather than a commit.
+func ReviewPromptForScope(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPath string, scope ReviewScope) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Perform an adversarial review of the spec `%s`.\n\n", specID)
 	fmt.Fprintf(&b, "Repo: %s\n\n", repoRoot)
-	if baseSHA != "" {
-		fmt.Fprintf(&b, "Review scope: `git diff %s...HEAD`. That base is the commit this spec's work\n"+
-			"starts from, resolved by the launcher; do NOT substitute `main` or guess one. It is the\n"+
-			"WHOLE change, not the delta since any previous review round — a late fix has to be\n"+
-			"judged against the early ones it may interact with.\n\n", baseSHA)
-	}
+	writeReviewScope(&b, scope)
 	fmt.Fprintf(&b, "You are running as `%s` (runner `%s`), drawn from harness/reviewer-pool.json\n"+
 		"for this review. That is your identity for this run, stated by the launcher that resolved\n"+
 		"it -- do not infer it from the doctrine you are about to read. The pool's exclusions were\n"+

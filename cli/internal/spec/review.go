@@ -525,6 +525,9 @@ func checkReviewProvenanceIn(specDir string, slot ReviewSlot, review Review) err
 			"the launcher always writes both; re-run `dotf spec review %s%s` and commit what it writes",
 			slot.Request, slot.Review, filepath.Base(specDir), slot.Flag())
 	}
+	if err := checkReviewScope(slot, req, filepath.Base(specDir)); err != nil {
+		return err
+	}
 
 	// The digest is the no-verdict case, and it is checked first because it
 	// explains the sha mismatch that would otherwise be reported instead: a
@@ -568,6 +571,30 @@ func checkReviewProvenanceIn(specDir string, slot ReviewSlot, review Review) err
 // errNoNewVerdict marks the provenance failure where the launched reviewer wrote
 // nothing, the one case whose cause the transcript can name.
 var errNoNewVerdict = errors.New("the reviewer wrote no verdict")
+
+// checkReviewScope refuses a review scope the launcher never writes (CLI-132,
+// #2566). The scope is provenance like the sha and the reviewer: an initial
+// review is launched from a root commit and the empty tree, never from a base
+// commit, so a request missing either, or carrying a base commit as well, was
+// not written by `spec review --initial`.
+func checkReviewScope(slot ReviewSlot, req ReviewRequest, specID string) error {
+	switch req.Scope {
+	case "":
+		return nil
+	case ScopeInitial:
+		if req.RootSHA != "" && req.BaseTree != "" && req.BaseSHA == "" {
+			return nil
+		}
+		return fmt.Errorf("%s records an initial scope without both its root_sha and base_tree, or with a base_sha as well\n"+
+			"the launcher writes root_sha and base_tree, and no base_sha, on every `--initial` launch\n"+
+			"re-run `dotf spec review %s --initial%s` and commit what it writes",
+			slot.Request, specID, slot.Flag())
+	default:
+		return fmt.Errorf("%s records scope %q, which the launcher never writes\n"+
+			"re-run `dotf spec review %s%s` and commit what it writes",
+			slot.Request, req.Scope, specID, slot.Flag())
+	}
+}
 
 // isFullSHA reports whether s is a full SHA-1 or SHA-256 object name.
 func isFullSHA(s string) bool {

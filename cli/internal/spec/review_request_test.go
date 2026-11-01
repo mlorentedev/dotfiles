@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -404,5 +405,94 @@ func TestWriteReviewRequestReportsAFailedWrite(t *testing.T) {
 	err := WriteReviewRequest(notADir, "abc", "nan/x", "")
 	if err == nil || !strings.Contains(err.Error(), ReviewRequestFile) {
 		t.Fatalf("want an error naming %s, got %v", ReviewRequestFile, err)
+	}
+}
+
+const (
+	initialTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+	initialRoot = "cccccccccccccccccccccccccccccccccccccccc"
+	launchedSHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+)
+
+// CLI-132 (#2566): an initial launch records what it reviewed from, so the
+// archive can tell an initial review from a request that simply has no base.
+func TestReviewRequestRecordsTheInitialScope(t *testing.T) {
+	dir := t.TempDir()
+	scope := ReviewScope{BaseTree: initialTree, RootSHA: initialRoot}
+	if err := WriteReviewRequestScoped(dir, FirstSigner, launchedSHA, "nan/deepseek-v4-flash", scope, ""); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, ReviewRequestFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]string{"scope": ScopeInitial, "root_sha": initialRoot, "base_tree": initialTree} {
+		if fields[key] != want {
+			t.Errorf("%s = %v, want %q:\n%s", key, fields[key], want, raw)
+		}
+	}
+	if _, present := fields["base_sha"]; present {
+		t.Errorf("an initial request must carry no base_sha; the baseline is a tree:\n%s", raw)
+	}
+}
+
+// seedScopedRequest writes a fresh verdict on launchedSHA beside a hand-written
+// request body, so only the scope fields decide the provenance check.
+func seedScopedRequest(t *testing.T, body string) string {
+	t.Helper()
+	dir := seedProvenanceSpec(t, provenanceReviewDoc)
+	if err := os.WriteFile(filepath.Join(dir, ReviewRequestFile), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+var launchedReview = Review{Verdict: "PASS", ReviewedSHA: launchedSHA, Reviewer: "nan/deepseek-v4-flash"}
+
+// The scope is launcher-written provenance like the sha and the reviewer. A
+// scope the launcher never writes proves nothing about the run.
+func TestProvenanceRefusesAnUnknownReviewScope(t *testing.T) {
+	dir := seedScopedRequest(t, `{"reviewed_sha":"`+launchedSHA+`","reviewer":"nan/deepseek-v4-flash","scope":"everything"}`)
+	err := checkReviewProvenance(dir, launchedReview)
+	if err == nil || !strings.Contains(err.Error(), `"everything"`) {
+		t.Fatalf("an unknown scope must be refused by name, got %v", err)
+	}
+}
+
+// An initial scope is only meaningful with the root commit and the tree it was
+// launched from, and never alongside a base commit.
+func TestProvenanceRefusesAnInitialScopeWithoutItsRootOrTree(t *testing.T) {
+	head := `{"reviewed_sha":"` + launchedSHA + `","reviewer":"nan/deepseek-v4-flash","scope":"initial"`
+	for name, body := range map[string]string{
+		"no root":       head + `,"base_tree":"` + initialTree + `"}`,
+		"no tree":       head + `,"root_sha":"` + initialRoot + `"}`,
+		"also has base": head + `,"root_sha":"` + initialRoot + `","base_tree":"` + initialTree + `","base_sha":"basebasebase"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := checkReviewProvenance(seedScopedRequest(t, body), launchedReview)
+			if err == nil || !strings.Contains(err.Error(), "initial") {
+				t.Fatalf("an incomplete initial scope must be refused, got %v", err)
+			}
+		})
+	}
+}
+
+// The positive direction, so the two refusals cannot pass by refusing every
+// initial review.
+func TestProvenanceAcceptsAnInitialScope(t *testing.T) {
+	dir := seedProvenanceSpec(t, "old content")
+	scope := ReviewScope{BaseTree: initialTree, RootSHA: initialRoot}
+	if err := WriteReviewRequestScoped(dir, FirstSigner, launchedSHA, "nan/deepseek-v4-flash", scope, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ReviewFile), []byte(provenanceReviewDoc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkReviewProvenance(dir, launchedReview); err != nil {
+		t.Fatalf("a launcher-written initial scope with a fresh verdict must pass: %v", err)
 	}
 }
