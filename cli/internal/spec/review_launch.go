@@ -343,7 +343,11 @@ func writeReviewScope(b *strings.Builder, scope ReviewScope) {
 		fmt.Fprintf(b, "Review scope: `git diff %s...HEAD`. That base is the commit this spec's work\n"+
 			"starts from, resolved by the launcher; do NOT substitute `main` or guess one. It is the\n"+
 			"WHOLE change, not the delta since any previous review round — a late fix has to be\n"+
-			"judged against the early ones it may interact with.\n\n", scope.BaseSHA)
+			"judged against the early ones it may interact with. If the branch merged main after\n"+
+			"that base, the range also holds other work that arrived through the merge:\n"+
+			"`git log --first-parent --no-merges %s..HEAD` lists the commits made on the branch\n"+
+			"itself, not those a merge brought in (a sub-branch merged into it is a merge too).\n"+
+			"Judge what the spec names first, and the rest only where it interacts.\n\n", scope.BaseSHA, scope.BaseSHA)
 	}
 }
 
