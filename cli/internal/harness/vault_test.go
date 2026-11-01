@@ -100,6 +100,8 @@ func TestCompareWithVault_EnforcedRecordsAreHeldToTheirSection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The record is cut from an LF checkout; the vault below is CRLF and cuts the same section.
+	writeFile(t, pattern, "# P\r\n\r\n## The Rule\r\n\r\nDo the thing.\r\n\r\n## Other\r\n\r\nnot this\r\n")
 	rec := filepath.Join(repo, filepath.FromSlash(EnforcedDir), "rule.md")
 	writeFile(t, rec, want)
 	writeFile(t, filepath.Join(repo, filepath.FromSlash(EnforcedDir), "gone.md"), "whatever\n")

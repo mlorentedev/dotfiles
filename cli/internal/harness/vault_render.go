@@ -16,16 +16,14 @@ import (
 // provenance it already carries. Line endings are compared as LF, so a vault
 // checked out with CRLF does not read as an edit.
 func (d *VaultDrift) compareRender(name, recDir, srcFile, from, sha string) {
-	srcDir := filepath.Dir(srcFile)
-	want, err := treeFiles(srcDir)
-	if err == nil {
-		file := filepath.Base(srcFile)
-		want[file] = stampProvenance(normalizeLF(want[file]), from, sha)
+	want, err := treeFiles(filepath.Dir(srcFile))
+	if err != nil {
+		d.Unread = append(d.Unread, fmt.Sprintf("vault %s (%v)", path.Dir(from), err))
+		return
 	}
-	var got map[string][]byte
-	if err == nil {
-		got, err = treeFiles(recDir)
-	}
+	file := filepath.Base(srcFile)
+	want[file] = stampProvenance(normalizeLF(want[file]), from, sha)
+	got, err := treeFiles(recDir)
 	if err != nil {
 		d.Unread = append(d.Unread, fmt.Sprintf("harness/%s (%v)", name, err))
 		return
