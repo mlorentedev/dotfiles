@@ -17,14 +17,14 @@ import (
 // checked out with CRLF does not read as an edit.
 func (d *VaultDrift) compareRender(name, recDir, srcFile, from, sha string) {
 	srcDir := filepath.Dir(srcFile)
-	want, err := renderedTree(srcDir)
+	want, err := treeFiles(srcDir)
 	if err == nil {
 		file := filepath.Base(srcFile)
 		want[file] = stampProvenance(normalizeLF(want[file]), from, sha)
 	}
 	var got map[string][]byte
 	if err == nil {
-		got, err = treeFiles(recDir, false)
+		got, err = treeFiles(recDir)
 	}
 	if err != nil {
 		d.Unread = append(d.Unread, fmt.Sprintf("harness/%s (%v)", name, err))
@@ -67,14 +67,11 @@ func (d *VaultDrift) compareEnforced(repoRoot, vault string) {
 	}
 }
 
-// renderedTree is the files a refresh copies from a vault dir: all of them but
-// the dir's own dotfiles, which the shell's "$dir"* glob skipped.
-func renderedTree(dir string) (map[string][]byte, error) {
-	return treeFiles(dir, true)
-}
-
-// treeFiles maps each file under dir, by slash path, to its LF content.
-func treeFiles(dir string, skipTopDotfiles bool) (map[string][]byte, error) {
+// treeFiles maps each file under dir, by slash path, to its LF content. The
+// dir's own dotfiles are skipped on both sides: a refresh never copies them
+// (the shell's "$dir"* glob skipped them), and a .DS_Store Finder leaves in a
+// record dir is not an edit.
+func treeFiles(dir string) (map[string][]byte, error) {
 	files := map[string][]byte{}
 	err := filepath.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil {
@@ -82,7 +79,7 @@ func treeFiles(dir string, skipTopDotfiles bool) (map[string][]byte, error) {
 		}
 		rel, _ := filepath.Rel(dir, p)
 		rel = filepath.ToSlash(rel)
-		if skipTopDotfiles && rel != "." && !strings.Contains(rel, "/") && strings.HasPrefix(rel, ".") {
+		if rel != "." && !strings.Contains(rel, "/") && strings.HasPrefix(rel, ".") {
 			if e.IsDir() {
 				return filepath.SkipDir
 			}

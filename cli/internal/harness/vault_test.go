@@ -25,6 +25,7 @@ func vaultPair(t *testing.T) (repo, vault string) {
 
 func TestCompareWithVault_ARefreshedCheckoutMatches(t *testing.T) {
 	repo, vault := vaultPair(t)
+	writeFile(t, filepath.Join(repo, "harness", "skills", "demo", ".DS_Store"), "finder\n")
 	d := CompareWithVault(repo, vault)
 	if d.Checked != 2 || d.HasDrift() {
 		t.Fatalf("want 2 records level with the vault, got %+v", d)

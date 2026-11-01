@@ -73,6 +73,8 @@ created: "2026-06-21"
     - [x] Enforced records, which carry no stamp, are held to the vault section they are cut from; a section
       that is gone is stale
     - [x] Line endings compare as LF, so a CRLF vault checkout is not an edit
+    - [x] A record dir's own dotfiles are skipped on both sides, as the refresh skips them, so a `.DS_Store`
+      Finder leaves there is not an edit
     - [x] doctor's vault check warns on an edited record and names the remedy (carry the edit to the vault)
     - [x] Real vault at origin/master: 50 records level; a one-line edit to `skills/helm` and to an enforced
       record each fails the check
