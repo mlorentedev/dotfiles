@@ -62,6 +62,10 @@ golangci-lint run
 # one — measured on #1075, where a `syscall.Mkfifo` in a test file passed every
 # local check and broke the Windows build. Cheap, and it closes that gap:
 GOOS=windows go vet ./...
+# vet does not run `unused`, and CI's lint job runs on Linux only, so nothing
+# lints a Windows-only file set: a constant only Linux and macOS read went
+# unreported on Windows (#3014). Lint the Windows build too:
+GOOS=windows golangci-lint run ./...
 ```
 
 **Run unreleased `dotf` with `go run ./cmd/dotf …` from the worktree** (or a
