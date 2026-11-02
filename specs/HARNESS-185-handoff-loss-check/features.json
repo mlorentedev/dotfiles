@@ -1,0 +1,58 @@
+[
+  {
+    "id": "HARNESS-185-handoff-loss-check-f1",
+    "behavior": "AC1: a linked worktree whose thread file exists without an entry makes the check WARN naming the key and the file",
+    "verification": "cd cli && go test ./internal/doctor -run TestHandoffThreads_WarnsOnALostEntry",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-185-handoff-loss-check-f2",
+    "behavior": "AC2: an entry, or a key+agent fork entry, passes",
+    "verification": "cd cli && go test ./internal/doctor -run TestHandoffThreads_EntryOrForkPasses",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-185-handoff-loss-check-f3",
+    "behavior": "AC3: a thread file moved to archive/ does not warn",
+    "verification": "cd cli && go test ./internal/doctor -run TestHandoffThreads_ArchivedThreadIsQuiet",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-185-handoff-loss-check-f4",
+    "behavior": "AC4: a journal under sessions/ without a thread file does not warn",
+    "verification": "cd cli && go test ./internal/doctor -run TestHandoffThreads_JournalAloneIsNotProof",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-185-handoff-loss-check-f5",
+    "behavior": "AC5: no vault, project, MEMORY.md or threads/ directory SKIPs and says why",
+    "verification": "cd cli && go test ./internal/doctor -run TestHandoffThreads_Skips",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-185-handoff-loss-check-f6",
+    "behavior": "AC6: read-only and never FAIL, doctor --fix leaves the vault byte-identical",
+    "verification": "cd cli && go test ./internal/doctor -run TestHandoffThreads_NeverWritesNeverFails",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-185-handoff-loss-check-f7",
+    "behavior": "AC7: the key comes from mem.ThreadKey for detached and slash branches",
+    "verification": "cd cli && go test ./internal/doctor -run TestHandoffThreads_KeysLikeTheWriter",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-185-handoff-loss-check-f8",
+    "behavior": "AC8: real-vault run recorded in verification.md",
+    "verification": "grep -n 'real vault' specs/HARNESS-185-handoff-loss-check/verification.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
