@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -25,6 +27,27 @@ var (
 	piRun      pi.Runner = pi.ExecRunner
 	piLookPath           = exec.LookPath
 )
+
+// piRetryWait is the pause before apply's one retry of a failed install. npm's
+// registry can 404 a tarball published minutes earlier, and a later run then
+// installs it (#3051); one retry lets the same run do so.
+var piRetryWait = 15 * time.Second
+
+// retryInstallOnce wraps run so a failed install runs once more after wait. The
+// first attempt's output is logged, so the retry hides nothing; a remove is
+// never retried, and a second failure is returned as the call's result.
+func retryInstallOnce(run pi.Runner, log io.Writer, wait time.Duration) pi.Runner {
+	return func(bin string, args ...string) (string, error) {
+		out, err := run(bin, args...)
+		if err == nil || len(args) == 0 || args[0] != "install" {
+			return out, err
+		}
+		_, _ = fmt.Fprintf(log, "[WARN] pi %s failed (%v), retrying once in %s; first attempt's output:\n%s\n",
+			strings.Join(args, " "), err, wait, out)
+		time.Sleep(wait)
+		return run(bin, args...)
+	}
+}
 
 // skipEnv is CI-002's contract (#1478): a throwaway runner whose diff cannot
 // change what the reconcile does sets it, and the reconcile then skips loudly.
@@ -170,7 +193,7 @@ func runPiApply(out, errOut io.Writer, repo, agentDir, piBin string, dryRun bool
 		_, _ = fmt.Fprintln(out, "[WARN] npm not found — skipping pi package reconcile (install Node.js, then re-run setup)")
 		return nil
 	}
-	res := pi.Apply(t.plan, pi.Options{PiBin: bin, Log: out}, piRun)
+	res := pi.Apply(t.plan, pi.Options{PiBin: bin, Log: out}, retryInstallOnce(piRun, out, piRetryWait))
 	_, _ = fmt.Fprintf(out, "pi packages: changed=%d (%d removed, %d installed, %d retired), %d failed\n",
 		res.Changed(), res.Removed, res.Installed, res.Retired, res.Failed)
 	if res.Failed > 0 {
