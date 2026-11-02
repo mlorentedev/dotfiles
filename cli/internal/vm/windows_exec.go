@@ -171,7 +171,11 @@ func (s WindowsSessions) launch(q *QGA, o ExecOptions, dir, task string) error {
 	if err := q.WriteFile(guestWork+`\guestexec.ps1`, bytes.NewReader(guestExecScript)); err != nil {
 		return fmt.Errorf("copy guestexec.ps1 in: %w", err)
 	}
-	return startTask(q, task, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File `+guestWork+`\guestexec.ps1 -Dir `+dir)
+	var flags []string
+	if o.Elevated {
+		flags = []string{"/rl", "highest"}
+	}
+	return startTask(q, task, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File `+guestWork+`\guestexec.ps1 -Dir `+dir, flags...)
 }
 
 // collect reads what the command left, as far as it got. A stream that never

@@ -51,7 +51,7 @@ created: "2026-10-22"
 - [x] [AC11] Windows `down`: no overlay and no state, `clean-base` untouched; `stale` cleaned by `down`
 - [x] [AC4] A guest file is read in chunks; a failed guest-to-host copy leaves the target as it was
 - [x] [AC11] A Windows `exec` is settled only by its `exit` file; a failed launch leaves nothing in the guest
-- [ ] Verb help states ADR-055's `--elevated` caveat (with `--elevated`, PR 2)
+- [x] Verb help states ADR-055's `--elevated` caveat
 
 ### PR 1d: `run` recomposed
 
@@ -60,10 +60,10 @@ created: "2026-10-22"
 
 ### PR 2: elevation and the guest prerequisites
 
-- [ ] [AC8] Failing test: `exec --elevated` on Windows creates the task with `/rl highest`; on Linux prefixes `sudo`
-- [ ] [AC8] Implement; measure on the real guest that the token is high integrity (`whoami /groups`)
-- [ ] [AC10] Decide and implement how the `ssh-target` role and a stand-in mesh address (100.64.0.0/10) reach a session (#2763 obstacle 3)
-- [ ] [AC10] Install OpenSSH Server inside a session with `exec --elevated`, never in `clean-base`
+- [x] [AC8] Failing test: `exec --elevated` on Windows creates the task with `/rl highest`; on Linux prefixes `sudo`
+- [x] [AC8] Implement; measure on the real guest that the token is high integrity (`whoami /groups`)
+- [x] [AC10] Decide and implement how the `ssh-target` role and a stand-in mesh address (100.64.0.0/10) reach a session (#2763 obstacle 3)
+- [x] [AC10] Install OpenSSH Server inside a session with `exec --elevated`, never in `clean-base`
 
 ### PR 3: the Windows fixture and acceptance
 

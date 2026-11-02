@@ -297,10 +297,12 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 	return errors.Join(runErr, check(rep))
 }
 
-// startTask starts action in the test user's session.
-func startTask(q *QGA, task, action string) error {
+// startTask starts action in the test user's session, with the flags added to
+// its creation.
+func startTask(q *QGA, task, action string, flags ...string) error {
+	create := []string{"/create", "/tn", task, "/tr", action, "/sc", "once", "/st", "00:00", "/ru", guestUser, "/it", "/f"}
 	for _, args := range [][]string{
-		{"/create", "/tn", task, "/tr", action, "/sc", "once", "/st", "00:00", "/ru", guestUser, "/it", "/f"},
+		append(create, flags...),
 		{"/run", "/tn", task},
 	} {
 		r, err := q.Run("schtasks.exe", args)

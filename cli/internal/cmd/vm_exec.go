@@ -42,6 +42,7 @@ type execFlags struct {
 	session, script string
 	secretIDs       []string
 	timeout         time.Duration
+	elevated        bool
 	asJSON          bool
 }
 
@@ -49,7 +50,7 @@ type execFlags struct {
 // exit 2. The program is what follows `--`: it is never parsed as flags, and
 // prose stays out of argv (ADR-055 decision 4).
 func (f execFlags) options(cmd *cobra.Command, args []string, g sessionGuest) (vm.ExecOptions, error) {
-	o := vm.ExecOptions{Session: f.session, Script: f.script, Timeout: f.timeout, Stdin: cmd.InOrStdin()}
+	o := vm.ExecOptions{Session: f.session, Script: f.script, Timeout: f.timeout, Elevated: f.elevated, Stdin: cmd.InOrStdin()}
 	if g.os == "windows" && !stdinGiven(o.Stdin) {
 		o.Stdin = nil
 	}
@@ -124,6 +125,7 @@ func newVMExecCmd(g sessionGuest) *cobra.Command {
 	sessionFlags(c, &f.session, &f.asJSON, "session name (required)")
 	c.Flags().StringVar(&f.script, "script", "", "host file to copy in and run with "+g.script)
 	c.Flags().StringArrayVar(&f.secretIDs, "secret", nil, "registry id or variable to forward on stdin (repeatable)")
+	c.Flags().BoolVar(&f.elevated, "elevated", false, "run as an administrator, for this call only")
 	c.Flags().DurationVar(&f.timeout, "timeout", 0, "stop the command after this long (default none)")
 	return c
 }
