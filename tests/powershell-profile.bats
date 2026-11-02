@@ -121,6 +121,7 @@ setup() {
     refute_grep_fixed 'healthcheck.ps1' "$PROFILE_SCRIPT"
 }
 
+# bats test_tags=windows
 @test "profile.ps1 valid PowerShell syntax (if pwsh available)" {
     require_pwsh
     pwsh -NoProfile -Command "Get-Content '$(_winpath "$PROFILE_SCRIPT")' | Out-Null; \$null = [System.Management.Automation.PSParser]::Tokenize((Get-Content '$(_winpath "$PROFILE_SCRIPT")' -Raw), [ref]\$null)"
