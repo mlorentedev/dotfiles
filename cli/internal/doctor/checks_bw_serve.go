@@ -72,7 +72,7 @@ func reportAbsentBWServe(sys *System, state secrets.BWServeState, rep *Report) {
 		return
 	}
 	lines, readErr := state.LastLogLines(bwServeTailLines)
-	tail := "log is empty"
+	tail := "nothing logged since it started"
 	switch {
 	case readErr != nil:
 		tail = "log unreadable (" + readErr.Error() + ")"

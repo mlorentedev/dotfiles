@@ -100,6 +100,43 @@ func TestBWServeState_LastLogLines(t *testing.T) {
 	}
 }
 
+// CLI-087 (#1750) item 1: the log is append-only across daemons, so a daemon
+// that died silently must not be reported with the previous one's output. The
+// tail stops at the last start marker dotf wrote.
+func TestBWServeState_LastLogLines_StopAtTheCurrentDaemonsStart(t *testing.T) {
+	s := NewBWServeState(t.TempDir())
+	f, err := s.openLog()
+	if err != nil {
+		t.Fatalf("openLog: %v", err)
+	}
+	t0 := time.Date(2026, 11, 2, 7, 0, 0, 0, time.UTC)
+	markStart(f, 100, t0)
+	_, _ = f.WriteString("Unable to fetch ServerConfig\n    at previous.js:1\n    at previous.js:2\n")
+	markStart(f, 200, t0.Add(time.Hour))
+	_, _ = f.WriteString("Listening on 127.0.0.1:8087\n")
+	_ = f.Close()
+
+	lines, err := s.LastLogLines(3)
+	if err != nil {
+		t.Fatalf("LastLogLines: %v", err)
+	}
+	if len(lines) != 1 || lines[0] != "Listening on 127.0.0.1:8087" {
+		t.Fatalf("want only what the current daemon logged, got %q", lines)
+	}
+
+	// A daemon that printed nothing at all leaves only its marker: no lines,
+	// not the previous daemon's last ones.
+	f, err = s.openLog()
+	if err != nil {
+		t.Fatalf("openLog: %v", err)
+	}
+	markStart(f, 300, t0.Add(2*time.Hour))
+	_ = f.Close()
+	if lines, err = s.LastLogLines(3); err != nil || len(lines) != 0 {
+		t.Fatalf("a silent daemon: want no lines, got %q, %v", lines, err)
+	}
+}
+
 // LastLogLines reads only the tail: a log far larger than the tail window
 // still yields its final lines, and the fragment the seek lands in is dropped
 // rather than reported as a line.
