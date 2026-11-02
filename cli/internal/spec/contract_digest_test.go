@@ -213,3 +213,36 @@ func TestContractDigestSeesTextAroundTheProvenance(t *testing.T) {
 		t.Error("a provenance-shaped line in the body was folded away")
 	}
 }
+
+// A fast-track spec holds its whole contract in spec.md, so a review of one
+// recorded three empty digests and the reviewer's comparison with `dotf spec
+// digest` was vacuous (#2980).
+func TestContractDigestCoversAFastTrackSpec(t *testing.T) {
+	spec := "# X\n\n## Intent\nrefuse a stale vault\n\n## Scope\ncli only\n\n## Promotion candidates\n- [ ] Lesson? `no`\n"
+	a := digestOf(t, map[string]string{"spec.md": spec})
+	if a["spec.md"] == "" {
+		t.Fatalf("a fast-track spec.md must have a digest: %v", a)
+	}
+	b := digestOf(t, map[string]string{"spec.md": strings.Replace(spec, "cli only", "cli and shell", 1)})
+	if a["spec.md"] == b["spec.md"] {
+		t.Error("an edit to the scope must change the digest")
+	}
+}
+
+// The author answers the promotion candidates after the review and before the
+// archive; those answers are bookkeeping, not contract, like a ticked box.
+// Only that section is folded: an edit after it, under the next heading, still
+// counts.
+func TestContractDigestIgnoresFastTrackPromotionAnswers(t *testing.T) {
+	spec := "# X\n\n## Intent\nrefuse a stale vault\n\n## Promotion candidates\n- [ ] Lesson? `no`\n- [ ] ADR? `no`\n"
+	answered := "# X\n\n## Intent\nrefuse a stale vault\n\n## Promotion candidates\n" +
+		"- [x] Lesson? yes: docs/lessons/lesson-1-x.md\n- [x] ADR? no: no decision\n"
+	a := digestOf(t, map[string]string{"spec.md": spec})
+	if b := digestOf(t, map[string]string{"spec.md": answered}); a["spec.md"] != b["spec.md"] {
+		t.Error("answering the promotion candidates changed the contract digest")
+	}
+	trailing := digestOf(t, map[string]string{"spec.md": spec + "\n## Scope\nadded after review\n"})
+	if a["spec.md"] == trailing["spec.md"] {
+		t.Error("a section after the promotion candidates must still change the digest")
+	}
+}
