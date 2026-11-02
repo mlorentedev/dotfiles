@@ -14,7 +14,7 @@ template_version: "1.0"
 
 <!-- from issue #1881: doctor: report a handoff section that lost a thread whose worktree still exists -->
 
-`dotf mem handoff-write` stops one session overwriting another's thread, but a hand edit, a wrongly resolved merge conflict or an older agent can still delete a live thread's entry from `MEMORY.md`, and nothing reports it: the owner finds out when the session that owned the thread next looks (HARNESS-088 AC8, declined at archive time). This is not hypothetical: on 2026-11-02 the dotfiles vault held seven `threads/<key>.md` files with no entry in `MEMORY.md`, one of them for a worktree that still existed. #1881 was parked unbuilt because its shape ("a journal for that thread exists under `sessions/`") rests on a file name that no longer identifies the thread, and the store has two layouts. This spec fixes the proof and the layouts first, so the check is not a guess.
+`dotf mem handoff-write` stops one session overwriting another's thread, but a hand edit, a wrongly resolved merge conflict or an older agent can still delete a live thread's entry from `MEMORY.md`, and nothing reports it: the owner finds out when the session that owned the thread next looks (HARNESS-088 AC8, declined at archive time). This is not hypothetical: on 2026-11-01 the dotfiles vault held seven `threads/<key>.md` files with no entry in `MEMORY.md`, one of them for a worktree that still existed. #1881 was parked unbuilt because its shape ("a journal for that thread exists under `sessions/`") rests on a file name that no longer identifies the thread, and the store has two layouts. This spec fixes the proof and the layouts first, so the check is not a guess.
 
 ## What
 
@@ -55,6 +55,6 @@ template_version: "1.0"
 
 ## References
 
-- Bitácora board: mlorentedev/dotfiles#1881 (parked with options A and B; the owner chose A on 2026-11-02)
+- Bitácora board: mlorentedev/dotfiles#1881 (parked with options A and B; the owner chose A on 2026-11-01)
 - Related: HARNESS-088 (#1278, per-thread blocks; AC8 declined), MEMORY-008 and ADR-056 (the per-thread store), #1477 (the budget and the archive step)
 - Code: `cli/internal/mem/handoff.go` (`ThreadKey`, `JournalName`), `cli/internal/mem/thread_store.go` (`threadsDir`, the archive wording)
