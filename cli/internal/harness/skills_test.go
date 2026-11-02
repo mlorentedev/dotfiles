@@ -242,6 +242,97 @@ func TestDeploySkills_ReportsAnUnmarkedCopyItCannotPrune(t *testing.T) {
 	}
 }
 
+// A record owns its deployed directory: a helper the record no longer ships
+// leaves every agent's copy, so a renamed or deleted script is not offered to
+// the agent forever (#2851). Top-level dotfiles stay, as the copy skips them.
+func TestDeploySkills_DropsAuxFilesTheRecordNoLongerShips(t *testing.T) {
+	repo, home := skillsRepo(t)
+	if _, err := DeploySkills(repo, home, none, false); err != nil {
+		t.Fatal(err)
+	}
+	deployed := filepath.Join(home, ".claude", "skills", "demo")
+	finder := filepath.Join(deployed, ".DS_Store")
+	writeFile(t, finder, "x")
+	if err := os.RemoveAll(filepath.Join(repo, "harness", "skills", "demo", "tools")); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(repo, "harness", "skills", "demo", "renamed.sh"), "#!/bin/sh\n")
+
+	out, err := DeploySkills(repo, home, none, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(deployed, "tools")); err == nil {
+		t.Error("the dropped helper's directory is still deployed")
+	}
+	for _, keep := range []string{"SKILL.md", "renamed.sh", ".DS_Store"} {
+		if _, err := os.Stat(filepath.Join(deployed, keep)); err != nil {
+			t.Errorf("%s is gone: %v", keep, err)
+		}
+	}
+	if countStatus(out, SkillDeployed) != 1 {
+		t.Errorf("the claude demo output should report deployed: %+v", out)
+	}
+	again, err := DeploySkills(repo, home, none, false)
+	if err != nil || countStatus(again, SkillDeployed) != 0 {
+		t.Errorf("second run: %+v, %v", again, err)
+	}
+}
+
+func TestDeploySkills_ADryRunKeepsTheDroppedAuxFile(t *testing.T) {
+	repo, home := skillsRepo(t)
+	if _, err := DeploySkills(repo, home, none, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(repo, "harness", "skills", "demo", "tools")); err != nil {
+		t.Fatal(err)
+	}
+	out, err := DeploySkills(repo, home, none, true)
+	if err != nil || countStatus(out, SkillDeployed) != 1 {
+		t.Fatalf("outcomes: %+v, %v", out, err)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude", "skills", "demo", "tools", "helper.sh")); err != nil {
+		t.Error("a dry run removed the helper")
+	}
+}
+
+// Prune owns an output by its provenance, not by a substring: a hand-written
+// skill that quotes the marker in its body is not removed with its directory.
+func TestIsGeneratedOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		want       bool
+	}{
+		{"a rendered skill", "---\ngenerated: true\ngenerated_from: x\nname: a\n---\nbody\n", true},
+		{"a CRLF rendered skill", "---\r\ngenerated: true\r\n---\r\n", true},
+		{"a rendered prompt", "<!-- generated: true; from: x; sha256:0; edit the vault source + re-run setup -->\n\nbody\n", true},
+		{"the marker quoted in the body", "---\nname: mine\n---\nWrite `generated: true` in the frontmatter.\ngenerated: true\n", false},
+		{"the marker in a later block", "---\nname: mine\n---\n---\ngenerated: true\n---\n", false},
+		{"a frontmatter that never closes", "---\ngenerated: true\n", false},
+		{"no frontmatter", "generated: true\n", false},
+		{"a value after the marker", "---\ngenerated: true-ish\n---\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isGeneratedOutput([]byte(tc.body)); got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDeploySkills_KeepsAHandWrittenSkillThatQuotesTheMarker(t *testing.T) {
+	repo, home := skillsRepo(t)
+	mine := filepath.Join(home, ".claude", "skills", "mine", "SKILL.md")
+	writeFile(t, mine, "---\nname: mine\n---\nRecords carry generated: true in their frontmatter.\n")
+	out, err := DeploySkills(repo, home, none, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(mine); err != nil || countStatus(out, SkillPruned) != 0 {
+		t.Errorf("a hand-written skill was pruned: %+v", out)
+	}
+}
+
 func TestDeploySkills_ABadRecordFailsAfterTheRest(t *testing.T) {
 	repo, home := skillsRepo(t)
 	writeFile(t, filepath.Join(repo, "harness", "skills", "broken", "SKILL.md"), "---\ntargets: [\n---\n")
