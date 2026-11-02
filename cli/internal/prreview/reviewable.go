@@ -26,6 +26,15 @@ import (
 // receive an empty diff, on which it publishes nothing, a failure the guard used
 // to blame on NaN (#1618, #1417).
 
+// Diff is what a run learned about the PR's files, for the step that declares it
+// unreviewed: reviewable=false alone also means a draft or a forfeited branch,
+// and reviewable=true also means a read that failed.
+const (
+	DiffEmpty      = "empty"      // every file is one PR-Agent drops
+	DiffReviewable = "reviewable" // at least one file reaches PR-Agent
+	DiffUnread     = "unread"     // not asked, or the read failed
+)
+
 // ErrNoAuditedRef means the commit of PR-Agent to read its filters at is not
 // known. It fails the step: guessing would read filters of another version.
 var ErrNoAuditedRef = errors.New("pr reviewable: no audited PR-Agent commit")
@@ -67,40 +76,46 @@ func AuditedRefFromContract(path string) string {
 	return contract.AuditedRef
 }
 
-// Reviewable answers whether PR-Agent should run on this PR. The only error is
-// ErrNoAuditedRef, once the PR's own state has not already answered.
-func Reviewable(ctx context.Context, in ReviewableInputs, env ReviewableEnv) (bool, error) {
+// Reviewable answers whether PR-Agent should run on this PR, and what it learned
+// about the diff. The only error is ErrNoAuditedRef, once the PR's own state has
+// not already answered.
+func Reviewable(ctx context.Context, in ReviewableInputs, env ReviewableEnv) (bool, string, error) {
 	if env.GH == nil {
 		env.GH = execGH
 	}
-	r := reviewableRun{in: in, env: env}
+	r := reviewableRun{in: in, env: env, narrowed: new(bool)}
 	if in.Event == "pull_request" {
 		if why := forfeit(r.readPR(ctx), in.PR, in.SkipPrefixes); why != "" {
 			r.say("::notice::%s", why)
-			return false, nil
+			return false, DiffUnread, nil
 		}
 	}
 	if !auditedRefPattern.MatchString(in.AuditedRef) {
 		r.say("::error::cannot read the audited PR-Agent commit from the executing contract")
-		return false, ErrNoAuditedRef
+		return false, DiffUnread, ErrNoAuditedRef
 	}
 	filter, err := r.loadFilter(ctx)
 	if err != nil {
 		annotate(env.Out, "cannot read PR-Agent's filters, so the review runs: %v", err)
-		return true, nil
+		return true, DiffUnread, nil
 	}
 	files, ok := r.readFiles(ctx)
 	if !ok {
 		annotate(env.Out, "cannot list this PR's files, so the review runs.")
-		return true, nil
+		return true, DiffUnread, nil
 	}
 	if filter.kept(files) > 0 {
-		return true, nil
+		// A narrowed filter keeps files the whole one might drop, so this says
+		// nothing a declaration may be cleared on. Its empty answer still stands.
+		if *r.narrowed {
+			return true, DiffUnread, nil
+		}
+		return true, DiffReviewable, nil
 	}
 	r.say("::notice::every file in this PR is in .pr_agent.toml's [ignore] list or of a type PR-Agent " +
 		"never reads (#1417), so PR-Agent has nothing it may read; not running it. This is not a review: " +
 		"review-attestation still needs CodeRabbit or a human (#1618).")
-	return false, nil
+	return false, DiffEmpty, nil
 }
 
 // livePR is the PR as the API tells it now. The zero value, a failed read, is
@@ -151,8 +166,9 @@ func splitPrefixes(raw string) []string {
 
 // reviewableRun is one decision, with what it reads from GitHub.
 type reviewableRun struct {
-	in  ReviewableInputs
-	env ReviewableEnv
+	in       ReviewableInputs
+	env      ReviewableEnv
+	narrowed *bool // a filter source was lost, so fewer files are dropped
 }
 
 func (r reviewableRun) say(format string, a ...any) {
@@ -168,19 +184,31 @@ func (r reviewableRun) readPR(ctx context.Context) livePR {
 	return pr
 }
 
-// content is a file through the contents API, empty when the read fails.
-func (r reviewableRun) content(ctx context.Context, repo, path, ref string) []byte {
-	out, stderr, err := r.env.GH(ctx, "api", "repos/"+repo+"/contents/"+path+"?ref="+ref, "--jq", ".content")
+// errContentAbsent is a 404 from the contents API, an answer and not an outage.
+var errContentAbsent = errors.New("no such file")
+
+// fetchContent is a file through the contents API.
+func fetchContent(ctx context.Context, gh GHRunner, repo, path, ref string) ([]byte, error) {
+	out, stderr, err := gh(ctx, "api", "repos/"+repo+"/contents/"+path+"?ref="+ref, "--jq", ".content")
 	if err != nil {
-		// A 404 is an answer: a repository may hold no `.pr_agent.toml`.
-		if !bytes.Contains(stderr, []byte("HTTP 404")) {
-			annotate(r.env.Out, "cannot read %s at %s, so fewer PRs are recognised as empty.", path, ref)
+		if bytes.Contains(stderr, []byte("HTTP 404")) {
+			return nil, errContentAbsent
 		}
-		return nil
+		return nil, fmt.Errorf("%w: %s", err, bytes.TrimSpace(stderr))
 	}
 	// The API wraps its base64, and the decoder skips the newlines.
-	raw, err := base64.StdEncoding.DecodeString(string(out))
+	return base64.StdEncoding.DecodeString(string(out))
+}
+
+// content is a file, empty when the read fails. A repository may hold no
+// `.pr_agent.toml`, so an absent file says nothing.
+func (r reviewableRun) content(ctx context.Context, repo, path, ref string) []byte {
+	raw, err := fetchContent(ctx, r.env.GH, repo, path, ref)
 	if err != nil {
+		if !errors.Is(err, errContentAbsent) {
+			*r.narrowed = true
+			annotate(r.env.Out, "cannot read %s at %s, so fewer PRs are recognised as empty.", path, ref)
+		}
 		return nil
 	}
 	return raw
@@ -189,7 +217,10 @@ func (r reviewableRun) content(ctx context.Context, repo, path, ref string) []by
 func (r reviewableRun) loadFilter(ctx context.Context) (*fileFilter, error) {
 	upstream := func(path string) []byte { return r.content(ctx, upstreamRepo, path, r.in.AuditedRef) }
 	cfg := r.content(ctx, r.in.Repo, ".pr_agent.toml", r.in.DefaultBranch)
-	warn := func(format string, a ...any) { annotate(r.env.Out, format, a...) }
+	warn := func(format string, a ...any) {
+		*r.narrowed = true
+		annotate(r.env.Out, format, a...)
+	}
 	return newFileFilter(cfg, upstream("pr_agent/settings/language_extensions.toml"),
 		upstream("pr_agent/algo/language_handler.py"), warn)
 }

@@ -36,7 +36,9 @@ caller holds it beside the pinned image. Exactly one is required.
 
 It calls the GitHub API through gh (GH_TOKEN), and reads GITHUB_REPOSITORY,
 PR_NUMBER, GITHUB_EVENT_NAME and DEFAULT_BRANCH. Prints reviewable=true|false,
-appended to --output or written to stdout. Annotations go to stdout.
+appended to --output or written to stdout, after diff=empty|reviewable|unread for
+'dotf pr declare-unreviewed': a draft, a forfeited branch and a failed read are
+unread, whatever reviewable says. Annotations go to stdout.
 
 Exit status is 0 with a decision, 1 when the audited commit is unknown, and 2
 for a usage error.`,
@@ -54,7 +56,7 @@ for a usage error.`,
 	cmd.Flags().StringVar(&o.contract, "contract", "", "the upstream contract whose audited_ref names PR-Agent's commit")
 	cmd.Flags().StringVar(&o.auditedRef, "audited-ref", "", "PR-Agent's audited commit, 40 hex characters")
 	cmd.Flags().StringVar(&o.skipPrefixes, "skip-branch-prefixes", "", "branch prefixes that forfeit the review, separated by commas or whitespace")
-	cmd.Flags().StringVar(&o.output, "output", "", "append reviewable=true|false to this file (default: stdout)")
+	cmd.Flags().StringVar(&o.output, "output", "", "append diff= and reviewable= to this file (default: stdout)")
 	return cmd
 }
 
@@ -75,12 +77,12 @@ func (o *reviewableOpts) run(c *cobra.Command, _ []string) error {
 	if o.contract != "" {
 		in.AuditedRef = prreview.AuditedRefFromContract(o.contract)
 	}
-	ok, err := prreview.Reviewable(c.Context(), in,
+	ok, diff, err := prreview.Reviewable(c.Context(), in,
 		prreview.ReviewableEnv{Out: c.OutOrStdout(), GH: prReviewableGH})
 	if err != nil {
 		return err
 	}
-	line := "reviewable=" + strconv.FormatBool(ok) + "\n"
+	line := "diff=" + diff + "\nreviewable=" + strconv.FormatBool(ok) + "\n"
 	if o.output == "" {
 		_, err = c.OutOrStdout().Write([]byte(line))
 		return err

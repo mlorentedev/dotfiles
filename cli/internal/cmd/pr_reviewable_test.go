@@ -57,7 +57,7 @@ func TestPrReviewable_AppendsToOutputAndPassesThePrefixes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != "earlier=1\nreviewable=false\n" {
+	if string(got) != "earlier=1\ndiff=unread\nreviewable=false\n" {
 		t.Errorf("output: %q", got)
 	}
 }

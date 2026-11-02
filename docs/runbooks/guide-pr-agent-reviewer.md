@@ -26,6 +26,7 @@ protect the behavior that depends on PR-Agent internals.
 | `.pr_agent.toml` | which model, what it reads, what it must check, what it must never see |
 | `dotf pr gate` | bounded push-review decision (ADR-040) |
 | `dotf pr reviewable` | whether this run has anything to review: PR state, skipped branch prefixes, empty diff |
+| `dotf pr declare-unreviewed` | label and rationale from `escape` on an ignored-only PR, and clearing a stale label, from `reviewable`'s `diff` output. For consumers that opt in: this repository's workflow does not call it (#1618) |
 | `dotf pr preflight` | probe the declared NaN chain; pass on the models that answer |
 | `dotf pr route` | probe the Anthropic member and draw who reviews first from the pool |
 | `dotf pr guard` | did this run publish a review: the probe before a second attempt, and the final guard |
