@@ -373,6 +373,26 @@ func TestClaudeCLIPinsTheConfigDirOnTheChild(t *testing.T) {
 	}
 }
 
+// `claude mcp get` health-checks the server it describes, and only the
+// registration is read. The child bounds that check even when the parent
+// exports a longer MCP_TIMEOUT; exec keeps the last duplicate.
+func TestClaudeCLIMcpGetBoundsTheHealthCheck(t *testing.T) {
+	t.Setenv("MCP_TIMEOUT", "60000")
+	cmd := claudeCLI{configDir: "/guarded"}.mcpGetCommand("hive")
+	if got := strings.Join(cmd.Args[1:], " "); got != "mcp get hive" {
+		t.Errorf("argv %q, want mcp get hive", got)
+	}
+	var last string
+	for _, kv := range cmd.Env {
+		if strings.HasPrefix(kv, "MCP_TIMEOUT=") {
+			last = kv
+		}
+	}
+	if last != "MCP_TIMEOUT=1" {
+		t.Fatalf("effective MCP_TIMEOUT = %q, want MCP_TIMEOUT=1", last)
+	}
+}
+
 func TestMcpAddArgvMatchesTheTwins(t *testing.T) {
 	got := strings.Join(mcpAddArgv("seq", "stdio", []string{"npx", "-y", "pkg"}), " ")
 	if want := "mcp add --transport stdio seq --scope user -- npx -y pkg"; got != want {

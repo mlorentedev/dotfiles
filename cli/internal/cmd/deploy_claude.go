@@ -54,9 +54,24 @@ func (c claudeCLI) UpdateMarketplace(name string) error {
 	return c.combined("plugin", "marketplace", "update", name)
 }
 
+// mcpGetTimeout bounds the health check `claude mcp get` runs on the server it
+// describes. Nothing reads its Status line: Register reads only the scope,
+// transport and argv, and a failed connection still exits 0. Unbounded, the
+// check starts every server cold, so on a runner whose npx and uvx caches are
+// empty the Claude extensions doctor check took ~54 s (#2059).
+const mcpGetTimeout = "MCP_TIMEOUT=1"
+
 func (c claudeCLI) McpGet(name string) (string, error) {
-	out, err := c.command("mcp", "get", name).Output()
+	out, err := c.mcpGetCommand(name).Output()
 	return string(out), err
+}
+
+// mcpGetCommand is McpGet's child. The timeout comes last, so it wins over an
+// MCP_TIMEOUT the parent exports.
+func (c claudeCLI) mcpGetCommand(name string) *exec.Cmd {
+	cmd := c.command("mcp", "get", name)
+	cmd.Env = append(cmd.Env, mcpGetTimeout)
+	return cmd
 }
 
 func (c claudeCLI) McpAdd(name, transport string, args []string) error {
