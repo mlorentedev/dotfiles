@@ -104,5 +104,6 @@ to the shell's behaviour. Nothing in Go depends on the oracles for this surface 
   frontmatter block, or a prompt's leading comment (`isGeneratedOutput`). A hand-written skill that quotes
   the marker in its body is no longer pruned with its directory
 - [x] Tests first: `TestDeploySkills_DropsAuxFilesTheRecordNoLongerShips`,
-  `TestDeploySkills_AnUnmarkedDirKeepsItsFilesUntilTheRenderOwnsIt`, `TestDeploySkills_ADryRunKeepsTheDroppedAuxFile`, `TestIsGeneratedOutput`,
+  `TestDeploySkills_AnUnmarkedDirKeepsItsFilesUntilTheRenderOwnsIt`, `TestDeploySkills_ADryRunKeepsTheDroppedAuxFile`,
+  `TestDeploySkills_KeepsAnAuxFileTheRecordShipsAsASymlink` (a symlinked record file is still shipped), `TestIsGeneratedOutput`,
   `TestDeploySkills_KeepsAHandWrittenSkillThatQuotesTheMarker`

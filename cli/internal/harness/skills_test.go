@@ -301,6 +301,32 @@ func TestDeploySkills_AnUnmarkedDirKeepsItsFilesUntilTheRenderOwnsIt(t *testing.
 	}
 }
 
+// A record file that is a symlink is copied as its target's bytes, so it is
+// still shipped: the next run must not remove what this run wrote.
+func TestDeploySkills_KeepsAnAuxFileTheRecordShipsAsASymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	repo, home := skillsRepo(t)
+	rec := filepath.Join(repo, "harness", "skills", "demo")
+	writeFile(t, filepath.Join(rec, "shared", "ref.md"), "reference\n")
+	if err := os.Symlink(filepath.Join("shared", "ref.md"), filepath.Join(rec, "ref.md")); err != nil {
+		t.Fatal(err)
+	}
+	for run := 1; run <= 2; run++ {
+		out, err := DeploySkills(repo, home, none, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := os.ReadFile(filepath.Join(home, ".claude", "skills", "demo", "ref.md")); err != nil || string(got) != "reference\n" {
+			t.Fatalf("run %d: ref.md = %q, %v", run, got, err)
+		}
+		if run == 2 && countStatus(out, SkillDeployed) != 0 {
+			t.Errorf("the second run does not converge: %+v", out)
+		}
+	}
+}
+
 func TestDeploySkills_ADryRunKeepsTheDroppedAuxFile(t *testing.T) {
 	repo, home := skillsRepo(t)
 	if _, err := DeploySkills(repo, home, none, false); err != nil {

@@ -273,7 +273,9 @@ func dropStaleAuxFiles(src, dst string, dryRun bool) (bool, error) {
 		case rel == "SKILL.md":
 			return nil
 		}
-		if fi, err := os.Lstat(filepath.Join(src, rel)); err != nil || !fi.Mode().IsRegular() {
+		// Stat, not Lstat: syncAuxFiles copies a symlinked record file as its
+		// target's bytes, so the record still ships it.
+		if fi, err := os.Stat(filepath.Join(src, rel)); err != nil || !fi.Mode().IsRegular() {
 			stale = append(stale, p)
 		}
 		return nil
