@@ -82,10 +82,12 @@ created: "2026-06-21"
   - [x] Vault sources (vault `345bb4c6`): `dispose-proposals`, `creating-skills`, `architecture-session`, `handoff`
     name `dotf harness refresh` / `deploy`. The skills README, CURRENT-STATE, `_ssot.md` and three patterns do too.
     The two pipeline patterns keep one "formerly `compile-harness.sh`" note as history.
+    They are on vault master, so a later refresh on any machine renders the same four records.
   - [x] `dotf harness refresh` carried the four skills into `harness/skills/`. Two other sessions' vault edits
     (insights, vault-doctor) and a new `hermes-kubelab` agent were left for their own refresh
   - [x] Hand-written instruction files, runbooks and both frontmatter schemas name the Go verbs, so
     `check-doc-paths.bats` stays green once the script is gone
+  - [x] Owner-landed (`harness/**`, `AGENTS.md`): left as a draft after triage, merged before the deletion PR
 - [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
   - [ ] The five `harness-*-parity.bats` oracles go with the script; `harness-doctrine-records.bats` and `harness-refresh-announce.bats` move to `dotf harness refresh --vault`
   - [ ] Before closing #2884 with it, each of its three cases has a Go-side test, or gets one here
