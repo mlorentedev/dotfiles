@@ -1,5 +1,5 @@
 ---
-id: "lesson-536-a-parity-oracle-pins-the-defects-it-shares-with-its-twin"
+id: "lesson-537-a-parity-oracle-pins-the-defects-it-shares-with-its-twin"
 type: lesson
 status: active
 title: "A parity oracle pins the defects it shares with its twin"
