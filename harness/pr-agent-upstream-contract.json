@@ -9,11 +9,13 @@
     "pr_agent/algo/comment_identity.py": "819a3cd08a6c286376f5f2579561df66e143fb87",
     "pr_agent/algo/file_filter.py": "09eaadf7007e8f9f9e70a1622b59df0033bf719b",
     "pr_agent/algo/inline_comment_dedup.py": "6a6426f63bf477bca1f0a6eeb09386cf83d5643d",
+    "pr_agent/algo/language_handler.py": "9ec8f81994abc20dd4122b108bb661f8dc8e31b4",
     "pr_agent/algo/review_finding_state.py": "62b5e93908724ba8ad49559d84e7d42ee56dfe94",
     "pr_agent/config_loader.py": "de441128ae2d4695303da7aa2d25ad56b8e5cd61",
     "pr_agent/git_providers/github_provider.py": "512077ccd97c9f79e92edd728c03ee8118ced3aa",
     "pr_agent/servers/github_action_runner.py": "f675ed8e5ac4db5a9c14aa463c22cdfc311b1b72",
     "pr_agent/settings/configuration.toml": "a671240ed62b67246f6dffeee89e1b0f15f12036",
+    "pr_agent/settings/language_extensions.toml": "0cc6c700f5e425649939a4312745f6a6dbb9ceb4",
     "pr_agent/tools/pr_reviewer.py": "d9033d41210856cd5fbdf1170db4c0653a3ff26d"
   }
 }

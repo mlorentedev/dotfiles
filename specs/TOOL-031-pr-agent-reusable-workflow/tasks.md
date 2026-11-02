@@ -117,7 +117,11 @@ review, not per merge.
   Expected: PASS.
 - [x] [AC4] `.github/actions/push-gate`: the composite runs `dotf pr gate` and fails the step on error. Test first.
 - [ ] [AC4] [AC6] `dotf pr declare-unreviewed`, with kubelab's declare tests (`tests/test_pr_agent_workflow.py:485-527`) ported to Go, behind the input `declare_unreviewed`. ~90 lines of shell would break ci-workflows' rule 1.
-- [ ] [AC6] `dotf pr reviewable` (#3016) reads the input `skip_branch_prefixes`. An expression cannot iterate a list in the job's `if:`, so the job enters the lane, and with `queue: max` it displaces nothing.
+- [x] [AC6] `dotf pr reviewable` (#3016) reads the input `skip_branch_prefixes`. An expression cannot iterate a list in the job's `if:`, so the job enters the lane, and with `queue: max` it displaces nothing.
+  - D's half. The verb takes `--skip-branch-prefixes` and `--contract` or `--audited-ref`, so C replaces its step with one line and its `PR_AGENT_REF` stays beside the image. A prefix applies to `pull_request` runs only, and is read from the live PR, never from the payload. dotfiles keeps its job-level `release-please--` literal: there it costs no lane, and `pr-agent-config.bats` pairs it with the gate's exemption.
+  - C still has to adopt it in `v0.2.0`, after a dotf release. The next item stays open for that.
+  - The step's `build-from-head` order moved: `dotf` is built before the first decision, so a draft costs a build. `push_gate` is gated on `reviewable`, the defect #3016's first comment names.
+  - The port departs from the step in two places. It reads `AUTO_GENERATED_FILES_EXACT`, which the step had stopped finding (lesson-531), and drops one pattern RE2 cannot compile rather than the whole answer, as upstream does. Interior `**/` expansion is not ported: #3036, which only narrows.
 - [ ] Make `declared_model` and `declared_fallback_models` optional with `pool: embedded`, and give `dotf_version` a default at each tag, so a bump of one pin brings the rest.
 - [ ] The three items above ship as C's `v0.2.0`, with the kubelab fixture.
 - [x] [AC6] Add caller fixtures `tests/fixtures/callers/{dotfiles,hive}.yml`, plus a bats case that each fixture's `with:` and `secrets:` match the declared interface

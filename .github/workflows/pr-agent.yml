@@ -233,45 +233,47 @@ jobs:
               "dotfiles/secrets/registry.yaml, then run: dotf secrets sync ci --repo ${GITHUB_REPOSITORY} NAN_API_KEY"
             exit 1
           fi
-      # A PR whose every file is in `.pr_agent.toml`'s [ignore] reaches the model
-      # as an EMPTY diff. PR-Agent then logs "No PR diff fits the /review request",
-      # publishes nothing and exits green, and the guard below reported that as NaN
-      # concurrency exhaustion. It is neither transient nor NaN's doing: every DR
-      # escrow refresh (only `sensitive/**`, ignored on purpose) failed that way,
-      # three runs in a row on #1614 (#1618).
+      # The job has no full checkout: only dotf's source, whose `dotf pr` verbs
+      # decide whether PR-Agent runs (the empty-diff check and TOOL-023's push
+      # gate), on which model (AI-045's preflight and the pool draw), and whether
+      # it published (the guard, which also gates the second attempt), plus the
+      # pool whose weights the draw reads and the contract that names the audited
+      # PR-Agent commit. They are fetched from the PR's merge ref, the same trust
+      # as this workflow file, and forks never reach this job.
+      - name: Check out dotf and the pool
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: |
+            harness/reviewer-pool.json
+            harness/pr-agent-upstream-contract.json
+            cli/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      # Built from the PR, not a release, so a PR that changes a decision runs
+      # its own version (TOOL-031). A consumer installs a pinned release instead.
+      # It precedes every decision, the first of which may end the run, so a
+      # draft now costs a build, and a draft that does not build fails here.
+      - name: Build dotf
+        working-directory: cli
+        run: |
+          go build -o "$RUNNER_TEMP/bin/dotf" ./cmd/dotf
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      # Does this run have anything to review? PR-Agent logs "No PR diff fits the
+      # /review request" on an empty diff, publishes nothing and exits green, which
+      # the guard would report as NaN's fault (#1618, #1417). And a PR merged,
+      # closed or drafted while its run waited in the lane above needs no review
+      # (#1923). This is also the only draft gate (#2591): the job `if` above does
+      # not read the payload's `draft`, so a PR marked ready is reviewed by
+      # whichever run survives the concurrency cancel.
       #
-      # So ask first, with PR-Agent's own semantics: upstream's `file_filter.py`
-      # turns each glob into `fnmatch.translate(glob)` (plus the glob without a
-      # leading `**/`) and drops a file when any pattern `re.match`es it. The
-      # config is read from the DEFAULT branch, which is where PR-Agent reads it.
-      #
-      # Skipping removes a run that could not review anything; it never grants a
-      # review. `review-attestation` still reads the PR as unreviewed until
-      # CodeRabbit or a human reviews it. Any failure to answer falls through to
-      # running PR-Agent, which is the behaviour before this step existed.
-      #
-      # PR-Agent also drops files by TYPE (`is_valid_file`): its bad_extensions
-      # list (`.gitignore`, `.lock`, images) and an exact lockfile list. A
-      # `.gitignore`-only PR (#1977) and lockfile-only dependabot bumps hit the
-      # same empty diff (#1417). Both lists are read from upstream at PR_AGENT_REF,
-      # the contract's `audited_ref`: the commit the pinned image was built from,
-      # which a test binds to the image digest, so nothing here is a copy that
-      # can drift. If either read fails, that list is empty: the skip narrows and
-      # never widens.
-      #
-      # The same output also skips a PR that was MERGED, CLOSED or turned back
-      # into a draft while its run waited in the one-at-a-time lane (`queue: max`
-      # above). The run's event is a snapshot from when it was queued, so nothing
-      # else notices. Measured 2026-10-07: a merged PR's review held the lane
-      # 18 minutes while eight open PRs waited behind it (#1923). A draft gets
-      # its review from `ready_for_review`. Only a definite answer skips:
-      # if the read fails, the review runs, as before. Only `pull_request`
-      # runs skip, because a human typing /review on a merged PR means it.
-      #
-      # This read is also the only draft gate (#2591): the job `if` above no longer
-      # looks at the payload's `draft`, so a draft costs one short run that ends
-      # here, and a PR marked ready is reviewed by whichever run survives the
-      # concurrency cancel.
+      # `dotf pr reviewable --help` has the rules; only a definite answer skips,
+      # and a skip never grants a review. The audited commit is read from the
+      # contract in this checkout, the commit executing this workflow, since a test
+      # binds that contract to the image digest pinned below.
       - name: Skip when PR-Agent would receive an empty diff
         id: reviewable
         if: steps.credential.outcome == 'success'
@@ -279,111 +281,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          WORKFLOW_SHA: ${{ github.workflow_sha }}
-        run: |
-          set -uo pipefail
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            pr_state=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
-              --jq 'if .merged then "merged" elif .state == "closed" then "closed" elif .draft then "draft" else "open" end' \
-              2>/dev/null) || pr_state=""
-            case "$pr_state" in
-              merged|closed|draft)
-                echo "::notice::PR #${PR_NUMBER} is ${pr_state} now (read from the API, not the event payload); not reviewing it."
-                echo "reviewable=false" >> "$GITHUB_OUTPUT"
-                exit 0
-                ;;
-            esac
-          fi
-          contract="harness/pr-agent-upstream-contract.json"
-          PR_AGENT_REF=$(gh api "repos/${GITHUB_REPOSITORY}/contents/${contract}?ref=${WORKFLOW_SHA}" \
-            --jq '.content' | base64 -d | jq -r '.audited_ref') || PR_AGENT_REF=""
-          if [[ ! "$PR_AGENT_REF" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::cannot read the audited PR-Agent commit from the executing contract"
-            exit 1
-          fi
-          CFG=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.pr_agent.toml?ref=${DEFAULT_BRANCH}" \
-            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null) || CFG=""
-          upstream() { # $1 = path in The-PR-Agent/pr-agent at PR_AGENT_REF; empty on failure
-            gh api "repos/The-PR-Agent/pr-agent/contents/$1?ref=${PR_AGENT_REF}" \
-              --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true
-          }
-          UPSTREAM_EXT=$(upstream pr_agent/settings/language_extensions.toml)
-          UPSTREAM_HANDLER=$(upstream pr_agent/algo/language_handler.py)
-          FILES=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate \
-            --jq '.[].filename' 2>/dev/null) || FILES=""
-          export CFG FILES UPSTREAM_EXT UPSTREAM_HANDLER
-          kept=$(python3 - <<'PY'
-          import ast, fnmatch, os, re, tomllib
-          ignore = tomllib.loads(os.environ["CFG"]).get("ignore", {})
-          patterns = list(ignore.get("regex", []) or [])
-          for glob in ignore.get("glob", []) or []:
-              patterns.append(fnmatch.translate(glob))
-              if glob.startswith("**/"):
-                  patterns.append(fnmatch.translate(glob[3:]))
-          compiled = [re.compile(p) for p in patterns]
-          ext = os.environ.get("UPSTREAM_EXT", "")
-          bad = {str(e).lower() for e in tomllib.loads(ext).get("bad_extensions", {}).get("default", [])} if ext else set()
-          lits = {}  # is_valid_file's literal lockfile set and suffix tuple, by name
-          for node in ast.walk(ast.parse(os.environ.get("UPSTREAM_HANDLER", ""))):
-              if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
-                  try:
-                      lits[node.targets[0].id] = ast.literal_eval(node.value)
-                  except (ValueError, TypeError, SyntaxError):
-                      pass
-          locks = set(lits.get("auto_generated_files_exact", ()))
-          suffixes = tuple(lits.get("auto_generated_suffixes", ()))
-          def typed_out(f):  # is_valid_file at PR_AGENT_REF, inverted
-              return (f.split("/")[-1] in locks or (bool(suffixes) and f.endswith(suffixes))
-                      or f.split(".")[-1].lower() in bad)
-          files = [f for f in os.environ["FILES"].splitlines() if f]
-          if not files:
-              raise SystemExit("no file list")
-          print(sum(1 for f in files if not typed_out(f) and not any(r.match(f) for r in compiled)))
-          PY
-          ) || kept=""
-          if [ "$kept" = "0" ]; then
-            echo "::notice::every file in this PR is in .pr_agent.toml's [ignore] list or of a type" \
-              "PR-Agent never reads (#1417), so PR-Agent" \
-              "has nothing it may read; not running it. This is not a review: review-attestation" \
-              "still needs CodeRabbit or a human (#1618)."
-            echo "reviewable=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "reviewable=true" >> "$GITHUB_OUTPUT"
-          fi
-      # The job has no full checkout: only dotf's source, whose `dotf pr` verbs
-      # decide whether PR-Agent runs (TOOL-023's push gate), on which model
-      # (AI-045's preflight and the pool draw), and whether it published (the
-      # guard, which also gates the second attempt), plus the pool whose weights
-      # the draw reads. They are fetched from the PR's merge ref, the same trust
-      # as this workflow file, and forks never reach this job.
-      - name: Check out dotf and the pool
-        if: steps.reviewable.outputs.reviewable != 'false'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          sparse-checkout: |
-            harness/reviewer-pool.json
-            cli/
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        if: steps.reviewable.outputs.reviewable != 'false'
-        with:
-          go-version-file: cli/go.mod
-          cache-dependency-path: cli/go.sum
-      # Built from the PR, not a release, so a PR that changes a decision runs
-      # its own version (TOOL-031). A consumer installs a pinned release instead.
-      - name: Build dotf
-        if: steps.reviewable.outputs.reviewable != 'false'
-        working-directory: cli
-        run: |
-          go build -o "$RUNNER_TEMP/bin/dotf" ./cmd/dotf
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+        run: dotf pr reviewable --contract harness/pr-agent-upstream-contract.json --output "$GITHUB_OUTPUT"
       # TOOL-023: the push gate decides BEFORE PR-Agent starts. A push PR-Agent
       # skipped would publish nothing, and the guard below would read that as a
       # failed inference.
       - name: Decide whether this push is reviewed
         id: push_gate
-        if: github.event.action == 'synchronize'
+        if: steps.reviewable.outputs.reviewable != 'false' && github.event.action == 'synchronize'
         # Fails OPEN. A read that fails leaves no file, and the gate reviews on
         # unreadable input. A step that fails leaves no output, and PR-Agent
         # runs. A review is skipped only when the data justifies it.

@@ -1,7 +1,7 @@
 ---
 id: "TOOL-031-pr-agent-reusable-workflow"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-10-21"
 issue: "mlorentedev/dotfiles#2893"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ci, pr-agent, reusable-workflows, dotf]
