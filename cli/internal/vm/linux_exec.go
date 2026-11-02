@@ -182,11 +182,12 @@ func (s LinuxSessions) guestRun(ctx context.Context, o ExecOptions, pairs []stri
 		argv = append(append(append([]string{"bash", "-c", forwardEnv, "_"}, names...), "--"), argv...)
 		stdin = io.MultiReader(strings.NewReader(lines.String()), stdin)
 	}
-	if o.Elevated {
-		argv = append([]string{"sudo", "-n"}, argv...)
-	}
 	if o.Timeout > 0 {
 		argv = append([]string{"timeout", "-k", "5", strconv.FormatFloat(o.Timeout.Seconds(), 'f', 3, 64)}, argv...)
+	}
+	// Outside the timeout: an unprivileged timeout cannot kill a root command.
+	if o.Elevated {
+		argv = append([]string{"sudo", "-n"}, argv...)
 	}
 	return s.L(ctx, stdin, stdout, stderr, append([]string{"shell", instance, "--"}, argv...)...)
 }

@@ -61,7 +61,7 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - Resolved: a Windows `exec` is settled only by its `exit` file, never by the clock. An `exit` read at the deadline is the command's outcome. A cancel, which nothing in the guest acts on, keeps the task and the directory and says the command may still be running.
 - Resolved: `guestexec.ps1` publishes no `exit` when `taskkill` failed and the program is alive, so the host takes the same path as a guest that never answered. A launch that failed removes its task and directory, because no command started.
 - Resolved: the `ssh-target` role and the stand-in mesh address reach a session through `exec --elevated`, with no new verb and no flag on `up`. A session is the guest a test shapes, and both are one command. On Windows a static address on the NIC turns its DHCP off (measured: `New-NetIPAddress` left only `100.64.0.2` and the guest lost the network), so the test sets the guest's own address statically beside the stand-in, and installs OpenSSH before it.
-- Resolved: `exec --elevated` on Linux is `sudo -n`, inside the guest's `timeout` so the limit still ends it, and outside what reads `--secret`, so the value reaches the command and not sudo. It never prompts: a guest that would is a failure, not a hang.
+- Resolved: `exec --elevated` on Linux is `sudo -n`, outside the guest's `timeout` because an unprivileged `timeout` cannot kill a root command, and outside what reads `--secret`, so the value reaches the command and not sudo. It never prompts: a guest that would is a failure, not a hang.
 - No open question blocks `tasks.md`.
 
 ## Acceptance criteria

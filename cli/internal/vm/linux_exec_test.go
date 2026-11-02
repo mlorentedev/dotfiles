@@ -361,8 +361,8 @@ func TestExecWrapsScriptSecretAndTimeoutInOrder(t *testing.T) {
 	}
 }
 
-// AC8: sudo sits inside the guest's timeout, so the limit still ends it, and
-// outside what reads the secret, so the value reaches the command, not sudo.
+// AC8: sudo is the outermost layer, so a root timeout can kill a root command,
+// and the secret is read past it, so the value reaches the command, not sudo.
 func TestExecElevatedPrefixesSudo(t *testing.T) {
 	f := scriptLima(t, "")
 	o := execOpts("id")
@@ -371,7 +371,7 @@ func TestExecElevatedPrefixesSudo(t *testing.T) {
 	if r := heldSession(t, f).Exec(context.Background(), o); r.Status != StatusOK {
 		t.Fatalf("Exec = %+v", r)
 	}
-	want := "shell dotf-x -- timeout -k 5 60.000 sudo -n bash -c " + forwardEnv + " _ API_TOKEN -- id"
+	want := "shell dotf-x -- sudo -n timeout -k 5 60.000 bash -c " + forwardEnv + " _ API_TOKEN -- id"
 	if got := shellCalls(f); len(got) != 1 || got[0] != want {
 		t.Errorf("calls = %q, want %q", got, want)
 	}
