@@ -1,0 +1,27 @@
+version: 1
+run_id: "tool031-20261102T0550Z"
+armed_by: manu
+armed_at: 2026-11-02T05:50:26Z
+expires_at: 2026-11-02T17:35:26Z
+objective: "Advance TOOL-031's dotf side and its Gitea groundwork, then clear small stale docs chores, one PR per item, landed under the standing grant or parked with a question."
+worktree: /Users/manu/Projects/worktrees/dotfiles/chore-autopilot-tool031-20261102t0550z
+branch: chore/autopilot-tool031-20261102t0550z
+scope:
+  write_paths: ["cli/internal/prreview/**", "cli/internal/cmd/pr_*", "tests/pr-agent-*", "specs/TOOL-031-pr-agent-reusable-workflow/**", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", "ai/nan/README.md", "README.md", ".agent/runs/tool031-20261102T0550Z/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "secrets/**", "scripts/**", "setup-*.sh", "setup-*.ps1", "versions.conf", "release-please-config.json", ".release-please-manifest.json"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, jq, yq, caffeinate]
+queue:
+  source: bitacora
+  filter: "In order, first eligible survivor each time: (1) #2893 tasks.md line 128, dotf's half: dotf pr preflight reads the NaN chain from the pool, so declared_model and declared_fallback_models can become optional with pool embedded; (2) #1005: inventory dotf pr guard's forge calls as a comment and add the test that fails when prreview reaches a forge outside the seam, no Gitea backend and no choice between Backend and inputs; (3) #252; (4) #235; (5) #257; (6) #256. Each must pass the 3 a.m. test and hold a free lease. #2928 belongs to the run in feat-pr-declare-unreviewed; #3048 #3049 #3033 #3007 #2784 #2896 #2957 #2851 #3050 #2979 #1906 #2407 #1649 #1727 #1749 #1750 belong to the night and bugs runs. Skip stale tickets with a comment rather than inventing a plan."
+  max_items: 6
+budget:
+  max_iterations: 10
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
