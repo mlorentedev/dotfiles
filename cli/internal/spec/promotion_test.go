@@ -92,6 +92,37 @@ func TestPromotionsAcceptAYesWhoseFileExists(t *testing.T) {
 	}
 }
 
+// A note in parentheses between the question and the answer is the author's,
+// not the answer: measured on MEMORY-008 (#2993), where it read as unanswered.
+func TestPromotionsReadTheAnswerAfterAParentheticalNote(t *testing.T) {
+	root, dir := promotionSpec(t, promotionsWith(
+		"no: nothing new",
+		"(the per-thread store changes the layout of every project's `memory/` (all of them)) yes: docs/adr/adr-056-x.md",
+		"(one repo so far) no: single project"))
+	adr := filepath.Join(root, "docs", "adr", "adr-056-x.md")
+	if err := os.MkdirAll(filepath.Dir(adr), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(adr, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if problems := CheckPromotions(root, dir, noVault); len(problems) != 0 {
+		t.Fatalf("want no problems, got %q", problems)
+	}
+}
+
+// Only a leading note is skipped: a "no" inside it is not an answer, and a
+// note followed by nothing is still unanswered.
+func TestPromotionsDoNotReadAnAnswerInsideTheNote(t *testing.T) {
+	for _, answer := range []string{"(no new pattern here)", "(unclosed note yes: docs/x.md"} {
+		root, dir := promotionSpec(t, promotionsWith(answer, "no: x", "no: y"))
+		problems := CheckPromotions(root, dir, noVault)
+		if len(problems) != 1 || !strings.Contains(problems[0], "unanswered") {
+			t.Errorf("answer %q: want one unanswered problem, got %q", answer, problems)
+		}
+	}
+}
+
 func TestPromotionsResolveAPatternAgainstTheVault(t *testing.T) {
 	root, dir := promotionSpec(t, promotionsWith("no: x", "no: y", "yes: 00_meta/patterns/pattern-x.md"))
 	vaultRoot := t.TempDir()

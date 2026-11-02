@@ -96,9 +96,9 @@ func judgePromotion(repoRoot string, vaultRoot func() (string, error), answer st
 	answer = strings.TrimSpace(strings.NewReplacer("*", "", "`", "").Replace(answer))
 	// The pattern line's question carries an extra sentence before the answer.
 	answer = strings.TrimSpace(strings.TrimPrefix(answer, "Only if this recurs in >1 project."))
-	m := promotionAnswer.FindStringSubmatch(answer)
+	m := promotionAnswer.FindStringSubmatch(skipLeadingNote(answer))
 	if m == nil {
-		return `unanswered: write "yes: <path>" or "no: <reason>"`
+		return `unanswered: write "yes: <path>" or "no: <reason>" right after the "?", or after a note in parentheses`
 	}
 	rest := strings.TrimSpace(m[2])
 	if strings.EqualFold(m[1], "no") {
@@ -118,6 +118,30 @@ func judgePromotion(repoRoot string, vaultRoot func() (string, error), answer st
 		}
 	}
 	return strings.Join(missing, "; ")
+}
+
+// skipLeadingNote drops a note in parentheses that opens answer, nested
+// parentheses included, so the answer can follow it (#2993). Only the opening
+// note is skipped: searching the whole line for yes or no would read the "no"
+// of "(no new pattern here)" as an answer. An unclosed note is left in place,
+// and the line then reads as unanswered.
+func skipLeadingNote(answer string) string {
+	if !strings.HasPrefix(answer, "(") {
+		return answer
+	}
+	depth := 0
+	for i, r := range answer {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return strings.TrimSpace(answer[i+1:])
+			}
+		}
+	}
+	return answer
 }
 
 // promotedFileProblem checks that one promoted path exists where it belongs.
