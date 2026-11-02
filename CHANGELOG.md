@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.79.0](https://github.com/mlorentedev/dotfiles/compare/v0.78.0...v0.79.0) (2026-11-02)
+
+
+### Features
+
+* **harness:** catch a record edited without its vault source ([#3027](https://github.com/mlorentedev/dotfiles/issues/3027)) ([70a8d78](https://github.com/mlorentedev/dotfiles/commit/70a8d786f85843aa8bf1c803879538ee47a9101f))
+* **harness:** render the refresh in Go ([#3023](https://github.com/mlorentedev/dotfiles/issues/3023)) ([ac3c865](https://github.com/mlorentedev/dotfiles/commit/ac3c865a864deb1e61ee8e545530d5f1eb248f77)), closes [#495](https://github.com/mlorentedev/dotfiles/issues/495)
+* **secrets:** deliver PR_AGENT_ANTHROPIC_API_KEY to hive's CI ([#3035](https://github.com/mlorentedev/dotfiles/issues/3035)) ([d90319b](https://github.com/mlorentedev/dotfiles/commit/d90319b40b6461607e5cad14b4ec341511b87cfd))
+
+
+### Bug Fixes
+
+* **mem:** read every field under a label, and drop the first-match read ([#3034](https://github.com/mlorentedev/dotfiles/issues/3034)) ([e061a50](https://github.com/mlorentedev/dotfiles/commit/e061a50eb697edad63e127e7d52489b86a440e67))
+* **mem:** say when a resume context has no Next action ([#3030](https://github.com/mlorentedev/dotfiles/issues/3030)) ([0eb6e5c](https://github.com/mlorentedev/dotfiles/commit/0eb6e5cd3fb9ffbb7ee9527f4f3f0586fb3f3db0)), closes [#3003](https://github.com/mlorentedev/dotfiles/issues/3003)
+* **prtriage:** judge late findings and tell same-named files apart ([#3024](https://github.com/mlorentedev/dotfiles/issues/3024)) ([60ce367](https://github.com/mlorentedev/dotfiles/commit/60ce367337a01be834852934292848128bf80b8f))
+* **spec:** warn the ordinary-scope review prompt about merged-in work ([#3026](https://github.com/mlorentedev/dotfiles/issues/3026)) ([83ed718](https://github.com/mlorentedev/dotfiles/commit/83ed718dbb28f7c7683b95b7865910d975a4ac25))
+* **worktree:** declare the ancestor-walk bound only where a walk reads it ([#3021](https://github.com/mlorentedev/dotfiles/issues/3021)) ([0f60a66](https://github.com/mlorentedev/dotfiles/commit/0f60a6643585d93b6108dca74e659d8c011cdd87))
+
 ## [0.78.0](https://github.com/mlorentedev/dotfiles/compare/v0.77.0...v0.78.0) (2026-11-01)
 
 
