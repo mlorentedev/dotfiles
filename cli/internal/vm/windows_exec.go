@@ -181,7 +181,10 @@ func (s WindowsSessions) collect(q *QGA, o ExecOptions, dir string, start time.T
 	stream := func(name string, w io.Writer) *capped {
 		c := &capped{}
 		plain := &lossy{w: w, err: &lost}
-		_ = q.CopyFile(dir+`\`+name, &skipBOM{w: io.MultiWriter(c, plain)})
+		// A stream that never appeared is empty; one that broke midway is a loss.
+		if err := q.CopyFile(dir+`\`+name, &skipBOM{w: io.MultiWriter(c, plain)}); err != nil && c.buf.Len() > 0 {
+			c.over, lost = true, err
+		}
 		return c
 	}
 	out, errOut := stream("stdout", o.Stdout), stream("stderr", o.Stderr)

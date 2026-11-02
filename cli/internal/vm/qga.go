@@ -189,8 +189,10 @@ func (q *QGA) WriteFile(path string, r io.Reader) (err error) {
 // ReadFile returns the contents of path in the guest.
 func (q *QGA) ReadFile(path string) ([]byte, error) {
 	var out bytes.Buffer
-	err := q.CopyFile(path, &out)
-	return out.Bytes(), err
+	if err := q.CopyFile(path, &out); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
 }
 
 // CopyFile writes a guest file to w chunk by chunk, so a large file never sits

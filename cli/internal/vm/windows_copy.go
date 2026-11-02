@@ -69,12 +69,12 @@ func copyOut(q *QGA, guest, host string) error {
 	if err := errors.Join(q.CopyFile(guest, f), f.Close()); err != nil {
 		return fmt.Errorf("copy from %s: %w", guest, err)
 	}
-	mode := os.FileMode(0o644)
+	// A target keeps its mode; a new file keeps CreateTemp's 0600, which no
+	// umask can make wider than the user meant.
 	if st, err := os.Stat(host); err == nil {
-		mode = st.Mode().Perm() // a target keeps its mode: guest data stays as private
-	}
-	if err := os.Chmod(f.Name(), mode); err != nil {
-		return err
+		if err := os.Chmod(f.Name(), st.Mode().Perm()); err != nil {
+			return err
+		}
 	}
 	return os.Rename(f.Name(), host)
 }
