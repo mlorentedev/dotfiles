@@ -71,7 +71,7 @@ func TestQuietReachesTheRemoteSideOfALocalTransport(t *testing.T) {
 // what the host sets there, such as core.autocrlf on Git for Windows.
 func TestQuietKeepsTheSystemConfigInForce(t *testing.T) {
 	cleanEnv(t)
-	host := filepath.Join(t.TempDir(), "system.gitconfig")
+	host := filepath.Join(t.TempDir(), "sys#tem;config") // comment characters git must not cut at
 	if err := os.WriteFile(host, []byte("[gittestdemo]\n\tkept = yes\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

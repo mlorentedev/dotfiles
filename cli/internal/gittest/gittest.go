@@ -86,7 +86,9 @@ func quietSystem() error {
 	if strings.HasPrefix(filepath.Base(current), filePrefix) {
 		return nil
 	}
-	body := "[include]\n\tpath = " + strings.ReplaceAll(filepath.ToSlash(current), `"`, `\"`) + "\n" + remoteKeys
+	// Quoted, so a `#` or `;` in the path is not read as a comment.
+	quoted := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(filepath.ToSlash(current))
+	body := "[include]\n\tpath = \"" + quoted + "\"\n" + remoteKeys
 	path, err := writeOnce(body)
 	if err != nil {
 		return err
@@ -95,14 +97,21 @@ func quietSystem() error {
 }
 
 // writeOnce writes body to a file named by its hash, so concurrent test
-// packages share one file and a rename makes each write atomic.
+// packages share one file and a rename makes each write atomic. The file lives
+// in a directory only this user can write: git runs what a config names (an
+// fsmonitor, an sshCommand), and a predictable name in a shared /tmp could be
+// planted by another user first.
 func writeOnce(body string) (string, error) {
+	dir, err := privateDir()
+	if err != nil {
+		return "", err
+	}
 	sum := sha256.Sum256([]byte(body))
-	path := filepath.Join(os.TempDir(), filePrefix+hex.EncodeToString(sum[:6])+".gitconfig")
+	path := filepath.Join(dir, filePrefix+hex.EncodeToString(sum[:6])+".gitconfig")
 	if _, err := os.Stat(path); err == nil {
 		return path, nil
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), filePrefix+"*.tmp")
+	tmp, err := os.CreateTemp(dir, filePrefix+"*.tmp")
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +120,23 @@ func writeOnce(body string) (string, error) {
 		return "", errors.Join(err, os.Remove(tmp.Name()))
 	}
 	if err := os.Rename(tmp.Name(), path); err != nil {
+		// Another package won the race; its file holds the same bytes. Windows
+		// refuses a rename onto a file another process has open.
+		if _, serr := os.Stat(path); serr == nil {
+			return path, os.Remove(tmp.Name())
+		}
 		return "", errors.Join(err, os.Remove(tmp.Name()))
 	}
 	return path, nil
+}
+
+// privateDir is this user's cache directory for gittest, created 0700. Without
+// a cache directory (no HOME), a fresh private temp directory stands in.
+func privateDir() (string, error) {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return os.MkdirTemp("", filePrefix)
+	}
+	dir := filepath.Join(base, "dotf-gittest")
+	return dir, os.MkdirAll(dir, 0o700)
 }
