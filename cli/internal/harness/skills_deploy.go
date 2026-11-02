@@ -31,8 +31,33 @@ type SkillOutcome struct {
 }
 
 // generatedMarker is the provenance every rendered output carries, and the only
-// proof that an output is ours to prune.
+// proof that an output is ours to prune (isGeneratedOutput says where it must sit).
 const generatedMarker = "generated: true"
+
+// isGeneratedOutput reports whether an output carries the provenance the render
+// writes: `generated: true` as a line of its leading frontmatter block, or the
+// leading comment of a prompt. A hand-written file that merely quotes the marker
+// is not ours, so prune never removes it with its directory (#2851).
+func isGeneratedOutput(content []byte) bool {
+	lines := recordLines(normalizeLF(content))
+	if len(lines) == 0 {
+		return false
+	}
+	if strings.HasPrefix(lines[0], "<!-- "+generatedMarker+";") {
+		return true
+	}
+	if !fenceLine.MatchString(lines[0]) {
+		return false
+	}
+	found := false
+	for _, l := range lines[1:] {
+		if fenceLine.MatchString(l) {
+			return found
+		}
+		found = found || l == generatedMarker
+	}
+	return false
+}
 
 // DeploySkills renders every committed skill record to each skills.deploy[]
 // target under home, then prunes the generated outputs whose record is gone or
@@ -135,15 +160,28 @@ func deploySkill(t SkillDeployTarget, recDir, name, base, srcPath string, dryRun
 	changed := false
 	if t.Render == RenderSkill {
 		// The skill's directory is the unit: a symlinked one is unlinked, and
-		// the record's auxiliary files are copied in beside the render.
+		// the record's auxiliary files are copied in beside the render. Once
+		// the deployed SKILL.md carries the marker the directory is the
+		// record's, and a file the record no longer ships is removed (#2851); a
+		// directory not ours yet keeps its files on the run that first renders.
 		if changed, err = unlinkSymlink(filepath.Dir(outp), dryRun); err != nil {
 			return nil, err
+		}
+		owned := false
+		if current, err := os.ReadFile(outp); err == nil { //nolint:gosec // an output under home
+			owned = isGeneratedOutput(current)
 		}
 		aux, err := syncAuxFiles(filepath.Join(recDir, name), filepath.Dir(outp), dryRun)
 		if err != nil {
 			return nil, err
 		}
-		changed = changed || aux
+		dropped := false
+		if owned {
+			if dropped, err = dropStaleAuxFiles(filepath.Join(recDir, name), filepath.Dir(outp), dryRun); err != nil {
+				return nil, err
+			}
+		}
+		changed = changed || aux || dropped
 	}
 	wrote, err := writeIfChanged(outp, []byte(RenderSkillRecord(t.Render, record, srcPath)), 0o644, dryRun)
 	if err != nil {
@@ -206,6 +244,58 @@ func syncAuxFiles(src, dst string, dryRun bool) (bool, error) {
 	return changed, err
 }
 
+// dropStaleAuxFiles removes from dst every file the record at src no longer
+// ships, then the directories that leaves empty. SKILL.md is the render's, and
+// top-level dotfiles are left alone, as syncAuxFiles never copies them: a
+// `.DS_Store` Finder drops there is not the record's to remove.
+func dropStaleAuxFiles(src, dst string, dryRun bool) (bool, error) {
+	var stale, dirs []string
+	err := filepath.WalkDir(dst, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		rel, _ := filepath.Rel(dst, p)
+		top := !strings.ContainsRune(rel, filepath.Separator)
+		switch {
+		case rel == ".":
+			return nil
+		case top && strings.HasPrefix(rel, "."):
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		case d.IsDir():
+			dirs = append(dirs, p)
+			return nil
+		case rel == "SKILL.md":
+			return nil
+		}
+		// Stat, not Lstat: syncAuxFiles copies a symlinked record file as its
+		// target's bytes, so the record still ships it.
+		if fi, err := os.Stat(filepath.Join(src, rel)); err != nil || !fi.Mode().IsRegular() {
+			stale = append(stale, p)
+		}
+		return nil
+	})
+	if err != nil || len(stale) == 0 || dryRun {
+		return len(stale) > 0, err
+	}
+	for _, p := range stale {
+		if err := os.Remove(p); err != nil {
+			return true, err
+		}
+	}
+	// Deepest first, so a parent empties before it is tried; a directory still
+	// holding something is kept.
+	for i := len(dirs) - 1; i >= 0; i-- {
+		_ = os.Remove(dirs[i])
+	}
+	return true, nil
+}
+
 // writeIfChanged writes content with mode perm unless p already holds exactly
 // that, and reports whether it wrote. A symlink at p is replaced, not followed.
 // The mode is compared as far as the OS expresses it (fsmode.Needs): Windows
@@ -259,7 +349,7 @@ func pruneSkills(t SkillDeployTarget, recDir, base string, dryRun bool) ([]Skill
 		}
 		record, recErr := os.ReadFile(filepath.Join(recDir, name, "SKILL.md")) //nolint:gosec // a record under the manifest's record_dir
 		deployed, _ := os.ReadFile(skillOutPath(t, base, name))                //nolint:gosec // an output under home
-		if !bytes.Contains(deployed, []byte(generatedMarker)) {
+		if !isGeneratedOutput(deployed) {
 			if recErr == nil {
 				out = append(out, SkillOutcome{Agent: t.Agent, Path: outp, Status: SkillUnmanaged})
 			}
