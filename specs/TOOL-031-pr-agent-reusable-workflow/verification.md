@@ -17,7 +17,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - AC6, D's half (#3016) -> `cli/internal/prreview/{reviewable,filefilter}_test.go`, `cli/internal/cmd/pr_reviewable_test.go`; the cases of `tests/pr-agent-queue-skip.bats` and the matcher cases of `tests/pr-agent-config.bats` are ported there, and the bats file keeps the wiring.
   - Mutations: 48 of the verb and 5 of the workflow wiring, each applied alone, every one failing a test. The first pass left 4 alive: two test gaps closed (a failed read with a body on stdout, an unpaginated listing), one literal case added, and one equivalent mutation that showed the code was redundant, now deleted.
-  - Live, PR #3037: run 41376549715 built from head and skipped the draft ("PR #3037 is draft now"), with the draw skipped; run 41376625169 on `ready_for_review` built, decided, drew Sonnet and published, with no incomplete-list warning, so the real lists read at the audited commit.
+  - Live, PR #3037: run 41376549715 built from head and skipped the draft ("PR #3037 is draft now"), with the draw skipped; run 41376625169 on `ready_for_review` built, decided, drew Sonnet and published, with no incomplete-list warning, so the real lists read at the audited commit. The empty-diff skip has not run on a real PR yet: its evidence is the Go tests over upstream's real files.
   - Differential, one-off, before the Python left: `translateGlob` against Python 3.13's `fnmatch.translate` on 240,000 random glob and path pairs. 239,844 agreed, none differed, 156 are globs RE2 refuses, which are dropped and only narrow.
 
 ## Test status

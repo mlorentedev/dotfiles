@@ -103,6 +103,7 @@ func TestFileFilter_Kept(t *testing.T) {
 		{"a backslash separates the base name, as upstream replaces it", []string{`a\go.sum`}, 0},
 		{"a lockfile's name inside another name is not one", []string{"notgo.sum"}, 1},
 		{"the extension follows the last dot of the whole path", []string{"Makefile", "dir.png/tool"}, 2},
+		{"a dotless name that is a bad extension is dropped, as upstream's split does", []string{"lock"}, 0},
 		{"a suffix is the end of the name, not the middle", []string{"a.min.js.txt.go"}, 1},
 		{"a path outside every glob is kept", []string{"xsensitive/a"}, 1},
 	}
