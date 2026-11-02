@@ -94,9 +94,12 @@ func promotionSection(content string) ([]string, bool) {
 // judgePromotion returns what is wrong with one answer, or "" when it holds.
 func judgePromotion(repoRoot string, vaultRoot func() (string, error), answer string) string {
 	answer = strings.TrimSpace(strings.NewReplacer("*", "", "`", "").Replace(answer))
-	// The pattern line's question carries an extra sentence before the answer.
-	answer = strings.TrimSpace(strings.TrimPrefix(answer, "Only if this recurs in >1 project."))
-	m := promotionAnswer.FindStringSubmatch(skipLeadingNote(answer))
+	// The pattern line's question carries an extra sentence before the answer,
+	// and an author's note may sit on either side of it.
+	const patternSentence = "Only if this recurs in >1 project."
+	answer = strings.TrimSpace(strings.TrimPrefix(answer, patternSentence))
+	answer = strings.TrimSpace(strings.TrimPrefix(skipLeadingNote(answer), patternSentence))
+	m := promotionAnswer.FindStringSubmatch(answer)
 	if m == nil {
 		return `unanswered: write "yes: <path>" or "no: <reason>" right after the "?", or after a note in parentheses`
 	}

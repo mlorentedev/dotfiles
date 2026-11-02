@@ -111,6 +111,20 @@ func TestPromotionsReadTheAnswerAfterAParentheticalNote(t *testing.T) {
 	}
 }
 
+// On the pattern line the note may come after the fixed sentence or before it.
+func TestPromotionsReadAPatternAnswerWithANoteOnEitherSideOfTheSentence(t *testing.T) {
+	sentenceFirst := promotionsWith("no: x", "no: y", "(seen in two repos) no: single project after all")
+	noteFirst := strings.Replace(sentenceFirst,
+		"Only if this recurs in >1 project. (seen in two repos)",
+		"(seen in two repos) Only if this recurs in >1 project.", 1)
+	for name, verification := range map[string]string{"sentence first": sentenceFirst, "note first": noteFirst} {
+		root, dir := promotionSpec(t, verification)
+		if problems := CheckPromotions(root, dir, noVault); len(problems) != 0 {
+			t.Errorf("%s: want no problems, got %q", name, problems)
+		}
+	}
+}
+
 // Only a leading note is skipped: a "no" inside it is not an answer, and a
 // note followed by nothing is still unanswered.
 func TestPromotionsDoNotReadAnAnswerInsideTheNote(t *testing.T) {
