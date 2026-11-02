@@ -101,33 +101,36 @@ review, not per merge.
 
 ### B. C: the thin reusable workflow (R5's repo exists: `mlorentedev/ci-workflows`, empty)
 
-- [ ] [AC4] Bats tests first:
+- [x] [AC4] Bats tests first:
   - `on: workflow_call` only, with the declared secrets and no `inherit`;
   - no branch literal and no `github.workflow_sha`;
   - a `dotf_version` input;
   - an install step that verifies a checksum.
 
   Expected: FAIL.
-- [ ] [AC4] Write `.github/workflows/pr-agent.yml`, derived from D's A5 workflow:
+- [x] [AC4] Write `.github/workflows/pr-agent.yml`, derived from D's A5 workflow:
   - the triggers, permissions and workflow-level concurrency are dropped;
-  - own files come from `job.workflow_ref` at `job.workflow_sha`;
+  - it reads no own files: actionlint does not know `job.workflow_sha`, and the audited PR-Agent commit sits beside the pinned image;
   - `dotf` is installed at `inputs.dotf_version` (R3);
   - every decision step is `dotf pr …`.
 
   Expected: PASS.
-- [ ] [AC4] `actions/push-gate`: the composite runs `dotf pr gate` and fails the step on error. Test first.
-- [ ] [AC4] [AC6] Inputs `declare_unreviewed` and `skip_branch_prefixes`, with kubelab's declare tests (`tests/test_pr_agent_workflow.py:411-640, 485-527`) ported as bats
-- [ ] [AC6] Add caller fixtures `tests/fixtures/callers/{kubelab,dotfiles,hive}.yml`, plus a bats case that each fixture's `with:` and `secrets:` match the declared interface
-- [ ] C: README (inputs, secrets, caller template with the `ci:` consumer step in dotfiles `secrets/registry.yaml` and `dotf secrets sync ci`, pinning rule) and a CI workflow (bats and actionlint); tag `v0.1.0`
+- [x] [AC4] `.github/actions/push-gate`: the composite runs `dotf pr gate` and fails the step on error. Test first.
+- [ ] [AC4] [AC6] `dotf pr declare-unreviewed`, with kubelab's declare tests (`tests/test_pr_agent_workflow.py:485-527`) ported to Go, behind the input `declare_unreviewed`. ~90 lines of shell would break ci-workflows' rule 1.
+- [ ] [AC6] `dotf pr reviewable` (#3016) reads the input `skip_branch_prefixes`. An expression cannot iterate a list in the job's `if:`, so the job enters the lane, and with `queue: max` it displaces nothing.
+- [ ] Make `declared_model` and `declared_fallback_models` optional with `pool: embedded`, and give `dotf_version` a default at each tag, so a bump of one pin brings the rest.
+- [ ] The three items above ship as C's `v0.2.0`, with the kubelab fixture.
+- [x] [AC6] Add caller fixtures `tests/fixtures/callers/{dotfiles,hive}.yml`, plus a bats case that each fixture's `with:` and `secrets:` match the declared interface
+- [x] C: README (inputs, secrets, caller template with the `ci:` consumer step in dotfiles `secrets/registry.yaml` and `dotf secrets sync ci`, pinning rule) and a CI workflow (bats and actionlint); tag `v0.1.0`
 
 ### C/D. H: pilot
 
-- [ ] [AC5] H PR-C (draft): add `.github/workflows/pr-agent-shared.yml`.
+- [x] [AC5] H PR-C (draft, hive#548): add `.github/workflows/pr-agent-shared.yml`.
   - It is pinned to C's `v0.1.0` SHA and passes `pool: embedded` and `dotf_version`.
   - The caller owns triggers, permissions and concurrency.
   - A pin-shape test is added.
 - [ ] [AC5] On one PR, both jobs run, and the summary names the member, the pool source and the dotf version
-- [ ] D: once PR-C is open, add `ci:mlorentedev/hive` to the consumers of `PR_AGENT_ANTHROPIC_API_KEY` in `secrets/registry.yaml`, with its bats test, in the shape of #2508. The owner then runs `dotf secrets sync ci` (R5).
+- [x] D: once PR-C is open, add `ci:mlorentedev/hive` to the consumers of `PR_AGENT_ANTHROPIC_API_KEY` in `secrets/registry.yaml`, with its bats test, in the shape of #2508. The owner then runs `dotf secrets sync ci` (R5).
 - [ ] [AC5] Tabulate seven days of runs in `verification.md`
 - [ ] [AC5] H PR-D: remove the old job. Record that `review` is not a required check (`gh api repos/mlorentedev/hive/branches/master/protection`).
 
