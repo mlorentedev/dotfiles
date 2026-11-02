@@ -431,7 +431,7 @@ func TestRationale_PointsAtNoDeadEnd(t *testing.T) {
 // kubelab's registry test: a literal here would be a second source of truth that
 // could drift from the file the gate reads, with neither side erroring.
 func TestDeclare_NeverHoldsTheEscapeAsALiteral(t *testing.T) {
-	raw, err := os.ReadFile("../../../harness/review-attestation.json")
+	raw, err := os.ReadFile(repoFile("harness", "review-attestation.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
