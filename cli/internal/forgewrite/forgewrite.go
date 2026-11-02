@@ -112,7 +112,9 @@ func LoadHosts(path string) (Hosts, error) {
 }
 
 // ParseOrigin reads owner/name and host out of an origin URL in any of the
-// three shapes git accepts: https, ssh:// and scp-like git@host:owner/name.
+// shapes git accepts: https, ssh:// and scp-like [user@]host:owner/name, where
+// host may be a ~/.ssh/config alias that stays unresolved: an alias can point
+// at an address no forge is declared under, so hosts.json names it instead.
 func ParseOrigin(raw string) (Repo, error) {
 	u := strings.TrimSpace(raw)
 	var host, path string
@@ -123,7 +125,7 @@ func ParseOrigin(raw string) (Repo, error) {
 			rest = rest[at+1:]
 		}
 		host, path, _ = strings.Cut(rest, "/")
-	case strings.Contains(u, "@") && strings.Contains(u, ":"):
+	case isSCPLike(u):
 		rest := u[strings.LastIndex(u, "@")+1:]
 		host, path, _ = strings.Cut(rest, ":")
 	default:
@@ -140,8 +142,16 @@ func ParseOrigin(raw string) (Repo, error) {
 	return Repo{Host: strings.ToLower(host), Owner: owner, Name: name}, nil
 }
 
+// isSCPLike follows git: a colon with no slash before it names a host, and a
+// slash before it makes the whole thing a local path. One letter is a Windows
+// drive, and a leading dash would reach a command line as an option.
+func isSCPLike(u string) bool {
+	colon := strings.Index(u, ":")
+	return colon > 1 && !strings.HasPrefix(u, "-") && !strings.Contains(u[:colon], "/")
+}
+
 func originError(raw string) error {
-	return fmt.Errorf("ERROR: cannot read a repository from origin %q. WHY: it is not an https, ssh or git@host:owner/name URL. FIX: set origin to the forge URL (git remote set-url origin <url>)", raw)
+	return fmt.Errorf("ERROR: cannot read a repository from origin %q. WHY: it is not an https, ssh or [user@]host:owner/name URL. FIX: set origin to the forge URL (git remote set-url origin <url>)", raw)
 }
 
 // Select picks the forge kind for a repository. Anything not declared is an
@@ -154,7 +164,7 @@ func Select(r Repo, hosts Hosts) (Kind, Host, error) {
 	if h, ok := hosts[r.Host]; ok {
 		return h.Kind, h, nil
 	}
-	return "", Host{}, fmt.Errorf("ERROR: no forge backend for %s. WHY: only github.com and the hosts declared in forge/hosts.json are reached. FIX: add %q to forge/hosts.json with its kind and registry secret", r, r.Host)
+	return "", Host{}, fmt.Errorf("ERROR: no forge backend for %s. WHY: only github.com and the hosts declared in forge/hosts.json are reached. FIX: add %q to forge/hosts.json with its kind and registry secret, and its api URL when it is an ssh alias", r, r.Host)
 }
 
 // redact removes a secret from text before it leaves the package, so no error
