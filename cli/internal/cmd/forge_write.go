@@ -208,6 +208,23 @@ var forgeWriteBranch = func() (string, error) {
 	return name, nil
 }
 
+// runEnvelopePath is the file an unattended run commits on its run branch.
+// That branch carries the run's ledger and is never merged, so a pull request
+// from it is always a mistake (#2784).
+const runEnvelopePath = ".agent/unattended.yml"
+
+// forgeHeadCarriesEnvelope reports whether the head branch, local or as
+// origin last showed it, holds the run envelope. A branch git does not know
+// answers false: the forge then judges the head itself. A seam for tests.
+var forgeHeadCarriesEnvelope = func(head string) bool {
+	for _, ref := range []string{"refs/heads/" + head, "refs/remotes/origin/" + head} {
+		if exec.Command("git", "cat-file", "-e", ref+":"+runEnvelopePath).Run() == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func newForgePRCreateCmd() *cobra.Command {
 	var title, bodyFile, head, base string
 	var draft bool
@@ -234,10 +251,22 @@ func newForgePRCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if head == "" {
+			defaulted := head == ""
+			if defaulted {
 				if head, err = forgeWriteBranch(); err != nil {
 					return err
 				}
+			}
+			// An agent shell reset to its launch worktree reads that
+			// worktree's branch as the default head: kubelab#2524 opened a
+			// pull request from a run branch that way. There is no override:
+			// the envelope never belongs on a base branch.
+			if forgeHeadCarriesEnvelope(head) {
+				fix := "pass --head <the branch that holds the change>; this one was read from the current branch"
+				if !defaulted {
+					fix = "open the pull request from a branch that does not commit the envelope"
+				}
+				return fmt.Errorf("ERROR: head %q carries %s. WHY: that is an unattended run's branch, which holds its ledger and is never merged. FIX: %s", head, runEnvelopePath, fix)
 			}
 			repo, backend, err := forgeTarget()
 			if err != nil {
