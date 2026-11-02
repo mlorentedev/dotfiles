@@ -64,6 +64,8 @@ func TestSpecAuditExitIssueState(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := makeRepo(t)
+			// The archive is asked of the origin, never of --repo (#1906).
+			withOrigin(t, root, "https://github.com/mlorentedev/dotfiles.git")
 			seedAuditSpec(t, root, "A-001-one", "mlorentedev/dotfiles#1")
 			seedAuditSpec(t, root, "B-002-two", "#2")
 			stubSpecAuditGH(t, tc.states)

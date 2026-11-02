@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
+	"github.com/mlorentedev/dotfiles/cli/internal/spechome"
 )
 
 // specIssueStateTimeout bounds one forge lookup, so an offline machine
@@ -32,16 +32,21 @@ func checkSpecIssueState(sys *System, rep *Report) {
 		return
 	}
 	origin, err := sys.CommandOutput("git", "-C", repo, "remote", "get-url", "origin")
-	home, perr := initrepo.ParseOriginRepo(origin)
-	if err != nil || perr != nil {
-		rep.Warn("no parseable origin remote in " + repo + " — cannot tell which repo owns specs/, audit not run")
+	if err != nil {
+		origin = ""
+	}
+	homes, err := spechome.Resolve(spechome.Inputs{
+		Root: repo, FlagName: "`dotf spec audit --repo`", Env: sys.Getenv("DOTF_BITACORA_REPO"), OriginURL: origin,
+	})
+	if err != nil {
+		rep.Warn("audit not run — " + err.Error())
 		return
 	}
 
 	lookup := spec.GHIssueStateLookup(func(args ...string) (string, string, error) {
 		return sys.CommandOutputBounded(specIssueStateTimeout, "gh", args...)
 	})
-	findings, err := spec.AuditIssueState(repo, home, lookup)
+	findings, err := spec.AuditIssueState(repo, homes.Issues, lookup)
 	if err != nil {
 		rep.Warn("cannot read specs/: " + err.Error())
 		return

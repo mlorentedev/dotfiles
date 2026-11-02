@@ -112,3 +112,33 @@ func TestCheckSpecIssueState(t *testing.T) {
 		})
 	}
 }
+
+// A Gitea origin with no declared issue home is a WARN that names the host and
+// how to declare one; it never asks github.com about the Gitea repository (#1906).
+func TestCheckSpecIssueStateGiteaOrigin(t *testing.T) {
+	repo := specIssueStateRepo(t, map[string]string{"A-001-a": "#1"})
+	sys := specIssueStateSys(repo, true, nil)
+	sys.CommandOutput = func(name string, args ...string) (string, error) {
+		return "https://deploy:s3cr3t@git.example.com/teledyne/projects-toolkit.git\n", nil
+	}
+	asked := false
+	sys.CommandOutputBounded = func(time.Duration, string, ...string) (string, string, error) {
+		asked = true
+		return "", "", errors.New("unexpected")
+	}
+	var buf bytes.Buffer
+	rep := capture(&buf)
+	checkSpecIssueState(sys, rep)
+	out := buf.String()
+	if rep.Warnings() != 1 || asked {
+		t.Fatalf("want one WARN and no forge call (asked=%v):\n%s", asked, out)
+	}
+	for _, w := range []string{"git.example.com", ".bitacora-repo"} {
+		if !strings.Contains(out, w) {
+			t.Errorf("output missing %q:\n%s", w, out)
+		}
+	}
+	if strings.Contains(out, "s3cr3t") {
+		t.Errorf("the origin URL leaked:\n%s", out)
+	}
+}

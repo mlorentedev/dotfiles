@@ -15,6 +15,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
+	"github.com/mlorentedev/dotfiles/cli/internal/spechome"
 	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
 
@@ -704,8 +705,9 @@ embedded SDD templates.
 Work-gate: the spec must be downstream of an OPEN GitHub issue.
 Pass --issue <N>; the issue is verified via 'gh issue view' and its title is
 recorded in the proposal's frontmatter (issue: owner/repo#N) and ## Why comment.
-The issue's repo defaults to the current repo's origin; override with
---bitacora-repo owner/repo or $DOTF_BITACORA_REPO for a cross-repo work-gate.
+The issue's repo is --bitacora-repo, else the owner/name committed in
+specs/.bitacora-repo, else $DOTF_BITACORA_REPO, else a github.com origin; a
+repository hosted elsewhere (Gitea) must declare it, and init refuses to guess.
 Use --force-no-gate to scaffold without an issue (NOT RECOMMENDED).
 
 WIP limit: init refuses while the repository already holds its limit
@@ -764,7 +766,7 @@ agent) or by hand. Do not skip the Why.`,
 	}
 
 	cmd.Flags().IntVar(&issueNum, "issue", 0, "GitHub issue number that gates this work (must exist and be OPEN)")
-	cmd.Flags().StringVar(&bitacoraRepo, "bitacora-repo", "", "owner/repo hosting the work-gate issue (default: current repo's origin, or $DOTF_BITACORA_REPO)")
+	cmd.Flags().StringVar(&bitacoraRepo, "bitacora-repo", "", "GitHub owner/name hosting the work-gate issue (default: specs/.bitacora-repo, $DOTF_BITACORA_REPO, then a github.com origin)")
 	cmd.Flags().StringVar(&overWIP, "over-wip-limit", "", "start a spec although the repository is at its WIP limit; the reason is recorded in proposal.md")
 	cmd.Flags().BoolVar(&forceNoGate, "force-no-gate", false, "skip the open-issue work-gate (NOT RECOMMENDED — the gate is the SSOT)")
 	return cmd
@@ -800,16 +802,11 @@ func checkWorkGate(cmd *cobra.Command, repoRoot string, issueNum int, bitacoraRe
 			"bitácora Project. Options: (a) open/find the issue, re-run with --issue;\n" +
 			"(b) re-run with --force-no-gate (NOT RECOMMENDED)")
 	}
-	repoSlug = workGateRepo(repoRoot, bitacoraRepo)
-	if repoSlug == "" {
-		return "", "", fmt.Errorf("cannot determine the repo hosting issue #%d: no "+
-			"--bitacora-repo, no DOTF_BITACORA_REPO, and no origin remote in %s.\n"+
-			"Pass --bitacora-repo owner/repo (e.g. mlorentedev/knowledge) or set "+
-			"DOTF_BITACORA_REPO", issueNum, repoRoot)
+	homes, err := resolveSpecHomes(repoRoot, bitacoraRepo, "--bitacora-repo")
+	if err != nil {
+		return "", "", fmt.Errorf("work-gate #%d: %w", issueNum, err)
 	}
-	if !initrepo.ValidRepoSlug(repoSlug) {
-		return "", "", fmt.Errorf("invalid bitácora repo %q: want owner/name", repoSlug)
-	}
+	repoSlug = homes.Issues
 	issueTitle, err = spec.Gate(issueNum, repoSlug)
 	if err != nil {
 		return "", "", err
@@ -818,23 +815,18 @@ func checkWorkGate(cmd *cobra.Command, repoRoot string, issueNum int, bitacoraRe
 	return repoSlug, issueTitle, nil
 }
 
-// workGateRepo resolves the repo that hosts the work-gate issue (HARNESS-023):
-// explicit --bitacora-repo, then DOTF_BITACORA_REPO, else the current repo's
-// origin slug, or "" when none is set. Used for BOTH the gate check and the
-// proposal's issue: frontmatter, so a cross-repo gate (e.g. a kubelab spec
-// gated by a knowledge issue) resolves correctly instead of silently checking
-// the current repo.
-func workGateRepo(repoRoot, bitacoraRepo string) string {
-	if bitacoraRepo != "" {
-		return bitacoraRepo
-	}
-	if env := os.Getenv("DOTF_BITACORA_REPO"); env != "" {
-		return env
-	}
-	if s, err := initrepo.OriginRepo(repoRoot); err == nil {
-		return s
-	}
-	return ""
+// resolveSpecHomes is the one resolution `spec init` and `spec audit` share
+// (#1906): the issue home is used for BOTH the gate check and the proposal's
+// issue: frontmatter, so a cross-repo gate (a kubelab spec gated by a
+// knowledge issue, HARNESS-023) resolves the same way the audit later reads it.
+func resolveSpecHomes(repoRoot, flag, flagName string) (spechome.Homes, error) {
+	return spechome.Resolve(spechome.Inputs{
+		Root:      repoRoot,
+		Flag:      flag,
+		FlagName:  flagName,
+		Env:       os.Getenv("DOTF_BITACORA_REPO"),
+		OriginURL: initrepo.OriginURL(repoRoot),
+	})
 }
 
 // settleWIPOverride records the reason a spec started over the WIP limit, and

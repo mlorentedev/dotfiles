@@ -283,8 +283,13 @@ var archiveRoutes = []string{"specs/archive/", "specs/archive/_abandoned/"}
 
 // GHArchiveLookup builds an ArchiveLookup over the REST contents endpoint of
 // homeRepo. It names no ref, so the forge answers for its default branch.
+// An empty homeRepo means the specs live off GitHub (spechome.Homes.Archive):
+// gh is never pointed at github.com for a repository that is not there.
 func GHArchiveLookup(run func(args ...string) (stdout, stderr string, err error), homeRepo string) ArchiveLookup {
 	return func(specID string) (bool, error) {
+		if homeRepo == "" {
+			return false, errors.New("the origin is not a github.com repository, so its default branch cannot be asked")
+		}
 		for _, route := range archiveRoutes {
 			_, errOut, err := run("api", fmt.Sprintf("repos/%s/contents/%s%s", homeRepo, route, specID), "--jq", ".[0].name")
 			switch {

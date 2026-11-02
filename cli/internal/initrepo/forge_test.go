@@ -150,8 +150,8 @@ func TestOriginHostNeverEchoesCredentials(t *testing.T) {
 		"/srv/git/r.git":                         "a local path",
 	}
 	for in, want := range cases {
-		if got := originHost(in); got != want {
-			t.Errorf("originHost(%q) = %q, want %q", in, got, want)
+		if got := OriginHost(in); got != want {
+			t.Errorf("OriginHost(%q) = %q, want %q", in, got, want)
 		}
 	}
 	root := repoOn(t, "main", credURL("git.example.lan/o/r.git"))
