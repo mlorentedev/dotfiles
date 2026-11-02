@@ -27,7 +27,7 @@ Measured on 2026-11-01 against upstream's own `translate_globs_to_regexes` at th
 - Differential: 20,000 random glob lists over `**`, `*`, sets, and unclosed and stray brackets, four paths each. 80,000 cases, 6,608 of them ignored upstream, 0 differences in either direction.
 - The table in `TestIgnorePatterns_ExpandsInteriorGlobstars` and the counts in `TestGlobSources_*` were each read from upstream, not derived from the port.
 - The bounds are ported, not relaxed: past six globstars, 256 runes or 256 variants PR-Agent keeps a file, so dropping it here would skip a real diff.
-- Mutations: 20 on the new code in the first pass, of which 4 exposed code with no effect (`lastClose`, the `**/` stride, the cap's seen check), deleted rather than tested; the remaining survivors were closed by tests, and the 11 rerun on the final code were all killed.
+- Mutations: 20 on the new code in the first pass, of which 4 exposed code with no effect (`lastClose`, the `**/` stride, and the cap's seen check and `break`), deleted rather than tested; the remaining survivors were closed by tests, and the 11 rerun on the final code were all killed.
 - Python 3.13's `fnmatch` compresses a run of stars, so `translateGlob` does too: it changes no match, only which forms count against the quota.
 
 ## Test status
