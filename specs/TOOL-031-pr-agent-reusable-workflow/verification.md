@@ -34,6 +34,8 @@ Measured on 2026-11-01 against upstream's own `translate_globs_to_regexes` at th
 
 - AC4 and AC6, D's half -> `cli/internal/prreview/declare_test.go`, `cli/internal/cmd/pr_declare_unreviewed_test.go`, and `TestReviewable_DiffSaysOnlyWhatWasRead`. kubelab's four step tests map to `TestDeclare_NeverHoldsTheEscapeAsALiteral`, `TestRationale_PointsAtNoDeadEnd` and the `empty` and `reviewable` branches of `TestPrDeclareUnreviewed_*`.
 - Mutations: 19 on the decisive lines, each applied alone. 18 failed a test; the survivor, the blank line under a filled heading, is now asserted.
+- Live, on the verb's own PR #3044, built from its head: `reviewable` answered `diff=reviewable`; `--diff reviewable` with no label wrote nothing; `--diff empty` wrote the section and `merged-unreviewed`; a second run left one section; `--diff reviewable` removed the label and warned that the section stays. The body was then restored. Against hive's real registry, `--diff empty` exited 1 with `harness/review-attestation.json at master declares no escape.label/escape.section`.
+- Not run: the verb under a `GITHUB_TOKEN` in a real workflow, which waits for ci-workflows `v0.2.0`, and a real PR of only ignored files.
 
 ## Test status
 
