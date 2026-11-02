@@ -27,7 +27,7 @@ setup() {
 # first pass collects those helpers.
 untagged_pwsh_tests() {
     awk -v f="$1" '
-        function runs(s) { return s ~ /require_pwsh/ || s ~ /(^[[:space:]]*|\$\(|[;|&][[:space:]]*)(run[[:space:]]+)?pwsh([[:space:]]|$)/ }
+        function runs(s) { return s ~ /require_pwsh/ || s ~ /(^[[:space:]]*|\$\(|[&;|][[:space:]]*)(run[[:space:]]+)?pwsh([[:space:]]|$)/ }
         FNR == NR {
             if ($0 ~ /^[A-Za-z_][A-Za-z0-9_]*\(\)[[:space:]]*\{/) { fn = $0; sub(/\(.*/, "", fn); infn = 1 }
             else if (infn && $0 ~ /^}/) infn = 0
