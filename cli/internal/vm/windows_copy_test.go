@@ -40,6 +40,20 @@ func TestWindowsCopyFailures(t *testing.T) {
 	if _, err := os.Stat(out); err == nil {
 		t.Error("a failed copy left a host file")
 	}
+	dir := t.TempDir()
+	kept := filepath.Join(dir, "kept")
+	if err := os.WriteFile(kept, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rec := s.Copy(context.Background(), `proof:C:\nothing`, kept, io.Discard); rec.Status != StatusFailed {
+		t.Errorf("missing guest file: %+v", rec)
+	}
+	if b, _ := os.ReadFile(kept); string(b) != "mine" {
+		t.Errorf("a failed copy changed the target: %q", b)
+	}
+	if left, _ := os.ReadDir(dir); len(left) != 1 {
+		t.Errorf("a failed copy left %v", left)
+	}
 	if rec := s.Copy(context.Background(), t.TempDir(), `proof:C:\x`, io.Discard); rec.Status != StatusFailed {
 		t.Errorf("a directory: %+v", rec)
 	}

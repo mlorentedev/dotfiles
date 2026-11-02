@@ -179,9 +179,7 @@ func (s WindowsSessions) launch(q *QGA, o ExecOptions, dir, task string) error {
 func (s WindowsSessions) collect(q *QGA, o ExecOptions, dir string, start time.Time) Record {
 	stream := func(name string, w io.Writer) *capped {
 		c := &capped{}
-		b, _ := q.ReadFile(dir + `\` + name)
-		b = bytes.TrimPrefix(b, []byte(utf8BOM))
-		_, _ = io.MultiWriter(c, w).Write(b)
+		_ = q.CopyFile(dir+`\`+name, &skipBOM{w: io.MultiWriter(c, w)})
 		return c
 	}
 	out, errOut := stream("stdout", o.Stdout), stream("stderr", o.Stderr)
@@ -189,6 +187,22 @@ func (s WindowsSessions) collect(q *QGA, o ExecOptions, dir string, start time.T
 	r.Stdout = out.buf.String()
 	r.Truncated = out.over || errOut.over
 	return r
+}
+
+// skipBOM drops the byte order mark a stream starts with. QGA chunks are far
+// larger than the mark, so it is whole in the first write.
+type skipBOM struct {
+	w       io.Writer
+	started bool
+}
+
+func (s *skipBOM) Write(p []byte) (int, error) {
+	n := len(p)
+	if !s.started {
+		s.started, p = true, bytes.TrimPrefix(p, []byte(utf8BOM))
+	}
+	_, err := s.w.Write(p)
+	return n, err
 }
 
 // windowsCommandLine joins args the way CommandLineToArgvW splits them: a

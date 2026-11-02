@@ -2,9 +2,11 @@ package vm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -52,9 +54,17 @@ func copyIn(q *QGA, host, guest string) error {
 }
 
 func copyOut(q *QGA, guest, host string) error {
-	b, err := q.ReadFile(guest)
+	// Beside the target, then a rename: a failed copy leaves what was there.
+	f, err := os.CreateTemp(filepath.Dir(host), ".dotf-cp-*")
 	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(f.Name()) }()
+	if err := errors.Join(q.CopyFile(guest, f), f.Close()); err != nil {
 		return fmt.Errorf("copy from %s: %w", guest, err)
 	}
-	return os.WriteFile(host, b, 0o644)
+	if err := os.Chmod(f.Name(), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), host)
 }

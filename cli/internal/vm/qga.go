@@ -187,28 +187,37 @@ func (q *QGA) WriteFile(path string, r io.Reader) (err error) {
 }
 
 // ReadFile returns the contents of path in the guest.
-func (q *QGA) ReadFile(path string) (data []byte, err error) {
+func (q *QGA) ReadFile(path string) ([]byte, error) {
+	var out bytes.Buffer
+	err := q.CopyFile(path, &out)
+	return out.Bytes(), err
+}
+
+// CopyFile writes a guest file to w chunk by chunk, so a large file never sits
+// in host memory.
+func (q *QGA) CopyFile(path string, w io.Writer) (err error) {
 	h, err := q.open(path, "rb")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { err = errors.Join(err, q.call("guest-file-close", map[string]int{"handle": h}, nil)) }()
-	var out bytes.Buffer
 	for {
 		var chunk struct {
 			Buf string `json:"buf-b64"`
 			EOF bool   `json:"eof"`
 		}
 		if err := q.call("guest-file-read", map[string]int{"handle": h, "count": qgaChunk}, &chunk); err != nil {
-			return nil, err
+			return err
 		}
 		b, derr := base64.StdEncoding.DecodeString(chunk.Buf)
 		if derr != nil {
-			return nil, fmt.Errorf("guest-file-read: %w", derr)
+			return fmt.Errorf("guest-file-read: %w", derr)
 		}
-		out.Write(b)
+		if _, err := w.Write(b); err != nil {
+			return err
+		}
 		if chunk.EOF {
-			return out.Bytes(), nil
+			return nil
 		}
 	}
 }
