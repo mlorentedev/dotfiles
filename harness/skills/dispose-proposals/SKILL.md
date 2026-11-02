@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/dispose-proposals/SKILL.md
-generated_sha: 976b46e98e81ed1f
+generated_sha: f2704257cea313b5
 id: dispose-proposals-skill
 type: skill
 status: active
@@ -12,7 +12,7 @@ description: Triage the CURATOR recurrence-proposal inbox — the weekly human g
   that turns emitted proposal drafts into bitácora issues. Triggers on "/curator dispose",
   "dispose the proposal inbox", "triage curator proposals", "process recurrence proposals",
   "review the proposals queue", and as a step of the weekly curator session. Reads
-  80_agents/hermes-nan/proposals/*.md (status pending), applies the curation SOP (promote
+  80_agents/*/proposals/*.md (status pending), applies the curation SOP (promote
   / keep / merge / wontfix), and on accept files a proposal-labelled issue and marks
   the draft disposed.
 keywords: [dispose proposals, curator dispose, triage proposals, proposal queue, recurrence
@@ -31,7 +31,7 @@ RECURRENCE verdict is a *candidate*, not a decision.
 
 ## Inputs
 
-- Inbox: `80_agents/hermes-nan/proposals/*.md` (skip `_TEMPLATE.md`). Each file's schema is in
+- Inbox: `80_agents/*/proposals/*.md` (primary: `80_agents/hermes-kubelab/proposals/*.md`; skip `_TEMPLATE.md`). Each file's schema is in
   `proposals/_TEMPLATE.md`; act only on `status: pending`.
 - SOP: the triage table in `00_meta/agents/runbooks/curation.md` (promote / keep / merge / wontfix).
 
@@ -40,7 +40,7 @@ RECURRENCE verdict is a *candidate*, not a decision.
 ### Step 1 — Gather the queue
 List pending drafts and read each one's frontmatter + body:
 ```bash
-ls 80_agents/hermes-nan/proposals/*.md 2>/dev/null | grep -v _TEMPLATE
+ls 80_agents/*/proposals/*.md 2>/dev/null | grep -v _TEMPLATE
 ```
 If none have `status: pending`, report "proposal inbox empty" and stop.
 
@@ -71,7 +71,7 @@ gh issue create --repo mlorentedev/knowledge --label proposal \
     '**Root cause:** <root_cause>' '' \
     '**Evidence (>=2 distinct incidents):**' '<- source (date) per evidence line>' '' \
     '**Suggested placement:** <placement> -> Tier <tier_target> (per pattern-memory-consolidation).' '' \
-    'Human gate: accept on the board -> promote to Tier 4 + compile-harness (S5, #139).')"
+    'Human gate: accept on the board -> promote to Tier 4 + dotf harness refresh (S5, #139).')"
 ```
 Then add it to the Bitácora board (Backlog) — resolve the project item id via GraphQL as in the
 board runbook — and write back into the draft: `status: disposed`, `issue: <N>`, `disposed_as: promote`.
@@ -88,10 +88,11 @@ Report: N disposed (promoted/merged/kept/wontfix), with the issue numbers for ac
 ### Step 6 — Execute Accepted Proposals (S5 Promotion Loop)
 When a proposal issue is approved on the board:
 1. Author or update the Tier-4 artifact in `00_meta/{patterns,skills,runbooks}/` following `genre-picker` and Frontmatter Law.
-2. If it is an enforced pattern or cross-agent skill, compile and distribute to all agent targets via dotfiles:
+2. If it is an enforced pattern or cross-agent skill, re-render the dotfiles records from the vault in a
+   dotfiles worktree, open a PR with the change, and deploy once it merges:
    ```bash
-   bash "${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"/scripts/compile-harness.sh --refresh
-   bash "${DOTFILES_REPO_DIR:-$HOME/Projects/dotfiles}"/scripts/compile-harness.sh --deploy
+   dotf harness refresh   # in the dotfiles worktree: re-renders harness/ and the targets from the vault
+   dotf harness deploy    # after the PR merges: copies the records to every agent target
    ```
 3. Close the proposal issue with reference to the created Tier-4 artifact commit.
 

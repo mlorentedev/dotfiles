@@ -12,7 +12,7 @@
 
 ## Claude Code Tooling Notes
 
-* **Overrides of harness defaults (generated).** Sourced from the vault via `scripts/compile-harness.sh` — edit the vault pattern + re-run setup, not here:
+* **Overrides of harness defaults (generated).** Sourced from the vault via `dotf harness refresh` — edit the vault pattern + refresh in a worktree, not here:
 <!-- BEGIN HARNESS GENERATED (sha256:b956dc5bd4b08b42) — SSOT: vault 00_meta/patterns; edit there + re-run setup, do NOT edit between markers -->
 - **No AI attribution** in git history or GitHub messages (commits, PRs, issues).
 - No `Co-Authored-By` trailers referencing AI agents.
@@ -74,7 +74,7 @@ Wire `dotf pr triage-queue` into any session-start hook the harness offers.
 
 **If a value does reach the output: say so immediately, name the affected credentials by type, and stop.** Then treat them as compromised and rotate: an exposed credential nobody rotated is indistinguishable from one never exposed.
 <!-- END HARNESS GENERATED -->
-* **Skills:** Auto-loaded via slash commands from `~/.claude/skills/<skill>/SKILL.md` (deployed by `compile-harness.sh --deploy`).
+* **Skills:** Auto-loaded via slash commands from `~/.claude/skills/<skill>/SKILL.md` (deployed by `dotf harness deploy`).
 * **TaskCreate / TaskUpdate / TaskList:** Use for non-trivial work (≥3 steps). Mark `in_progress` before start, `completed` on finish.
 * **Advisor:** AGENTS.md's *second opinion before recommending* is `advisor()` here (model: `advisorModel` in `ai/claude/settings.json`). Call it before any recommendation handed to the owner, and before declaring non-trivial work done.
 * **AskUserQuestion:** Use for branching decisions (2-4 options), marking "(Recommended)" on preferred.

@@ -17,7 +17,7 @@
 | `forge/` | GitHub-side state declared in git: `branch-protection.json` and its schema (GUARD-017), read by `dotf forge protection check` and the `dotf doctor` branch-protection section |
 | `git/` | The dotfiles' global git settings (`dotfiles.gitconfig`), deployed by `dotf deploy` and included from `~/.gitconfig` by `dotf converge`; `~/.gitconfig` itself belongs to git and gh (#2207) |
 | `git-hooks/` | Global git hooks deployed via `core.hooksPath` (GUARD-001) — the memory-sink guard (`pre-commit`) plus per-type chain dispatchers that re-exec the repo-local `.git/hooks/<type>` so local guards (gitleaks) survive |
-| `harness/` | Compiled harness records (skills, enforced overrides) — generated cache from the vault SSOT via `compile-harness.sh`; do not hand-edit |
+| `harness/` | Compiled harness records (skills, enforced overrides) — generated cache from the vault SSOT via `dotf harness refresh`; do not hand-edit |
 | `powershell/` | PowerShell profile (Windows counterpart of `.zsh/`) |
 | `scripts/` | Shell tooling as `.sh`/`.ps1` twins — **shrinking**: each twin is deleted when its logic ports to a `dotf` subcommand (ADR-020, epic #131); end state is thin bootstrap helpers only |
 | `secrets/` | Secrets registry (`registry.yaml`) — the mapping SSOT (id → store source → env/file → consumers) read by `dotf secrets` (ADR-028) |

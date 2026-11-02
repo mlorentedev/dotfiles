@@ -23,7 +23,7 @@ Merge the release PR when one of these holds:
 1. **A next step needs the binary installed.** A merged change under `cli/` takes effect only once installed: a check that `dotf` runs, or a subcommand someone is about to use.
 2. **A merged fix removes a live hazard that has no workaround.** The hazard must be one that sessions hit with the installed binary.
 
-Otherwise, let it accumulate. Skill records, doctrine, CI, scripts and documentation need no release. They reach every agent through `dotf harness mirror` and `scripts/compile-harness.sh --deploy`, run from main.
+Otherwise, let it accumulate. Skill records, doctrine, CI, scripts and documentation need no release. They reach every agent through `dotf harness mirror` and `dotf harness deploy`, run from main.
 
 While a fix waits, tell live peers about the hazard and its workaround. For #1725, that was a `--dry-run` before `dotf mem handoff-write`.
 
@@ -97,7 +97,7 @@ After the last merge, check the regenerated release PR before its merge:
 5. **Deploy** to every harness target:
 
    ```bash
-   scripts/compile-harness.sh --deploy
+   dotf harness deploy
    ```
 
 6. **Install** the version pinned in `versions.conf`. It then runs `dotf converge`, which finds the records and skills of steps 4 and 5 already current:

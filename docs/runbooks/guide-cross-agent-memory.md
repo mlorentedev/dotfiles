@@ -71,7 +71,7 @@ Claude Code provides native process lifecycle hooks. These are registered declar
 
 ### 2. OpenCode
 OpenCode's configuration schema (`opencode.jsonc`) supports model providers, agents, instructions, formatters, and MCP tools, but does not provide background daemon lifecycle hooks. Continuity in OpenCode is delivered via the `/handoff` command:
-- Deployed by `compile-harness.sh --deploy` to `~/.config/opencode/commands/handoff.md`.
+- Deployed by `dotf harness deploy` to `~/.config/opencode/commands/handoff.md`.
 - Invoking `/handoff` formats the structured `## Session Handoff` markdown block and writes the session record to the project's vault sessions folder.
 
 ### 3. Antigravity (AGY)

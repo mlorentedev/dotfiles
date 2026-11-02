@@ -10,7 +10,7 @@
 
 OpenCode slash-commands are no longer stored here. They are rendered from the
 vault skill records (`harness/skills/`) to `~/.config/opencode/commands/<name>.md`
-at deploy time by `scripts/compile-harness.sh --deploy` (SDD-008), honoring each
+at deploy time by `dotf harness deploy` (SDD-008), honoring each
 skill's `targets[]`. The former `commands/` mirror + `skills-to-opencode.sh` were
 removed.
 

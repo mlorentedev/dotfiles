@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: c395319533983f7e
+generated_sha: 0fefcf90069ae2f7
 id: handoff-skill
 type: skill
 status: active
@@ -182,7 +182,7 @@ several sessions running at once, these are the places two of them can collide:
 |---|---|
 | `MEMORY.md` handoff | `dotf mem handoff-write` (never an Edit) |
 | Vault `sessions/` | the thread-scoped filename from `dotf mem thread` |
-| `~/.dotfiles` deploy dir and the per-agent skill dirs | `setup-linux.sh`, or `dotf harness mirror` then `compile-harness.sh --deploy` from the checkout that holds the change (`dotf deploy` installs only the `ai/deploy.json` configs; the deploy dir is not a git checkout, never edit it) |
+| `~/.dotfiles` deploy dir and the per-agent skill dirs | `setup-linux.sh`, or `dotf harness mirror` then `dotf harness deploy` from the checkout that holds the change (`dotf deploy` installs only the `ai/deploy.json` configs; the deploy dir is not a git checkout, never edit it) |
 | Agent harness settings (`settings.json`, etc.) | the harness deploy path, which merges by marker |
 | The agent's **pending-work surface** (`SCRATCHPAD.md`, the harness memory tool) | the harness's own memory command — never a manual edit of a memory file |
 | The git stash | never bare `git stash` — see the standing order |
