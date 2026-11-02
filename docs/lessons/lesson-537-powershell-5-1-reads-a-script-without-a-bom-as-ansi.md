@@ -1,5 +1,5 @@
 ---
-id: "lesson-536-powershell-5-1-reads-a-script-without-a-bom-as-ansi"
+id: "lesson-537-powershell-5-1-reads-a-script-without-a-bom-as-ansi"
 type: lesson
 status: active
 title: "PowerShell 5.1 reads a script without a BOM as ANSI"
