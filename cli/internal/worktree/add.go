@@ -134,9 +134,11 @@ func refuseBranchAsSlug(opts AddOptions) error {
 	if opts.Branch != "" || !strings.Contains(opts.Slug, "/") {
 		return nil
 	}
+	if err := ValidateBranch(opts.Slug); err != nil {
+		return fmt.Errorf("the slug %q holds a \"/\": a slug is one name, and a branch goes in -b: %w", opts.Slug, err)
+	}
 	_, rest, _ := strings.Cut(opts.Slug, "/")
-	return fmt.Errorf("the slug %q looks like a branch: use dotf worktree add %s -b %s",
-		opts.Slug, strings.ReplaceAll(rest, "/", "-"), opts.Slug)
+	return fmt.Errorf("the slug %q looks like a branch: use dotf worktree add %s -b %s", opts.Slug, rest, opts.Slug)
 }
 
 // ResolveSiblingPath computes the canonical external sibling path (<repo>-wt-<slug>).

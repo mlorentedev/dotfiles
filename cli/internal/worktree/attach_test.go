@@ -60,7 +60,6 @@ func TestAddRefusesABaseForAnExistingBranch(t *testing.T) {
 func TestAddPointsAtTheBranchFlagWhenTheSlugIsABranch(t *testing.T) {
 	cases := map[string]string{
 		"fix/guard-account": "use dotf worktree add guard-account -b fix/guard-account",
-		"feat/a/b":          "use dotf worktree add a-b -b feat/a/b",
 	}
 	for slug, want := range cases {
 		t.Run(slug, func(t *testing.T) {
@@ -69,6 +68,22 @@ func TestAddPointsAtTheBranchFlagWhenTheSlugIsABranch(t *testing.T) {
 			_, err := AddWithRunner(AddOptions{RepoRoot: repo, WorktreeRoot: t.TempDir(), Slug: slug}, &MockAddRunner{}, time.Now())
 			if err == nil || !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), "feat/"+slug) {
 				t.Fatalf("got %v, want a refusal containing %q", err, want)
+			}
+		})
+	}
+}
+
+// A slug that is no valid branch either gets no command: the hint would only
+// lead to the next refusal.
+func TestAddOffersNoCommandWhenTheSlugIsNoValidBranch(t *testing.T) {
+	for _, slug := range []string{"feat/a/b", "fix/", "fix/Not_Kebab"} {
+		t.Run(slug, func(t *testing.T) {
+			repo := filepath.Join(t.TempDir(), "myrepo")
+			_ = os.MkdirAll(filepath.Join(repo, ".git", "info"), 0o755)
+			_, err := AddWithRunner(AddOptions{RepoRoot: repo, WorktreeRoot: t.TempDir(), Slug: slug}, &MockAddRunner{}, time.Now())
+			if err == nil || !strings.Contains(err.Error(), "a slug is one name") ||
+				strings.Contains(err.Error(), "use dotf") || strings.Contains(err.Error(), "feat/"+slug) {
+				t.Fatalf("got %v", err)
 			}
 		})
 	}
