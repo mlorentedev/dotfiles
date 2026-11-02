@@ -11,13 +11,27 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/memlink"
 )
 
+// redirectTempDir points os.TempDir at a directory of the test's own. Windows reads
+// TMP, then TEMP, and never TMPDIR, so TMPDIR alone left every test on the runner's
+// real lock file, shared with each test process running at the same time.
+func redirectTempDir(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, dir)
+	}
+	if got := os.TempDir(); got != dir {
+		t.Fatalf("os.TempDir() = %q, want %q", got, dir)
+	}
+}
+
 // worktreeTestRepo is a git repository with one commit, in a directory whose
-// siblings are the test's own. TMPDIR is redirected so done's lock file is
-// per-test too, and WORKTREE_ROOT so add never writes under the real
+// siblings are the test's own. The temp directory is redirected so done's lock
+// file is per-test too, and WORKTREE_ROOT so add never writes under the real
 // ~/Projects/worktrees.
 func worktreeTestRepo(t *testing.T) string {
 	t.Helper()
-	t.Setenv("TMPDIR", t.TempDir())
+	redirectTempDir(t)
 	t.Setenv("WORKTREE_ROOT", filepath.Join(t.TempDir(), "worktrees"))
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir()) // never the operator's transcripts
 	repo := filepath.Join(t.TempDir(), "repo")
