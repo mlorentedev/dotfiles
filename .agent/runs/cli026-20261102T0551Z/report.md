@@ -33,3 +33,4 @@ Status: armed 2026-11-02T05:51Z, expires 17:51Z. The verdict is written here at 
 | time (UTC) | item | event | evidence |
 |---|---|---|---|
 | 05:51 | - | armed | `.agent/unattended.yml` |
+| 07:12 | - | usage limit hit after arming (05:5x-07:11); wake-lock caffeinate -i -t 38400 started; the run starts now | `pmset -g`: sleep 0 |
