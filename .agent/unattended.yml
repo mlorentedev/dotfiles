@@ -1,0 +1,62 @@
+# Arming envelope for one unattended run. The run reads the COMMITTED copy
+# (git show <base>:.agent/unattended.yml) and halts if the working tree differs.
+version: 1
+run_id: "autopilot-bugs-20261102T0551Z"
+armed_by: manu
+armed_at: 2026-11-02T05:51:11Z
+expires_at: 2026-11-02T17:51:11Z
+branch: chore/autopilot-bugs-20261102t0600z
+worktree: /Users/manu/Projects/worktrees/dotfiles/chore-autopilot-bugs-20261102t0600z
+objective: "Close the owner-approved dotfiles bug queue below, one PR per item, without touching cli/internal/spec (another session's lane tonight)."
+scope:
+  write_paths:
+    - "cli/internal/gittest/**"
+    - "cli/internal/cmd/**"
+    - "cli/internal/worktree/**"
+    - "cli/internal/lessons/**"
+    - "cli/internal/prtriage/**"
+    - "cli/internal/converge/**"
+    - "cli/internal/pi/**"
+    - "docs/lessons/**"
+    - "tests/**"
+    - ".agent/runs/**"
+  frozen_paths:
+    - "cli/internal/spec/**"
+    - "specs/**"
+    - ".github/**"
+    - "harness/**"
+    - "**/AGENTS.md"
+    - "setup-linux.sh"
+    - "setup-windows.ps1"
+    - "versions.conf"
+    - ".agent/unattended.yml"
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, bats, shellcheck, jq, python3, caffeinate]
+queue:
+  source: owner-approved
+  # Approved by the owner on 2026-11-02 05:5xZ, in this order. Empty queue ends the run.
+  items:
+    - issue: 3050
+      action: "revert the frontmatter vault backup e8a90a65 added to 00_meta/templates/{spec-tasks,spec-proposal,agents-spec-section}.md, unless vault-validate requires it (then park with two options); vault edits go direct to master via a detached temp worktree"
+    - issue: 3031
+      action: "about ten full `go test ./...` runs under load; on a failure capture git --version and whether the source loose object still exists; with none, close as could-not-reproduce, reopen on recurrence, with the evidence"
+    - issue: 3033
+    - issue: 3007
+    - issue: 2896
+    - issue: 3051
+  max_items: 6
+budget:
+  max_iterations: 12
+  max_minutes_per_iteration: 40
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+coordination:
+  # Peer overnight run feat-plat003-close-c4 holds cli/internal/spec and the queue
+  # #3053 #2979 #1906 #2407 #1649 #1727 #1749 #1750. Never claim those.
+  peer_lanes: ["cli/internal/spec/**"]
+  api: "prefer REST (gh api); GraphQL was exhausted at 05:45Z"
