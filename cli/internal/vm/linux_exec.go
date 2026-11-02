@@ -42,8 +42,11 @@ type ExecOptions struct {
 	// guest can serve the call, so a refusal never costs a decryption.
 	Secrets func() ([]string, error)
 	Timeout time.Duration // 0 is none
-	Stdout  io.Writer
-	Stderr  io.Writer
+	// Elevated runs the call as an administrator: under sudo on Linux, in a
+	// high-integrity token on Windows (ADR-055 decision 6).
+	Elevated bool
+	Stdout   io.Writer
+	Stderr   io.Writer
 }
 
 // capped keeps the first maxRecordOutput bytes and swallows the rest, so it
@@ -178,6 +181,9 @@ func (s LinuxSessions) guestRun(ctx context.Context, o ExecOptions, pairs []stri
 		}
 		argv = append(append(append([]string{"bash", "-c", forwardEnv, "_"}, names...), "--"), argv...)
 		stdin = io.MultiReader(strings.NewReader(lines.String()), stdin)
+	}
+	if o.Elevated {
+		argv = append([]string{"sudo", "-n"}, argv...)
 	}
 	if o.Timeout > 0 {
 		argv = append([]string{"timeout", "-k", "5", strconv.FormatFloat(o.Timeout.Seconds(), 'f', 3, 64)}, argv...)

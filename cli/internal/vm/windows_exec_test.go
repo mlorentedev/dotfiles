@@ -206,6 +206,24 @@ func TestWindowsExecAFailedWriterKeepsTheRecord(t *testing.T) {
 	}
 }
 
+// AC8: elevation belongs to the call: the task of a plain call stays filtered.
+func TestWindowsExecElevatedRunsTheTaskAtHighest(t *testing.T) {
+	s, g := heldWindows(t, func(g *fakeGuest, dir string) { finish(g, dir, "0", "", "") })
+	run := func(elevated bool) []string {
+		rec := s.Exec(context.Background(), ExecOptions{Session: "proof", Argv: []string{"x"}, Elevated: elevated, Stdout: io.Discard, Stderr: io.Discard})
+		if rec.Status != StatusOK {
+			t.Fatalf("Exec = %+v", rec)
+		}
+		return g.ran("schtasks.exe /create")
+	}
+	if plain := run(false); len(plain) != 1 || strings.Contains(plain[0], "/rl") {
+		t.Errorf("a plain call: %q", plain)
+	}
+	if all := run(true); len(all) != 2 || !strings.Contains(all[1], "/rl highest") {
+		t.Errorf("an elevated call: %q", all)
+	}
+}
+
 func TestWindowsExecBoundsTheRecord(t *testing.T) {
 	s, _ := heldWindows(t, func(g *fakeGuest, dir string) {
 		finish(g, dir, "0", strings.Repeat("x", maxRecordOutput+1), "")

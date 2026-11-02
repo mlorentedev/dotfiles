@@ -74,7 +74,7 @@ func linuxGuest() sessionGuest {
 		up:   "up boots the Linux guest (Ubuntu 24.04, nothing shared with the host) and keeps\nit until `down`. Without --session the name is linux-<unix time>; it is printed.\nA name already held is busy.",
 		down: "down deletes the session's Lima instance and its state, and clears a stale\nsession. It acts only on a session `up` created.",
 		exec: "exec runs the program after -- directly, with no shell, or --script <file>\n" +
-			"copied in and run by sh. Its stdin is forwarded.\n\n" +
+			"copied in and run by sh. Its stdin is forwarded. --elevated runs it under sudo.\n\n" +
 			"--secret <id> resolves a registry value and writes it on the guest's stdin, as\n" +
 			"the variable the registry names; it is never in argv or on the guest's disk,\n" +
 			"and the guest's output is masked for it. A value the guest got elsewhere is\n" +
@@ -101,7 +101,10 @@ func windowsSessionGuest() sessionGuest {
 			"--secret is unsupported too: a Windows session receives no credential. A guest\n" +
 			"command that exits non-zero is status ok with its code in exit, and dotf exits\n" +
 			"1. On --timeout the guest kills the command and its children. --json bounds\n" +
-			"each stream at 1 MiB (truncated says so).",
+			"each stream at 1 MiB (truncated says so).\n\n" +
+			"--elevated runs in a high-integrity token. UAC consents without a prompt in\n" +
+			"this guest, so a pass proves what an administrator can do, not that a real\n" +
+			"machine would not stop at a prompt.",
 		script:  "PowerShell",
 		example: `C:\Users\Public\report.json`,
 	}

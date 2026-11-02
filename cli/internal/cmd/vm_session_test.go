@@ -131,6 +131,8 @@ type fakeSession struct {
 	status vm.Status
 	calls  int
 	stdin  io.Reader
+	// elevated is what the last exec asked for.
+	elevated bool
 }
 
 func (f *fakeSession) Up(_ context.Context, name string, _, _ io.Writer) vm.Record {
@@ -145,7 +147,7 @@ func (f *fakeSession) Down(_ context.Context, name string, _ io.Writer) vm.Recor
 
 func (f *fakeSession) Exec(_ context.Context, o vm.ExecOptions) vm.Record {
 	f.calls++
-	f.stdin = o.Stdin
+	f.stdin, f.elevated = o.Stdin, o.Elevated
 	return vm.NewRecord(o.Session, "windows", f.status)
 }
 
@@ -191,6 +193,9 @@ func TestVMWindowsVerbs(t *testing.T) {
 	f.calls = 0
 	if _, err := run("cp", `proof:C:\Users\Public\a.bin`, filepath.Join(t.TempDir(), "a.bin")); ExitCode(err) != 2 || f.calls != 1 {
 		t.Errorf("cp = %v, %d calls", err, f.calls)
+	}
+	if _, err := run("exec", "--session", "proof", "--elevated", "--", "whoami"); ExitCode(err) != 2 || !f.elevated {
+		t.Errorf("exec --elevated = %v, elevated %v", err, f.elevated)
 	}
 	f.calls = 0
 	if _, err := run("up", "--session", "Bad Name"); ExitCode(err) != 2 {
