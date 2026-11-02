@@ -20,6 +20,16 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - Live, PR #3037: run 41376549715 built from head and skipped the draft ("PR #3037 is draft now"), with the draw skipped; run 41376625169 on `ready_for_review` built, decided, drew Sonnet and published, with no incomplete-list warning, so the real lists read at the audited commit. The empty-diff skip has not run on a real PR yet: its evidence is the Go tests over upstream's real files.
   - Differential, one-off, before the Python left: `translateGlob` against Python 3.13's `fnmatch.translate` on 240,000 random glob and path pairs. 239,844 agreed, none differed, 156 are globs RE2 refuses, which are dropped and only narrow.
 
+### `dotf pr reviewable`: interior globstars (#3036)
+
+Measured on 2026-11-01 against upstream's own `translate_globs_to_regexes` at the audited commit, Python 3.13.16, with `pr_agent`'s two imports stubbed out of `file_filter.py`.
+
+- Differential: 20,000 random glob lists over `**`, `*`, sets, and unclosed and stray brackets, four paths each. 80,000 cases, 6,608 of them ignored upstream, 0 differences in either direction.
+- The table in `TestIgnorePatterns_ExpandsInteriorGlobstars` and the counts in `TestGlobSources_*` were each read from upstream, not derived from the port.
+- The bounds are ported, not relaxed: past six globstars, 256 runes or 256 variants PR-Agent keeps a file, so dropping it here would skip a real diff.
+- Mutations: 20 on the new code in the first pass, of which 4 exposed code with no effect (`lastClose`, the `**/` stride, the cap's seen check), deleted rather than tested; the remaining survivors were closed by tests, and the 11 rerun on the final code were all killed.
+- Python 3.13's `fnmatch` compresses a run of stars, so `translateGlob` does too: it changes no match, only which forms count against the quota.
+
 ## Test status
 
 - #3016, `cli/`: `go build ./... && go vet ./... && go test ./...` -> exit 0, no failing package; `GOOS=windows go vet ./...` -> exit 0; pinned `golangci-lint` 2.12.2, Linux and `GOOS=windows` -> `0 issues.`
