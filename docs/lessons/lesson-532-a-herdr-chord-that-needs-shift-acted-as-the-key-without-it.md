@@ -3,7 +3,7 @@ id: "lesson-532-a-herdr-chord-that-needs-shift-acted-as-the-key-without-it"
 type: lesson
 status: active
 title: "A herdr chord that needs shift acted as the key without it"
-created: "2026-11-02"
+created: "2026-11-01"
 ---
 
 # A herdr chord that needs shift acted as the key without it
