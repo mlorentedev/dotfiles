@@ -56,6 +56,10 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - Resolved: `down` acts only on the session it is named. A guest a `--keep` run left has no record, so it is `busy` for `up`, `no-session` for `down`, and stays `dotf vm windows stop`'s, which also leaves a session stale if it stops that session's guest.
 - Resolved: Windows `exec` takes its program from `request.json` in the call's own directory, with the arguments joined as one Windows command line, so nothing of it is on the task's line. A program that cannot start is `ok, exit: 127`, as on Linux, and the child gets an empty stdin so a reader sees EOF. The agent's socket takes one client, so a concurrent call on the session fails rather than interleaves.
 - Resolved: stdin counts as given only when it is a pipe, a file or any non-file reader. A terminal or `/dev/null`, which a harness hands every command, is no stdin, so the refusal never fires on an agent's plain call.
+- Resolved: Windows `cp` runs no guest command, so it has no task and no directory of its own, and `Exit` stays null, as on Linux. A guest file reaches the host through `QGA.CopyFile`, chunk by chunk, which `exec`'s streams use too: the record's 1 MiB bound does not need the whole stream in host memory.
+- Resolved: guest to host writes a temporary file beside the target and renames it. The failure this avoids is `cp proof:C:\missing ./report.json` emptying a `report.json` that was there.
+- Resolved: a Windows `exec` is settled only by its `exit` file, never by the clock. An `exit` read at the deadline is the command's outcome. A cancel, which nothing in the guest acts on, keeps the task and the directory and says the command may still be running.
+- Resolved: `guestexec.ps1` publishes no `exit` when `taskkill` failed and the program is alive, so the host takes the same path as a guest that never answered. A launch that failed removes its task and directory, because no command started.
 - No open question blocks `tasks.md`.
 
 ## Acceptance criteria
