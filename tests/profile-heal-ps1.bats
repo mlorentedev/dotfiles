@@ -85,6 +85,7 @@ setup() {
     grep -qE 'exit 0|return$' "$PS1_SCRIPT"
 }
 
+# bats test_tags=windows
 @test "profile-heal.ps1 valid PowerShell syntax (if pwsh available)" {
     require_pwsh
     run pwsh -NonInteractive -Command "

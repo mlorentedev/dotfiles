@@ -18,6 +18,18 @@ refute_legacy_mise_sync() {
     [[ -f "$PS1_SCRIPT" ]] || false
 }
 
+# test-windows runs only the `windows` tier of this file (#2059 N1). The other
+# tests read the checkout and run on Linux, which is sound only if both OSes
+# read the same bytes. This test checks that on Windows: the .ps1 is CRLF on
+# every line (.gitattributes), and _winpath gives the native path pwsh needs.
+# bats test_tags=windows
+@test "the static tests read what Windows checks out: CRLF .ps1, native _winpath" {
+    [ "$(grep -c $'\r$' "$PS1_SCRIPT")" -eq "$(wc -l < "$PS1_SCRIPT")" ]
+    if command -v cygpath >/dev/null 2>&1; then
+        [[ "$(_winpath "$PS1_SCRIPT")" =~ ^[A-Za-z]:\\ ]] || false
+    fi
+}
+
 # --- Structural checks ---
 
 @test "setup-windows.ps1 has .SYNOPSIS block" {
@@ -744,6 +756,7 @@ refute_legacy_mise_sync() {
         | grep -qE '\bcatch\s*\{'
 }
 
+# bats test_tags=windows
 @test "setup-windows.ps1 valid PowerShell syntax (if pwsh available)" {
     require_pwsh
     run pwsh -NonInteractive -Command "
@@ -792,6 +805,7 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     "
 }
 
+# bats test_tags=windows
 @test "setup-windows.ps1 executes harness mirror with its checkout path (WIN-014)" {
     require_pwsh
     run_windows_harness_mirror_block yes 'C:\checkout with spaces'
@@ -799,6 +813,7 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     [[ "$output" == *'CALL <harness> <mirror> <--repo> <C:\checkout with spaces>'* ]] || false
 }
 
+# bats test_tags=windows
 @test "setup-windows.ps1 warns when dotf cannot mirror the harness (WIN-014)" {
     require_pwsh
     run_windows_harness_mirror_block no 'C:\checkout'

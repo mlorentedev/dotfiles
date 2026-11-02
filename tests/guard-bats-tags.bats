@@ -13,7 +13,9 @@
 # bats scans every file it runs for these comments, so a test file must never
 # contain one in a heredoc or a string; fixtures assemble the line instead.
 
-KNOWN_TAGS="os-sensitive"
+# os-sensitive: the macOS bash 3.2 tier. windows: what test-windows runs from
+# the files its bats step names (#2059 N1, tests/ci-windows-bats-tier.bats).
+KNOWN_TAGS="os-sensitive windows"
 
 setup() {
     TESTS="$BATS_TEST_DIRNAME"

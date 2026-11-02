@@ -46,6 +46,7 @@ setup() {
     grep -q 'exit 2' "$PS1_SCRIPT"
 }
 
+# bats test_tags=windows
 @test "obs-cli.ps1 valid PowerShell syntax (if pwsh available)" {
     require_pwsh
     run pwsh -NonInteractive -Command "
