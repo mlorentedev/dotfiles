@@ -24,8 +24,8 @@ const (
 	ForgeOther Forge = "other" // any other remote
 )
 
-// originURL returns the origin remote's URL, or "" when there is none.
-func originURL(root string) string {
+// OriginURL returns the origin remote's URL, or "" when there is none.
+func OriginURL(root string) string {
 	out, err := exec.Command("git", "-C", root, "remote", "get-url", "origin").Output()
 	if err != nil {
 		return ""
@@ -35,16 +35,22 @@ func originURL(root string) string {
 
 // ClassifyOrigin reports root's forge and the origin URL it was read from.
 func ClassifyOrigin(root string) (Forge, string) {
-	url := originURL(root)
+	url := OriginURL(root)
+	return ClassifyURL(root, url), url
+}
+
+// ClassifyURL classifies an origin URL the caller already read; root is the
+// checkout whose .gitea/ or .forgejo/ directory marks a Gitea-family forge.
+func ClassifyURL(root, url string) Forge {
 	switch {
-	case url == "":
-		return ForgeAbsent, ""
+	case strings.TrimSpace(url) == "":
+		return ForgeAbsent
 	case isGitHubRemote(url):
-		return ForgeGitHub, url
+		return ForgeGitHub
 	case giteaActionsDir(root) != "":
-		return ForgeGitea, url
+		return ForgeGitea
 	default:
-		return ForgeOther, url
+		return ForgeOther
 	}
 }
 
@@ -110,10 +116,10 @@ func yamlBranch(b string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(b) + `"`
 }
 
-// originHost is the host of a remote URL, for reports. The full URL is never
+// OriginHost is the host of a remote URL, for reports. The full URL is never
 // printed: a self-hosted remote often embeds a token (https://user:token@host/...),
 // and a report line lands in terminals and agent transcripts.
-func originHost(url string) string {
+func OriginHost(url string) string {
 	u := url
 	if i := strings.Index(u, "://"); i >= 0 {
 		u = u[i+3:]

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "BUG-110-spec-home-repo-resolver-f1",
+    "behavior": "AC1: a github.com origin with no override resolves the same issue and archive home as before, in init, audit and doctor",
+    "verification": "cd cli && go test ./internal/spechome/ ./internal/cmd/ ./internal/doctor/ -run 'TestResolvePrecedence|TestSpecAuditExitIssueState|TestSpecInit|TestCheckSpecIssueState$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-110-spec-home-repo-resolver-f2",
+    "behavior": "AC2: a Gitea origin (HTTPS, SSH) with no override fails closed before any forge call, naming forge class and host, never the URL",
+    "verification": "cd cli && go test ./internal/spechome/ ./internal/cmd/ ./internal/doctor/ -run 'FailsClosed|NamesAGiteaCheckout|TestCheckSpecIssueStateGiteaOrigin' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-110-spec-home-repo-resolver-f3",
+    "behavior": "AC3: specs/.bitacora-repo sets the issue home; a malformed file is an error naming the file",
+    "verification": "cd cli && go test ./internal/spechome/ -run 'TestResolvePrecedence|BitacoraRepoFileMalformed' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-110-spec-home-repo-resolver-f4",
+    "behavior": "AC4: precedence flag > file > env > origin, and spec init and spec audit agree on the issue home",
+    "verification": "cd cli && go test ./internal/spechome/ ./internal/cmd/ -run 'TestResolvePrecedence|TestSpecInitAndAuditAgreeOnTheIssueHome' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-110-spec-home-repo-resolver-f5",
+    "behavior": "AC5: a Gitea origin with an override grades against the override and never queries github.com for the Gitea slug",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestSpecAuditGiteaOriginWithOverride' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-110-spec-home-repo-resolver-f6",
+    "behavior": "AC6: with a GitHub origin and an override elsewhere, the zombie-archive lookup queries the origin",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestSpecAuditArchiveUsesOrigin' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -13,7 +13,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mlorentedev/dotfiles/cli/internal/initrepo"
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
@@ -79,7 +78,12 @@ and only asking the forge can find it.
   UNANSWERABLE  the forge could not be asked (auth, network, rate limit)
 
 Exit status is 0 only when nothing is FAIL or UNANSWERABLE: a question that
-could not be answered must not read as a clean audit.`,
+could not be answered must not read as a clean audit.
+
+Issues are asked of GitHub. The repository holding them is --repo, else the
+owner/name committed in specs/.bitacora-repo, else $DOTF_BITACORA_REPO, else a
+github.com origin. A repository hosted elsewhere (Gitea) declares it in
+specs/.bitacora-repo; the audit refuses rather than guess.`,
 		Example:       "  dotf spec audit\n  dotf spec audit --repo mlorentedev/hive",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
@@ -93,21 +97,18 @@ could not be answered must not read as a clean audit.`,
 			if err != nil {
 				return err
 			}
-			home := repo
-			if home == "" {
-				home, _ = initrepo.OriginRepo(root)
-			}
-			if !initrepo.ValidRepoSlug(home) {
-				err := fmt.Errorf("spec audit: cannot tell which repository owns these specs (no origin remote in %s); pass --repo owner/name", root)
+			homes, err := resolveSpecHomes(root, repo, "--repo")
+			if err != nil {
+				err = fmt.Errorf("spec audit: %w", err)
 				c.PrintErrln(err)
 				return err
 			}
-			findings, err := spec.AuditIssueState(root, home, spec.GHIssueStateLookup(specAuditRun, spec.Attempts(specAuditAttempts), spec.RetryWait(specAuditWait)))
+			findings, err := spec.AuditIssueState(root, homes.Issues, spec.GHIssueStateLookup(specAuditRun, spec.Attempts(specAuditAttempts), spec.RetryWait(specAuditWait)))
 			if err != nil {
 				c.PrintErrln("spec audit:", err)
 				return err
 			}
-			spec.ExcuseArchivedZombies(findings, spec.GHArchiveLookup(specAuditRun, home))
+			spec.ExcuseArchivedZombies(findings, spec.GHArchiveLookup(specAuditRun, homes.Archive))
 			printSpecAudit(c.OutOrStdout(), findings)
 			if spec.AuditNeedsAttention(findings) {
 				return errAuditAttention
@@ -115,7 +116,7 @@ could not be answered must not read as a clean audit.`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&repo, "repo", "", "owner/name that owns these specs (default: the origin remote)")
+	cmd.Flags().StringVar(&repo, "repo", "", "GitHub owner/name holding these specs' issues (default: specs/.bitacora-repo, $DOTF_BITACORA_REPO, then a github.com origin)")
 	return cmd
 }
 

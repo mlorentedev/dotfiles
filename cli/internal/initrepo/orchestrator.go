@@ -157,7 +157,7 @@ func initGithubWithDryRun(root string, dryRun bool) (status, detail string) {
 		return "skipped", "no origin remote yet (run `dotf init github` after adding one)"
 	case ForgeGitHub:
 	default:
-		return "skipped", "origin is not a GitHub remote (" + string(forge) + " at " + originHost(url) + "); GitHub repo defaults do not apply"
+		return "skipped", "origin is not a GitHub remote (" + string(forge) + " at " + OriginHost(url) + "); GitHub repo defaults do not apply"
 	}
 	repo, err := OriginRepo(root)
 	if err != nil {
