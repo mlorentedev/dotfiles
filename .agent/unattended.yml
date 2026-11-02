@@ -11,7 +11,7 @@ scope:
   frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "scripts/**", "setup-*.sh", "setup-*.ps1", "specs/**", "versions.conf", "secrets/**", "powershell/**", "release-please-config.json", ".release-please-manifest.json"]
   max_files: 12
   max_loc: 300
-allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, caffeinate]
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, jq, caffeinate]
 queue:
   source: bitacora
   filter: "In order, first eligible survivor each time: #3053 (land, in flight), #2979, #1906, #2407, #1649, #1727, #1749, #1750. Each must pass the 3 a.m. test, be Linux-verifiable, have a fix direction on the issue or an obvious mechanical cause, and hold a free lease (dotf worktree add --issue). Skip anything another session holds, anything Windows-empirical, and any change to a public contract (park and ask). Defects found while working are filed, never worked unless in scope of the current item."
