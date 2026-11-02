@@ -283,13 +283,19 @@ func TestForgePRCreateRefusesARunBranchHead(t *testing.T) {
 	if _, err := runForge(t, "pr", "create", "--title", "t", "--base", "main", "--head", "fix/x", "--body-file", writeBody(t, "b")); err != nil || rec.newPR.Head != "fix/x" {
 		t.Errorf("an explicit --head to a change branch must pass: err=%v head=%q", err, rec.newPR.Head)
 	}
+	// Passed explicitly, the advice to pass --head would send the caller round in a circle.
+	_, err = runForge(t, "pr", "create", "--title", "t", "--base", "main", "--head", "chore/autopilot-run", "--body-file", writeBody(t, "b"))
+	if err == nil || strings.Contains(err.Error(), "pass --head") {
+		t.Errorf("an explicit run-branch head must be refused without the --head advice: err=%v", err)
+	}
 }
 
 func TestForgeHeadCarriesEnvelopeReadsTheBranchTree(t *testing.T) {
 	dir := t.TempDir()
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", args...)
+		// The operator's signing and hooks must not decide this fixture.
+		cmd := exec.Command("git", append([]string{"-c", "commit.gpgsign=false", "-c", "core.hooksPath=" + os.DevNull}, args...)...)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
 		if out, err := cmd.CombinedOutput(); err != nil {

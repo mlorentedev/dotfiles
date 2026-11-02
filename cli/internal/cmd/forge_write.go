@@ -251,16 +251,22 @@ func newForgePRCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if head == "" {
+			defaulted := head == ""
+			if defaulted {
 				if head, err = forgeWriteBranch(); err != nil {
 					return err
 				}
 			}
 			// An agent shell reset to its launch worktree reads that
 			// worktree's branch as the default head: kubelab#2524 opened a
-			// pull request from a run branch that way.
+			// pull request from a run branch that way. There is no override:
+			// the envelope never belongs on a base branch.
 			if forgeHeadCarriesEnvelope(head) {
-				return fmt.Errorf("ERROR: head %q carries %s. WHY: that is an unattended run's branch, which holds its ledger and is never merged; the head was probably read from the launch worktree. FIX: pass --head <the branch that holds the change>", head, runEnvelopePath)
+				fix := "pass --head <the branch that holds the change>; this one was read from the current branch"
+				if !defaulted {
+					fix = "open the pull request from a branch that does not commit the envelope"
+				}
+				return fmt.Errorf("ERROR: head %q carries %s. WHY: that is an unattended run's branch, which holds its ledger and is never merged. FIX: %s", head, runEnvelopePath, fix)
 			}
 			repo, backend, err := forgeTarget()
 			if err != nil {
