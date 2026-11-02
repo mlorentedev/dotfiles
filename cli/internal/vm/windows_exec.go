@@ -177,16 +177,35 @@ func (s WindowsSessions) launch(q *QGA, o ExecOptions, dir, task string) error {
 // collect reads what the command left, as far as it got. A stream that never
 // appeared is empty: a program that could not start has only stderr.
 func (s WindowsSessions) collect(q *QGA, o ExecOptions, dir string, start time.Time) Record {
+	var lost error
 	stream := func(name string, w io.Writer) *capped {
 		c := &capped{}
-		_ = q.CopyFile(dir+`\`+name, &skipBOM{w: io.MultiWriter(c, w)})
+		plain := &lossy{w: w, err: &lost}
+		_ = q.CopyFile(dir+`\`+name, &skipBOM{w: io.MultiWriter(c, plain)})
 		return c
 	}
 	out, errOut := stream("stdout", o.Stdout), stream("stderr", o.Stderr)
 	r := s.rec(o.Session, StatusOK, start, errOut.buf.String())
 	r.Stdout = out.buf.String()
 	r.Truncated = out.over || errOut.over
+	if lost != nil {
+		r.Stderr += fmt.Sprintf("dotf: writing the guest's output: %v\n", lost)
+	}
 	return r
+}
+
+// lossy keeps a failed writer from stopping the record beside it: it remembers
+// the first error and drops the rest.
+type lossy struct {
+	w   io.Writer
+	err *error
+}
+
+func (l *lossy) Write(p []byte) (int, error) {
+	if *l.err == nil {
+		_, *l.err = l.w.Write(p)
+	}
+	return len(p), nil
 }
 
 // skipBOM drops the byte order mark a stream starts with. QGA chunks are far

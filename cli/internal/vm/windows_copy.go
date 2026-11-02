@@ -47,6 +47,12 @@ func copyIn(q *QGA, host, guest string) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
+	// The agent truncates the guest file on open, before the first read here.
+	if st, err := f.Stat(); err != nil {
+		return err
+	} else if !st.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", host)
+	}
 	if err := q.WriteFile(guest, f); err != nil {
 		return fmt.Errorf("copy to %s: %w", guest, err)
 	}
@@ -63,7 +69,11 @@ func copyOut(q *QGA, guest, host string) error {
 	if err := errors.Join(q.CopyFile(guest, f), f.Close()); err != nil {
 		return fmt.Errorf("copy from %s: %w", guest, err)
 	}
-	if err := os.Chmod(f.Name(), 0o644); err != nil {
+	mode := os.FileMode(0o644)
+	if st, err := os.Stat(host); err == nil {
+		mode = st.Mode().Perm() // a target keeps its mode: guest data stays as private
+	}
+	if err := os.Chmod(f.Name(), mode); err != nil {
 		return err
 	}
 	return os.Rename(f.Name(), host)

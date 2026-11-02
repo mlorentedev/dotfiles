@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -188,6 +189,20 @@ func TestWindowsExecAMissingScriptLeavesNoDirectory(t *testing.T) {
 	}
 	if len(g.ran("cmd.exe /c rmdir")) != 1 {
 		t.Error("the call's directory stayed in the guest")
+	}
+}
+
+type brokenWriter struct{}
+
+func (brokenWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
+
+// A reader that went away costs the plain stream, never the record.
+func TestWindowsExecAFailedWriterKeepsTheRecord(t *testing.T) {
+	big := strings.Repeat("x", 200_000)
+	s, _ := heldWindows(t, func(g *fakeGuest, dir string) { finish(g, dir, "0", big, "") })
+	rec := s.Exec(context.Background(), ExecOptions{Session: "proof", Argv: []string{"x"}, Stdout: brokenWriter{}, Stderr: io.Discard})
+	if len(rec.Stdout) != len(big) || !strings.Contains(rec.Stderr, "closed") {
+		t.Errorf("record %d bytes, stderr %q", len(rec.Stdout), rec.Stderr)
 	}
 }
 

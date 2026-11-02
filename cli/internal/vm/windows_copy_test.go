@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -30,8 +31,27 @@ func TestWindowsCopyBothWays(t *testing.T) {
 	}
 }
 
+func TestWindowsCopyKeepsTheTargetsMode(t *testing.T) {
+	s, g := heldWindows(t, nil)
+	g.files[`C:\t\a`] = []byte("secret")
+	out := filepath.Join(t.TempDir(), "out")
+	if err := os.WriteFile(out, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if rec := s.Copy(context.Background(), `proof:C:\t\a`, out, io.Discard); rec.Status != StatusOK {
+		t.Fatalf("Copy = %+v", rec)
+	}
+	st, err := os.Stat(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 {
+		t.Errorf("mode = %o", st.Mode().Perm())
+	}
+}
+
 func TestWindowsCopyFailures(t *testing.T) {
-	s, _ := heldWindows(t, nil)
+	s, g := heldWindows(t, nil)
 	out := filepath.Join(t.TempDir(), "out")
 	rec := s.Copy(context.Background(), `proof:C:\nothing`, out, io.Discard)
 	if rec.Status != StatusFailed {
@@ -54,8 +74,12 @@ func TestWindowsCopyFailures(t *testing.T) {
 	if left, _ := os.ReadDir(dir); len(left) != 1 {
 		t.Errorf("a failed copy left %v", left)
 	}
+	g.files[`C:\x`] = []byte("kept")
 	if rec := s.Copy(context.Background(), t.TempDir(), `proof:C:\x`, io.Discard); rec.Status != StatusFailed {
 		t.Errorf("a directory: %+v", rec)
+	}
+	if string(g.files[`C:\x`]) != "kept" {
+		t.Error("a refused copy reached the guest file")
 	}
 	if rec := s.Copy(context.Background(), out, `ghost:C:\x`, io.Discard); rec.Status != StatusNoSession {
 		t.Errorf("unknown session: %+v", rec)
