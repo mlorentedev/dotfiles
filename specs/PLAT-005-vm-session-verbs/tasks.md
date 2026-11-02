@@ -49,6 +49,8 @@ created: "2026-10-22"
 - [x] [AC3] Windows refuses stdin with `unsupported`, exit 2
 - [x] [AC4] Windows `cp` with `QGA.WriteFile`/`ReadFile` in 48 KiB chunks
 - [x] [AC11] Windows `down`: no overlay and no state, `clean-base` untouched; `stale` cleaned by `down`
+- [x] [AC4] A guest file is read in chunks; a failed guest-to-host copy leaves the target as it was
+- [x] [AC11] A Windows `exec` is settled only by its `exit` file; a failed launch leaves nothing in the guest
 - [ ] Verb help states ADR-055's `--elevated` caveat (with `--elevated`, PR 2)
 
 ### PR 1d: `run` recomposed

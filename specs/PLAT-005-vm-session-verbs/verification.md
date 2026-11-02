@@ -29,6 +29,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - AC2: `exec -- whoami` gave `dotf-win\\dotf`, `ok`, `exit: 0`, in 6.5 s; a program exiting 3 gave `ok`, `exit: 3`, process code 1; a missing one `ok`, `exit: 127`; a UTF-8 `--script` printed its text whole and exited 4.
   - AC3: piped stdin was `unsupported`, exit 2.
   - AC4: 200 kB of random bytes went host to guest to host byte-identical through `C:\Users\Public\a b.bin`; a directory and a missing guest file both failed out loud.
+  - AC4: unit tests pin that a failed `cp proof:C:\nothing <target>` leaves `<target>` unchanged with no temporary file beside it; the real-guest copy above ran on the streaming read.
   - AC11: `--timeout 8s` on PowerShell running `ping -n 60` gave `timeout`, process code 1, with the output so far; no `ping` was left in the guest, and the call left no task or directory.
   - AC11: `down` on an unknown name was `no-session`, exit 3. `down` cleared the stale session, `status` went back to `[]`, and `clean-base` stayed.
 - No regressions in existing test suite: yes / no (if no, document)
