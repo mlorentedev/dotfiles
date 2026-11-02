@@ -23,7 +23,13 @@ const ReviewFile = "review.md"
 // checklist AT archive time (tickArchiveChecklist), which would false-positive
 // on every archive. Both exclusions are deliberate and specified in the
 // proposal.
-var contractFiles = []string{"proposal.md", "tasks.md", "features.json"}
+//
+// spec.md is the whole contract of a fast-track spec, which has none of the
+// other three; without it a fast-track review recorded only empty digests
+// (#2980). Its promotion answers, written after the review, are folded (see
+// normaliseContract). A full spec has no spec.md, so its entry is "" on both
+// sides of every comparison.
+var contractFiles = []string{"proposal.md", "tasks.md", "features.json", "spec.md"}
 
 // Verdict is the adversarial-review outcome recorded in review.md frontmatter.
 type Verdict string

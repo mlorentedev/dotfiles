@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 // ContractDigests returns the normalised SHA-256 of each contract file in
@@ -70,6 +71,8 @@ var archiveProvenance = regexp.MustCompile(`\n<!-- archived [^\n]+ — PR: [^\n]
 //     (HARNESS-151), when foldStatus is set;
 //   - the provenance line `archive --pr` appends in the same pass (#2824). Both
 //     digest forms fold it: no review predates an archive of its own spec.
+//   - the body of a fast-track spec.md's promotion candidates, which the author
+//     answers after the review and before the archive (#2980).
 //
 // A reworded criterion, a new task or a changed feature behavior still moves
 // the digest; the tests pin both halves.
@@ -86,7 +89,32 @@ func normaliseContract(name string, data []byte, foldStatus bool) []byte {
 		data = []byte(setStatus(string(data), "-"))
 	}
 	data = archiveProvenance.ReplaceAll(data, nil)
+	if name == "spec.md" {
+		data = foldPromotionAnswers(data)
+	}
 	return listCheckbox.ReplaceAll(data, []byte("${1}[ ]"))
+}
+
+// foldPromotionAnswers drops the lines under PromotionHeading, up to the next
+// level-1 or level-2 heading, keeping the heading itself. The boundary is the
+// one promotionSection reads, so the digest folds exactly what the archive's
+// promotion check consumes.
+func foldPromotionAnswers(data []byte) []byte {
+	var out []string
+	in := false
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if in && (strings.HasPrefix(trimmed, "# ") || strings.HasPrefix(trimmed, "## ")) {
+			in = false
+		}
+		if !in {
+			out = append(out, line)
+		}
+		if strings.EqualFold(trimmed, PromotionHeading) {
+			in = true
+		}
+	}
+	return []byte(strings.Join(out, "\n"))
 }
 
 // normaliseFeatures re-encodes features.json with the harness-owned fields

@@ -394,7 +394,7 @@ func ReviewPromptForScope(slot ReviewSlot, specID, repoRoot, reviewerID, runner,
 	fmt.Fprintf(&b, "- Set `reviewer:` to exactly `%s`. That string is matched against this repo's\n"+
 		"  reviewer pool, so any other spelling is refused even when the model is correct.\n", reviewerID)
 	b.WriteString("- Set `reviewed_sha` to the output of `git rev-parse HEAD`.\n")
-	b.WriteString("- Do NOT modify `proposal.md`, `tasks.md` or `features.json`. Those are the contract\n" +
+	b.WriteString("- Do NOT modify `proposal.md`, `tasks.md`, `features.json` or a fast-track `spec.md`. Those are the contract\n" +
 		"  files a staleness check watches, so editing one would invalidate your own review the\n" +
 		"  moment you wrote it. If you believe one needs changing, say so as a finding instead.\n")
 	fmt.Fprintf(&b, "- To check the `contract_digests` in review-request.json, compare them with the output of\n"+

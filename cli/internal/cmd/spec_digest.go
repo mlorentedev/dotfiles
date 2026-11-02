@@ -19,8 +19,9 @@ func newSpecDigestCmd() *cobra.Command {
 		Short: "Print the contract digests a review request records, for comparing against one",
 		Long: "digest prints the normalised digests of the spec's contract files in the\n" +
 			"shape review-request.json records them. Compare a recorded request with this\n" +
-			"output, not with sha256sum: the digest ignores ticked boxes, the status line and\n" +
-			"line endings, so a raw hash differs from it without the contract changing.",
+			"output, not with sha256sum: the digest ignores ticked boxes, the status line,\n" +
+			"line endings and a fast-track spec.md's promotion answers, so a raw hash differs\n" +
+			"from it without the contract changing.",
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

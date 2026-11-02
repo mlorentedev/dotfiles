@@ -313,7 +313,7 @@ func TestReviewPromptNamesTheExactReviewerIDAndProtectsContractFiles(t *testing.
 	for _, want := range []string{
 		"AI-001-x", "/repo", "/skill/SKILL.md",
 		"`nan/deepseek-v4-flash`",
-		"proposal.md", "tasks.md", "features.json",
+		"proposal.md", "tasks.md", "features.json", "spec.md",
 		"Do not rubber-stamp",
 	} {
 		if !strings.Contains(p, want) {
