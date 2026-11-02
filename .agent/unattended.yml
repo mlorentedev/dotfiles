@@ -1,0 +1,28 @@
+# .agent/unattended.yml - written at arming, committed on the run's branch
+version: 1
+run_id: "ci-20261102T0600Z"
+armed_by: manu
+armed_at: 2026-11-02T05:53:00Z
+expires_at: 2026-11-02T17:53:00Z
+objective: "Close unclaimed CI and test-reliability defects in dotfiles, one PR per ticket: cli/ and tests/ changes land under the standing grant, .github/** changes stay open for the owner."
+worktree: /Users/manu/Projects/worktrees/dotfiles/chore-autopilot-ci-20261102
+branch: chore/autopilot-ci-20261102
+scope:
+  write_paths: ["cli/internal/cmd/pi*", "cli/internal/initrepo/**", "cli/internal/spec/templates/**", "cli/internal/spec/init*", "cli/internal/cmd/spec_init*", "cli/internal/doctor/checks_pi*", "tests/**", ".github/workflows/**", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", ".agent/runs/ci-20261102T0600Z/**"]
+  frozen_paths: [".github/merge-grant.yml", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "setup-*.sh", "setup-*.ps1", "specs/**", "versions.conf", "secrets/**", "release-please-config.json", ".release-please-manifest.json"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, jq, docker, caffeinate]
+queue:
+  source: bitacora
+  filter: "dotfiles issues in order, first eligible survivor each time: #3050, #3051, #1330, #1222, #2965. #3050 is decided by the owner (2026-11-02): re-vendor the three vault templates and make spec init render {{title}} to the spec id, so no placeholder lands unrendered; the bugs run yielded it. Each must pass the 3 a.m. test, hold a free lease (dotf worktree add --issue), and appear in no other run envelope on origin (night, bugs, night-t0555z, plat005, tool031 runs own #3048 #3049 #3033 #3007 #2784 #2896 #2957 #2851 #2928 #2979 #1906 #2407 #1649 #1727 #1749 #1750 #2842 #2893 #1005). A PR touching .github/** is opened and triaged but never merged by this run. #2965 changes dotf init's stack contract: park and ask unless the issue already settles the shape. Root cause unknown after 3 rounds parks with two options. Defects found while working are filed, never worked unless in scope of the current item."
+  max_items: 5
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
