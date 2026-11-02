@@ -1,0 +1,41 @@
+# Arming envelope. Committed on the run's branch; the run reads the COMMITTED copy only.
+version: 1
+run_id: "handoff-20261102T0554Z"
+armed_by: manu
+armed_at: 2026-11-02T05:54:00Z
+expires_at: 2026-11-02T17:54:00Z
+objective: "Implement the 'Handoff threads' doctor check (HARNESS-185, #1881) and archive its spec after an independent review, then fix #3031, in the lane no other run holds."
+scope:
+  write_paths:
+    - "cli/internal/doctor/**"
+    - "cli/internal/cmd/harness*"
+    - "cli/internal/cmd/doctor*"
+    - "specs/HARNESS-185-handoff-loss-check/**"
+    - "specs/archive/HARNESS-185-handoff-loss-check/**"
+    - "docs/lessons/**"
+    - "docs/runbooks/**"
+    - ".agent/runs/handoff-20261102T0554Z/**"
+  frozen_paths:
+    - ".github/**"
+    - "harness/**"
+    - "**/AGENTS.md"
+    - "versions.conf"
+    - ".release-please-manifest.json"
+    - "CHANGELOG.md"
+    - ".agent/unattended.yml"
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, bats, shellcheck, golangci-lint]
+queue:
+  source: bitacora
+  filter: "dotfiles, in this order: #1881 (spec HARNESS-185, tasks in its tasks.md; the PR that implements it closes #1881 and archives the spec after an independent dotf spec review), then #3031. Nothing else: every other open bug is in another run's envelope on origin (night, bugs x2, ci, cli026, night-t0555z, tool031, plat005). Skip anything a peer holds; the queue ending is a stop, not a reason to widen."
+  max_items: 2
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
