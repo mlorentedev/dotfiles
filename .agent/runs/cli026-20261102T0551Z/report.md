@@ -49,7 +49,10 @@ Status: armed 2026-11-02T05:51Z, expires 17:51Z, disarmed 10:28Z.
 
 1. **Merge #3066** (7c-records: `harness/**`, `AGENTS.md`). It is in draft, so mark it ready first. Its mergeable state is clean.
 2. **Then merge #3069** (7c-delete, closes #2884 and #1733). Once #3066 has merged, retarget it to `main` (or let GitHub retarget it) and mark it ready.
-3. **#3075**: review the two vault edits to `insights` and `vault-doctor`, then refresh or revert them. Until then, the real-vault bats test is red on vault machines; CI stays green.
+3. **Two comments still name the deleted script:** `.github/workflows/ci.yml:333` and `setup-linux.sh:268`. Both paths were frozen for this run. Correct them when you next touch those files, or as a CLI-026 closing item.
+4. **#3075**: review the two vault edits to `insights` and `vault-doctor`, then refresh or revert them. Until then, the real-vault bats test is red on vault machines; CI stays green.
+
+Verified at disarm: `git merge-tree --write-tree origin/main` exits 0 for both the #3066 and #3069 branches, so neither conflicts with today's `main`.
 
 ## Parked
 
