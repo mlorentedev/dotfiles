@@ -1,6 +1,6 @@
-# run tool031-20261102T0550Z — ended queue-empty after 6 iterations / 3.7h — 3 done, 3 parked, 2 merged, 0 unmerged
+# run tool031-20261102T0550Z — ended queue-empty after 6 iterations / 3.7h — 3 done, 2 parked, 1 skipped (held), 2 merged, 0 unmerged
 
-Waiting on a human: one decision on #2893 and two on parked tickets. Irreversible: the two merges below, both reversible by revert.
+Waiting on a human: one decision on #2893 and two on parked tickets. Nothing is irreversible: the two merges below can be reverted.
 
 ## Waiting on you
 
@@ -11,9 +11,9 @@ Waiting on a human: one decision on #2893 and two on parked tickets. Irreversibl
 
 **Decisions:** the three parks below.
 
-## Parked
+## Parked and skipped
 
-1. **#2893, the queue's first item: not started.** Reason: lease held. `feat-pr-declare-unreviewed` holds the lease until 2026-11-03T03:09Z, past this run's expiry; #2928 is closed and that worktree is detached and clean, so the holder looks idle, but I did not bypass it with `--share-issue`. Filed as #3076.
+1. **#2893, the queue's first item: skipped, held; no park comment, board unchanged.** Reason: lease held. `feat-pr-declare-unreviewed` holds the lease until 2026-11-03T03:09Z, past this run's expiry; #2928 is closed and that worktree is detached and clean, so the holder looks idle, but I did not bypass it with `--share-issue`. Filed as #3076.
    - (A) Run `dotf worktree done` on that worktree, then rerun this item. No new risk.
    - (B) Authorize `--share-issue` for it. Same result; the holder stays.
    - Shape settled with the advisor, ready to build: `dotf pr preflight --pool embedded|<path>`, exactly one of `--pool` or `--model`/`--fallbacks` (else exit 2). The chain is the `openai/` `pr_agent` members, weight descending, pool order breaking ties: mimo, deepseek, glm, which equals today's chain. Document order is out because the pool says order is provenance. A pool with no NaN member exits 2, never 1. Fix `preflight.go:105` to compare with the derived primary, and make `remedy` name the pool, not dotfiles' files, when the source is a pool. Pin the slice with a test.
