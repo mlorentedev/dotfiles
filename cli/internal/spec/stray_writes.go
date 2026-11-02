@@ -1,0 +1,75 @@
+package spec
+
+import (
+	"fmt"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
+)
+
+// TreeSnapshot is the working tree's state as `git status` reports it: one
+// entry per path, its two-letter status as the value. A reviewer's only
+// sanctioned output is review.md (HARNESS-142, #1649), so comparing a snapshot
+// taken before the run with one taken after names what else it left behind:
+// untracked probes, scratch dumps, staged restores.
+type TreeSnapshot struct {
+	prefix  string // the spec folder, relative to the repository root
+	entries map[string]string
+}
+
+// SnapshotTree records the state of the repository holding review. Paths under
+// review's own folder are the review's sanctioned output and are left out.
+func SnapshotTree(review string) (TreeSnapshot, error) {
+	dir := filepath.Dir(review)
+	prefix, err := gitOutput(dir, "rev-parse", "--show-prefix")
+	if err != nil {
+		return TreeSnapshot{}, err
+	}
+	out, err := gitOutput(dir, "status", "--porcelain", "-z", "--untracked-files=all")
+	if err != nil {
+		return TreeSnapshot{}, err
+	}
+	snap := TreeSnapshot{prefix: strings.TrimSpace(prefix), entries: map[string]string{}}
+	fields := strings.Split(out, "\x00")
+	for i := 0; i < len(fields); i++ {
+		f := fields[i]
+		if len(f) < 4 {
+			continue
+		}
+		code, path := f[:2], f[3:]
+		if code[0] == 'R' || code[0] == 'C' {
+			i++ // -z writes a rename's source as the next field
+		}
+		if snap.prefix != "" && strings.HasPrefix(path, snap.prefix) {
+			continue
+		}
+		snap.entries[path] = code
+	}
+	return snap, nil
+}
+
+// StrayWrites lists the paths whose state after differs from before, sorted.
+// A file that was already dirty and is changed again keeps its status and is
+// not seen: the snapshot compares states, not contents.
+func (before TreeSnapshot) StrayWrites(after TreeSnapshot) []string {
+	var stray []string
+	for path, code := range after.entries {
+		if before.entries[path] != code {
+			stray = append(stray, path)
+		}
+	}
+	sort.Strings(stray)
+	return stray
+}
+
+// Folder is the spec folder the snapshot excludes, as the repository names it.
+func (s TreeSnapshot) Folder() string { return s.prefix }
+
+func gitOutput(dir string, args ...string) (string, error) {
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
+	if err != nil {
+		return "", fmt.Errorf("git %s in %s: %w", args[0], dir, err)
+	}
+	return string(out), nil
+}

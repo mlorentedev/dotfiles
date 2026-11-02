@@ -413,7 +413,10 @@ func ReviewPromptForScope(slot ReviewSlot, specID, repoRoot, reviewerID, runner,
 		"  UNVERIFIED.\n", repoRoot)
 	b.WriteString("- Verify claims by running things — the build, the linters, the test suite, and\n" +
 		"  mutation edits that you revert afterwards — not by reading assertions about them.\n" +
-		"  Leave the working tree clean apart from your review.\n\n")
+		"  Leave the working tree clean apart from your review: put probes and scratch\n" +
+		"  files under a `mktemp -d` directory, never in the repository. When the run\n" +
+		"  ends, every file left changed outside the spec folder is listed and the run\n" +
+		"  fails.\n\n")
 	b.WriteString("You are reviewing a change you did not write. Do not rubber-stamp it. Assume gaps\n" +
 		"exist until you have argued against them with evidence.\n")
 	return b.String()
