@@ -1,6 +1,7 @@
 package prreview
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -169,8 +170,12 @@ func (r reviewableRun) readPR(ctx context.Context) livePR {
 
 // content is a file through the contents API, empty when the read fails.
 func (r reviewableRun) content(ctx context.Context, repo, path, ref string) []byte {
-	out, _, err := r.env.GH(ctx, "api", "repos/"+repo+"/contents/"+path+"?ref="+ref, "--jq", ".content")
+	out, stderr, err := r.env.GH(ctx, "api", "repos/"+repo+"/contents/"+path+"?ref="+ref, "--jq", ".content")
 	if err != nil {
+		// A 404 is an answer: a repository may hold no `.pr_agent.toml`.
+		if !bytes.Contains(stderr, []byte("HTTP 404")) {
+			annotate(r.env.Out, "cannot read %s at %s, so fewer PRs are recognised as empty.", path, ref)
+		}
 		return nil
 	}
 	// The API wraps its base64, and the decoder skips the newlines.

@@ -16,12 +16,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - AC3, partly -> PR #3015, run 41232841929: `Build dotf`, the preflight, the draw, the guard probe and the final guard all ran from the PR and passed; the risk route drew Sonnet, which published. The push gate was skipped on `ready_for_review`. No weight changed in that PR, so the task's run on a weight change is still open.
 
 - AC6, D's half (#3016) -> `cli/internal/prreview/{reviewable,filefilter}_test.go`, `cli/internal/cmd/pr_reviewable_test.go`; the cases of `tests/pr-agent-queue-skip.bats` and the matcher cases of `tests/pr-agent-config.bats` are ported there, and the bats file keeps the wiring.
-  - Mutations: 46 of the verb and 5 of the workflow wiring, each applied alone, every one failing a test. The first pass left 4 alive: two test gaps closed (a failed read with a body on stdout, an unpaginated listing), one literal case added, and one equivalent mutation that showed the code was redundant, now deleted.
+  - Mutations: 48 of the verb and 5 of the workflow wiring, each applied alone, every one failing a test. The first pass left 4 alive: two test gaps closed (a failed read with a body on stdout, an unpaginated listing), one literal case added, and one equivalent mutation that showed the code was redundant, now deleted.
+  - Live, PR #3037: run 41376549715 built from head and skipped the draft ("PR #3037 is draft now"), with the draw skipped; run 41376625169 on `ready_for_review` built, decided, drew Sonnet and published, with no incomplete-list warning, so the real lists read at the audited commit.
   - Differential, one-off, before the Python left: `translateGlob` against Python 3.13's `fnmatch.translate` on 240,000 random glob and path pairs. 239,844 agreed, none differed, 156 are globs RE2 refuses, which are dropped and only narrow.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
+- #3016, `cli/`: `go build ./... && go vet ./... && go test ./...` -> exit 0, no failing package; `GOOS=windows go vet ./...` -> exit 0; pinned `golangci-lint` 2.12.2, Linux and `GOOS=windows` -> `0 issues.`
+- #3016, shell: `bats` on `tests/pr-agent-config.bats`, `tests/stub-real-pairing.bats` and every suite naming these files -> 110 tests, none failing.
+- Whole spec: `<command> -> <output / coverage %>`
 - Manual smoke test: what was exercised, what was observed
 - No regressions in existing test suite: yes / no (if no, document)
 

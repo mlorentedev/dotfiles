@@ -19,7 +19,8 @@ const testAuditedRef = "981344be2755e303df501e18e3f60b848a188a80"
 type fakeGitHub struct {
 	pull, files          string
 	config, ext, handler []byte
-	failConfig, failExt  bool
+	failConfig, noConfig bool
+	failExt              bool
 	calls                []string
 }
 
@@ -61,6 +62,9 @@ func (f *fakeGitHub) run(_ context.Context, args ...string) ([]byte, []byte, err
 		}
 		return answer(f.files)
 	case strings.HasPrefix(path, "repos/o/r/contents/.pr_agent.toml?ref=main"):
+		if f.noConfig {
+			return nil, []byte("gh: Not Found (HTTP 404)\n"), errors.New("exit status 1")
+		}
 		return file(f.config, f.failConfig)
 	case path == "repos/The-PR-Agent/pr-agent/contents/pr_agent/settings/language_extensions.toml?ref="+testAuditedRef:
 		return file(f.ext, f.failExt)
@@ -152,6 +156,22 @@ func TestReviewable_WhatCannotBeReadKeepsTheReview(t *testing.T) {
 				t.Errorf("reviewable = %v, err %v, want the review to run", ok, err)
 			}
 		})
+	}
+}
+
+// The ignore list narrows the skip when it is lost, and that must be seen, except
+// where the repository simply holds no config.
+func TestReviewable_AFailedConfigReadIsAnnotatedAndAnAbsentOneIsNot(t *testing.T) {
+	g := newFakeGitHub(t)
+	g.failConfig = true
+	_, out, _ := decide(t, g, "pull_request", "")
+	if !strings.Contains(out, "::warning::cannot read .pr_agent.toml at main") {
+		t.Errorf("a lost ignore list said nothing: %q", out)
+	}
+	g = newFakeGitHub(t)
+	g.noConfig = true
+	if _, out, _ := decide(t, g, "pull_request", ""); out != "" {
+		t.Errorf("an absent config is not a failure: %q", out)
 	}
 }
 
