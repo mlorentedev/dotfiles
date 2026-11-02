@@ -121,7 +121,7 @@ review, not per merge.
   - D's half. The verb takes `--skip-branch-prefixes` and `--contract` or `--audited-ref`, so C replaces its step with one line and its `PR_AGENT_REF` stays beside the image. A prefix applies to `pull_request` runs only, and is read from the live PR, never from the payload. dotfiles keeps its job-level `release-please--` literal: there it costs no lane, and `pr-agent-config.bats` pairs it with the gate's exemption.
   - C still has to adopt it in `v0.2.0`, after a dotf release. The next item stays open for that.
   - The step's `build-from-head` order moved: `dotf` is built before the first decision, so a draft costs a build. `push_gate` is gated on `reviewable`, the defect #3016's first comment names.
-  - The port departs from the step in two places. It reads `AUTO_GENERATED_FILES_EXACT`, which the step had stopped finding (lesson-531), and drops one pattern RE2 cannot compile rather than the whole answer, as upstream does. Interior `**/` expansion is not ported: #3036, which only narrows.
+  - The port departs from the step in two places. It reads `AUTO_GENERATED_FILES_EXACT`, which the step had stopped finding (lesson-531), and drops one pattern RE2 cannot compile rather than the whole answer, as upstream does. Interior `**/` expansion, bounds included, came in #3036.
 - [ ] Make `declared_model` and `declared_fallback_models` optional with `pool: embedded`, and give `dotf_version` a default at each tag, so a bump of one pin brings the rest.
 - [ ] The three items above ship as C's `v0.2.0`, with the kubelab fixture.
 - [x] [AC6] Add caller fixtures `tests/fixtures/callers/{dotfiles,hive}.yml`, plus a bats case that each fixture's `with:` and `secrets:` match the declared interface

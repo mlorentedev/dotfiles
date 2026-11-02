@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -202,6 +203,92 @@ func TestIgnorePatterns_ALeadingGlobstarAlsoMatchesAtTheRoot(t *testing.T) {
 	}
 }
 
+// Each `want` was read from upstream's translate_globs_to_regexes at the audited
+// commit, including the bounds: past them PR-Agent keeps the file.
+func TestIgnorePatterns_ExpandsInteriorGlobstars(t *testing.T) {
+	seven := strings.Repeat("**/", 7) + "x"
+	fits := "q/**/" + strings.Repeat("a", 249) + "/x"    // 256 runes
+	tooLong := "q/**/" + strings.Repeat("a", 250) + "/x" // 257 runes
+	wide := "q/**/" + strings.Repeat("ñ", 249) + "/x"    // 256 runes, 505 bytes
+	for _, c := range []struct {
+		name  string
+		globs []string
+		file  string
+		want  bool
+	}{
+		{"an interior globstar also means no directory", []string{"a/**/b"}, "a/b", true},
+		{"and still one or more", []string{"a/**/b"}, "a/x/y/b", true},
+		{"every subset of two", []string{"a/**/b/**/c"}, "a/b/c", true},
+		{"one dropped, one kept", []string{"a/**/b/**/c"}, "a/x/b/c", true},
+		{"a leading and an interior one", []string{"**/a/**/b"}, "a/b", true},
+		{"only a whole segment expands", []string{"a/x**/b"}, "a/b", false},
+		{"a final `**` has no `/` to drop", []string{"a/**"}, "a", false},
+		{"a globstar inside a set is not one", []string{"[a/**/]b"}, "b", false},
+		{"nor does the set end at its own `/`", []string{"[!a/**/b]c"}, "*c", false},
+		{"a `[` no later `]` closes does not hide it", []string{"[a/**/b"}, "[a/b", true},
+		{"a set closed by the last `]` hides it", []string{"[!]/**/]b/**/c"}, "xb/c", true},
+		{"six globstars expand", []string{strings.Repeat("**/", 6) + "x"}, "x", true},
+		{"seven do not", []string{seven}, "a/x", false},
+		{"but seven still lose the leading one", []string{seven}, "a/b/c/d/e/f/x", true},
+		{"256 runes expand", []string{fits}, "q/" + strings.Repeat("a", 249) + "/x", true},
+		{"257 do not", []string{tooLong}, "q/" + strings.Repeat("a", 250) + "/x", false},
+		{"the bound counts runes, not bytes", []string{wide}, "q/" + strings.Repeat("ñ", 249) + "/x", true},
+		{"a repeated glob does not spend the quota", []string{"a/**/b", "a/**/b"}, "a/b", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := &fileFilter{}
+			for _, source := range globSources(c.globs) {
+				if re, err := regexp.Compile(source); err == nil {
+					f.patterns = append(f.patterns, re)
+				}
+			}
+			if got := f.ignored(c.file); got != c.want {
+				t.Errorf("ignored(%q) = %v, want %v", c.file, got, c.want)
+			}
+		})
+	}
+}
+
+// Upstream stops at 256 new translations across every glob, and a form already
+// translated costs nothing: past the quota a file stays in the diff.
+// Forms are compared by translation, so a repeat is one regex and costs no quota.
+func TestGlobSources_CountsTranslations(t *testing.T) {
+	for _, c := range []struct {
+		globs []string
+		want  int
+	}{
+		{[]string{"a/**/b", "a/**/b"}, 2},
+		{[]string{"**/a/**/b"}, 4},
+		{[]string{"a**b", "a*b"}, 1},
+		{[]string{"**/"}, 1},
+	} {
+		if got := globSources(c.globs); len(got) != c.want {
+			t.Errorf("globSources(%q) = %q, want %d", c.globs, got, c.want)
+		}
+	}
+}
+
+func TestGlobSources_TheVariantQuotaIsUpstreams(t *testing.T) {
+	var globs []string
+	for _, name := range []string{"p", "q", "r", "s", "t"} { // 63 forms each
+		globs = append(globs, name+"/**/a/**/b/**/c/**/d/**/e/**/x")
+	}
+	sources := globSources(globs)
+	if len(sources) != 5+256 {
+		t.Fatalf("sources = %d, want 5 globs and 256 variants", len(sources))
+	}
+	covered := func(file string) bool {
+		f := &fileFilter{}
+		for _, source := range sources {
+			f.patterns = append(f.patterns, regexp.MustCompile(source))
+		}
+		return f.ignored(file)
+	}
+	if !covered("s/a/b/x/c/d/e/x") || covered("t/a/b/c/d/e/x") {
+		t.Error("the quota did not fall between the fourth and fifth globs")
+	}
+}
+
 func TestTranslateGlob(t *testing.T) {
 	for _, c := range []struct {
 		glob, file string
@@ -229,6 +316,7 @@ func TestTranslateGlob(t *testing.T) {
 		{"[[:alpha:]]x", ":]x", true},
 		{"(a)+", "(a)+", true},
 		{"(a)+", "aa", false},
+		{"a**b", "a/x/b", true}, // a run of stars is one, as fnmatch compresses it
 	} {
 		t.Run(c.glob+" "+c.file, func(t *testing.T) {
 			ps, err := ignorePatterns([]byte("[ignore]\nglob = ['"+c.glob+"']\n"), noWarn(t))

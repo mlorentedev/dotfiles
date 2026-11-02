@@ -15,9 +15,9 @@ import (
 // read at the audited commit, so nothing here is a copy that can drift.
 //
 // It must never drop a file PR-Agent would keep: that would skip a review with a
-// real diff. So a difference may only narrow it. Upstream's interior `**/`
-// expansion is not ported (#3036), a pattern RE2 cannot compile is dropped, as
-// upstream drops one Python cannot, and a list that cannot be read is empty.
+// real diff. So a difference may only narrow it: a pattern RE2 cannot compile is
+// dropped, as upstream drops one Python cannot, and a list that cannot be read is
+// empty.
 type fileFilter struct {
 	patterns []*regexp.Regexp
 	bad      map[string]bool // extensions, lower case
@@ -89,8 +89,8 @@ func (f *fileFilter) typedOut(file string) bool {
 }
 
 // ignorePatterns compiles `[ignore]`. Entries of `regex` are Python's, matched
-// from the start of the path; a `glob` also applies without a leading `**/`. A
-// config with neither, or no config at all, has none.
+// from the start of the path; globs expand as globSources says. A config with
+// neither, or no config at all, has none.
 func ignorePatterns(cfg []byte, warn warnFunc) ([]*regexp.Regexp, error) {
 	var parsed struct {
 		Ignore struct {
@@ -105,12 +105,7 @@ func ignorePatterns(cfg []byte, warn warnFunc) ([]*regexp.Regexp, error) {
 	for _, r := range parsed.Ignore.Regex {
 		sources = append(sources, `\A(?:`+r+`)`)
 	}
-	for _, glob := range parsed.Ignore.Glob {
-		sources = append(sources, translateGlob(glob))
-		if rest, found := strings.CutPrefix(glob, "**/"); found {
-			sources = append(sources, translateGlob(rest))
-		}
-	}
+	sources = append(sources, globSources(parsed.Ignore.Glob)...)
 	var patterns []*regexp.Regexp
 	for _, source := range sources {
 		p, err := regexp.Compile(source)
@@ -123,6 +118,102 @@ func ignorePatterns(cfg []byte, warn warnFunc) ([]*regexp.Regexp, error) {
 	return patterns, nil
 }
 
+// Upstream's bounds on the zero-directory forms. They are part of the behaviour:
+// past them PR-Agent keeps a file, so dropping it here would skip a real diff.
+const (
+	maxGlobstars    = 6
+	maxGlobVariants = 256
+	maxExpandedGlob = 256
+	globstarSegment = "**/"
+)
+
+// globSources is translate_globs_to_regexes: every glob, the glob without a
+// leading `**/`, and then each form that drops a subset of its whole `**/`
+// segments, since `a/**/b` also means `a/b`. Translations are compared, not
+// globs, as upstream counts its quota.
+func globSources(globs []string) []string {
+	var sources []string
+	seen := map[string]bool{}
+	add := func(glob string) bool {
+		source := translateGlob(glob)
+		if glob == "" || seen[source] {
+			return false
+		}
+		seen[source] = true
+		sources = append(sources, source)
+		return true
+	}
+	for _, glob := range globs {
+		add(glob)
+		if rest, found := strings.CutPrefix(glob, globstarSegment); found {
+			add(rest)
+		}
+	}
+	variants := 0
+	for _, glob := range globs {
+		for _, variant := range globVariants(glob) {
+			if variants == maxGlobVariants {
+				return sources
+			}
+			if add(variant) {
+				variants++
+			}
+		}
+	}
+	return sources
+}
+
+// globVariants is glob without each non-empty subset of its `**/` segments, in
+// upstream's order, or nothing when glob is past the bounds.
+func globVariants(glob string) []string {
+	runes := []rune(glob)
+	offsets := globstarOffsets(runes)
+	if len(offsets) == 0 || len(offsets) > maxGlobstars || len(runes) > maxExpandedGlob {
+		return nil
+	}
+	segments := strings.Split(glob, "/")
+	var variants []string
+	for mask := 1; mask < 1<<len(offsets); mask++ {
+		dropped := map[int]bool{}
+		for bit, offset := range offsets {
+			if mask>>bit&1 == 1 {
+				dropped[strings.Count(string(runes[:offset]), "/")] = true
+			}
+		}
+		var kept []string
+		for i, segment := range segments {
+			if !dropped[i] {
+				kept = append(kept, segment)
+			}
+		}
+		variants = append(variants, strings.Join(kept, "/"))
+	}
+	return variants
+}
+
+// globstarOffsets is _globstar_offsets: where whole `**/` segments start, outside
+// bracket sets.
+func globstarOffsets(runes []rune) []int {
+	var offsets []int
+	for i := 0; i < len(runes); {
+		if runes[i] == '[' {
+			if end := closingBracket(runes, i+1); end >= 0 {
+				i = end + 1
+				continue
+			}
+		}
+		if isGlobstarSegment(runes, i) {
+			offsets = append(offsets, i)
+		}
+		i++
+	}
+	return offsets
+}
+
+func isGlobstarSegment(runes []rune, i int) bool {
+	return strings.HasPrefix(string(runes[i:]), globstarSegment) && (i == 0 || runes[i-1] == '/')
+}
+
 // translateGlob is Python's fnmatch.translate, for RE2. `*` crosses `/`: fnmatch
 // is not path-aware, and neither is PR-Agent's filter.
 func translateGlob(glob string) string {
@@ -132,7 +223,9 @@ func translateGlob(glob string) string {
 	for i := 0; i < len(runes); i++ {
 		switch c := runes[i]; c {
 		case '*':
-			b.WriteString(".*")
+			if i == 0 || runes[i-1] != '*' { // fnmatch compresses a run of stars
+				b.WriteString(".*")
+			}
 		case '?':
 			b.WriteString(".")
 		case '[':
