@@ -33,6 +33,8 @@ type Session interface {
 	// List answers what the hypervisor says about each session. It is never nil,
 	// so --json writes [].
 	List(ctx context.Context) ([]Record, error)
+	// Exec runs one command in a session; the record holds its outcome.
+	Exec(ctx context.Context, o ExecOptions) Record
 }
 
 // Record is the one JSON object a `--json` call writes to stdout, whatever the

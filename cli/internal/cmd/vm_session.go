@@ -42,7 +42,8 @@ var windowsSessions = func() (vm.Session, error) {
 		H:       host,
 		Machine: vm.Machine{Layout: layout, Firmware: firmware, CPUs: 4, MemoryMB: 8192},
 		Agent:   10 * time.Minute,
-		Poll:    5 * time.Second,
+		Poll:    500 * time.Millisecond,
+		Grace:   15 * time.Second,
 		Now:     time.Now,
 	}, nil
 }
@@ -53,6 +54,9 @@ type sessionGuest struct {
 	open func() (vm.Session, error)
 	up   string // `up`'s description
 	down string // `down`'s description
+	exec string // `exec`'s description
+	// script names what runs --script, for the flag's help.
+	script string
 }
 
 func linuxGuest() sessionGuest {
@@ -67,6 +71,16 @@ func linuxGuest() sessionGuest {
 		},
 		up:   "up boots the Linux guest (Ubuntu 24.04, nothing shared with the host) and keeps\nit until `down`. Without --session the name is linux-<unix time>; it is printed.\nA name already held is busy.",
 		down: "down deletes the session's Lima instance and its state, and clears a stale\nsession. It acts only on a session `up` created.",
+		exec: "exec runs the program after -- directly, with no shell, or --script <file>\n" +
+			"copied in and run by sh. Its stdin is forwarded.\n\n" +
+			"--secret <id> resolves a registry value and writes it on the guest's stdin, as\n" +
+			"the variable the registry names; it is never in argv or on the guest's disk,\n" +
+			"and the guest's output is masked for it. A value the guest got elsewhere is\n" +
+			"not masked, nor is piped stdin. A guest command that exits non-zero is status\n" +
+			"ok with its code in exit, and dotf exits 1. A code of 255 can also be ssh\n" +
+			"losing the guest. --json bounds each stream at 1 MiB (truncated says so);\n" +
+			"without it stdout and stderr are the guest's.",
+		script: "sh",
 	}
 }
 
@@ -76,6 +90,16 @@ func windowsSessionGuest() sessionGuest {
 		open: func() (vm.Session, error) { return windowsSessions() },
 		up:   "up boots a throwaway overlay of clean-base and keeps it until `down`. Without\n--session the name is windows-<unix time>; it is printed. The host runs one\nWindows guest, so a second up is busy whatever its name.",
 		down: "down stops the session's guest and deletes its overlay and state, and clears a\nstale session. clean-base never changes. It acts only on a session `up` created;\n`dotf vm windows stop` is for a guest `--keep` left running.",
+		exec: "exec runs the program after -- directly, with no shell, or --script <file>\n" +
+			"copied in and run by PowerShell, as the guest's test user. The output arrives\n" +
+			"when the command ends, through a scheduled task and polling, so a call is\n" +
+			"slower than on Linux; duration_ms shows it.\n\n" +
+			"The guest agent has no stdin, so piped stdin is unsupported: `cp` the data in.\n" +
+			"--secret is unsupported too: a Windows session receives no credential. A guest\n" +
+			"command that exits non-zero is status ok with its code in exit, and dotf exits\n" +
+			"1. On --timeout the guest kills the command and its children. --json bounds\n" +
+			"each stream at 1 MiB (truncated says so).",
+		script: "PowerShell",
 	}
 }
 
@@ -88,7 +112,7 @@ const sessionVerbs = "A session is a named guest that `up` holds until `down`. W
 	"3 no such session. Progress goes to stderr."
 
 func addSessionVerbs(c *cobra.Command, g sessionGuest) {
-	c.AddCommand(newVMUpCmd(g), newVMDownCmd(g), newVMStatusCmd(g))
+	c.AddCommand(newVMUpCmd(g), newVMDownCmd(g), newVMStatusCmd(g), newVMExecCmd(g))
 }
 
 func sessionFlags(c *cobra.Command, session *string, asJSON *bool, usage string) {

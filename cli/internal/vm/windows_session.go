@@ -23,6 +23,7 @@ type WindowsSessions struct {
 	Machine Machine
 	Agent   time.Duration // until the guest agent answers and the test user is logged on
 	Poll    time.Duration
+	Grace   time.Duration // how long a timed-out command gets to be killed in the guest
 	Now     func() time.Time
 }
 
