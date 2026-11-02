@@ -36,10 +36,12 @@ var seamLiteralURLs = []string{
 // nothing else, because spec also holds calls that run `gh`.
 var seamSpecNames = []string{"PRAgentBlock", "ParseReviewerPool", "ReviewerPool"}
 
-// seamModulePackages are the dotf packages the package may import.
-var seamModulePackages = []string{"github.com/mlorentedev/dotfiles/cli/internal/spec"}
-
-const seamModulePrefix = "github.com/mlorentedev/dotfiles/"
+// seamOutsidePackages are the packages beyond the standard library the package
+// may import. A forge client would have to be added here, on purpose.
+var seamOutsidePackages = []string{
+	"github.com/mlorentedev/dotfiles/cli/internal/spec",
+	"github.com/pelletier/go-toml/v2",
+}
 
 var seamURL = regexp.MustCompile(`https?://[^\s"'` + "`" + `)]+`)
 
@@ -73,8 +75,10 @@ func checkSeamImport(imp *ast.ImportSpec, report seamReport) {
 	switch {
 	case path == "net" || path == "syscall" || strings.HasPrefix(path, "net/rpc"):
 		report(imp.Pos(), "imports %s, which can reach a forge outside GHRunner", path)
-	case strings.HasPrefix(path, seamModulePrefix) && !slices.Contains(seamModulePackages, path):
+	case strings.Contains(strings.Split(path, "/")[0], ".") && !slices.Contains(seamOutsidePackages, path):
 		report(imp.Pos(), "imports %s: a forge call belongs behind GHRunner", path)
+	case (path == "os/exec" || path == "net/http") && imp.Name != nil:
+		report(imp.Pos(), "renames %s, which hides its calls from this check", path)
 	}
 }
 
@@ -102,6 +106,8 @@ func (c seamCheck) node(n ast.Node) bool {
 		}
 	case *ast.SelectorExpr:
 		c.selector(x)
+	case *ast.CallExpr:
+		c.call(x)
 	}
 	return true
 }
@@ -115,6 +121,20 @@ func (c seamCheck) markSeamDefault(a *ast.AssignStmt) {
 	if isField && isIdent && lhs.Sel.Name == "GH" {
 		c.seamDefault[rhs] = true
 	}
+}
+
+// call catches a request sent through a client: `c.Do(req)` or
+// `http.DefaultClient.Get(u)`, where no package name marks it. Only a call
+// counts, since `pr.Head` is a field.
+func (c seamCheck) call(x *ast.CallExpr) {
+	sel, isSel := x.Fun.(*ast.SelectorExpr)
+	if !isSel || !clientSends(sel.Sel.Name) || c.inFunc("post") {
+		return
+	}
+	if pkg, isIdent := sel.X.(*ast.Ident); isIdent && pkg.Name == "http" {
+		return // the selector rule reports this one
+	}
+	c.report(x.Pos(), "a call to %s outside post: a client can reach a forge past GHRunner", sel.Sel.Name)
 }
 
 func (c seamCheck) selector(x *ast.SelectorExpr) {
@@ -135,6 +155,12 @@ func (c seamCheck) selector(x *ast.SelectorExpr) {
 // httpReachesOut is whether the net/http name starts a request.
 func httpReachesOut(name string) bool {
 	return slices.Contains([]string{"Get", "Head", "Post", "PostForm", "NewRequest", "NewRequestWithContext"}, name)
+}
+
+// clientSends is whether a method of that name on an http.Client sends a
+// request. A client held in a variable has no package name to match on.
+func clientSends(name string) bool {
+	return slices.Contains([]string{"Do", "Get", "Head", "Post", "PostForm"}, name)
 }
 
 func checkSeamLiteral(lit *ast.BasicLit, report seamReport) {
@@ -203,6 +229,14 @@ func f() string { return "https://forge.example/api/v1/repos" }`, "names https:/
 import _ "github.com/mlorentedev/dotfiles/cli/internal/forge"`, "imports github.com/mlorentedev/dotfiles/cli/internal/forge"},
 		"execGH called past the seam": {`package p
 func readPR() { _, _, _ = execGH(ctx, "api", "repos/o/r/pulls/1") }`, "execGH used directly"},
+		"the default client": {`package p
+func f() { _, _ = http.DefaultClient.Get(u) }`, "a call to Get outside post"},
+		"a client in a variable": {`package p
+func f(c *http.Client) { _, _ = c.Do(req) }`, "a call to Do outside post"},
+		"a renamed net/http": {`package p
+import h "net/http"`, "renames net/http"},
+		"a third-party forge client": {`package p
+import _ "github.com/google/go-github/v60/github"`, "imports github.com/google/go-github/v60/github"},
 		"a raw socket": {`package p
 import _ "net"`, "imports net"},
 		"a spec call that runs gh": {`package p
@@ -225,7 +259,7 @@ func TestForgeSeamCheckAllowsTheSeamItself(t *testing.T) {
 	fset, files := parseSeamSource(t, `package p
 import ("net/http"; "os/exec")
 func execGH() { _ = exec.CommandContext(ctx, "gh") }
-func post() { _, _ = http.NewRequestWithContext(ctx, "POST", u, nil) }
+func post(c *http.Client) { _, _ = http.NewRequestWithContext(ctx, "POST", u, nil); _, _ = c.Do(req) }
 func defaults(env Env) { env.GH = execGH }`)
 	if v := forgeSeamViolations(fset, files); len(v) != 0 {
 		t.Errorf("the seam was reported: %v", v)
