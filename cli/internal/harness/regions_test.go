@@ -41,14 +41,27 @@ func TestDeployedMatchesSource(t *testing.T) {
 	}
 }
 
-func TestCatalogMarkerMatchesCompileHarness(t *testing.T) {
-	raw, err := os.ReadFile("../../../scripts/compile-harness.sh")
+// The catalog deployCatalog writes must read back as deploy-only, or every
+// machine with copilot reports the catalog it was just given as drift.
+func TestTheDeployedCatalogIsDeployOnly(t *testing.T) {
+	repo, home, file := catalogRepo(t)
+	writeFile(t, file, "# Copilot\n\n"+catalogSlot+"\n"+GeneratedEndMarker+"\n")
+	if _, err := DeploySkills(repo, home, none, false); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(file)
 	if err != nil {
-		t.Skipf("compile-harness.sh unreadable: %v", err)
+		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), "— "+CatalogMarker+" from vault") {
-		t.Errorf("compile-harness.sh no longer writes %q into the catalog BEGIN line; deploy-only detection would miss the catalog", CatalogMarker)
+	for _, l := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(l, GeneratedBeginPrefix) {
+			if kindOf(l) != catalogRegion {
+				t.Errorf("the deployed catalog BEGIN line is not read as the catalog: %q", l)
+			}
+			return
+		}
 	}
+	t.Fatalf("no catalog region was written:\n%s", raw)
 }
 
 // The real source: copilot-instructions.md's empty slot must be read as the

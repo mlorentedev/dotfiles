@@ -5,9 +5,9 @@
 # ---------------
 # Five files ran `git init`, a config and a seed commit in every setup().  On a
 # Mac that is about 100 ms a test against 6 ms for a copy: 9 of the 30 seconds
-# compile-harness.bats took (CI-012 N3, #2059).  Building the tree once in
-# setup_file and copying it keeps each test's fixture its own, so no test can
-# see what another wrote.
+# the since-retired compile-harness.bats took (CI-012 N3, #2059).  Building the
+# tree once in setup_file and copying it keeps each test's fixture its own, so
+# no test can see what another wrote.
 #
 # THE RULE
 # --------

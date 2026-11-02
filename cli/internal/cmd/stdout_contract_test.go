@@ -94,10 +94,10 @@ func TestStdoutContracts(t *testing.T) {
 			// frontmatter. On stderr it would capture as "", and the render
 			// would emit a bare `model:` — a definition naming no model, which
 			// is the exact degrade model-map.json was built to prevent.
-			name:     "harness resolve-tier — compile-harness substitutes this into agent frontmatter",
+			name:     "harness resolve-tier — the agent render substitutes this into frontmatter",
 			args:     []string{"harness", "resolve-tier", "top", "--harness", "claude"},
 			wantSub:  "opus",
-			consumer: `compile-harness.sh: model_id="$(dotf harness resolve-tier "$tier" --harness "$agent")"`,
+			consumer: `a caller rendering agent frontmatter: model_id="$(dotf harness resolve-tier "$tier" --harness "$agent")"`,
 		},
 		{
 			// The whole point of `agent run` is to be composed: its consumer is

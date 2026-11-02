@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 # Guard for #673/GOV-004: every HARNESS GENERATED region carries a truncated
 # sha256 of its own between-markers content in the BEGIN marker. That sha is
-# emitted by scripts/compile-harness.sh (sha_of = `sha256sum | cut -c1-16`) so a
+# emitted by `dotf harness instructions` (the first 16 hex of a sha256) so a
 # reader WITHOUT the vault can spot a hand-edited or corrupted generated block.
 # Nothing enforced it before — the marker could silently go stale. This asserts
 # each marker's declared sha equals the recomputed content sha.
 #
 # Region CONTENT drift vs the committed harness/enforced/ records is a separate,
-# stronger check already run in CI (`compile-harness.sh --check`, ci.yml). This
+# stronger check already run in CI (`dotf harness check`, ci.yml). This
 # guard adds integrity of the self-describing sha marker itself.
 #
 # Note (#710 self-match): the BEGIN-marker pattern is ANCHORED at column 0 (^).
@@ -30,7 +30,7 @@ setup() {
         declared="$(grep -oE 'sha256:[0-9a-f]{16}' "$f" | head -1 | cut -d: -f2)"
         recomputed="$(awk '/^<!-- BEGIN HARNESS GENERATED/{inb=1;next} /^<!-- END HARNESS GENERATED -->/{inb=0} inb{print}' "$f" | sha256sum | cut -c1-16)"
         if [ "$declared" != "$recomputed" ]; then
-            echo "DRIFT: $f declared=$declared recomputed=$recomputed — re-run scripts/compile-harness.sh" >&2
+            echo "DRIFT: $f declared=$declared recomputed=$recomputed — re-run dotf harness deploy" >&2
             failed=1
         fi
     done
@@ -64,7 +64,7 @@ setup() {
         recomputed="$(awk 'NR==1 || NR>4' "$f" | sha256sum | cut -c1-16)"
         checked=$((checked + 1))
         if [ "$declared" != "$recomputed" ]; then
-            echo "DRIFT: $f declared=$declared body=$recomputed — edit the vault source, pull the vault (git -C \"\$VAULT_PATH\" pull --ff-only: a stale clone reverts records, #2162), then run scripts/compile-harness.sh --refresh" >&2
+            echo "DRIFT: $f declared=$declared body=$recomputed — edit the vault source, pull the vault (git -C \"\$VAULT_PATH\" pull --ff-only: a stale clone reverts records, #2162), then run dotf harness refresh" >&2
             failed=1
         fi
     done < <(git grep -lE '^generated_sha: [0-9a-f]{16}$' -- 'harness/**/*.md')

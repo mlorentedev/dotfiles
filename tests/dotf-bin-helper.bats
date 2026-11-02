@@ -191,7 +191,7 @@ EOF2
 
 @test "guard: every file that ran its own build now resolves the binary through the helper" {
     local f
-    for f in compile-harness-real \
+    for f in harness-doctrine-records skills-pipeline \
              vault-maintenance-weekly dotf-agent-run; do
         grep -qF "load 'lib/dotf-bin'" "$REPO/tests/$f.bats"
         grep -qF 'dotf_bin_resolve' "$REPO/tests/$f.bats"

@@ -14,22 +14,26 @@ setup() {
     grep -qF '"$_dotf" harness refresh --repo "$CURRENT_DIR"' "$DOTFILES_DIR/setup-linux.sh"
 }
 
-# A direct `compile-harness.sh --refresh` reads whatever the local vault clone
-# holds. From a clone that was behind, it rewrote merged records to their older
-# state and setup asked for the revert to be committed (#2162). Comments may
-# name the script; a real invocation may not.
-@test "setup-linux.sh has no direct compile-harness --refresh invocation (#2162)" {
-    run bash -c "grep -nE 'compile-harness[^ ]* --refresh' '$DOTFILES_DIR/setup-linux.sh' | grep -vE '^[0-9]+:[[:space:]]*#' || true"
+# scripts/compile-harness.sh is deleted (CLI-026). A call to it that came back
+# would fail, and setup runs such calls with output discarded, so the failure
+# would be silent: the records and the agent copies would just stop updating.
+# Comments may name the script; a real invocation may not, in either setup.
+_script_calls() {
+    grep -nE 'compile-harness' "$1" | grep -vE '^[0-9]+:[[:space:]]*#' || true
+}
+
+@test "neither setup script invokes the deleted compile-harness.sh" {
+    run _script_calls "$DOTFILES_DIR/setup-linux.sh"
+    [ -z "$output" ]
+    run _script_calls "$DOTFILES_DIR/setup-windows.ps1"
     [ -z "$output" ]
 }
 
-@test "the no-direct-refresh guard detects the shape it forbids" {
-    local probe
-    probe="$(mktemp)"
+@test "the no-invocation guard detects the shape it forbids" {
+    local probe="$BATS_TEST_TMPDIR/probe.sh"
     printf '%s\n' '# compile-harness.sh --refresh in a comment is fine' \
         '    if ( cd "$CURRENT_DIR" && "$CURRENT_DIR/scripts/compile-harness.sh" --refresh ) >/dev/null 2>&1; then' > "$probe"
-    run bash -c "grep -nE 'compile-harness[^ ]* --refresh' '$probe' | grep -vE '^[0-9]+:[[:space:]]*#' || true"
-    rm -f "$probe"
+    run _script_calls "$probe"
     [[ "$output" == "2:"* ]] || false
 }
 
@@ -39,14 +43,4 @@ setup() {
 
 @test "setup-linux.sh stays valid zsh" {
     zsh -n "$DOTFILES_DIR/setup-linux.sh"
-}
-
-# Windows runs --deploy only (ENGINE-001: --refresh/--check are Linux-only), so it
-# never mutates the committed records and needs no announce. Encode the invariant
-# so a future Windows --refresh port cannot silently reintroduce the drift class:
-# one that wants a refresh calls `dotf harness refresh`, which is OS-agnostic.
-# A comment reference to --refresh is fine; a real invocation is not.
-@test "setup-windows.ps1 has no real compile-harness --refresh invocation (Linux-only)" {
-    run bash -c "grep -E 'compile-harness.*--refresh' '$DOTFILES_DIR/setup-windows.ps1' | grep -vE '^[[:space:]]*#' || true"
-    [ -z "$output" ]
 }

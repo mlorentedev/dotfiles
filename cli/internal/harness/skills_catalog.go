@@ -8,8 +8,7 @@ import (
 
 // The copilot skill catalog: copilot has no per-skill mechanism, so every
 // record that targets it is listed, one bullet each, in the GENERATED region of
-// its $HOME instructions file. This is the Go form of compile-harness.sh's
-// build_skill_catalog and the catalog step of deploy_skills (CLI-026).
+// its $HOME instructions file (CLI-026 ported it from the retired shell engine).
 
 // deployCatalog rewrites the catalog region of the manifest's catalog file. A
 // file that is absent, or does not carry exactly one GENERATED region, is
@@ -26,7 +25,7 @@ func deployCatalog(m *SkillManifest, recDir string, names []string, home string,
 		return skipped, nil
 	}
 	bullets := catalogBullets(recDir, names, m.Catalog.Agent)
-	begin := GeneratedBeginPrefix + " (sha256:" + PresenceSHA(bullets) + ") — skill catalog from vault " +
+	begin := GeneratedBeginPrefix + " (sha256:" + PresenceSHA(bullets) + ") — " + CatalogMarker + " from vault " +
 		m.VaultSubpath + "; edit there + re-run setup, do NOT edit between markers -->"
 	want, ok := replaceCatalogRegion(string(current), begin, bullets)
 	if !ok {

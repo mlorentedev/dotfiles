@@ -688,15 +688,15 @@ _deployed_state_hashes() {
 # =============================================================================
 # Section: harness injection targets are mirrored into the deploy dir
 #
-# `dotf doctor` runs `compile-harness.sh --check` from $DOTFILES_DIR, so every
+# `dotf doctor` runs the harness check from $DOTFILES_DIR, so every
 # file harness/manifest.json declares as a target must exist there. #1176 added
 # ai/orca/ORCA.md to the manifest without a copy line in setup-linux.sh, and the
 # result was a permanent doctor FAIL whose printed remedy could not clear it:
 # running --refresh from the repo exits 0, because the repo has the file (#1200).
 #
 # This asserts the OUTCOME on a real deploy, which is the half no unit test can
-# reach — tests/compile-harness-rootresolve.bats builds its own tmp mirror, so
-# it passed throughout by hand-copying the file setup never delivered.
+# reach — the since-retired compile-harness-rootresolve.bats built its own tmp
+# mirror, so it passed throughout by hand-copying the file setup never delivered.
 # =============================================================================
 
 @test "every harness manifest target exists in the deploy dir" {
@@ -731,20 +731,14 @@ _deployed_state_hashes() {
     }
 }
 
-@test "compile-harness --check passes from the deploy dir" {
-    # The assertion dotf doctor makes, made directly: a green --check here is
-    # what a green [Harness + skill drift] section means.
-    [ -x "$DOTFILES_DIR/scripts/compile-harness.sh" ]
-    # `--check` requires jq ON PATH (`type -P jq || exit 2`), and setup installs
-    # it to ~/.local/bin without putting that on this process's PATH (#1202).
-    # SKIP rather than inject the path: injecting would make this test green on
-    # a machine where `dotf doctor` is red, which is the failure mode
-    # docs/lessons/lesson-223 is about. A named skip says which condition was
-    # hit; once #1202 lands, this starts running here on its own.
-    command -v jq >/dev/null 2>&1 || \
-        skip "jq is not on PATH, so --check exits 2 before it can answer about drift (#1202)"
-    run bash "$DOTFILES_DIR/scripts/compile-harness.sh" --check
-    [ "$status" -eq 0 ]
+@test "dotf harness check passes from the deploy dir" {
+    # The assertion dotf doctor makes, made directly: a green check here is what
+    # a green [Harness + skill drift] section means. The deploy dir is the
+    # offline copy setup mirrors (WIN-007), so this also proves the mirror holds
+    # every input the check reads.
+    command -v dotf >/dev/null 2>&1
+    run dotf harness check --repo-root "$DOTFILES_DIR"
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
     echo "$output" | grep -q 'no harness drift'
 }
 

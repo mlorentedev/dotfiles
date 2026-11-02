@@ -40,9 +40,9 @@ With --fix it reports the exact shell-profile lines for any missing env default
 (e.g. core.hooksPath).
 
 With --quick it runs ONLY the env-contract sweep (env vars, PATH, required
-binaries) and skips the heavy sections — chiefly the ~2.8s compile-harness drift
-gate. This is the fast subset the SessionStart hook wires in; --quick is
-report-only (it ignores --fix).
+binaries) and skips the heavy sections — chiefly the harness drift gate. This
+is the fast subset the SessionStart hook wires in; --quick is report-only (it
+ignores --fix).
 
 With --scope machine it checks what converge produces and skips the identity
 checks: the age key, Bitwarden, the gh login and the knowledge vault, which are
@@ -79,7 +79,7 @@ the scope for a fresh machine before its identity is restored, and for CI.`,
 
 	cmd.Flags().BoolVar(&fix, "fix", false, "report safe env defaults to persist and wire safe repaired state (e.g. core.hooksPath)")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "list passing checks too (default summarises them per section)")
-	cmd.Flags().BoolVar(&quick, "quick", false, "env-contract sweep only — fast, no compile-harness gate (for the SessionStart hook)")
+	cmd.Flags().BoolVar(&quick, "quick", false, "env-contract sweep only — fast, no harness drift gate (for the SessionStart hook)")
 	cmd.Flags().StringVar(&scope, "scope", "all", "all, or machine: skip the identity checks (age key, Bitwarden, gh login, vault)")
 	return cmd
 }

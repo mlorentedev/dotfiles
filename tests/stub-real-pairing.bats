@@ -43,7 +43,7 @@ setup() {
 #   dotf-bin-helper           stubs `go` — the case it pins is a toolchain that is present and cannot
 #                             compile the tree, and a real `go` only produces that by breaking the
 #                             tree under test. The real build path is driven for real by every
-#                             suite that calls the helper (compile-harness-real among them).
+#                             suite that calls the helper (skills-pipeline among them).
 #   gh-auth-helper            stubs `gh` to fail `auth status` the way an API blip does, which a real
 #                             gh cannot be made to do on demand. The helper runs against the real gh
 #                             in spec-gate-pr-real and spec-gate-prepush-real on every CI run, and a
