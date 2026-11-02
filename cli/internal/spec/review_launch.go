@@ -395,8 +395,9 @@ func ReviewPromptForScope(slot ReviewSlot, specID, repoRoot, reviewerID, runner,
 		"  reviewer pool, so any other spelling is refused even when the model is correct.\n", reviewerID)
 	b.WriteString("- Set `reviewed_sha` to the output of `git rev-parse HEAD`.\n")
 	b.WriteString("- Do NOT modify `proposal.md`, `tasks.md`, `features.json` or a fast-track `spec.md`. Those are the contract\n" +
-		"  files a staleness check watches, so editing one would invalidate your own review the\n" +
-		"  moment you wrote it. If you believe one needs changing, say so as a finding instead.\n")
+		"  files your review describes, and their digests are recorded when it starts; on a full spec\n" +
+		"  the archive's staleness check compares them, so editing one would invalidate your own\n" +
+		"  review. If you believe one needs changing, say so as a finding instead.\n")
 	fmt.Fprintf(&b, "- To check the `contract_digests` in review-request.json, compare them with the output of\n"+
 		"  `dotf spec digest %s`, never with sha256sum: they are taken over a normalised form, so a\n"+
 		"  raw hash differs from them without the contract having changed.\n", specID)
