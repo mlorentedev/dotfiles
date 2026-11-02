@@ -162,19 +162,20 @@ func TestSpecInitAndAuditAgreeOnTheIssueHome(t *testing.T) {
 }
 
 func TestSpecInitGiteaOriginFailsClosed(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the gh stub is a POSIX shell script")
-	}
 	for _, origin := range []string{giteaOrigin, "git@git.example.com:teledyne/projects-toolkit.git"} {
 		t.Run(origin, func(t *testing.T) {
 			root := makeRepo(t)
 			withOrigin(t, root, origin)
 			// A gh that leaves a mark: the refusal must come before any forge call.
-			bin, mark := t.TempDir(), filepath.Join(t.TempDir(), "gh-ran")
-			if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\ntouch '"+mark+"'\n"), 0o755); err != nil {
-				t.Fatal(err)
+			// The stub is a POSIX script, so Windows checks only the refusal.
+			mark := filepath.Join(t.TempDir(), "gh-ran")
+			if runtime.GOOS != "windows" {
+				bin := t.TempDir()
+				if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\ntouch '"+mark+"'\n"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 			}
-			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 			_, _, err := execute(t, "spec", "init", "CLI-007-x", "--issue", "7")
 			if err == nil || !strings.Contains(err.Error(), "--bitacora-repo") || !strings.Contains(err.Error(), "git.example.com") {
