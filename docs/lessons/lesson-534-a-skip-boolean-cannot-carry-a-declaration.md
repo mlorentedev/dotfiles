@@ -1,5 +1,5 @@
 ---
-id: "lesson-532-a-skip-boolean-cannot-carry-a-declaration"
+id: "lesson-534-a-skip-boolean-cannot-carry-a-declaration"
 type: lesson
 status: active
 title: "A skip boolean cannot carry a declaration"
