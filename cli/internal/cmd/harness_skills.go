@@ -24,12 +24,14 @@ func newHarnessSkillsCmd() *cobra.Command {
 		Short: "Render each committed skill record to every skills.deploy target",
 		Long: "skills renders every harness/skills/<name>/SKILL.md record to each\n" +
 			"harness/manifest.json skills.deploy[] target under $HOME, as a skill directory\n" +
-			"(with the record's auxiliary files), an opencode command or an agy prompt. A\n" +
-			"record's targets: list is matched by exact harness name; an absent one means\n" +
-			"every harness. An output that already holds its render is not rewritten. A\n" +
-			"target whose requires_command is not on PATH is skipped. Generated outputs whose\n" +
-			"record is gone, or no longer targets that harness, are pruned; an unmarked copy\n" +
-			"of a managed skill is reported and kept. Last, the skills.catalog file (copilot's\n" +
+			"(with the record's auxiliary files, and without any file the record no longer\n" +
+			"ships), an opencode command or an agy prompt. A record's targets: list is\n" +
+			"matched by exact harness name; an absent one means every harness. An output\n" +
+			"that already holds its render is not rewritten. A target whose\n" +
+			"requires_command is not on PATH is skipped. Generated outputs (a generated: true\n" +
+			"line in their frontmatter, or a prompt's leading comment) whose record is gone,\n" +
+			"or no longer targets that harness, are pruned; an unmarked copy of a managed\n" +
+			"skill is reported and kept. Last, the skills.catalog file (copilot's\n" +
 			"instructions) gets one bullet per record that targets its harness, written into\n" +
 			"its one GENERATED region; a file that is absent or has no such region is skipped.",
 		Example:      "  dotf harness skills --dry-run\n  dotf harness skills --repo-root /path/to/checkout",
