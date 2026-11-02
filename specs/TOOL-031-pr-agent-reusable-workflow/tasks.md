@@ -116,7 +116,10 @@ review, not per merge.
 
   Expected: PASS.
 - [x] [AC4] `.github/actions/push-gate`: the composite runs `dotf pr gate` and fails the step on error. Test first.
-- [ ] [AC4] [AC6] `dotf pr declare-unreviewed`, with kubelab's declare tests (`tests/test_pr_agent_workflow.py:485-527`) ported to Go, behind the input `declare_unreviewed`. ~90 lines of shell would break ci-workflows' rule 1.
+- [x] [AC4] [AC6] `dotf pr declare-unreviewed`, with kubelab's declare tests (`tests/test_pr_agent_workflow.py:485-531`) ported to Go, behind the input `declare_unreviewed`. ~90 lines of shell would break ci-workflows' rule 1.
+  - D's half. `dotf pr reviewable` now also prints `diff=empty|reviewable|unread`, and the verb takes it as `--diff`, so a run lists the PR's files once and C calls one step on both branches: `dotf pr declare-unreviewed --diff "${{ steps.reviewable.outputs.diff }}"`.
+  - C still has to adopt it in `v0.2.0`, after a dotf release. Its step needs `if: inputs.declare_unreviewed`, on `pull_request` or a `/review` comment and never `/improve`, as kubelab's does, and `continue-on-error`, so a failed label read does not stop the review that follows. The job already holds `pull-requests: write` and `issues: write`.
+  - No workflow in dotfiles calls it (#1618).
 - [x] [AC6] `dotf pr reviewable` (#3016) reads the input `skip_branch_prefixes`. An expression cannot iterate a list in the job's `if:`, so the job enters the lane, and with `queue: max` it displaces nothing.
   - D's half. The verb takes `--skip-branch-prefixes` and `--contract` or `--audited-ref`, so C replaces its step with one line and its `PR_AGENT_REF` stays beside the image. A prefix applies to `pull_request` runs only, and is read from the live PR, never from the payload. dotfiles keeps its job-level `release-please--` literal: there it costs no lane, and `pr-agent-config.bats` pairs it with the gate's exemption.
   - C still has to adopt it in `v0.2.0`, after a dotf release. The next item stays open for that.

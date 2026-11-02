@@ -30,6 +30,13 @@ Measured on 2026-11-01 against upstream's own `translate_globs_to_regexes` at th
 - Mutations: 20 on the new code in the first pass, of which 4 exposed code with no effect (`lastClose`, the `**/` stride, and the cap's seen check and `break`), deleted rather than tested; the remaining survivors were closed by tests, and the 11 rerun on the final code were all killed.
 - Python 3.13's `fnmatch` compresses a run of stars, so `translateGlob` does too: it changes no match, only which forms count against the quota.
 
+### `dotf pr declare-unreviewed`
+
+- AC4 and AC6, D's half -> `cli/internal/prreview/declare_test.go`, `cli/internal/cmd/pr_declare_unreviewed_test.go`, and `TestReviewable_DiffSaysOnlyWhatWasRead`. kubelab's four step tests map to `TestDeclare_NeverHoldsTheEscapeAsALiteral`, `TestRationale_PointsAtNoDeadEnd` and the `empty` and `reviewable` branches of `TestPrDeclareUnreviewed_*`.
+- Mutations: 19 on the decisive lines, each applied alone. 18 failed a test; the survivor, the blank line under a filled heading, is now asserted.
+- Live, on the verb's own PR #3044, built from its head: `reviewable` answered `diff=reviewable`; `--diff reviewable` with no label wrote nothing; `--diff empty` wrote the section and `merged-unreviewed`; a second run left one section; `--diff reviewable` removed the label and warned that the section stays. The body was then restored. Against hive's real registry, `--diff empty` exited 1 with `harness/review-attestation.json at master declares no escape.label/escape.section`.
+- Not run: the verb under a `GITHUB_TOKEN` in a real workflow, which waits for ci-workflows `v0.2.0`, and a real PR of only ignored files.
+
 ## Test status
 
 - #3016, `cli/`: `go build ./... && go vet ./... && go test ./...` -> exit 0, no failing package; `GOOS=windows go vet ./...` -> exit 0; pinned `golangci-lint` 2.12.2, Linux and `GOOS=windows` -> `0 issues.`
@@ -42,8 +49,10 @@ Measured on 2026-11-01 against upstream's own `translate_globs_to_regexes` at th
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
--
--
+- `dotf pr declare-unreviewed` takes `--diff` from a new `diff=` output of `dotf pr reviewable`, not its boolean. `reviewable=false` also means a draft, a closed PR or a forfeited branch, which kubelab's `open` step filtered before its declare step, and `reviewable=true` also means a read that failed. The advisor proposed `skip_reason` with a `--clear` flag; that covers the first and not the second, and leaves the choice of mode in the workflow.
+- `diff=reviewable` needs every filter source read. A lost source narrows the filter, which keeps files the whole one might drop, so that run says `unread`, and a declared label survives an outage.
+- The section check follows `check-review-attestation.sh`, not kubelab's `grep -qxF`: CRLF and trailing blanks do not count, and a heading with nothing under it is filled in place, because the gate reads the first heading and refuses an empty one. kubelab's step would report "already declared" and leave the gate red.
+- Departs from kubelab's test on one point. It asserts `lesson-376` and `#1527` in the rationale; those are kubelab's, and would link to something else in another repository. The rationale keeps the method, decrypt both sides and diff the key names, with no reference.
 
 ## Promotion candidates
 
