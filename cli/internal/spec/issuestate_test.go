@@ -346,6 +346,21 @@ func TestArchiveGHLookupFindsAnAbandonedSpec(t *testing.T) {
 	}
 }
 
+// An empty home means the specs live off GitHub: the lookup must answer "could
+// not be asked" without running gh, never `repos//contents/…` on github.com
+// (#1906; the BUG-110 review found this guard untested).
+func TestArchiveGHLookupWithoutAGitHubHomeNeverRunsGH(t *testing.T) {
+	ran := false
+	archived := GHArchiveLookup(func(...string) (string, string, error) {
+		ran = true
+		return "", "", nil
+	}, "")
+	got, err := archived("A-002-zombie")
+	if ran || got || err == nil || !strings.Contains(err.Error(), "github.com") {
+		t.Fatalf("got (%v, %v) ran=%v, want an error naming github.com and no gh call", got, err, ran)
+	}
+}
+
 // A checkout cut before the default branch archived a spec still holds it
 // active while its issue is already closed: that is a stale ref, not a zombie
 // (#2918). Only a zombie is excused, and only on an answered "archived".

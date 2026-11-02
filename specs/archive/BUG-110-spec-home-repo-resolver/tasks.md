@@ -34,5 +34,5 @@ created: "2026-11-01"
 - [x] `golangci-lint run` at the pinned version
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
-- [ ] Independent review
+- [x] PR opened referencing this spec folder
+- [x] Independent review
