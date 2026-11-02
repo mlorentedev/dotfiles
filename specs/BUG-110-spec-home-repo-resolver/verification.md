@@ -30,7 +30,7 @@ created: "2026-11-01"
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-532-a-name-parsed-from-a-url-is-only-valid-on-the-host-it-came-from.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-533-a-name-parsed-from-a-url-is-only-valid-on-the-host-it-came-from.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: `specs/.bitacora-repo` follows ADR-043's `.wip-limit` precedent. The precedence is documented in the resolver and in `spec audit --help`.
 - [x] New pattern candidate for `00_meta/patterns/`? no: one occurrence. The lesson carries it.
 

@@ -1,5 +1,5 @@
 ---
-id: "lesson-532-a-name-parsed-from-a-url-is-only-valid-on-the-host-it-came-from"
+id: "lesson-533-a-name-parsed-from-a-url-is-only-valid-on-the-host-it-came-from"
 type: lesson
 status: active
 title: "A name parsed from a URL is only valid on the host it came from"
