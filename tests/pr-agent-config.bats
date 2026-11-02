@@ -266,7 +266,7 @@ print(s['consumers'], s['expose'], s['plane'])
 print(any(s.get('expose', {}).get('env') == 'ANTHROPIC_API_KEY' for s in d['secrets']))
 "
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "['ci:mlorentedev/dotfiles', 'ci:mlorentedev/kubelab'] {'env': 'PR_AGENT_ANTHROPIC_API_KEY'} app" ]
+    [ "${lines[0]}" = "['ci:mlorentedev/dotfiles', 'ci:mlorentedev/hive', 'ci:mlorentedev/kubelab'] {'env': 'PR_AGENT_ANTHROPIC_API_KEY'} app" ]
     [ "${lines[1]}" = "False" ]
 }
 

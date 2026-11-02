@@ -37,10 +37,10 @@ ADR-042's classes place each piece. No new rule is needed.
    - **Consumers.** A consumer with no local pool, such as hive, passes `embedded`, so its dotf pin is also its pool pin. HARNESS-180 (#2439) still delivers the file to repositories that run `dotf spec review`.
 3. **A thin reusable workflow in `mlorentedev/ci-workflows` (class 1), plus the push gate as a composite action (class 2).**
    - **What it does.** The workflow installs `dotf` at the version the caller passes and runs the PR-Agent action. It calls `dotf pr …` for each decision.
-   - **Its own commit.** It checks out its own files through `job.workflow_sha` and `job.workflow_ref`, never `github.workflow_sha`.
+   - **Its own commit.** It reads no own files (actionlint does not know `job.workflow_sha`) and never `github.workflow_sha`.
    - **Secrets.** `NAN_API_KEY` is required and `PR_AGENT_ANTHROPIC_API_KEY` is optional. Each is declared, never `secrets: inherit`.
    - **Caller.** The caller owns triggers, permissions and workflow-level concurrency. The repository-wide job lane stays inside the job.
-   - **kubelab's differences, as inputs.** `declare_unreviewed` (default off) puts the label and the rationale from the caller's `escape.*` on an ignored-only PR. It is idempotent and clears a stale label. `skip_branch_prefixes` covers branches such as `deploy/` and `promote/`.
+   - **kubelab's differences, as inputs.** `declare_unreviewed` (default off) puts the label and the rationale from the caller's `escape.*` on an ignored-only PR. It is idempotent and clears a stale label. `skip_branch_prefixes` covers branches such as `deploy/` and `promote/`. Both ship in C's `v0.2.0`, decided in `dotf pr` (owner, 2026-11-01).
    - **Artifact.** The `pr-number` artifact (`pr-number.txt`) is uploaded on every run.
 4. **dotfiles keeps testing its own changes.** Its workflow builds `dotf` from the PR's head, so a PR that changes the route runs its own version (CLI-101's requirement). Consumers use a released, pinned version.
 5. **hive is the pilot, in two PRs.** The first adds a caller pinned by SHA next to the old job. After a week with both outputs, the second removes the old job. hive's `review` check is not required, so ADR-042 decision 6's protection steps are moot here. Two PRs are kept for the side-by-side comparison (owner decision, 2026-10-22).
@@ -109,4 +109,3 @@ ADR-042's classes place each piece. No new rule is needed.
 - Owner decision of 2026-10-18: mlorentedev/kubelab#2295 (TOOL-117), last comment.
 - ADRs: ADR-042 (shared CI is referenced, not copied), ADR-046 (Anthropic reviewers; §5 allowlist), ADR-040 (push gate), ADR-054 (container action pinned by digest).
 - `cli/internal/harness/model_map.go`: why an implicit embedded fallback is refused.
-- GitHub docs, contexts reference (`job.workflow_sha`, `job.workflow_ref`): https://docs.github.com/en/actions/reference/workflows-and-actions/contexts
