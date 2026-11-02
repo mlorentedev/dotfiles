@@ -92,7 +92,7 @@ func openPR(branch string) string {
 func decide(t *testing.T, g *fakeGitHub, event, prefixes string) (bool, string, error) {
 	t.Helper()
 	var out bytes.Buffer
-	ok, err := Reviewable(context.Background(), ReviewableInputs{Repo: "o/r", PR: "7", Event: event,
+	ok, _, err := Reviewable(context.Background(), ReviewableInputs{Repo: "o/r", PR: "7", Event: event,
 		DefaultBranch: "main", AuditedRef: testAuditedRef, SkipPrefixes: prefixes},
 		ReviewableEnv{Out: &out, GH: g.run})
 	return ok, out.String(), err
@@ -284,7 +284,7 @@ func TestReviewable_AnUnknownAuditedCommitFailsTheStep(t *testing.T) {
 		t.Run(ref, func(t *testing.T) {
 			g := newFakeGitHub(t)
 			var out bytes.Buffer
-			_, err := Reviewable(context.Background(), ReviewableInputs{Repo: "o/r", PR: "7",
+			_, _, err := Reviewable(context.Background(), ReviewableInputs{Repo: "o/r", PR: "7",
 				Event: "pull_request", DefaultBranch: "main", AuditedRef: ref},
 				ReviewableEnv{Out: &out, GH: g.run})
 			if !errors.Is(err, ErrNoAuditedRef) {
@@ -302,10 +302,48 @@ func TestReviewable_AnUnknownAuditedCommitFailsTheStep(t *testing.T) {
 func TestReviewable_TheStateAnswersBeforeTheAuditedCommitIsNeeded(t *testing.T) {
 	g := newFakeGitHub(t)
 	g.pull = `{"merged":true,"state":"closed"}`
-	ok, err := Reviewable(context.Background(), ReviewableInputs{Repo: "o/r", PR: "7", Event: "pull_request"},
+	ok, diff, err := Reviewable(context.Background(), ReviewableInputs{Repo: "o/r", PR: "7", Event: "pull_request"},
 		ReviewableEnv{Out: &bytes.Buffer{}, GH: g.run})
-	if ok || err != nil {
-		t.Errorf("reviewable = %v, err %v", ok, err)
+	if ok || diff != DiffUnread || err != nil {
+		t.Errorf("reviewable = %v, diff %s, err %v", ok, diff, err)
+	}
+}
+
+// What a declaration may rest on. reviewable=false alone would label a draft, and
+// reviewable=true alone would clear a label on a failed read.
+func TestReviewable_DiffSaysOnlyWhatWasRead(t *testing.T) {
+	ignored := `[{"filename":"package-lock.json"}]`
+	cases := map[string]struct {
+		mutate   func(*fakeGitHub)
+		prefixes string
+		wantOK   bool
+		wantDiff string
+	}{
+		"a file reaches PR-Agent": {wantOK: true, wantDiff: DiffReviewable},
+		"every file is ignored":   {mutate: func(g *fakeGitHub) { g.files = ignored }, wantDiff: DiffEmpty},
+		"a draft of ignored files": {mutate: func(g *fakeGitHub) {
+			g.files, g.pull = ignored, `{"state":"open","draft":true}`
+		}, wantDiff: DiffUnread},
+		"a forfeited branch": {mutate: func(g *fakeGitHub) { g.files = ignored }, prefixes: "feat/", wantDiff: DiffUnread},
+		"a failed listing":   {mutate: func(g *fakeGitHub) { g.files = "fail" }, wantOK: true, wantDiff: DiffUnread},
+		"no filters":         {mutate: func(g *fakeGitHub) { g.failExt = true }, wantOK: true, wantDiff: DiffUnread},
+		"no ignore list":     {mutate: func(g *fakeGitHub) { g.failConfig = true }, wantOK: true, wantDiff: DiffUnread},
+		"no .pr_agent.toml":  {mutate: func(g *fakeGitHub) { g.noConfig = true }, wantOK: true, wantDiff: DiffReviewable},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			g := newFakeGitHub(t)
+			g.pull = openPR("feat/x")
+			if c.mutate != nil {
+				c.mutate(g)
+			}
+			ok, diff, err := Reviewable(context.Background(), ReviewableInputs{Repo: "o/r", PR: "7",
+				Event: "pull_request", DefaultBranch: "main", AuditedRef: testAuditedRef, SkipPrefixes: c.prefixes},
+				ReviewableEnv{Out: &bytes.Buffer{}, GH: g.run})
+			if err != nil || ok != c.wantOK || diff != c.wantDiff {
+				t.Errorf("reviewable %v, diff %q, err %v; want %v, %q", ok, diff, err, c.wantOK, c.wantDiff)
+			}
+		})
 	}
 }
 
