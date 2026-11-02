@@ -37,3 +37,5 @@ Status: armed 2026-11-02T05:51Z, expires 17:51Z. The verdict is written here at 
 | 07:23 | 7c-records | vault 345bb4c6 on master; PR #3066 opened (owner-landed) | harness check OK; bats 186/1 (real-vault test, fails on main too) |
 | 07:34 | 7c-delete | PR #3069 opened, stacked on #3066 (owner-landed); script + 10 bats gone, 140+/4325- | go test ok (vault-template drift aside, #3050); lint 0; bats 345/346 (real-vault drift: insights, vault-doctor) |
 | 07:43 | #2851 | PR #3070 opened (grant-eligible), gated on the deployed marker per advisor | go test harness/cmd ok; lint 0; bats parity+pipeline 33/33 |
+| 09:15 | 7c | #3066 and #3069 reviewed (PR-Agent; CodeRabbit rate-limited), triaged, returned to draft; filed #3075 (stale insights/vault-doctor records) | review-attestation success on both; main d2c5c790 real-vault test not ok 2 on the same two files |
+| 09:15 | #2851 | review findings applied: lesson 536, real evidence in body; new head re-queued for CI and review | go vet/test/lint output in PR body |
