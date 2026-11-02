@@ -28,6 +28,9 @@ func piRepo(t *testing.T, manifest, live string) (agentDir string, calls *[]stri
 		return "", nil
 	}
 	piLookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
+	origWait := piRetryWait
+	t.Cleanup(func() { piRetryWait = origWait })
+	piRetryWait = 0
 	return agentDir, &got
 }
 
@@ -86,6 +89,62 @@ func TestPiPackagesApplyFailureExitsNonZero(t *testing.T) {
 	writeFileAt(t, bin, "")
 	if out, _, err := execute(t, "pi", "packages", "apply", "--pi", bin, "--agent-dir", agentDir); err == nil {
 		t.Fatalf("a failed install must not exit 0:\n%s", out)
+	}
+}
+
+// #3051: the registry 404'd a tarball published minutes earlier, the install
+// failed, and only the next setup run installed it. One retry absorbs that, and
+// the first failure's output still reaches the log.
+func TestPiPackagesApplyRetriesAFailedInstallOnce(t *testing.T) {
+	agentDir, _ := piRepo(t, piManifest, `{"packages":["npm:keep@1"]}`)
+	var calls []string
+	piRun = func(_ string, args ...string) (string, error) {
+		calls = append(calls, strings.Join(args, " "))
+		if len(calls) == 1 {
+			return "npm error code E404", errors.New("exit status 1")
+		}
+		return "", nil
+	}
+	bin := filepath.Join(t.TempDir(), "pi")
+	writeFileAt(t, bin, "")
+	out, _, err := execute(t, "pi", "packages", "apply", "--pi", bin, "--agent-dir", agentDir)
+	if err != nil || strings.Join(calls, ";") != "install npm:new@1;install npm:new@1" {
+		t.Fatalf("a failed install is retried once and then counts as installed: err=%v calls=%v\n%s", err, calls, out)
+	}
+	if !strings.Contains(out, "retrying once") || !strings.Contains(out, "npm error code E404") {
+		t.Errorf("the retry and the first attempt's output must be logged:\n%s", out)
+	}
+}
+
+func TestPiPackagesApplyRetriesOnlyOnceAndNeverARemove(t *testing.T) {
+	agentDir, _ := piRepo(t, piManifest, `{"packages":["npm:keep@1","npm:gone@2"]}`)
+	var calls []string
+	piRun = func(_ string, args ...string) (string, error) {
+		calls = append(calls, strings.Join(args, " "))
+		return "npm ERR!", errors.New("exit status 1")
+	}
+	bin := filepath.Join(t.TempDir(), "pi")
+	writeFileAt(t, bin, "")
+	out, _, err := execute(t, "pi", "packages", "apply", "--pi", bin, "--agent-dir", agentDir)
+	if err == nil || strings.Join(calls, ";") != "remove npm:gone@2;install npm:new@1;install npm:new@1" {
+		t.Fatalf("want one remove, two installs, and a non-zero exit: err=%v calls=%v\n%s", err, calls, out)
+	}
+}
+
+// An outage fails every install. After one retry fails, later installs fail
+// without a wait, so the run pays one wait, not one per package.
+func TestPiPackagesApplyStopsRetryingOnceARetryFails(t *testing.T) {
+	agentDir, _ := piRepo(t, `{"version":1,"packages":[{"source":"npm:a@1","why":"x"},{"source":"npm:b@1","why":"y"}]}`, `{"packages":[]}`)
+	var calls []string
+	piRun = func(_ string, args ...string) (string, error) {
+		calls = append(calls, strings.Join(args, " "))
+		return "npm error code ECONNREFUSED", errors.New("exit status 1")
+	}
+	bin := filepath.Join(t.TempDir(), "pi")
+	writeFileAt(t, bin, "")
+	out, _, err := execute(t, "pi", "packages", "apply", "--pi", bin, "--agent-dir", agentDir)
+	if err == nil || strings.Join(calls, ";") != "install npm:a@1;install npm:a@1;install npm:b@1" {
+		t.Fatalf("want a retried once, b not retried, and a non-zero exit: err=%v calls=%v\n%s", err, calls, out)
 	}
 }
 
