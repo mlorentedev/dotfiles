@@ -279,6 +279,28 @@ func TestDeploySkills_DropsAuxFilesTheRecordNoLongerShips(t *testing.T) {
 	}
 }
 
+// A directory whose SKILL.md is not ours yet keeps its other files on the run
+// that first renders into it; from the next run, the record owns it.
+func TestDeploySkills_AnUnmarkedDirKeepsItsFilesUntilTheRenderOwnsIt(t *testing.T) {
+	repo, home := skillsRepo(t)
+	deployed := filepath.Join(home, ".claude", "skills", "demo")
+	extra := filepath.Join(deployed, "notes.md")
+	writeFile(t, filepath.Join(deployed, "SKILL.md"), "---\nname: demo\n---\nhand-written\n")
+	writeFile(t, extra, "mine\n")
+	if _, err := DeploySkills(repo, home, none, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(extra); err != nil {
+		t.Fatal("the first render into an unmarked directory removed a file in it")
+	}
+	if _, err := DeploySkills(repo, home, none, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(extra); err == nil {
+		t.Error("the record owns the directory after its first render, and the extra file is still there")
+	}
+}
+
 func TestDeploySkills_ADryRunKeepsTheDroppedAuxFile(t *testing.T) {
 	repo, home := skillsRepo(t)
 	if _, err := DeploySkills(repo, home, none, false); err != nil {

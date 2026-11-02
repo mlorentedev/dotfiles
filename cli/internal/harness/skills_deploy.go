@@ -159,19 +159,27 @@ func deploySkill(t SkillDeployTarget, recDir, name, base, srcPath string, dryRun
 	outp := skillOutPath(t, base, name)
 	changed := false
 	if t.Render == RenderSkill {
-		// The skill's directory is the unit: a symlinked one is unlinked, the
-		// record's auxiliary files are copied in beside the render, and a file
-		// the record no longer ships is removed (#2851).
+		// The skill's directory is the unit: a symlinked one is unlinked, and
+		// the record's auxiliary files are copied in beside the render. Once
+		// the deployed SKILL.md carries the marker the directory is the
+		// record's, and a file the record no longer ships is removed (#2851); a
+		// directory not ours yet keeps its files on the run that first renders.
 		if changed, err = unlinkSymlink(filepath.Dir(outp), dryRun); err != nil {
 			return nil, err
+		}
+		owned := false
+		if current, err := os.ReadFile(outp); err == nil { //nolint:gosec // an output under home
+			owned = isGeneratedOutput(current)
 		}
 		aux, err := syncAuxFiles(filepath.Join(recDir, name), filepath.Dir(outp), dryRun)
 		if err != nil {
 			return nil, err
 		}
-		dropped, err := dropStaleAuxFiles(filepath.Join(recDir, name), filepath.Dir(outp), dryRun)
-		if err != nil {
-			return nil, err
+		dropped := false
+		if owned {
+			if dropped, err = dropStaleAuxFiles(filepath.Join(recDir, name), filepath.Dir(outp), dryRun); err != nil {
+				return nil, err
+			}
 		}
 		changed = changed || aux || dropped
 	}
