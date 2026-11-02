@@ -127,6 +127,18 @@ func (r *RealAddRunner) WorktreeAttach(repo, target, branch, remote string) erro
 	return nil
 }
 
+// refuseBranchAsSlug names the input the caller got wrong. A slug holding a "/" is
+// a branch passed in the wrong place, and left alone it fails on feat/<slug>, a
+// name the caller never wrote, which reads as add being unable to check it out.
+func refuseBranchAsSlug(opts AddOptions) error {
+	if opts.Branch != "" || !strings.Contains(opts.Slug, "/") {
+		return nil
+	}
+	_, rest, _ := strings.Cut(opts.Slug, "/")
+	return fmt.Errorf("the slug %q looks like a branch: use dotf worktree add %s -b %s",
+		opts.Slug, strings.ReplaceAll(rest, "/", "-"), opts.Slug)
+}
+
 // ResolveSiblingPath computes the canonical external sibling path (<repo>-wt-<slug>).
 func ResolveSiblingPath(repoRoot, slug string) string {
 	cleanRoot := filepath.Clean(repoRoot)
@@ -237,6 +249,9 @@ func AddWithRunner(opts AddOptions, runner AddRunner, now time.Time) (*Info, err
 		return nil, fmt.Errorf("branch %q already exists, so add attaches to it and --base %s does not apply: drop --base, or name a new branch", branchName, opts.BaseRef)
 	}
 	if !exists {
+		if err := refuseBranchAsSlug(opts); err != nil {
+			return nil, err
+		}
 		if err := ValidateBranch(branchName); err != nil {
 			return nil, err
 		}

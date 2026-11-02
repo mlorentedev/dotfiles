@@ -55,6 +55,36 @@ func TestAddRefusesABaseForAnExistingBranch(t *testing.T) {
 	}
 }
 
+// #3033: the refusal names what the caller wrote and how to say it, never the
+// feat/<slug> they did not.
+func TestAddPointsAtTheBranchFlagWhenTheSlugIsABranch(t *testing.T) {
+	cases := map[string]string{
+		"fix/guard-account": "use dotf worktree add guard-account -b fix/guard-account",
+		"feat/a/b":          "use dotf worktree add a-b -b feat/a/b",
+	}
+	for slug, want := range cases {
+		t.Run(slug, func(t *testing.T) {
+			repo := filepath.Join(t.TempDir(), "myrepo")
+			_ = os.MkdirAll(filepath.Join(repo, ".git", "info"), 0o755)
+			_, err := AddWithRunner(AddOptions{RepoRoot: repo, WorktreeRoot: t.TempDir(), Slug: slug}, &MockAddRunner{}, time.Now())
+			if err == nil || !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), "feat/"+slug) {
+				t.Fatalf("got %v, want a refusal containing %q", err, want)
+			}
+		})
+	}
+}
+
+// With -b the slug is only the directory hint, and an existing branch attaches
+// under its own name: neither reaches the refusal.
+func TestAddAcceptsASlashInTheSlugWhenTheBranchIsNamed(t *testing.T) {
+	repo := filepath.Join(t.TempDir(), "myrepo")
+	_ = os.MkdirAll(filepath.Join(repo, ".git", "info"), 0o755)
+	runner := &MockAddRunner{OnWorktreeAdd: func(_, target, _, _ string) error { return os.MkdirAll(target, 0o755) }}
+	if _, err := AddWithRunner(AddOptions{RepoRoot: repo, WorktreeRoot: t.TempDir(), Slug: "a/b", Branch: "fix/x"}, runner, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func gitT(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
