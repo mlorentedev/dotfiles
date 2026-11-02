@@ -295,7 +295,7 @@ import sys, yaml
 job = yaml.safe_load(open(sys.argv[1]))["jobs"]["review"]
 step = next(s for s in job["steps"] if s.get("id") == "reviewable")
 assert "pull_request.draft" not in job["if"], "the job gate decides from the event payload's draft flag"
-assert 'pulls/${PR_NUMBER}' in step["run"] and ".draft" in step["run"], "the reviewable step no longer reads draft from the API"
+assert "dotf pr reviewable" in step["run"], "the reviewable step no longer calls the verb that reads the live PR"
 PY
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
@@ -852,103 +852,40 @@ print('echo \"exit=\${rc}\" >> \"\$GITHUB_OUTPUT\"' in m['run'], m['run'].rstrip
     [ "$output" = "0" ]
 }
 
-# #1618: a PR whose every file is in [ignore] reaches PR-Agent as an empty diff.
-# It used to fail the job with a false NaN diagnosis, on every DR escrow refresh.
-# These run the REAL matcher: the Python between `<<'PY'` and `PY` in the
-# workflow's reviewable step, fed this repository's real .pr_agent.toml.
-_reviewable_kept() { # $1 = newline-separated file list; prints how many survive [ignore]
-    local py
-    py=$(awk "/<<'PY'/{f=1; next} /^ *PY\$/{f=0} f" "$WF" | sed 's/^          //')
-    [ -n "$py" ] || { echo "the reviewable step's matcher is gone from $WF" >&2; return 1; }
-    CFG="$(cat "$CFG")" FILES="$1" python3 -c "$py"
-}
-
-@test "pr-agent: an escrow-only PR is recognised as having nothing PR-Agent may read (#1618)" {
-    run _reviewable_kept $'sensitive/dr/bitwarden-export.age\nsensitive/dr/escrow-manifest.json'
-    [ "$status" -eq 0 ] && [ "$output" = "0" ] \
-        || { echo "escrow-only PR: expected 0 reviewable files, got '$output'" >&2; false; }
-}
-
-@test "pr-agent: one reviewable file is enough to run the review (#1618)" {
-    run _reviewable_kept $'sensitive/dr/escrow-manifest.json\ncli/internal/secrets/bw.go'
-    [ "$status" -eq 0 ]
-    [ "$output" = "1" ]
-    run _reviewable_kept $'specs/X-1/review-transcript.jsonl\nspecs/X-1/review.md'
-    [ "$status" -eq 0 ]
-    [ "$output" = "1" ]
-}
-
-@test "pr-agent: an unanswerable reviewable check falls through to running PR-Agent (#1618)" {
-    # An empty file list must not read as "nothing to review": that would skip a
-    # review on an API hiccup. The matcher refuses it and the step keeps PR-Agent on.
-    run _reviewable_kept ""
-    [ "$status" -ne 0 ]
-    grep -q 'if: steps.reviewable.outputs.reviewable != '"'false'" "$WF"
-    grep -q "steps.reviewable.outputs.reviewable != 'false'" "$WF"
-}
-
-# #1417: PR-Agent also drops files by type before the model sees them
-# (`is_valid_file` in pr_agent/algo/language_handler.py): its bad_extensions
-# list and an exact lockfile list. A `.gitignore`-only PR (#1977) or a
-# lockfile-only dependabot bump reached it as an empty diff and went red.
-_upstream_ext='[bad_extensions]
-default = ["gitignore", "lock", "png"]'
-# The shape of upstream's is_valid_file: two literals the step reads by name.
-_upstream_handler='def is_valid_file(filename, bad_extensions=None):
-    auto_generated_files_exact = {"uv.lock", "go.sum"}
-    auto_generated_suffixes = (".min.js", ".js.map")
-    computed = sorted(bad_extensions)
-    return True'
-
-@test "pr-agent: a PR of file types PR-Agent never reads is recognised as empty (#1417)" {
-    UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="$_upstream_handler" \
-        run _reviewable_kept $'.gitignore\nsite/uv.lock\ngo.sum\nassets/Logo.PNG\nweb/app.min.js'
-    [ "$status" -eq 0 ] && [ "$output" = "0" ] \
-        || { echo "type-filtered PR: expected 0 reviewable files, got '$output'" >&2; false; }
-}
-
-@test "pr-agent: a readable file next to type-filtered ones keeps the review (#1417)" {
-    UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="$_upstream_handler" \
-        run _reviewable_kept $'.gitignore\nscripts/utils.sh'
-    [ "$status" -eq 0 ]
-    [ "$output" = "1" ]
-}
-
-@test "pr-agent: a failed read of either upstream list narrows the skip, never widens it (#1417)" {
-    # Both lists are fetched at run time. Whichever read fails contributes nothing.
-    UPSTREAM_EXT="" UPSTREAM_HANDLER="$_upstream_handler" run _reviewable_kept $'.gitignore\ngo.sum'
-    [ "$status" -eq 0 ]
-    [ "$output" = "1" ]
-    UPSTREAM_EXT="$_upstream_ext" UPSTREAM_HANDLER="" run _reviewable_kept $'.gitignore\ngo.sum'
-    [ "$status" -eq 0 ]
-    [ "$output" = "1" ]
-    UPSTREAM_EXT="" UPSTREAM_HANDLER="" run _reviewable_kept $'.gitignore\ngo.sum'
-    [ "$status" -eq 0 ]
-    [ "$output" = "2" ]
-}
-
-@test "pr-agent: the extension list is read at the commit the pinned image was built from (#1417)" {
-    refute_grep '^ *PR_AGENT_REF: [0-9a-f]{40}' "$WF"
-    grep -qF 'WORKFLOW_SHA: ${{ github.workflow_sha }}' "$WF"
-}
-
-@test "pr-agent: the filter derives its upstream ref from the executing contract" {
-    run python3 -c "
+# #1618, #1417: what `dotf pr reviewable` decides is pinned in
+# cli/internal/prreview/{filefilter,reviewable}_test.go, against this repository's
+# real .pr_agent.toml and upstream's real lists. What stays here is the wiring.
+@test "pr-agent: the verb decides, and its answer gates everything after it (#1618)" {
+    run python3 - "$WF" <<'PY'
 import sys, yaml
-steps = yaml.safe_load(open(sys.argv[1]))['jobs']['review']['steps']
-filter_step = next(s for s in steps if s.get('id') == 'reviewable')
-print(filter_step['env'].get('WORKFLOW_SHA') == '\${{ github.workflow_sha }}')
-print('PR_AGENT_REF=' in filter_step['run'])
-print('harness/pr-agent-upstream-contract.json' in filter_step['run'] and '/contents/\${contract}?ref=\${WORKFLOW_SHA}' in filter_step['run'])
-print('.audited_ref' in filter_step['run'])
-print('PR_AGENT_REF' not in filter_step['env'])
-" "$WF"
-    [ "$status" -eq 0 ]
-    [ "${lines[0]%$'\r'}" = "True" ]
-    [ "${lines[1]%$'\r'}" = "True" ]
-    [ "${lines[2]%$'\r'}" = "True" ]
-    [ "${lines[3]%$'\r'}" = "True" ]
-    [ "${lines[4]%$'\r'}" = "True" ]
+steps = yaml.safe_load(open(sys.argv[1]))["jobs"]["review"]["steps"]
+step = next(s for s in steps if s.get("id") == "reviewable")
+assert "dotf pr reviewable" in step["run"], "the step does not call the verb"
+assert '--output "$GITHUB_OUTPUT"' in step["run"], "the answer does not reach the job"
+assert "python3" not in step["run"] and "tomllib" not in step["run"], "the matcher is back in the workflow"
+assert set(step["env"]) == {"GH_TOKEN", "PR_NUMBER", "DEFAULT_BRANCH"}, step["env"]
+# A skip must end the run at the first step that would spend something.
+for sid in ("push_gate", "models"):
+    gated = next(s for s in steps if s.get("id") == sid)
+    assert "steps.reviewable.outputs.reviewable != 'false'" in gated["if"], sid
+PY
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "pr-agent: the upstream filters are read at the commit the pinned image was built from (#1417)" {
+    # The audited commit comes from the contract in this run's own checkout, the
+    # commit executing the workflow, never a literal in the workflow here.
+    refute_grep '^ *PR_AGENT_REF: [0-9a-f]{40}' "$WF"
+    run python3 - "$WF" <<'PY'
+import sys, yaml
+steps = yaml.safe_load(open(sys.argv[1]))["jobs"]["review"]["steps"]
+step = next(s for s in steps if s.get("id") == "reviewable")
+co = next(s for s in steps if "checkout" in s.get("uses", ""))
+contract = "harness/pr-agent-upstream-contract.json"
+assert "--contract " + contract in step["run"], step["run"]
+assert contract in co["with"]["sparse-checkout"].split(), "the contract is not checked out"
+PY
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
 @test "pr-agent: the audited upstream contract covers every source and is bound to the image pin" {
@@ -958,6 +895,7 @@ print('PR_AGENT_REF' not in filter_step['env'])
         pr_agent/agent/pr_agent.py pr_agent/agent/request_policy.py \
         pr_agent/algo/comment_identity.py pr_agent/config_loader.py \
         pr_agent/algo/file_filter.py pr_agent/algo/inline_comment_dedup.py \
+        pr_agent/algo/language_handler.py pr_agent/settings/language_extensions.toml \
         pr_agent/algo/review_finding_state.py \
         pr_agent/git_providers/github_provider.py pr_agent/servers/github_action_runner.py \
         pr_agent/tools/pr_reviewer.py; do
@@ -1047,16 +985,18 @@ print(s.get('if', ''))
     run _step_if "s.get('id') == 'push_gate'"
     [ "$status" -eq 0 ] || { echo "no step with id push_gate" >&2; false; }
     [[ "$output" == *"github.event.action == 'synchronize'"* ]] || false
+    # A run the verb ended has no push to gate (#3016).
+    [[ "$output" == *"steps.reviewable.outputs.reviewable != 'false'"* ]] || false
     grep -q 'dotf pr gate' "$WF"
-    # The job has no full checkout: dotf's source and the pool are the only
-    # files checked out.
+    # The job has no full checkout: dotf's source, the pool and the contract are
+    # the only files checked out.
     run python3 -c "
 import yaml
 steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 co = next(s for s in steps if 'checkout' in s.get('uses', ''))
 print(co['with']['sparse-checkout'].split())
 "
-    [ "$output" = "['harness/reviewer-pool.json', 'cli/']" ]
+    [ "$output" = "['harness/reviewer-pool.json', 'harness/pr-agent-upstream-contract.json', 'cli/']" ]
 }
 
 @test "pr-agent: dotf is built from the PR before the first decision, and no script decides" {
@@ -1066,9 +1006,11 @@ steps = yaml.safe_load(open('$WF'))['jobs']['review']['steps']
 names = [s.get('name', s.get('uses', '')) for s in steps]
 build = names.index('Build dotf')
 decisions = [i for i, s in enumerate(steps) if 'dotf pr ' in s.get('run', '')]
-print(len(decisions), build < min(decisions), steps[build]['working-directory'] == 'cli')
+print(len(decisions), build < min(decisions), steps[build]['working-directory'] == 'cli', 'if' in steps[build])
 "
-    [ "$output" = "6 True True" ]
+    # Nothing may stand between a decision and the binary: a conditional build is
+    # how push_gate ran with no dotf, hidden by continue-on-error (#3016).
+    [ "$output" = "7 True True False" ]
     run grep -c '\./scripts/pr-agent-' "$WF"
     [ "$output" = "0" ]
 }

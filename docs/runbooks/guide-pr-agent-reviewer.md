@@ -25,6 +25,7 @@ protect the behavior that depends on PR-Agent internals.
 | `.github/workflows/pr-agent.yml` | when it fires, what credential it gets |
 | `.pr_agent.toml` | which model, what it reads, what it must check, what it must never see |
 | `dotf pr gate` | bounded push-review decision (ADR-040) |
+| `dotf pr reviewable` | whether this run has anything to review: PR state, skipped branch prefixes, empty diff |
 | `dotf pr preflight` | probe the declared NaN chain; pass on the models that answer |
 | `dotf pr route` | probe the Anthropic member and draw who reviews first from the pool |
 | `dotf pr guard` | did this run publish a review: the probe before a second attempt, and the final guard |

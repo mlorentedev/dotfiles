@@ -64,9 +64,6 @@ setup() {
 #                             driven by its own stub-server tests. The API's verdict on the gh
 #                             read path comes from workflow_dispatch run 36887489906 on main,
 #                             recorded on #1860; the issue writes have only the stub suite.
-#   pr-agent-queue-skip       stubs `gh` — its subject is a PR whose state changed while its run
-#                             was queued, and a failed read; neither can be produced on demand
-#                             against the live API. The real step runs on every reviewed PR (#1923)
 #   release-pr-body-refs      stubs `gh` — a real run rewrites the body of the live release PR
 #   review-attestation-workflow stubs `gh` — its subject is how the gate's resolve step answers
 #                             another run's artifacts (absent, not a number, a closed PR), which
@@ -92,7 +89,7 @@ setup() {
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
 EXEMPT_SUITES="bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper gh-auth-helper guard-memory-sink guard-no-gui
-hermes-setup install model-canary pr-agent-queue-skip release-pr-body-refs review-attestation-workflow setup-no-arch-downloads shell-profile skills-pipeline
+hermes-setup install model-canary release-pr-body-refs review-attestation-workflow setup-no-arch-downloads shell-profile skills-pipeline
 tmux vault-maintenance-weekly zshrc-guards"
 
 exempt() {
