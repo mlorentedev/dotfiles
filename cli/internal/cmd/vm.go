@@ -97,6 +97,7 @@ func newVMWindowsCmd() *cobra.Command {
 	w.Flags().IntVar(&cpus, "cpus", 4, "virtual CPUs")
 	w.Flags().IntVar(&memory, "memory", 8192, "memory in MiB")
 	w.AddCommand(newVMWindowsBuildCmd(), newVMWindowsStopCmd())
+	addSessionVerbs(w, windowsSessionGuest())
 	return w
 }
 
@@ -284,7 +285,8 @@ func newVMLinuxCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&ref, "ref", "HEAD", "committed branch, tag or commit to converge")
 	cmd.Flags().BoolVar(&keep, "keep", false, "leave the guest running for inspection")
-	addSessionVerbs(cmd)
+	addSessionVerbs(cmd, linuxGuest())
+	cmd.AddCommand(newVMExecCmd(), newVMCpCmd())
 	return cmd
 }
 

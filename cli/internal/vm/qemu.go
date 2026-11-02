@@ -27,6 +27,7 @@ func (l Layout) BaseVars() string { return filepath.Join(l.Dir, "clean-base-vars
 func (l Layout) Disk() string     { return filepath.Join(l.Dir, "run.qcow2") }
 func (l Layout) Vars() string     { return filepath.Join(l.Dir, "run-vars.fd") }
 func (l Layout) Log() string      { return filepath.Join(l.Dir, "qemu.log") }
+func (l Layout) Sessions() string { return filepath.Join(l.Dir, "sessions") }
 func (l Layout) Stuck() string    { return filepath.Join(l.Dir, "build-stuck.png") }
 func (l Layout) Media() string    { return filepath.Join(l.Dir, "media") }
 func (l Layout) WindowsISO() string {
