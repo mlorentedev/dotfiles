@@ -19,17 +19,27 @@ setup() {
     FILES=$(printf '%s\n' "$STEP" | grep -oE 'tests/[A-Za-z0-9_.-]+\.bats' | sort -u)
 }
 
-# Tests in a file that run pwsh without the tag, as file:line: name. A test
-# runs pwsh when its body calls require_pwsh (tests/lib/pwsh.bash, the gate
-# every such test passes) or invokes pwsh with a flag. A bare word "pwsh" in a
-# grep pattern is not an invocation.
+# Tests in a file that run pwsh without the tag, as file:line: name. A line
+# runs pwsh when it calls require_pwsh (tests/lib/pwsh.bash, the gate every such
+# test passes) or has pwsh in command position: at the start, after `run`, `$(`,
+# `;`, `|` or `&`. The word "pwsh" inside a grep pattern is not a command. A test
+# also runs pwsh when it calls a function in the same file that does, so the
+# first pass collects those helpers.
 untagged_pwsh_tests() {
     awk -v f="$1" '
-        /^@test / { name = $0; line = NR; tagged = (prev ~ /^# bats test_tags=([^ ]*,)?windows(,[^ ]*)?$/); body = 1; hit = 0 }
-        body && /(require_pwsh|(^|[[:space:]])pwsh[[:space:]]+-)/ { hit = 1 }
+        function runs(s) { return s ~ /require_pwsh/ || s ~ /(^[[:space:]]*|\$\(|[;|&][[:space:]]*)(run[[:space:]]+)?pwsh([[:space:]]|$)/ }
+        FNR == NR {
+            if ($0 ~ /^[A-Za-z_][A-Za-z0-9_]*\(\)[[:space:]]*\{/) { fn = $0; sub(/\(.*/, "", fn); infn = 1 }
+            else if (infn && $0 ~ /^}/) infn = 0
+            else if (infn && runs($0)) helper[fn] = 1
+            next
+        }
+        /^@test / { name = $0; line = FNR; tagged = (prev ~ /^# bats test_tags=([^ ]*,)?windows(,[^ ]*)?$/); body = 1; hit = 0 }
+        body && runs($0) { hit = 1 }
+        body { for (h in helper) if ($0 ~ ("(^|[^A-Za-z0-9_])" h "([^A-Za-z0-9_]|$)")) hit = 1 }
         body && /^}/ { if (hit && !tagged) printf "%s:%d: %s\n", f, line, name; body = 0 }
         { prev = $0 }
-    ' "$1"
+    ' "$1" "$1"
 }
 
 @test "ci: the Windows bats step runs only the windows tier, over the files it names" {
