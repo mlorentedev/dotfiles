@@ -1,6 +1,10 @@
 ---
 tags: [spec, tasks, templates]
 created: "{{date:YYYY-MM-DD}}"
+id: "{{title}}"
+type: spec-tasks
+status: active
+owner: manu
 ---
 
 # Tasks - <feature-id>
