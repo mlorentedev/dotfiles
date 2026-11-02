@@ -40,6 +40,7 @@ func newPrCmd() *cobra.Command {
 	pr.AddCommand(newPrPreflightCmd())
 	pr.AddCommand(newPrGuardCmd())
 	pr.AddCommand(newPrGateCmd())
+	pr.AddCommand(newPrReviewableCmd())
 	return pr
 }
 
