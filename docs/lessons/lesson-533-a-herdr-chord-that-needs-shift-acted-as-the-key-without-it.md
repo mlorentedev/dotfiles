@@ -24,8 +24,9 @@ effect was observed.
 
 ## Solution
 
-The docked explorer moved to a plain letter, `prefix+f` (#2992). Herdr 0.9.5 binds no default there, which the
-config reference lists. The owner confirmed on the real terminal that `ctrl+s` then `f` docks and undocks it. A
+The docked explorer moved to a plain letter, `prefix+f` (#2992). Neither herdr 0.9.3, the version `versions.conf`
+pins, nor 0.9.5 binds a default there; both config references list their `keys.*` defaults. The owner confirmed on
+the real terminal, running 0.9.5, that `ctrl+s` then `f` docks and undocks it. A
 bats test (`no custom herdr key relies on shift`, #3012) rejects any `[[keys.command]]` that names `shift`, so a
 shifted chord needs a real-keyboard check before it can be added.
 
