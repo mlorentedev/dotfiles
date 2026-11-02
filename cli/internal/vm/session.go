@@ -35,6 +35,8 @@ type Session interface {
 	List(ctx context.Context) ([]Record, error)
 	// Exec runs one command in a session; the record holds its outcome.
 	Exec(ctx context.Context, o ExecOptions) Record
+	// Copy moves one file between the host and a session.
+	Copy(ctx context.Context, src, dst string, stderr io.Writer) Record
 }
 
 // Record is the one JSON object a `--json` call writes to stdout, whatever the

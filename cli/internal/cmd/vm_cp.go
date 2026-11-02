@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,7 +10,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/vm"
 )
 
-func newVMCpCmd() *cobra.Command {
+func newVMCpCmd(g sessionGuest) *cobra.Command {
 	var asJSON bool
 	c := &cobra.Command{
 		Use:   "cp <source> <target>",
@@ -20,11 +19,11 @@ func newVMCpCmd() *cobra.Command {
 			"side is <session>:<guest path>, the other a host path; write a host path with\n" +
 			"a colon as ./a:b. A guest path is literal: no glob, no ~. A directory is\n" +
 			"refused by the transfer.\n\n" + sessionVerbs,
-		Example:      "  dotf vm linux cp ./build.tar.gz proof:/tmp/build.tar.gz\n  dotf vm linux cp proof:/tmp/report.json ./report.json --json",
+		Example:      "  dotf vm " + g.os + " cp ./report.json proof:" + g.example + "\n  dotf vm " + g.os + " cp proof:" + g.example + " ./report.json --json",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 2 {
-				return withExitCode(2, errors.New("usage: dotf vm linux cp <source> <target>"))
+				return withExitCode(2, fmt.Errorf("usage: dotf vm %s cp <source> <target>", g.os))
 			}
 			if _, err := vm.CopySession(args[0], args[1]); err != nil {
 				return withExitCode(2, err)
@@ -34,7 +33,7 @@ func newVMCpCmd() *cobra.Command {
 					return withExitCode(2, fmt.Errorf("source: %w", err))
 				}
 			}
-			s, err := linuxSessions()
+			s, err := g.open()
 			if err != nil {
 				return err
 			}

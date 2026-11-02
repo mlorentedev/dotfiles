@@ -149,6 +149,11 @@ func (f *fakeSession) Exec(_ context.Context, o vm.ExecOptions) vm.Record {
 	return vm.NewRecord(o.Session, "windows", f.status)
 }
 
+func (f *fakeSession) Copy(_ context.Context, src, _ string, _ io.Writer) vm.Record {
+	f.calls++
+	return vm.NewRecord(src, "windows", f.status)
+}
+
 func (f *fakeSession) List(context.Context) ([]vm.Record, error) {
 	f.calls++
 	return []vm.Record{}, nil
@@ -182,6 +187,10 @@ func TestVMWindowsVerbs(t *testing.T) {
 	}
 	if out, err := run("status", "--json"); err != nil || strings.TrimSpace(out) != "[]" {
 		t.Errorf("status = %q, %v", out, err)
+	}
+	f.calls = 0
+	if _, err := run("cp", `proof:C:\Users\Public\a.bin`, filepath.Join(t.TempDir(), "a.bin")); ExitCode(err) != 2 || f.calls != 1 {
+		t.Errorf("cp = %v, %d calls", err, f.calls)
 	}
 	f.calls = 0
 	if _, err := run("up", "--session", "Bad Name"); ExitCode(err) != 2 {

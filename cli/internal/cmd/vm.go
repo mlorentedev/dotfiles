@@ -286,7 +286,6 @@ func newVMLinuxCmd() *cobra.Command {
 	cmd.Flags().StringVar(&ref, "ref", "HEAD", "committed branch, tag or commit to converge")
 	cmd.Flags().BoolVar(&keep, "keep", false, "leave the guest running for inspection")
 	addSessionVerbs(cmd, linuxGuest())
-	cmd.AddCommand(newVMCpCmd())
 	return cmd
 }
 

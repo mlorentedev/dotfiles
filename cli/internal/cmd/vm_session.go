@@ -57,6 +57,8 @@ type sessionGuest struct {
 	exec string // `exec`'s description
 	// script names what runs --script, for the flag's help.
 	script string
+	// example is one guest path, for cp's help.
+	example string
 }
 
 func linuxGuest() sessionGuest {
@@ -80,7 +82,8 @@ func linuxGuest() sessionGuest {
 			"ok with its code in exit, and dotf exits 1. A code of 255 can also be ssh\n" +
 			"losing the guest. --json bounds each stream at 1 MiB (truncated says so);\n" +
 			"without it stdout and stderr are the guest's.",
-		script: "sh",
+		script:  "sh",
+		example: "/tmp/report.json",
 	}
 }
 
@@ -99,7 +102,8 @@ func windowsSessionGuest() sessionGuest {
 			"command that exits non-zero is status ok with its code in exit, and dotf exits\n" +
 			"1. On --timeout the guest kills the command and its children. --json bounds\n" +
 			"each stream at 1 MiB (truncated says so).",
-		script: "PowerShell",
+		script:  "PowerShell",
+		example: `C:\Users\Public\report.json`,
 	}
 }
 
@@ -112,7 +116,7 @@ const sessionVerbs = "A session is a named guest that `up` holds until `down`. W
 	"3 no such session. Progress goes to stderr."
 
 func addSessionVerbs(c *cobra.Command, g sessionGuest) {
-	c.AddCommand(newVMUpCmd(g), newVMDownCmd(g), newVMStatusCmd(g), newVMExecCmd(g))
+	c.AddCommand(newVMUpCmd(g), newVMDownCmd(g), newVMStatusCmd(g), newVMExecCmd(g), newVMCpCmd(g))
 }
 
 func sessionFlags(c *cobra.Command, session *string, asJSON *bool, usage string) {

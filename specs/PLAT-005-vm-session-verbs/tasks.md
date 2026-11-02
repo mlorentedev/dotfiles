@@ -47,7 +47,7 @@ created: "2026-10-22"
 - [x] [AC1] One fixed guest: a second `up` is `busy`; `up` and `status` share the `running` check of `vm/run.go`
 - [x] [AC2] Windows `exec` over QGA and the scheduled task
 - [x] [AC3] Windows refuses stdin with `unsupported`, exit 2
-- [ ] [AC4] Windows `cp` with `QGA.WriteFile`/`ReadFile` in 48 KiB chunks
+- [x] [AC4] Windows `cp` with `QGA.WriteFile`/`ReadFile` in 48 KiB chunks
 - [x] [AC11] Windows `down`: no overlay and no state, `clean-base` untouched; `stale` cleaned by `down`
 - [ ] Verb help states ADR-055's `--elevated` caveat (with `--elevated`, PR 2)
 
