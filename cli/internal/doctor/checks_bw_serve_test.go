@@ -51,6 +51,7 @@ func TestCheckBWServeDaemon_States(t *testing.T) {
 		wantStatus Status
 		needle     string
 		wantSubstr []string
+		notSubstr  []string
 	}{
 		{
 			name: "absent, never started → Info as before", status: "absent",
@@ -63,10 +64,22 @@ func TestCheckBWServeDaemon_States(t *testing.T) {
 			wantSubstr: []string{"pid 4242", "TypeError: cannot read properties of undefined", "bw-serve.log", "dotf secrets unlock"},
 		},
 		{
-			name: "absent, pid recorded and gone, empty log → WARN says the log is empty", status: "absent",
+			name: "absent, pid recorded and gone, empty log → WARN says nothing was logged", status: "absent",
 			pid: 4242, alive: false,
 			wantStatus: StatusWarn, needle: "daemon exited",
-			wantSubstr: []string{"log is empty"},
+			wantSubstr: []string{"nothing logged since it started"},
+		},
+		{
+			// #1750: a daemon that died silently is not reported with the
+			// previous daemon's stack frames.
+			name: "absent, gone, silent after a previous daemon's output → WARN shows none of it", status: "absent",
+			pid: 4242, alive: false,
+			log: "==== dotf: started bw serve pid 4100 at 2026-11-01T07:00:00Z ====\n" +
+				"Unable to fetch ServerConfig\n    at previous.js:1\n" +
+				"==== dotf: started bw serve pid 4242 at 2026-11-02T07:00:00Z ====\n",
+			wantStatus: StatusWarn, needle: "daemon exited",
+			wantSubstr: []string{"nothing logged since it started"},
+			notSubstr:  []string{"ServerConfig", "previous.js"},
 		},
 		{
 			name: "absent, pid recorded and alive → WARN alive but not answering", status: "absent",
@@ -103,6 +116,11 @@ func TestCheckBWServeDaemon_States(t *testing.T) {
 			for _, want := range tc.wantSubstr {
 				if !strings.Contains(out, want) {
 					t.Errorf("expected %q in:\n%s", want, out)
+				}
+			}
+			for _, bad := range tc.notSubstr {
+				if strings.Contains(out, bad) {
+					t.Errorf("unexpected %q in:\n%s", bad, out)
 				}
 			}
 		})

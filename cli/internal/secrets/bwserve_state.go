@@ -23,9 +23,8 @@ import (
 // only evidence was that nothing listened on 8087 any more. A process nobody
 // can watch has to leave its evidence behind itself.
 //
-// Dir is the deploy dir's state area, <DOTFILES_DIR>/state — beside the
-// DR-drill marker (doctor/checks_dr.go), and for the same reason: a daemon's
-// death is a property of THIS box, not of the source tree. Callers derive it
+// Dir is the deploy dir's state area, <DOTFILES_DIR>/state: a daemon's death
+// is a property of THIS box, not of the source tree. Callers derive it
 // through NewBWServeState from their own deploy-dir resolution (env.DotfilesDir
 // in the CLI, cfg.DotfilesDir in doctor) so the writer and the reader can never
 // disagree on where the files are.
@@ -86,7 +85,7 @@ func (s BWServeState) PIDPath() string {
 // openLog opens the log for appending — rotating it first when it is over the
 // cap — and creates the state dir on first use. 0700/0600: nothing here is a
 // secret (bw serve writes diagnostics to stdio, never vault material), but the
-// directory sits beside the DR escrow and inherits its posture.
+// deploy dir also holds the DR escrow (sensitive/dr), and this keeps its posture.
 func (s BWServeState) openLog() (*os.File, error) {
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create bw serve state dir: %w", err)
@@ -194,7 +193,20 @@ func (s BWServeState) LastLogLines(n int) ([]string, error) {
 	if start > 0 && len(lines) > 0 {
 		lines = lines[1:] // the seek landed mid-line; the fragment is not a line
 	}
-	return tailLines(lines, n), nil
+	return tailLines(sinceLastStart(lines), n), nil
+}
+
+// sinceLastStart drops everything up to and including the last start marker:
+// the log is append-only across daemons, and what an earlier one printed is not
+// evidence about the one that died (#1750). Without a marker in the window the
+// lines are returned as they are.
+func sinceLastStart(lines []string) []string {
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.HasPrefix(lines[i], bwServeStartMarker) {
+			return lines[i+1:]
+		}
+	}
+	return lines
 }
 
 // tailLines keeps the last n non-empty lines, trimmed and width-capped.
@@ -221,8 +233,12 @@ func tailLines(lines []string, n int) []string {
 // next's in an append-only file, and it is written by dotf rather than the
 // child so it lands even if bw serve prints nothing before dying.
 func markStart(w io.Writer, pid int, now time.Time) {
-	_, _ = fmt.Fprintf(w, "==== dotf: started bw serve pid %d at %s ====\n", pid, now.UTC().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w, "%s pid %d at %s ====\n", bwServeStartMarker, pid, now.UTC().Format(time.RFC3339))
 }
+
+// bwServeStartMarker opens every line markStart writes; LastLogLines reads the
+// log back from the last one.
+const bwServeStartMarker = "==== dotf: started bw serve"
 
 // traceAlive is the liveness check Trace consults, a variable so a test can
 // pin it without a real process.
