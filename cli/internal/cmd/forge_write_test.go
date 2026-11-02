@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -58,10 +59,11 @@ func (r *commentRecorder) CommentIssue(_ context.Context, repo forgewrite.Repo, 
 func stubForgeWrite(t *testing.T, origin string) *commentRecorder {
 	t.Helper()
 	rec := &commentRecorder{}
-	oldO, oldB := forgeWriteOrigin, forgeWriteBackend
+	oldO, oldB, oldE := forgeWriteOrigin, forgeWriteBackend, forgeHeadCarriesEnvelope
 	forgeWriteOrigin = func() (string, error) { return origin, nil }
 	forgeWriteBackend = func(forgewrite.Repo) (forgewrite.Backend, error) { return rec, nil }
-	t.Cleanup(func() { forgeWriteOrigin, forgeWriteBackend = oldO, oldB })
+	forgeHeadCarriesEnvelope = func(string) bool { return false }
+	t.Cleanup(func() { forgeWriteOrigin, forgeWriteBackend, forgeHeadCarriesEnvelope = oldO, oldB, oldE })
 	return rec
 }
 
@@ -261,6 +263,56 @@ func TestForgePRCreateRefusesACrossForkHead(t *testing.T) {
 	_, err := runForge(t, "pr", "create", "--title", "t", "--base", "main", "--head", "fork:branch", "--body-file", writeBody(t, "b"))
 	if err == nil || !strings.Contains(err.Error(), "FIX:") || len(rec.calls) != 0 {
 		t.Errorf("err=%v calls=%v", err, rec.calls)
+	}
+}
+
+// kubelab#2524: the default head was the launch worktree's run branch (#2784).
+func TestForgePRCreateRefusesARunBranchHead(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/o/n.git")
+	forgeHeadCarriesEnvelope = func(head string) bool { return head == "chore/autopilot-run" }
+	old := forgeWriteBranch
+	forgeWriteBranch = func() (string, error) { return "chore/autopilot-run", nil }
+	t.Cleanup(func() { forgeWriteBranch = old })
+	_, err := runForge(t, "pr", "create", "--title", "t", "--base", "main", "--body-file", writeBody(t, "b"))
+	if err == nil || !strings.Contains(err.Error(), ".agent/unattended.yml") || !strings.Contains(err.Error(), "--head") {
+		t.Errorf("a run-branch head must be refused with the fix named: err=%v", err)
+	}
+	if len(rec.calls) != 0 {
+		t.Errorf("a refused create reached the backend: %v", rec.calls)
+	}
+	if _, err := runForge(t, "pr", "create", "--title", "t", "--base", "main", "--head", "fix/x", "--body-file", writeBody(t, "b")); err != nil || rec.newPR.Head != "fix/x" {
+		t.Errorf("an explicit --head to a change branch must pass: err=%v head=%q", err, rec.newPR.Head)
+	}
+}
+
+func TestForgeHeadCarriesEnvelopeReadsTheBranchTree(t *testing.T) {
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q", "-b", "main")
+	git("commit", "-q", "--allow-empty", "-m", "base")
+	git("checkout", "-q", "-b", "chore/autopilot-run")
+	if err := os.MkdirAll(filepath.Join(dir, ".agent"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, runEnvelopePath), []byte("version: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git("add", runEnvelopePath)
+	git("commit", "-q", "-m", "arm")
+	git("checkout", "-q", "main")
+	t.Chdir(dir)
+	for head, want := range map[string]bool{"chore/autopilot-run": true, "main": false, "no/such-branch": false} {
+		if got := forgeHeadCarriesEnvelope(head); got != want {
+			t.Errorf("%s: got %v, want %v", head, got, want)
+		}
 	}
 }
 
