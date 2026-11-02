@@ -21,6 +21,9 @@ var guestExecScript []byte
 
 const utf8BOM = "\xef\xbb\xbf"
 
+// guestTimedOut is what guestexec.ps1 writes to exit once it killed a command.
+const guestTimedOut = "timeout"
+
 // guestRequest is what guestexec.ps1 reads: the program never travels on a
 // command line, so no deny glob or task listing sees it (ADR-055 decision 4).
 type guestRequest struct {
@@ -90,13 +93,18 @@ func (s WindowsSessions) Exec(ctx context.Context, o ExecOptions) Record {
 	id := fmt.Sprintf("exec-%d", s.Now().UnixNano())
 	dir := guestWork + `\` + id
 	task := "dotf-" + id
+	remove := func() {
+		_, _ = q.Run("schtasks.exe", []string{"/delete", "/tn", task, "/f"})
+		_, _ = q.Run("cmd.exe", []string{"/c", "rmdir", "/s", "/q", dir})
+	}
 	if err := s.launch(q, o, dir, task); err != nil {
+		remove()
 		return s.rec(o.Session, StatusFailed, start, err.Error())
 	}
 	code, werr := pollExit(ctx, q, s.Poll, dir+`\exit`)
-	timedOut := errors.Is(ctx.Err(), context.DeadlineExceeded)
-	settled := !timedOut
-	if timedOut {
+	timedOut := code == guestTimedOut || (werr != nil && errors.Is(ctx.Err(), context.DeadlineExceeded))
+	settled := werr == nil
+	if werr != nil && timedOut {
 		// The guest's own limit started after the host's: give it the moment it
 		// needs to end the command, so the record holds the output and the
 		// directory is not pulled from under a process that still writes it.
@@ -107,16 +115,12 @@ func (s WindowsSessions) Exec(ctx context.Context, o ExecOptions) Record {
 	}
 	r := s.collect(q, o, dir, start)
 	if settled {
-		_, _ = q.Run("schtasks.exe", []string{"/delete", "/tn", task, "/f"})
-		_, _ = q.Run("cmd.exe", []string{"/c", "rmdir", "/s", "/q", dir})
+		remove()
 	}
 	switch {
 	case timedOut:
 		r.Status = StatusTimeout
 		r.Stderr += fmt.Sprintf("dotf: timed out after %s\n", o.Timeout)
-		if !settled {
-			r.Stderr += "dotf: the guest command may still be running\n"
-		}
 	case werr != nil:
 		r.Status = StatusFailed
 		r.Stderr += werr.Error() + "\n"
@@ -128,6 +132,9 @@ func (s WindowsSessions) Exec(ctx context.Context, o ExecOptions) Record {
 			break
 		}
 		r.Exit = &n
+	}
+	if !settled {
+		r.Stderr += "dotf: the guest command may still be running\n"
 	}
 	return r
 }

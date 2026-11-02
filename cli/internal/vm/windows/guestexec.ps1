@@ -39,6 +39,8 @@ try {
         $code = "$($p.ExitCode)"
     } else {
         & taskkill.exe /T /F /PID $p.Id | Out-Null
+        # No exit file: the host then keeps the directory and says it may still run.
+        if ($LASTEXITCODE -ne 0 -and -not $p.HasExited) { exit 1 }
         $code = 'timeout'
     }
 } catch {

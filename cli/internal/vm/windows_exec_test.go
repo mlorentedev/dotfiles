@@ -147,6 +147,50 @@ func TestWindowsExecTimesOutAndWaitsForTheGuestsKill(t *testing.T) {
 	}
 }
 
+// A cancel is no deadline: nothing kills the command, so it may still run.
+func TestWindowsExecCancelledKeepsTheCommandsDirectory(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	s, g := heldWindows(t, func(*fakeGuest, string) { cancel() })
+	rec := s.Exec(ctx, ExecOptions{Session: "proof", Argv: []string{"x"}, Stdout: io.Discard, Stderr: io.Discard})
+	if rec.Status != StatusFailed || !strings.Contains(rec.Stderr, "may still be running") {
+		t.Fatalf("Exec = %+v", rec)
+	}
+	if len(g.ran("cmd.exe /c rmdir")) != 0 {
+		t.Error("removed the directory of a command that may still be running")
+	}
+}
+
+// An exit read as the deadline passes is the command's outcome, not a timeout.
+func TestWindowsExecAnExitAtTheDeadlineWins(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	s, _ := heldWindows(t, func(g *fakeGuest, dir string) { finish(g, dir, "3", "", "") })
+	rec := s.Exec(ctx, ExecOptions{Session: "proof", Argv: []string{"x"}, Stdout: io.Discard, Stderr: io.Discard})
+	if rec.Status != StatusOK || rec.Exit == nil || *rec.Exit != 3 {
+		t.Fatalf("Exec = %+v", rec)
+	}
+}
+
+func TestWindowsExecTheGuestsTimeoutIsATimeout(t *testing.T) {
+	s, _ := heldWindows(t, func(g *fakeGuest, dir string) { finish(g, dir, guestTimedOut, "", "") })
+	rec := s.Exec(context.Background(), ExecOptions{Session: "proof", Argv: []string{"x"}, Stdout: io.Discard, Stderr: io.Discard})
+	if rec.Status != StatusTimeout || rec.Exit != nil {
+		t.Fatalf("Exec = %+v", rec)
+	}
+}
+
+// A call that never started leaves nothing in the guest.
+func TestWindowsExecAMissingScriptLeavesNoDirectory(t *testing.T) {
+	s, g := heldWindows(t, nil)
+	rec := s.Exec(context.Background(), ExecOptions{Session: "proof", Script: filepath.Join(t.TempDir(), "absent.ps1"), Stdout: io.Discard, Stderr: io.Discard})
+	if rec.Status != StatusFailed {
+		t.Fatalf("Exec = %+v", rec)
+	}
+	if len(g.ran("cmd.exe /c rmdir")) != 1 {
+		t.Error("the call's directory stayed in the guest")
+	}
+}
+
 func TestWindowsExecBoundsTheRecord(t *testing.T) {
 	s, _ := heldWindows(t, func(g *fakeGuest, dir string) {
 		finish(g, dir, "0", strings.Repeat("x", maxRecordOutput+1), "")
@@ -183,7 +227,7 @@ func TestWindowsCommandLine(t *testing.T) {
 // the limit kills the program's children too, and exit appears last and whole.
 func TestGuestExec_KillsTheTreeAndWritesExitLast(t *testing.T) {
 	script := string(guestExecScript)
-	for _, want := range []string{"taskkill.exe /T /F /PID", "$null = $p.Handle", "RedirectStandardInput"} {
+	for _, want := range []string{"taskkill.exe /T /F /PID", "$p.HasExited) { exit 1 }", "$null = $p.Handle", "RedirectStandardInput"} {
 		if !strings.Contains(script, want) {
 			t.Errorf("guestexec.ps1 lost %q", want)
 		}
