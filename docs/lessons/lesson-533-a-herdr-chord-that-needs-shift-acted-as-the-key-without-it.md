@@ -1,5 +1,5 @@
 ---
-id: "lesson-532-a-herdr-chord-that-needs-shift-acted-as-the-key-without-it"
+id: "lesson-533-a-herdr-chord-that-needs-shift-acted-as-the-key-without-it"
 type: lesson
 status: active
 title: "A herdr chord that needs shift acted as the key without it"
