@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -100,8 +101,10 @@ func TestSpecAuditGiteaOriginWithOverride(t *testing.T) {
 		}
 	}
 	for _, c := range calls() {
-		if strings.Contains(c, "projects-toolkit") {
-			t.Errorf("github.com was asked about the Gitea repository: %s", c)
+		// No archive call at all: the specs are not on github.com, so there is
+		// no default branch there to ask (not even `repos//contents/…`).
+		if strings.Contains(c, "projects-toolkit") || strings.Contains(c, "/contents/") {
+			t.Errorf("github.com was asked about the Gitea repository's archive: %s", c)
 		}
 	}
 }
@@ -159,13 +162,31 @@ func TestSpecInitAndAuditAgreeOnTheIssueHome(t *testing.T) {
 }
 
 func TestSpecInitGiteaOriginFailsClosed(t *testing.T) {
-	root := makeRepo(t)
-	withOrigin(t, root, giteaOrigin)
-	_, _, err := execute(t, "spec", "init", "CLI-007-x", "--issue", "7")
-	if err == nil || !strings.Contains(err.Error(), "--bitacora-repo") || !strings.Contains(err.Error(), "git.example.com") {
-		t.Fatalf("want a refusal naming the host and --bitacora-repo, got %v", err)
-	}
-	if _, statErr := os.Stat(filepath.Join(root, "specs", "CLI-007-x")); !errors.Is(statErr, os.ErrNotExist) {
-		t.Errorf("no spec may be scaffolded when the gate cannot resolve")
+	for _, origin := range []string{giteaOrigin, "git@git.example.com:teledyne/projects-toolkit.git"} {
+		t.Run(origin, func(t *testing.T) {
+			root := makeRepo(t)
+			withOrigin(t, root, origin)
+			// A gh that leaves a mark: the refusal must come before any forge call.
+			// The stub is a POSIX script, so Windows checks only the refusal.
+			mark := filepath.Join(t.TempDir(), "gh-ran")
+			if runtime.GOOS != "windows" {
+				bin := t.TempDir()
+				if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\ntouch '"+mark+"'\n"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			}
+
+			_, _, err := execute(t, "spec", "init", "CLI-007-x", "--issue", "7")
+			if err == nil || !strings.Contains(err.Error(), "--bitacora-repo") || !strings.Contains(err.Error(), "git.example.com") {
+				t.Fatalf("want a refusal naming the host and --bitacora-repo, got %v", err)
+			}
+			if _, statErr := os.Stat(mark); statErr == nil {
+				t.Error("gh ran before the refusal")
+			}
+			if _, statErr := os.Stat(filepath.Join(root, "specs", "CLI-007-x")); !errors.Is(statErr, os.ErrNotExist) {
+				t.Errorf("no spec may be scaffolded when the gate cannot resolve")
+			}
+		})
 	}
 }
