@@ -131,6 +131,23 @@ func TestPiPackagesApplyRetriesOnlyOnceAndNeverARemove(t *testing.T) {
 	}
 }
 
+// An outage fails every install. After one retry fails, later installs fail
+// without a wait, so the run pays one wait, not one per package.
+func TestPiPackagesApplyStopsRetryingOnceARetryFails(t *testing.T) {
+	agentDir, _ := piRepo(t, `{"version":1,"packages":[{"source":"npm:a@1","why":"x"},{"source":"npm:b@1","why":"y"}]}`, `{"packages":[]}`)
+	var calls []string
+	piRun = func(_ string, args ...string) (string, error) {
+		calls = append(calls, strings.Join(args, " "))
+		return "npm error code ECONNREFUSED", errors.New("exit status 1")
+	}
+	bin := filepath.Join(t.TempDir(), "pi")
+	writeFileAt(t, bin, "")
+	out, _, err := execute(t, "pi", "packages", "apply", "--pi", bin, "--agent-dir", agentDir)
+	if err == nil || strings.Join(calls, ";") != "install npm:a@1;install npm:a@1;install npm:b@1" {
+		t.Fatalf("want a retried once, b not retried, and a non-zero exit: err=%v calls=%v\n%s", err, calls, out)
+	}
+}
+
 // AC4: the skip comes first, before any probe, even with no manifest at all.
 func TestPiPackagesApplySkipIsFirstAndLoud(t *testing.T) {
 	agentDir, calls := piRepo(t, piManifest, `{"packages":[]}`)

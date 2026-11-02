@@ -28,24 +28,31 @@ var (
 	piLookPath           = exec.LookPath
 )
 
-// piRetryWait is the pause before apply's one retry of a failed install. npm's
-// registry can 404 a tarball published minutes earlier, and a later run then
-// installs it (#3051); one retry lets the same run do so.
-var piRetryWait = 15 * time.Second
+// piRetryWait is the pause before apply's retry of a failed install. npm's
+// registry can 404 a tarball published shortly before, and a later run then
+// installs it (#3051). The one observed recovery came within ten minutes, which
+// bounds the lag but does not measure it; a minute is what a failed install may
+// cost a setup run, and a retry that fails again still fails loudly.
+var piRetryWait = time.Minute
 
 // retryInstallOnce wraps run so a failed install runs once more after wait. The
 // first attempt's output is logged, so the retry hides nothing; a remove is
-// never retried, and a second failure is returned as the call's result.
+// never retried, and a second failure is returned as the call's result. Once a
+// retry has failed, the registry is taken to be down rather than lagging and no
+// later install waits, so an outage costs one wait per run, not one per package.
 func retryInstallOnce(run pi.Runner, log io.Writer, wait time.Duration) pi.Runner {
+	retryFailed := false
 	return func(bin string, args ...string) (string, error) {
 		out, err := run(bin, args...)
-		if err == nil || len(args) == 0 || args[0] != "install" {
+		if err == nil || retryFailed || len(args) == 0 || args[0] != "install" {
 			return out, err
 		}
 		_, _ = fmt.Fprintf(log, "[WARN] pi %s failed (%v), retrying once in %s; first attempt's output:\n%s\n",
 			strings.Join(args, " "), err, wait, out)
 		time.Sleep(wait)
-		return run(bin, args...)
+		out, err = run(bin, args...)
+		retryFailed = err != nil
+		return out, err
 	}
 }
 
