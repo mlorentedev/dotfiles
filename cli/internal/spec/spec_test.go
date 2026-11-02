@@ -76,7 +76,7 @@ func TestRenderSubstitutesAndFixesIssueFrontmatter(t *testing.T) {
 
 	// No raw placeholders survive in any rendered file.
 	for name, content := range files {
-		for _, ph := range []string{"<feature-id>", "{TITLE}", "{{date:YYYY-MM-DD}}"} {
+		for _, ph := range []string{"<feature-id>", "{TITLE}", "{{title}}", "{{date:YYYY-MM-DD}}"} {
 			if strings.Contains(content, ph) {
 				t.Errorf("%s still contains placeholder %q", name, ph)
 			}
@@ -107,6 +107,21 @@ func TestRenderStampsCreatedInAllFiles(t *testing.T) {
 	for _, name := range []string{"proposal.md", "tasks.md", "verification.md"} {
 		if !strings.Contains(files[name], `created: "2026-06-13"`) {
 			t.Errorf("%s did not stamp created: with the generation date:\n%s", name, files[name])
+		}
+	}
+}
+
+// The vault templates carry Obsidian's {{title}} placeholder in id: (#3050).
+// Obsidian fills it from the note name; a scaffolded spec has no Obsidian, so
+// Render fills it with the spec id instead of writing the placeholder.
+func TestRenderFillsTheObsidianTitlePlaceholderWithTheSpecID(t *testing.T) {
+	files, err := Render("BUG-007-x", "2026-06-13", "", 0, "")
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, name := range []string{"tasks.md", "verification.md"} {
+		if !strings.Contains(files[name], `id: "BUG-007-x"`) {
+			t.Errorf("%s id: is not the spec id:\n%s", name, files[name])
 		}
 	}
 }

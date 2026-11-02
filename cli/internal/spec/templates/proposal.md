@@ -6,6 +6,7 @@ created: "{{date:YYYY-MM-DD}}"
 issue: ""   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
+owner: manu
 ---
 
 # {TITLE}
