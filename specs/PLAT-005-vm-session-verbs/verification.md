@@ -23,7 +23,11 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - AC4: a file went host to guest to host byte-identical through `/tmp/a b`; `findmnt` in the guest listed no share.
   - AC7: the wire protocol ran on the guest with synthetic values only. The masking is proved by unit tests, never against a live store (lesson 261).
   - AC11: `--timeout 2s` on `sleep 20` gave `timeout`, process code 1, in 2068 ms, with no `sleep` left in the guest; `no-session` exit 3; a stopped guest `stale` exit 2.
-  - Windows is not covered until PR 1c.
+  - Windows `exec` and `cp` are not covered yet.
+- Manual smoke test, Windows session verbs on the real guest, macOS Arm64, session `plat005-win`:
+  - AC1: `up` booted an overlay in 36 s and returned; QEMU outlived dotf, and `status` answered `ok`. A second `up` under another name was `busy`, exit 2, naming the holder.
+  - AC1: with the guest stopped behind the record, `status` answered `stale` and `up` was `stale`, exit 2, naming `down`.
+  - AC11: `down` on an unknown name was `no-session`, exit 3. `down` cleared the stale session, `status` went back to `[]`, and `clean-base` stayed.
 - No regressions in existing test suite: yes / no (if no, document)
 
 ## Decisions made during implementation

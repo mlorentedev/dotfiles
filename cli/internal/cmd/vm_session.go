@@ -31,6 +31,54 @@ var linuxSessions = func() (vm.LinuxSessions, error) {
 	}, nil
 }
 
+// windowsSessions builds the Windows session store; a variable for the same
+// reason. `down` and `status` reach it too, so a missing QEMU refuses them.
+var windowsSessions = func() (vm.Session, error) {
+	host, firmware, _, layout, err := windowsGuest()
+	if err != nil {
+		return nil, err
+	}
+	return vm.WindowsSessions{
+		H:       host,
+		Machine: vm.Machine{Layout: layout, Firmware: firmware, CPUs: 4, MemoryMB: 8192},
+		Agent:   10 * time.Minute,
+		Poll:    5 * time.Second,
+		Now:     time.Now,
+	}, nil
+}
+
+// sessionGuest is what the shared verbs need to know about a guest.
+type sessionGuest struct {
+	os   string
+	open func() (vm.Session, error)
+	up   string // `up`'s description
+	down string // `down`'s description
+}
+
+func linuxGuest() sessionGuest {
+	return sessionGuest{
+		os: "linux",
+		open: func() (vm.Session, error) {
+			s, err := linuxSessions()
+			if err != nil {
+				return nil, err
+			}
+			return s, nil
+		},
+		up:   "up boots the Linux guest (Ubuntu 24.04, nothing shared with the host) and keeps\nit until `down`. Without --session the name is linux-<unix time>; it is printed.\nA name already held is busy.",
+		down: "down deletes the session's Lima instance and its state, and clears a stale\nsession. It acts only on a session `up` created.",
+	}
+}
+
+func windowsSessionGuest() sessionGuest {
+	return sessionGuest{
+		os:   "windows",
+		open: func() (vm.Session, error) { return windowsSessions() },
+		up:   "up boots a throwaway overlay of clean-base and keeps it until `down`. Without\n--session the name is windows-<unix time>; it is printed. The host runs one\nWindows guest, so a second up is busy whatever its name.",
+		down: "down stops the session's guest and deletes its overlay and state, and clears a\nstale session. clean-base never changes. It acts only on a session `up` created;\n`dotf vm windows stop` is for a guest `--keep` left running.",
+	}
+}
+
 const sessionVerbs = "A session is a named guest that `up` holds until `down`. With --json\n" +
 	"stdout is exactly one record: {version, session, os, status, exit, stdout,\n" +
 	"stderr, truncated, duration_ms, state_dir}. Read status and exit, never the\n" +
@@ -39,8 +87,8 @@ const sessionVerbs = "A session is a named guest that `up` holds until `down`. W
 	"1 failure or timeout; 2 refused before any work (busy, stale, bad flag);\n" +
 	"3 no such session. Progress goes to stderr."
 
-func addSessionVerbs(linux *cobra.Command) {
-	linux.AddCommand(newVMUpCmd(), newVMDownCmd(), newVMStatusCmd(), newVMExecCmd(), newVMCpCmd())
+func addSessionVerbs(c *cobra.Command, g sessionGuest) {
+	c.AddCommand(newVMUpCmd(g), newVMDownCmd(g), newVMStatusCmd(g))
 }
 
 func sessionFlags(c *cobra.Command, session *string, asJSON *bool, usage string) {
@@ -66,14 +114,14 @@ func emitSession(cmd *cobra.Command, rec vm.Record, asJSON bool) error {
 	return nil
 }
 
-func newVMUpCmd() *cobra.Command {
+func newVMUpCmd(g sessionGuest) *cobra.Command {
 	var session string
 	var asJSON bool
 	c := &cobra.Command{
 		Use:          "up",
-		Short:        "Create a Linux guest and hold it as a named session",
-		Long:         "up boots the Linux guest (Ubuntu 24.04, nothing shared with the host) and keeps\nit until `down`. Without --session the name is linux-<unix time>; it is printed.\nA name already held is busy.\n\n" + sessionVerbs,
-		Example:      "  dotf vm linux up --session sshd-proof --json",
+		Short:        "Create a guest and hold it as a named session",
+		Long:         g.up + "\n\n" + sessionVerbs,
+		Example:      "  dotf vm " + g.os + " up --session sshd-proof --json",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -82,32 +130,32 @@ func newVMUpCmd() *cobra.Command {
 					return withExitCode(2, err)
 				}
 			}
-			s, err := linuxSessions()
+			s, err := g.open()
 			if err != nil {
 				return err
 			}
 			return emitSession(cmd, s.Up(cmd.Context(), session, cmd.ErrOrStderr(), cmd.ErrOrStderr()), asJSON)
 		},
 	}
-	sessionFlags(c, &session, &asJSON, "session name (default linux-<unix time>)")
+	sessionFlags(c, &session, &asJSON, "session name (default "+g.os+"-<unix time>)")
 	return c
 }
 
-func newVMDownCmd() *cobra.Command {
+func newVMDownCmd(g sessionGuest) *cobra.Command {
 	var session string
 	var asJSON bool
 	c := &cobra.Command{
 		Use:          "down",
 		Short:        "Delete a session's guest and its state",
-		Long:         "down deletes the session's Lima instance and its state, and clears a stale\nsession. It acts only on a session `up` created.\n\n" + sessionVerbs,
-		Example:      "  dotf vm linux down --session sshd-proof",
+		Long:         g.down + "\n\n" + sessionVerbs,
+		Example:      "  dotf vm " + g.os + " down --session sshd-proof",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := vm.ValidSessionName(session); err != nil {
 				return withExitCode(2, err)
 			}
-			s, err := linuxSessions()
+			s, err := g.open()
 			if err != nil {
 				return err
 			}
@@ -118,7 +166,7 @@ func newVMDownCmd() *cobra.Command {
 	return c
 }
 
-func newVMStatusCmd() *cobra.Command {
+func newVMStatusCmd(g sessionGuest) *cobra.Command {
 	var asJSON bool
 	c := &cobra.Command{
 		Use:          "status",
@@ -127,13 +175,13 @@ func newVMStatusCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			s, err := linuxSessions()
+			s, err := g.open()
 			if err != nil {
 				return err
 			}
 			list, err := s.List(cmd.Context())
 			if err != nil {
-				rec := vm.NewRecord("", "linux", vm.StatusFailed)
+				rec := vm.NewRecord("", g.os, vm.StatusFailed)
 				rec.Stderr = err.Error()
 				return emitSession(cmd, rec, asJSON)
 			}

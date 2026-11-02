@@ -51,6 +51,8 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - Resolved: `--secret` takes one value per id (`ShowEntry`), so a file or multi-var secret is refused before anything is decrypted, and it is repeatable. A value shorter than redaction's 6-byte floor, or multi-line, is refused, because forwarding it would break AC7 in silence.
 - Known residual: `limactl shell` returns 255 both for a command killed by a signal and for ssh losing the guest, so that case reads `ok, exit: 255`. The check before the shell rules out a stopped guest; the verb's help states the rest.
 - Resolved: `cp` runs `limactl copy --backend=scp`. Lima's default rsync passes a guest path through a remote shell, which split `/tmp/a b` and wrote `/tmp/a`, and it copies a directory with no `-r` to nowhere with exit 0 (both measured on Lima 2.2.1). Over scp a path is literal and a directory is a loud failure, which is also the file-only contract Windows has.
+- Resolved: PR 1c splits in two to stay under the cap: `up`, `down`, `status` and the `Session` interface first, `exec` and `cp` second. A Windows `up` is refused by any held name, and a stale record blocks every name until `down` clears it, because there is one overlay to overwrite. The Session interface holds the verbs both guests implement, so `exec` and `cp` join it with the second PR.
+- Resolved: `down` acts only on the session it is named. A guest a `--keep` run left has no record, so it is `busy` for `up`, `no-session` for `down`, and stays `dotf vm windows stop`'s, which also leaves a session stale if it stops that session's guest.
 - No open question blocks `tasks.md`.
 
 ## Acceptance criteria

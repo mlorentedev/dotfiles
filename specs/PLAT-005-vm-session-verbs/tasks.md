@@ -32,7 +32,7 @@ created: "2026-10-22"
 
 - [x] [P] [AC9] `noGuest(t)` coverage for every new verb's refusals: failing test per verb, `go -C cli test ./internal/cmd/ -run TestVMVerbRefusals`
 - [x] [P] [AC2] Failing test for the record shape and the status, exit and process-code table in `cli/internal/vm/session_test.go`
-- [ ] [AC2] `Session` interface and `Record` type in `cli/internal/vm/session.go`; `--json` writes one record, empty lists are `[]`
+- [x] [AC2] `Session` interface and `Record` type in `cli/internal/vm/session.go`; `--json` writes one record, empty lists are `[]`
 - [x] [AC1] Linux `up --session` over Lima (default name `<os>-<unix time>`); `status` lists what `limactl list` answers
 - [x] [AC1] `up` on a name whose guest is gone: `stale`, exit 2, names `down`
 - [x] [AC2] Linux `exec` over `limactl shell` (argv, no shell) and `--script`
@@ -44,11 +44,11 @@ created: "2026-10-22"
 
 ### PR 1c: the Windows verbs
 
-- [ ] [AC1] One fixed guest: a second `up` is `busy`; `up` and `status` share the `running` check of `vm/run.go`
+- [x] [AC1] One fixed guest: a second `up` is `busy`; `up` and `status` share the `running` check of `vm/run.go`
 - [ ] [AC2] Windows `exec` over QGA and the scheduled task
 - [ ] [AC3] Windows refuses stdin with `unsupported`, exit 2
 - [ ] [AC4] Windows `cp` with `QGA.WriteFile`/`ReadFile` in 48 KiB chunks
-- [ ] [AC11] Windows `down`: no overlay and no state, `clean-base` untouched; `stale` cleaned by `down`
+- [x] [AC11] Windows `down`: no overlay and no state, `clean-base` untouched; `stale` cleaned by `down`
 - [ ] Verb help states ADR-055's `--elevated` caveat
 
 ### PR 1d: `run` recomposed

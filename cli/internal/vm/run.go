@@ -56,47 +56,25 @@ func Run(h Host, o RunOptions) (err error) {
 	if !done {
 		return fmt.Errorf("no clean-base at %s: run `dotf vm windows build` first", l.BaseDisk())
 	}
-	if err := errors.Join(removeIfPresent(l.Disk()), removeIfPresent(l.Vars())); err != nil {
-		return err
-	}
 	defer func() {
 		if !o.Keep {
 			err = errors.Join(err, removeIfPresent(l.Disk()), removeIfPresent(l.Vars()))
 		}
 	}()
-	if err := h.Img("create", "-q", "-f", "qcow2", "-b", l.BaseDisk(), "-F", "qcow2", l.Disk()); err != nil {
-		return fmt.Errorf("qemu-img create: %w", err)
+	p, q, err := bootGuest(h, o)
+	if p != nil {
+		defer func() {
+			if o.Keep {
+				step(o.Progress, "kept: the guest is still running; `dotf vm windows stop` stops it")
+				return
+			}
+			kill(p)
+		}()
 	}
-	if err := copyFile(l.BaseVars(), l.Vars()); err != nil {
-		return err
+	if q != nil {
+		defer func() { _ = q.Close() }()
 	}
-	log, err := os.OpenFile(l.Log(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
-		return err
-	}
-	defer func() { _ = log.Close() }()
-
-	step(o.Progress, "boot a throwaway overlay of clean-base (QEMU's output in %s)", l.Log())
-	p, err := start(h, o.Machine, log)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if o.Keep {
-			step(o.Progress, "kept: the guest is still running; `dotf vm windows stop` stops it")
-			return
-		}
-		kill(p)
-	}()
-	q, err := agent(h, l, o.Agent, p)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = q.Close() }()
-	if err := syncClock(q, o); err != nil {
-		return err
-	}
-	if err := waitLogon(q, o); err != nil {
 		return err
 	}
 
@@ -127,6 +105,42 @@ func Run(h Host, o RunOptions) (err error) {
 	}
 	step(o.Progress, "converged, and the second run changed nothing")
 	return nil
+}
+
+// bootGuest boots a fresh overlay of clean-base and waits until the test user
+// is logged on, which is when a scheduled task can run. It returns what it got
+// as far as it got: the caller decides whether a guest that failed halfway is
+// kept or killed.
+func bootGuest(h Host, o RunOptions) (Process, *QGA, error) {
+	l := o.Machine.Layout
+	if err := errors.Join(removeIfPresent(l.Disk()), removeIfPresent(l.Vars())); err != nil {
+		return nil, nil, err
+	}
+	if err := h.Img("create", "-q", "-f", "qcow2", "-b", l.BaseDisk(), "-F", "qcow2", l.Disk()); err != nil {
+		return nil, nil, fmt.Errorf("qemu-img create: %w", err)
+	}
+	if err := copyFile(l.BaseVars(), l.Vars()); err != nil {
+		return nil, nil, err
+	}
+	log, err := os.OpenFile(l.Log(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = log.Close() }()
+
+	step(o.Progress, "boot a throwaway overlay of clean-base (QEMU's output in %s)", l.Log())
+	p, err := start(h, o.Machine, log)
+	if err != nil {
+		return nil, nil, err
+	}
+	q, err := agent(h, l, o.Agent, p)
+	if err != nil {
+		return p, nil, err
+	}
+	if err := syncClock(q, o); err != nil {
+		return p, q, err
+	}
+	return p, q, waitLogon(q, o)
 }
 
 // copyDotf copies a dotf source build in, where guestrun.ps1 puts it on PATH

@@ -124,3 +124,62 @@ func TestVMUpWritesProgressToStderrAndTheNameToStdout(t *testing.T) {
 		t.Errorf("up: stdout=%q stderr=%q err=%v", stdout, stderr, err)
 	}
 }
+
+// fakeSession answers every verb with one status, and counts the calls.
+type fakeSession struct {
+	status vm.Status
+	calls  int
+}
+
+func (f *fakeSession) Up(_ context.Context, name string, _, _ io.Writer) vm.Record {
+	f.calls++
+	return vm.NewRecord(name, "windows", f.status)
+}
+
+func (f *fakeSession) Down(_ context.Context, name string, _ io.Writer) vm.Record {
+	f.calls++
+	return vm.NewRecord(name, "windows", f.status)
+}
+
+func (f *fakeSession) List(context.Context) ([]vm.Record, error) {
+	f.calls++
+	return []vm.Record{}, nil
+}
+
+// The Windows verbs are the shared ones (ADR-055 decision 1): the record and
+// the process code come out the same, and a bad name never reaches the store.
+func TestVMWindowsVerbs(t *testing.T) {
+	noGuest(t)
+	f := &fakeSession{status: vm.StatusBusy}
+	old := windowsSessions
+	t.Cleanup(func() { windowsSessions = old })
+	windowsSessions = func() (vm.Session, error) { return f, nil }
+	run := func(args ...string) (string, error) {
+		c := newVMWindowsCmd()
+		c.SetArgs(args)
+		var out bytes.Buffer
+		c.SetOut(&out)
+		c.SetErr(io.Discard)
+		err := c.Execute()
+		return out.String(), err
+	}
+
+	out, err := run("up", "--session", "proof", "--json")
+	var rec vm.Record
+	if jerr := json.Unmarshal([]byte(out), &rec); jerr != nil {
+		t.Fatalf("up wrote %q: %v", out, jerr)
+	}
+	if rec.Status != vm.StatusBusy || rec.OS != "windows" || ExitCode(err) != 2 {
+		t.Errorf("up = %+v, %v", rec, err)
+	}
+	if out, err := run("status", "--json"); err != nil || strings.TrimSpace(out) != "[]" {
+		t.Errorf("status = %q, %v", out, err)
+	}
+	f.calls = 0
+	if _, err := run("up", "--session", "Bad Name"); ExitCode(err) != 2 {
+		t.Errorf("a bad name: %v", err)
+	}
+	if f.calls != 0 {
+		t.Error("a bad name reached the store")
+	}
+}
