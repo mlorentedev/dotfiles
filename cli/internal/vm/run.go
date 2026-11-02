@@ -2,6 +2,7 @@ package vm
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -268,22 +269,15 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 	}
 	task := "dotf-" + name
 	action := `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ` + guestWork + `\guestrun.ps1 -Step ` + name
-	for _, args := range [][]string{
-		{"/create", "/tn", task, "/tr", action, "/sc", "once", "/st", "00:00", "/ru", guestUser, "/it", "/f"},
-		{"/run", "/tn", task},
-	} {
-		r, err := q.Run("schtasks.exe", args)
-		if err != nil {
-			return err
-		}
-		if r.ExitCode != 0 {
-			return fmt.Errorf("schtasks %s: exit %d: %s", args[0], r.ExitCode, strings.TrimSpace(string(r.Stdout)+string(r.Stderr)))
-		}
+	if err := startTask(q, task, action); err != nil {
+		return err
 	}
 
-	code, werr := waitExit(q, o, guestWork+`\`+name+".exit")
+	limit, cancel := context.WithTimeout(context.Background(), o.Step)
+	defer cancel()
+	code, werr := pollExit(limit, q, o.Poll, guestWork+`\`+name+".exit")
 	if out, err := q.ReadFile(guestWork + `\` + name + ".log"); err == nil {
-		_, _ = o.Out.Write(bytes.TrimPrefix(out, []byte("\xef\xbb\xbf")))
+		_, _ = o.Out.Write(bytes.TrimPrefix(out, []byte(utf8BOM)))
 	}
 	if werr != nil {
 		return fmt.Errorf("%s did not finish in %s: %w", label, o.Step, werr)
@@ -303,20 +297,37 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 	return errors.Join(runErr, check(rep))
 }
 
-// waitExit polls for a step's exit file, which guestrun.ps1 writes last.
-func waitExit(q *QGA, o RunOptions, path string) (string, error) {
-	deadline := time.Now().Add(o.Step)
+// startTask starts action in the test user's session.
+func startTask(q *QGA, task, action string) error {
+	for _, args := range [][]string{
+		{"/create", "/tn", task, "/tr", action, "/sc", "once", "/st", "00:00", "/ru", guestUser, "/it", "/f"},
+		{"/run", "/tn", task},
+	} {
+		r, err := q.Run("schtasks.exe", args)
+		if err != nil {
+			return err
+		}
+		if r.ExitCode != 0 {
+			return fmt.Errorf("schtasks %s: exit %d: %s", args[0], r.ExitCode, strings.TrimSpace(string(r.Stdout)+string(r.Stderr)))
+		}
+	}
+	return nil
+}
+
+// pollExit polls for an exit file, which a step writes last, until ctx ends.
+func pollExit(ctx context.Context, q *QGA, poll time.Duration, path string) (string, error) {
 	for {
 		b, err := q.ReadFile(path)
-		if code := strings.TrimSpace(string(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")))); err == nil && code != "" {
+		if code := strings.TrimSpace(string(bytes.TrimPrefix(b, []byte(utf8BOM)))); err == nil && code != "" {
 			return code, nil
 		}
-		if time.Now().After(deadline) {
+		select {
+		case <-ctx.Done():
 			if err == nil {
 				err = errors.New("its exit file stayed empty")
 			}
 			return "", err
+		case <-time.After(poll):
 		}
-		time.Sleep(o.Poll)
 	}
 }

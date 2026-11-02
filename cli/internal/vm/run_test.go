@@ -25,6 +25,8 @@ type fakeGuest struct {
 	t     *testing.T
 	steps map[string]guestStep // by step name
 	hangs bool                 // no step ever writes its exit file
+	// onExec plays guestexec.ps1 for one exec's directory, with mu held.
+	onExec func(dir string)
 
 	mu      sync.Mutex
 	starts  [][]string
@@ -146,6 +148,12 @@ func (g *fakeGuest) exec(a json.RawMessage) any {
 		delete(g.files, e.Arg[len(e.Arg)-1])
 	case e.Path == "schtasks.exe" && e.Arg[0] == "/run":
 		name := strings.TrimPrefix(e.Arg[len(e.Arg)-1], "dotf-")
+		if strings.HasPrefix(name, "exec-") {
+			if g.onExec != nil {
+				g.onExec(guestWork + `\` + name)
+			}
+			break
+		}
 		s, ok := g.steps[name]
 		if !ok {
 			g.t.Errorf("ran unknown step %q", name)
