@@ -604,3 +604,70 @@ func TestInputsFromEnvReadsTheScriptsVariables(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 }
+
+func TestRoute_AForcedProviderThatFellBackReachesTheNote(t *testing.T) {
+	f := newFixture(t)
+	f.api.answer("", "529")
+	f.in.Provider = "anthropic"
+	r, _ := f.at(0).ok()
+	if r.First != "nan" || !strings.Contains(r.Note, "PR_AGENT_PROVIDER=anthropic") {
+		t.Errorf("first %q, note %q", r.First, r.Note)
+	}
+}
+
+func TestRoute_MalformedFallbacksAreRefusedNeverAnEmptyChain(t *testing.T) {
+	for _, raw := range []string{"not json", `{"a":1}`, `[1]`, `["a"`} {
+		f := newFixture(t)
+		f.in.NanFallbacks = raw
+		_, out, err := f.at(0).run()
+		if !errors.Is(err, ErrRefused) || !strings.Contains(out, "::error::NAN_FALLBACKS") {
+			t.Errorf("%q: err %v, out %q", raw, err, out)
+		}
+		if got := f.api.probedModels(); got != "" {
+			t.Errorf("%q: probed %q", raw, got)
+		}
+	}
+}
+
+func TestRoute_EmptyFallbacksAreNoChain(t *testing.T) {
+	for _, raw := range []string{"", "[]"} {
+		f := newFixture(t)
+		f.in.NanFallbacks = raw
+		r, _ := f.at(0).ok()
+		if r.NanModel != "openai/mimo-v2.6-flash" || len(r.NanFallbacks) != 0 {
+			t.Errorf("%q: %+v", raw, r)
+		}
+	}
+}
+
+func TestRoute_FallbacksAreNotReadWhenNoNaNModelAnswered(t *testing.T) {
+	f := newFixture(t)
+	f.in.NanOutcome, f.in.NanModel, f.in.NanFallbacks = "failure", "", "not json"
+	if r, _ := f.at(0).ok(); r.First != "anthropic" {
+		t.Errorf("first %q", r.First)
+	}
+}
+
+const weightedRiskPool = `{"pool": [
+ {"id": "nan/mimo-v2.6-flash", "pr_agent": {"model": "openai/mimo-v2.6-flash", "weight": 3}},
+ {"id": "anthropic-review/claude-sonnet-5-5", "signs": "second",
+  "pr_agent": {"model": "anthropic/claude-sonnet-5-5", "weight": 2, "route": "risk"}}
+], "pr_agent_risk": {"min_changed_lines": 900, "label": "deep-review"}}`
+
+func TestRoute_AWeightedRiskMemberIsProbedOnce(t *testing.T) {
+	for name, answer := range map[string]string{"answers": "200", "fails": "529"} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			f.pool = mustPool(t, weightedRiskPool)
+			f.api.answer("", answer)
+			f.in.ChangedLines = "1000"
+			r, _ := f.at(0).ok()
+			if got := f.api.probedModels(); strings.Count(got, "claude-sonnet-5-5") != 1 {
+				t.Errorf("probed %q", got)
+			}
+			if answer == "529" && strings.Count(r.Note, "HTTP 529") != 1 {
+				t.Errorf("the probe's note is not there once: %q", r.Note)
+			}
+		})
+	}
+}
