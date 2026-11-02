@@ -16,7 +16,7 @@ template_version: "1.0"
 
 ## What
 
-One resolver in `package spec` answers two separate questions for every caller (`spec init`, `spec audit` and the `spec-issue-state` doctor check):
+One resolver, `spechome.Resolve` (a leaf package: `spec` cannot import `initrepo` without a cycle), answers two separate questions for every caller (`spec init`, `spec audit` and the `spec-issue-state` doctor check):
 
 - **Issue home:** the GitHub `owner/name` that completes bare `#N` links and hosts the work-gate issue. It comes from the first of these that is set:
   1. the command's flag (`--bitacora-repo` on init, `--repo` on audit);
@@ -38,7 +38,7 @@ A malformed `specs/.bitacora-repo` is an error that names the file, never a sile
 ## Risks / open questions
 
 - **Precedence of the committed file over the env var.** Decided: the file wins. `DOTF_BITACORA_REPO` is machine-wide, and a value exported for one repository must not redirect another that has declared its own home. A repository without the file behaves exactly as today.
-- **Behaviour change for `spec audit`.** It now reads `DOTF_BITACORA_REPO` when no flag and no file are set. Previously it ignored the variable and used origin. This is the drift being removed. Before release, check whether any machine exports the variable and runs `spec audit`.
+- **Behaviour change for `spec audit`.** It now reads `DOTF_BITACORA_REPO` when no flag and no file are set. Previously it ignored the variable and used origin. This is the drift being removed. Checked 2026-11-01: `git grep -n DOTF_BITACORA_REPO -- ':!cli' ':!specs' ':!docs/lessons' ':!docs/adr'` matches nothing (exit 1), so no rc file, setup script or CI step exports it.
 - **Archive home on a GitHub origin with an issue home elsewhere.** Today the archive lookup uses the issue home. Under an override that is the wrong repository, so the archive home is always the origin.
 
 ## Acceptance criteria
@@ -54,4 +54,4 @@ A malformed `specs/.bitacora-repo` is an error that names the file, never a sile
 
 - Bitácora board: mlorentedev/dotfiles#1906 (BUG-110)
 - Related ADR: `docs/adr/adr-043-a-wip-limit-on-active-specs.md` (the `specs/.wip-limit` precedent), ADR-018 (issues live on the GitHub bitácora)
-- Code: `cli/internal/cmd/spec_audit.go`, `cli/internal/cmd/spec.go` (`workGateRepo`), `cli/internal/doctor/checks_spec_issue_state.go`, `cli/internal/initrepo/forge.go` (`ClassifyOrigin`)
+- Code: `cli/internal/spechome/home.go`, `cli/internal/cmd/spec_audit.go`, `cli/internal/cmd/spec.go` (`resolveSpecHomes`, which replaced `workGateRepo`), `cli/internal/doctor/checks_spec_issue_state.go`, `cli/internal/initrepo/forge.go` (`ClassifyOrigin`)
