@@ -18,8 +18,9 @@ const claudeRemedy = "run `dotf converge --only agent-extensions`"
 // `claude mcp get` health-checks the server it describes. The runner bounds
 // that check with MCP_TIMEOUT, because only the registration is read, so a
 // server costs one claude start rather than a cold start of the server (#2059).
-// Every claude call runs inside the .claude.json snapshot guard: if one shrinks that file (upstream #59870), the guard writes
-// the snapshot back. That is the only write this check can cause.
+// Every claude call runs inside the .claude.json snapshot guard: if one
+// shrinks that file (upstream #59870), the guard writes the snapshot back.
+// That is the only write this check can cause.
 func checkClaudeExtensions(sys *System, cfg *Config, rep *Report, syncer func(home string) (claude.Syncer, bool)) {
 	rep.Section("Claude extensions")
 	if syncer == nil {
