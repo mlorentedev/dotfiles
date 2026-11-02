@@ -366,6 +366,42 @@ func TestEvaluate_AnUndeclaredAuthorDoesNotClearTheQueue(t *testing.T) {
 	}
 }
 
+// #2896: a record the queue ignores must say why, or `dotf pr land` refuses a
+// PR whose author believes it is triaged and nothing names the cause.
+func TestEvaluate_AnIgnoredTriageRecordIsNamedInTheReason(t *testing.T) {
+	review := Comment{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings", CreatedAt: at(10)}
+	app := Comment{Author: "some-app[bot]", AuthorAssociation: "NONE", Body: "## Review triage\nall fine", CreatedAt: at(20)}
+	st := Evaluate(PR{Number: 1, Comments: []Comment{review, app}}, reg())
+	if !st.Pending || !strings.Contains(st.Reason, "some-app[bot]") || !strings.Contains(st.Reason, "NONE") || !strings.Contains(st.Reason, "triage.standing") {
+		t.Fatalf("the ignored record must be named with its association: pending=%v reason=%q", st.Pending, st.Reason)
+	}
+	// After a counted triage, a newer review and a newer ignored record: still named.
+	owner := Comment{Author: "manu", AuthorAssociation: "OWNER", Body: "## Review triage\nok", CreatedAt: at(5)}
+	app.CreatedAt = at(30)
+	st = Evaluate(PR{Number: 1, Comments: []Comment{owner, review, app}}, reg())
+	if !st.Pending || !strings.Contains(st.Reason, "some-app[bot]") {
+		t.Fatalf("an ignored record after the last counted one must be named: %q", st.Reason)
+	}
+	// An ignored record older than the counted one explains nothing.
+	app.CreatedAt = at(1)
+	owner.CreatedAt = at(5)
+	st = Evaluate(PR{Number: 1, Comments: []Comment{app, owner, review}}, reg())
+	if strings.Contains(st.Reason, "some-app[bot]") {
+		t.Fatalf("a stale ignored record must not be named: %q", st.Reason)
+	}
+}
+
+// #2896 F1: only a conversation comment is a triage record. A review body that
+// carries the marker is review output, never a disposition, whoever wrote it.
+func TestEvaluate_AReviewBodyIsNotATriageRecord(t *testing.T) {
+	review := Comment{Author: "github-actions", Body: "## PR Reviewer Guide\nfindings", CreatedAt: at(10)}
+	asReview := Comment{Author: "manu", AuthorAssociation: "OWNER", Body: "## Review triage\nall applied", CreatedAt: at(20)}
+	st := Evaluate(PR{Number: 1, Comments: []Comment{review}, Reviews: []Comment{asReview}}, reg())
+	if !st.Pending {
+		t.Fatalf("a triage marker in a review body cleared the queue: %s", st.Reason)
+	}
+}
+
 // The registry is hand-ported to every repository, so a copy without
 // triage.standing must still answer, with the default; an explicit empty list
 // is refused like an empty marker.
