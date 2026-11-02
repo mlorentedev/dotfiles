@@ -36,3 +36,4 @@ Status: armed 2026-11-02T05:51Z, expires 17:51Z. The verdict is written here at 
 | 07:12 | - | usage limit hit after arming (05:5x-07:11); wake-lock caffeinate -i -t 38400 started; the run starts now | `pmset -g`: sleep 0 |
 | 07:23 | 7c-records | vault 345bb4c6 on master; PR #3066 opened (owner-landed) | harness check OK; bats 186/1 (real-vault test, fails on main too) |
 | 07:34 | 7c-delete | PR #3069 opened, stacked on #3066 (owner-landed); script + 10 bats gone, 140+/4325- | go test ok (vault-template drift aside, #3050); lint 0; bats 345/346 (real-vault drift: insights, vault-doctor) |
+| 07:43 | #2851 | PR #3070 opened (grant-eligible), gated on the deployed marker per advisor | go test harness/cmd ok; lint 0; bats parity+pipeline 33/33 |
