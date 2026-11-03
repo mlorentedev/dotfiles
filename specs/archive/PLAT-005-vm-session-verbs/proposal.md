@@ -1,7 +1,7 @@
 ---
 id: "PLAT-005-vm-session-verbs"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-10-22"
 issue: "mlorentedev/dotfiles#2842"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
