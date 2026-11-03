@@ -57,6 +57,12 @@ func TestWriteWorkEntryCreatesFilesWithTokensSubstituted(t *testing.T) {
 	if !strings.Contains(mem, "# edge-fw — Work SDK Session Memory") {
 		t.Errorf("MEMORY.md missing component header:\n%s", mem)
 	}
+	if !strings.Contains(mem, `created: "2026-06-16"`) {
+		t.Errorf("MEMORY.md missing rendered created date:\n%s", mem)
+	}
+	if strings.Contains(mem, "{{") {
+		t.Errorf("MEMORY.md has unrendered token:\n%s", mem)
+	}
 
 	fam := readFile(t, filepath.Join(opts.VaultPath, "50_work", "45-development", "acme-sensors", "context.md"))
 	for _, want := range []string{"# acme-sensors: Product Family Context", "| edge-fw |"} {
