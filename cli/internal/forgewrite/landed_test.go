@@ -183,3 +183,20 @@ func TestGitHubLandedHeadsSaysWhatFailed(t *testing.T) {
 		t.Fatalf("want gh's reason in the error, got %v", err)
 	}
 }
+
+func TestGiteaLandedHeadsReadsACutOff404AsNoPullRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/repos/o/n" {
+			_, _ = w.Write([]byte(`{"default_branch":"main"}`))
+			return
+		}
+		w.Header().Set("Content-Length", "1000")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"mess`))
+	}))
+	t.Cleanup(srv.Close)
+	heads, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
+	if err != nil || len(heads) != 0 {
+		t.Fatalf("heads = %v, err %v", heads, err)
+	}
+}

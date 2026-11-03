@@ -231,16 +231,18 @@ func (g Gitea) do(ctx context.Context, method, path string, payload any) ([]byte
 		return nil, fmt.Errorf("gitea %s %s: %s", method, url, redact(err.Error(), token))
 	}
 	defer func() { _ = resp.Body.Close() }()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return nil, fmt.Errorf("gitea %s %s: reading the answer: %s", method, url, redact(err.Error(), token))
-	}
+	raw, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	// The status outranks a cut-off body: a 404 is an answer however much of
+	// its page arrived.
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		quoted := redact(string(raw), token)
 		if len(quoted) > maxErrBody {
 			quoted = quoted[:maxErrBody] + "..."
 		}
 		return nil, giteaStatusError{code: resp.StatusCode, text: fmt.Sprintf("gitea %s %s: HTTP %d: %s", method, url, resp.StatusCode, quoted)}
+	}
+	if readErr != nil {
+		return nil, fmt.Errorf("gitea %s %s: reading the answer: %s", method, url, redact(readErr.Error(), token))
 	}
 	return raw, nil
 }

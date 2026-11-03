@@ -56,3 +56,5 @@ Agents reached forges through whatever was at hand: `gh` with the prose on the c
 The Gitea half of `LandedHeads` above could not finish on a real repository. `personal/resume` has 453 closed pull requests at about 5.5s a page, so it met the 30-second read limit at page 6 and the 10-page cap after that. Raising either would cost more than a minute per worktree and grow with the repository.
 
 Gitea now answers with `GET /repos/{owner}/{repo}/pulls/{base}/{head}` against the default branch: 1.2s, it resolves a deleted branch, and a 404 means no pull request. The price is that it returns the newest pull request against one base, so `LandedHeads` no longer returns every one on Gitea. A reused branch name or a pull request into another base can read "not landed". That is the safe side: `worktree done` refuses and the worktree stays, while the listing's failure left every branch `unknown`. GitHub is unchanged. The owner chose this on 2026-11-02.
+
+Clause 4 of the amendment above is out of date: `worktree list` and `sweep` already take this read through `forgeLandedHeads`, so on a Gitea origin they report landed branches too.
