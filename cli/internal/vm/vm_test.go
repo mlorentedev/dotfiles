@@ -97,6 +97,7 @@ type fakeLima struct {
 	failNext  string // a call starting with this fails
 	silentRun int    // this converge (1-based) writes no report
 	report    bool   // a report exists in the guest
+	prints    string // what a converge writes to stdout
 }
 
 func (f *fakeLima) run(_ context.Context, stdin io.Reader, stdout, _ io.Writer, args ...string) error {
@@ -120,6 +121,7 @@ func (f *fakeLima) run(_ context.Context, stdin io.Reader, stdout, _ io.Writer, 
 		_, _ = io.WriteString(stdout, "/ ext4\n")
 	case strings.Contains(call, " bash -c "):
 		f.runs++
+		_, _ = io.WriteString(stdout, f.prints)
 		if f.runs != f.silentRun {
 			f.report = true // a silent run leaves the previous report in place
 		}
@@ -180,6 +182,33 @@ func TestVerify_ConvergesTwiceAndDeletesTheGuest(t *testing.T) {
 	}
 	if !copied {
 		t.Errorf("the archive was not copied into the guest's home: %q", f.calls)
+	}
+}
+
+// A converge's output reaches the log the run prints, so the token it holds is
+// masked there as an `exec --secret` value is.
+func TestVerify_MasksTheTokenInAConvergesOutput(t *testing.T) {
+	f := &fakeLima{changed: []int{12, 0}, prints: "fetch with s3cr3t-value done\n"}
+	var out strings.Builder
+	if err := Verify(context.Background(), f.run, Options{Source: "/tmp/src.tar.gz", Name: "n", Token: "s3cr3t-value", Out: &out}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "s3cr3t-value") || !strings.Contains(out.String(), "[REDACTED:GITHUB_TOKEN]") {
+		t.Errorf("out = %q", out.String())
+	}
+}
+
+// A token that could not be masked is refused before anything boots.
+func TestVerify_RefusesATokenItCouldNotMask(t *testing.T) {
+	for _, token := range []string{"short", "two\nlines-of-token"} {
+		f := &fakeLima{}
+		err := Verify(context.Background(), f.run, Options{Source: "/tmp/src.tar.gz", Name: "n", Token: token, Out: io.Discard})
+		if err == nil || !strings.Contains(err.Error(), "GITHUB_TOKEN") || strings.Contains(err.Error(), token) {
+			t.Errorf("Verify = %v", err)
+		}
+		if len(f.calls) != 0 {
+			t.Errorf("it reached limactl: %q", f.calls)
+		}
 	}
 }
 

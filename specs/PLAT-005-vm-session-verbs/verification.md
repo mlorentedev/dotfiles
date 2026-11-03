@@ -57,3 +57,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - [ ] Folder moved: `specs/PLAT-005-vm-session-verbs/` -> `specs/archive/PLAT-005-vm-session-verbs/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+## `run` composed below the verbs (AC5, AC6)
+
+`dotf secrets run -- dotf vm linux` from `33ce746c`, on a real Lima guest: first converge, second converge, "converged, and the second run changed nothing", exit 0, guest deleted. The token was set, and the run's log carries 28 `[REDACTED:` markers. `vm_test.go`'s assertions are unchanged; `TestVerify_MasksTheTokenInAConvergesOutput` and `TestVerify_RefusesATokenItCouldNotMask` are new. The Windows `run` is untouched.

@@ -258,7 +258,8 @@ func newVMLinuxCmd() *cobra.Command {
 			"not a build of this tree. Any committed ref works, pushed or not; the\n" +
 			"host working tree never reaches the guest. GITHUB_TOKEN, when set (run\n" +
 			"under `dotf secrets run --` to set it), reaches the guest's converges on\n" +
-			"stdin, for mise's downloads, and is never written into the guest.\n\n" +
+			"stdin, for mise's downloads, is never written into the guest, and is\n" +
+			"masked in the output.\n\n" +
 			archiveGap,
 		Example:      "  dotf vm linux --ref feat/my-branch\n  dotf secrets run -- dotf vm linux",
 		Args:         cobra.NoArgs,
