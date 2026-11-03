@@ -77,6 +77,11 @@ func Init(opts InitOptions) (InitReport, error) {
 		}
 		report.add("ci", okOrSkip(action != "created"), detail)
 	}
+	if action, err := WriteLintOpts(opts.Root, opts.DryRun); err != nil {
+		report.add("lint", "warn", err.Error())
+	} else {
+		report.add("lint", okOrSkip(action != "created"), "lint.yml "+action)
+	}
 
 	// 4. Stack init (lightweight, offline).
 	if opts.DryRun {
