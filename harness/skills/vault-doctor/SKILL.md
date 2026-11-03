@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/vault-doctor/SKILL.md
-generated_sha: 44c7027af3c69b2c
+generated_sha: e0780773a756d819
 id: vault-doctor-skill
 type: skill
 status: active
@@ -39,7 +39,7 @@ vault_health(include_usage=True)
 
 # Via dotf CLI (if Obsidian GUI running)
 dotf vault health
-python3 00_meta/scripts/vault-validate.py --strict
+python3 "$VAULT_PATH/00_meta/scripts/vault-validate.py" --strict
 ```
 
 Collect:
