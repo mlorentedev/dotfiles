@@ -187,6 +187,9 @@ type Result struct {
 	Reasons    []string // why it did not merge
 	Retargeted []int    // dependents pointed at the base before the merge
 	Warnings   []string // what went wrong after the merge landed
+	// ManualMerge is the gh command that merges the head Land read, set on a
+	// refusal a human may override and empty otherwise (#3108).
+	ManualMerge string
 }
 
 // Land merges the PR when Decide finds no reason against it and the head did
@@ -235,9 +238,34 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		res.Reasons = []string{fmt.Sprintf("merge state is BEHIND after merging the base in %d times: the base moved again during each CI run (#2083)", updates)}
 	}
 	if len(res.Reasons) > 0 {
+		f.GrantDeclared, f.Excluded = g.declared, g.excluded
+		res.ManualMerge = manualMerge(o, number, f)
 		return res, nil
 	}
 	return merge(ctx, gh, o, n, f, res)
+}
+
+// manualMerge is the command a human runs to merge the head Land refused, so the
+// manual path is the same whatever the reason (#3108). --match-head-commit pins
+// the head Land read: gh refuses it if the head moved. There is none where gh
+// could not merge the PR (not open, a draft) or where the refusal is policy the
+// owner holds rather than a check: a release, a grant exclusion or change, a
+// repository without the grant, reviewer output still awaiting triage.
+func manualMerge(o Options, number int, f Facts) string {
+	if f.State != "OPEN" || f.IsDraft || f.HeadSHA == "" || ownerOnly(f) {
+		return ""
+	}
+	cmd := fmt.Sprintf("gh pr merge %d --squash --match-head-commit %s", number, f.HeadSHA)
+	if o.Repo != "" {
+		cmd += " --repo " + o.Repo
+	}
+	return cmd
+}
+
+// ownerOnly reports a refusal that policy, not a failing check, makes.
+func ownerOnly(f Facts) bool {
+	return strings.HasPrefix(f.HeadRef, releasePrefix) || len(excludedReasons(f, f.Excluded)) > 0 ||
+		!f.GrantDeclared || !f.FilesComplete || slices.Contains(f.Files, GrantFile) || f.Untriaged
 }
 
 // gh runs gh for the repository the options name.
