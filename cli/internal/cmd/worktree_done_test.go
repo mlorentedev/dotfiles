@@ -349,3 +349,43 @@ func TestWorktreeMigrateMovesALegacySibling(t *testing.T) {
 		t.Fatalf("second migrate: %v\n%s", err, out)
 	}
 }
+
+// The main checkout is no worktree done can tear down, so it is not offered as
+// a name that would have worked.
+func TestWorktreeDoneDoesNotListTheMainCheckoutAsAKnownWorktree(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	t.Chdir(t.TempDir())
+
+	_, err := executeWorktree(t, "done", "nosuch", "--repo", repo)
+	if err == nil {
+		t.Fatal("done nosuch succeeded")
+	}
+	if !strings.Contains(err.Error(), "no linked worktrees") {
+		t.Errorf("error %q does not say there is nothing to name", err)
+	}
+	if strings.Contains(err.Error(), "(main)") {
+		t.Errorf("error %q lists the main checkout", err)
+	}
+}
+
+// A name that matches nothing says which names would have worked: the
+// directory name and branch of every linked worktree git knows (#3109).
+func TestWorktreeDoneListsTheWorktreesItKnowsForAnUnknownName(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	if out, err := executeWorktree(t, "add", "demo", "--repo", repo); err != nil {
+		t.Fatalf("add: %v\n%s", err, out)
+	}
+	t.Chdir(t.TempDir())
+
+	for _, arg := range []string{"nosuch", "fix/nosuch"} {
+		_, err := executeWorktree(t, "done", arg, "--repo", repo)
+		if err == nil {
+			t.Fatalf("done %s succeeded", arg)
+		}
+		for _, want := range []string{"done takes a path, or the slug add was given", "feat-demo (feat/demo)"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("done %s: error %q does not list %s", arg, err, want)
+			}
+		}
+	}
+}

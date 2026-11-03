@@ -502,7 +502,8 @@ func resolveDoneTarget(args []string, worktreePath, repoDir string) (string, err
 // was given. A bare name is also a slug, naming any of worktree.SlugCandidates:
 // the legacy <repo>-wt-<slug> sibling, or the worktree under WORKTREE_ROOT. A
 // name that resolves to more than one directory is refused, naming each, rather
-// than guessed. When it names none, the error lists every path it tried.
+// than guessed. When it names none, the error lists every path it tried and the
+// linked worktrees it knows (#3109).
 func resolveDoneArg(arg, repoDir string) (string, error) {
 	asPath, err := filepath.Abs(arg)
 	if err != nil {
@@ -515,7 +516,7 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 		if p := branchUnderRoot(arg, repoDir); p != "" && isDirectory(p) {
 			return worktreeAt(p)
 		}
-		return "", fmt.Errorf("no worktree at %s", asPath)
+		return "", fmt.Errorf("no worktree at %s%s", asPath, knownWorktreesNote(repoDir))
 	}
 	root, rootErr := resolveCommandRepoRoot(repoDir)
 	if rootErr != nil {
@@ -534,7 +535,7 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 	}
 	switch len(found) {
 	case 0:
-		return "", doneNotFound(arg, tried, wtRoot)
+		return "", fmt.Errorf("%w%s", doneNotFound(arg, tried, wtRoot), knownWorktreesNote(repoDir))
 	case 1:
 		return worktreeAt(found[0])
 	}
@@ -565,6 +566,34 @@ func doneNotFound(arg string, tried []string, wtRoot string) error {
 		msg += "; WORKTREE_ROOT could not be resolved, so the worktree root was not searched (run `dotf doctor`)"
 	}
 	return errors.New(msg)
+}
+
+// knownWorktreesNote says what done takes and lists each linked worktree git
+// knows by the directory name that is its slug and by its branch, so a miss
+// names what would have worked. A renamed branch no longer matches its directory
+// (#3109); the note is how the operator finds the directory name.
+func knownWorktreesNote(repoDir string) string {
+	const takes = "; done takes a path, or the slug add was given"
+	root, err := resolveCommandRepoRoot(repoDir)
+	if err != nil {
+		return takes
+	}
+	porcelain, err := (&worktree.RealGitRunner{}).WorktreeListPorcelain(root)
+	if err != nil {
+		return takes
+	}
+	linked, err := worktree.LinkedWorktrees(porcelain)
+	if err != nil {
+		return takes
+	}
+	var known []string
+	for _, w := range linked {
+		known = append(known, fmt.Sprintf("%s (%s)", filepath.Base(w.Path), w.Branch))
+	}
+	if len(known) == 0 {
+		return takes + "; this repository has no linked worktrees"
+	}
+	return takes + "; known worktrees, as slug (branch): " + strings.Join(known, ", ")
 }
 
 // worktreeAt returns the top of the git worktree holding dir, or an error that
