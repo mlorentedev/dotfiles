@@ -546,7 +546,12 @@ not a verdict. Otherwise the command's own exit status passes through.
 With --stall-timeout and --transcript the run is also stopped when the
 transcript has not changed for that long. That run exits 125, and stderr names
 the last tool call the transcript recorded. With --review, a stopped run also
-says whether review.md holds a provisional record or was not rewritten.`,
+says whether review.md holds a provisional record or was not rewritten.
+
+With --review, every path the run left changed outside the review's own spec
+folder is named on stderr, since a reviewer's only sanctioned output is
+review.md. A run that otherwise exited 0 then exits 4, so the leftovers are a
+failure someone reads rather than files a later "git add -A" commits.`,
 		Hidden:        true,
 		Args:          cobra.MinimumNArgs(2),
 		SilenceUsage:  true,
@@ -559,12 +564,18 @@ says whether review.md holds a provisional record or was not rewritten.`,
 			if stall < 0 {
 				return fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", stall)
 			}
+			errw := cmd.ErrOrStderr()
+			var before spec.TreeSnapshot
+			var snapErr error
+			if review != "" {
+				before, snapErr = spec.SnapshotTree(review)
+			}
 			res, err := spec.RunWithLimits(spec.Limits{Deadline: limit, StallTimeout: stall, Transcript: transcript},
-				args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr())
+				args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), errw)
 			if err != nil {
 				return err
 			}
-			errw := cmd.ErrOrStderr()
+			stray := reportStrayWrites(errw, review, before, snapErr)
 			switch res.Stop {
 			case spec.StopDeadline:
 				_, _ = fmt.Fprintf(errw, "[review] stopped at the %s deadline: the time limit ended this run, not a verdict\n", limit)
@@ -580,6 +591,9 @@ says whether review.md holds a provisional record or was not rewritten.`,
 			if res.Code != 0 {
 				return withExitCode(res.Code, fmt.Errorf("exit %d", res.Code))
 			}
+			if stray {
+				return withExitCode(exitStrayWrites, fmt.Errorf("the review wrote outside its spec folder"))
+			}
 			return nil
 		},
 	}
@@ -587,6 +601,32 @@ says whether review.md holds a provisional record or was not rewritten.`,
 	cmd.Flags().StringVar(&transcript, "transcript", "", "the transcript file the stall detector watches")
 	cmd.Flags().StringVar(&review, "review", "", "the review file a stopped run reports on")
 	return cmd
+}
+
+// exitStrayWrites is the status of a review run that exited 0 but left files
+// changed outside its spec folder (#1649).
+const exitStrayWrites = 4
+
+// reportStrayWrites names, on errw, what the run left changed outside the
+// review's spec folder, and says whether there was any. A snapshot that could
+// not be taken is reported as unchecked, never as clean.
+func reportStrayWrites(errw io.Writer, review string, before spec.TreeSnapshot, snapErr error) bool {
+	if review == "" {
+		return false
+	}
+	after, err := before, snapErr
+	if err == nil {
+		after, err = spec.SnapshotTree(review)
+	}
+	if err != nil {
+		_, _ = fmt.Fprintf(errw, "[review] writes outside the spec folder were NOT checked: %v\n", err)
+		return false
+	}
+	stray := before.StrayWrites(after)
+	for _, p := range stray {
+		_, _ = fmt.Fprintf(errw, "[review] wrote outside %s: %s\n", before.Folder(), p)
+	}
+	return len(stray) > 0
 }
 
 // deadlineWrap runs argv under this binary's `spec deadline`, resolved by
