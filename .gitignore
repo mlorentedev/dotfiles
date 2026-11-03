@@ -44,6 +44,11 @@ Thumbs.db
 node_modules/
 *.log
 
+# Runtime state dotf writes under the deploy dir (the bw serve daemon's pid
+# file and its log, rotated to .log.1). Only matters where the deploy dir is a
+# git checkout (#1750).
+/state/
+
 # Go build artifacts — the CLI installs to ~/.local/bin via install.sh; a local
 # `go build` in cli/ leaves an untracked binary that must never be committed.
 /cli/dotf

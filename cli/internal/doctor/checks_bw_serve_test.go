@@ -82,6 +82,20 @@ func TestCheckBWServeDaemon_States(t *testing.T) {
 			notSubstr:  []string{"ServerConfig", "previous.js"},
 		},
 		{
+			// #1750: doctor prints the daemon's own output, so nothing pins
+			// what kind of text that is. A credential-shaped string never
+			// reaches the report, even one straddling the line-width cut.
+			name: "absent, gone, credential-shaped output → WARN masks it", status: "absent",
+			pid: 4242, alive: false,
+			log: "==== dotf: started bw serve pid 4242 at 2026-11-02T07:00:00Z ====\n" +
+				"fetch https://user:" + sentinelSecret + "@vault.example/api failed\n" +
+				"Authorization: Bearer " + sentinelSecret + "\n" +
+				strings.Repeat("x", 150) + " " + sentinelGitHubToken + "\n",
+			wantStatus: StatusWarn, needle: "daemon exited",
+			wantSubstr: []string{"[REDACTED]", "https://user:"},
+			notSubstr:  []string{sentinelSecret, sentinelGitHubToken[:5]}, // the cut alone would leave "ghp_T…"
+		},
+		{
 			name: "absent, pid recorded and alive → WARN alive but not answering", status: "absent",
 			pid: 4242, alive: true,
 			wantStatus: StatusWarn, needle: "alive but nothing answers",
@@ -126,6 +140,13 @@ func TestCheckBWServeDaemon_States(t *testing.T) {
 		})
 	}
 }
+
+// Sentinels for the credential row, assembled at run time so the source holds
+// no literal a secret scanner would stop on.
+var (
+	sentinelSecret      = "s3ntinel" + strings.Repeat("Q", 16)
+	sentinelGitHubToken = "gh" + "p_" + strings.Repeat("T", 36)
+)
 
 // tagOf renders a Status for a failure message; -1 (statusOfLine's "no such
 // line") has no tag.
