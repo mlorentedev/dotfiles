@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/pr-review-triage/SKILL.md
-generated_sha: 8caa08e3c9c33dc0
+generated_sha: 8026a9275faf9db6
 id: pr-review-triage-skill
 type: skill
 status: active
@@ -204,6 +204,8 @@ dotf forge pr comment <N> --body-file <file>    # run inside the repo's checkout
 ```
 
 **The heading is a contract, not a formatting choice.** `dotf pr triage-queue` reads it back to decide whether a PR is still pending: a PR is pending when its newest reviewer output is newer than its newest triage record. The string is declared once, in `harness/review-attestation.json` under `triage.marker` — this skill writes it and the queue reads it. Match it exactly, at the start of a line.
+
+**Post it as a conversation comment, from an account with standing.** The queue counts a record only when its author's GitHub association is listed under `triage.standing` in the same file (default: `OWNER`, `MEMBER`, `COLLABORATOR`). A `gh` that posts as a GitHub App gets `NONE`, and a triage submitted as a review body is review output, not a record: neither takes the PR out of the queue, and `dotf pr land` refuses. The queue's pending reason names an ignored record and its association.
 
 **Record the empty case too.** *"CI green, no review findings"* is a disposition and it must be written down like any other — one row saying so is enough. Skipping it because there was nothing to apply leaves the PR in the queue forever, and a queue that never drains is one nobody reads. The queue re-opens by itself the moment a reviewer speaks again, so recording early costs nothing.
 
