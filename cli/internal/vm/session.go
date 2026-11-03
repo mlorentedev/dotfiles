@@ -1,6 +1,10 @@
 package vm
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"io"
+)
 
 // Status is what a verb reports about itself, never about the guest command it
 // ran (ADR-055 decision 8): `ok` means the verb ran to completion.
@@ -17,6 +21,23 @@ const (
 	// a state record outlived its guest, and `down` clears it.
 	StatusStale Status = "stale"
 )
+
+// Session is a guest store behind the verbs (ADR-055 decision 1): Linux holds
+// many named guests, Windows one.
+type Session interface {
+	// Up creates a session, the name defaulting to <os>-<unix time>, and holds it
+	// until Down. Progress and the hypervisor's output never reach the record.
+	Up(ctx context.Context, name string, progress, out io.Writer) Record
+	// Down removes a session's guest and state, and clears a stale one.
+	Down(ctx context.Context, name string, out io.Writer) Record
+	// List answers what the hypervisor says about each session. It is never nil,
+	// so --json writes [].
+	List(ctx context.Context) ([]Record, error)
+	// Exec runs one command in a session; the record holds its outcome.
+	Exec(ctx context.Context, o ExecOptions) Record
+	// Copy moves one file between the host and a session.
+	Copy(ctx context.Context, src, dst string, stderr io.Writer) Record
+}
 
 // Record is the one JSON object a `--json` call writes to stdout, whatever the
 // outcome (ADR-055 decision 7). A consumer reads Status and Exit, never stderr

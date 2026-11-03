@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -122,5 +123,133 @@ func TestVMUpWritesProgressToStderrAndTheNameToStdout(t *testing.T) {
 	stdout, stderr, err := runVerb(t, "up", "--session", "proof")
 	if err != nil || stdout != "proof\n" || !strings.Contains(stderr, "==> boot dotf-proof") {
 		t.Errorf("up: stdout=%q stderr=%q err=%v", stdout, stderr, err)
+	}
+}
+
+// fakeSession answers every verb with one status, and counts the calls.
+type fakeSession struct {
+	status vm.Status
+	calls  int
+	stdin  io.Reader
+	// elevated is what the last exec asked for.
+	elevated bool
+}
+
+func (f *fakeSession) Up(_ context.Context, name string, _, _ io.Writer) vm.Record {
+	f.calls++
+	return vm.NewRecord(name, "windows", f.status)
+}
+
+func (f *fakeSession) Down(_ context.Context, name string, _ io.Writer) vm.Record {
+	f.calls++
+	return vm.NewRecord(name, "windows", f.status)
+}
+
+func (f *fakeSession) Exec(_ context.Context, o vm.ExecOptions) vm.Record {
+	f.calls++
+	f.stdin, f.elevated = o.Stdin, o.Elevated
+	return vm.NewRecord(o.Session, "windows", f.status)
+}
+
+func (f *fakeSession) Copy(_ context.Context, src, _ string, _ io.Writer) vm.Record {
+	f.calls++
+	return vm.NewRecord(src, "windows", f.status)
+}
+
+func (f *fakeSession) List(context.Context) ([]vm.Record, error) {
+	f.calls++
+	return []vm.Record{}, nil
+}
+
+// The Windows verbs are the shared ones (ADR-055 decision 1): the record and
+// the process code come out the same, and a bad name never reaches the store.
+func TestVMWindowsVerbs(t *testing.T) {
+	noGuest(t)
+	f := &fakeSession{status: vm.StatusBusy}
+	old := windowsSessions
+	t.Cleanup(func() { windowsSessions = old })
+	windowsSessions = func() (vm.Session, error) { return f, nil }
+	run := func(args ...string) (string, error) {
+		c := newVMWindowsCmd()
+		c.SetArgs(args)
+		var out bytes.Buffer
+		c.SetOut(&out)
+		c.SetErr(io.Discard)
+		err := c.Execute()
+		return out.String(), err
+	}
+
+	out, err := run("up", "--session", "proof", "--json")
+	var rec vm.Record
+	if jerr := json.Unmarshal([]byte(out), &rec); jerr != nil {
+		t.Fatalf("up wrote %q: %v", out, jerr)
+	}
+	if rec.Status != vm.StatusBusy || rec.OS != "windows" || ExitCode(err) != 2 {
+		t.Errorf("up = %+v, %v", rec, err)
+	}
+	if out, err := run("status", "--json"); err != nil || strings.TrimSpace(out) != "[]" {
+		t.Errorf("status = %q, %v", out, err)
+	}
+	f.calls = 0
+	if _, err := run("cp", `proof:C:\Users\Public\a.bin`, filepath.Join(t.TempDir(), "a.bin")); ExitCode(err) != 2 || f.calls != 1 {
+		t.Errorf("cp = %v, %d calls", err, f.calls)
+	}
+	if _, err := run("exec", "--session", "proof", "--elevated", "--", "whoami"); ExitCode(err) != 2 || !f.elevated {
+		t.Errorf("exec --elevated = %v, elevated %v", err, f.elevated)
+	}
+	f.calls = 0
+	if _, err := run("up", "--session", "Bad Name"); ExitCode(err) != 2 {
+		t.Errorf("a bad name: %v", err)
+	}
+	if f.calls != 0 {
+		t.Error("a bad name reached the store")
+	}
+}
+
+// AC3: /dev/null and a terminal carry nothing, so a harness that hands every
+// command one is not refused; a pipe or a reader is the caller's data.
+func TestStdinGiven(t *testing.T) {
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = null.Close() }()
+	if stdinGiven(null) {
+		t.Error("the null device is not stdin to forward")
+	}
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.Close(); _ = w.Close() }()
+	if !stdinGiven(r) {
+		t.Error("a pipe is the caller's data")
+	}
+	if !stdinGiven(strings.NewReader("data")) {
+		t.Error("a reader is the caller's data")
+	}
+}
+
+func TestVMWindowsExecPassesNoStdinFromTheNullDevice(t *testing.T) {
+	noGuest(t)
+	f := &fakeSession{status: vm.StatusOK, stdin: strings.NewReader("stale")}
+	old := windowsSessions
+	t.Cleanup(func() { windowsSessions = old })
+	windowsSessions = func() (vm.Session, error) { return f, nil }
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = null.Close() }()
+	c := newVMWindowsCmd()
+	c.SetArgs([]string{"exec", "--session", "proof", "--json", "--", "whoami"})
+	c.SetIn(null)
+	c.SetOut(io.Discard)
+	c.SetErr(io.Discard)
+	if err := c.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if f.stdin != nil {
+		t.Errorf("stdin = %v, want none", f.stdin)
 	}
 }

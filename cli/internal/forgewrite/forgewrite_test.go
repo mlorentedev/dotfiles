@@ -16,6 +16,35 @@ import (
 
 const fakeToken = "fixture-value-not-a-credential"
 
+func TestParseOrigin_ReadsAnSSHHostAlias(t *testing.T) {
+	got, err := ParseOrigin("forge:personal/resume.git\n")
+	want := Repo{Host: "forge", Owner: "personal", Name: "resume"}
+	if err != nil || got != want {
+		t.Fatalf("got %+v, %v; want %+v", got, err, want)
+	}
+}
+
+func TestParseOrigin_RefusesWhatGitDoesNotReadAsAHost(t *testing.T) {
+	for name, origin := range map[string]string{
+		"a drive letter":       `C:/owner/name`,
+		"a slash before colon": "./odd:owner/name",
+		"an option as a host":  "-oProxyCommand=x:owner/name",
+		"nothing before colon": ":owner/name",
+		"a path with no owner": "forge:name.git",
+	} {
+		if _, err := ParseOrigin(origin); err == nil {
+			t.Errorf("%s: %q parsed", name, origin)
+		}
+	}
+}
+
+func TestSelect_NamesTheAPIForAnAliasNoHostDeclares(t *testing.T) {
+	_, _, err := Select(Repo{Host: "forge", Owner: "o", Name: "r"}, Hosts{})
+	if err == nil || !strings.Contains(err.Error(), `"forge"`) || !strings.Contains(err.Error(), "api") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestParseOrigin(t *testing.T) {
 	cases := map[string]Repo{
 		"https://github.com/mlorentedev/dotfiles.git":            {"github.com", "mlorentedev", "dotfiles"},

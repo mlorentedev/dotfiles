@@ -361,6 +361,22 @@ func TestExecWrapsScriptSecretAndTimeoutInOrder(t *testing.T) {
 	}
 }
 
+// AC8: sudo is the outermost layer, so a root timeout can kill a root command,
+// and the secret is read past it, so the value reaches the command, not sudo.
+func TestExecElevatedPrefixesSudo(t *testing.T) {
+	f := scriptLima(t, "")
+	o := execOpts("id")
+	o.Elevated, o.Timeout = true, time.Minute
+	o.Secrets = func() ([]string, error) { return []string{"API_TOKEN=" + fakeSecret}, nil }
+	if r := heldSession(t, f).Exec(context.Background(), o); r.Status != StatusOK {
+		t.Fatalf("Exec = %+v", r)
+	}
+	want := "shell dotf-x -- sudo -n timeout -k 5 60.000 bash -c " + forwardEnv + " _ API_TOKEN -- id"
+	if got := shellCalls(f); len(got) != 1 || got[0] != want {
+		t.Errorf("calls = %q, want %q", got, want)
+	}
+}
+
 // A copy that fails is dotf's failure: its exit status must not read as the
 // script's.
 func TestExecScriptCopyFailureIsNotAGuestExit(t *testing.T) {

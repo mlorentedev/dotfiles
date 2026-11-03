@@ -275,6 +275,31 @@ func triageRecord(pr PR, reg Registry) (Comment, bool) {
 	return newest, found
 }
 
+// ignoredTriageNote names the newest record that carries the marker but lacks
+// standing, when it is newer than the last counted one (#2896). Without it a
+// session whose gh posts as an app sees its triage ignored and `dotf pr land`
+// refuse, with nothing saying why. It explains a verdict and never changes one.
+func ignoredTriageNote(pr PR, reg Registry, after time.Time) string {
+	var newest Comment
+	found := false
+	for _, c := range pr.Comments {
+		if !hasLinePrefix(c.Body, reg.Triage.Marker) || hasStanding(c, reg.Triage.Standing) || !c.CreatedAt.After(after) {
+			continue
+		}
+		if !found || c.CreatedAt.After(newest.CreatedAt) {
+			newest, found = c, true
+		}
+	}
+	if !found {
+		return ""
+	}
+	assoc := strings.TrimSpace(newest.AuthorAssociation)
+	if assoc == "" {
+		assoc = "unreadable"
+	}
+	return fmt.Sprintf("; a triage record by %s was ignored: its author association %s is not in triage.standing", newest.Author, assoc)
+}
+
 // hasStanding reports whether c's author association is one the registry lets
 // write a triage record. An association that could not be read is not one.
 func hasStanding(c Comment, standing []string) bool {
@@ -315,11 +340,11 @@ func Evaluate(pr PR, reg Registry) Status {
 	triaged, any := lastTriage(pr, reg)
 	if !any {
 		return Status{PR: pr, Pending: true, Reviewer: by, At: out.Spoken(),
-			Reason: fmt.Sprintf("%s reviewed, never triaged", by)}
+			Reason: fmt.Sprintf("%s reviewed, never triaged", by) + ignoredTriageNote(pr, reg, triaged)}
 	}
 	if out.Spoken().After(triaged) {
 		return Status{PR: pr, Pending: true, Reviewer: by, At: out.Spoken(),
-			Reason: fmt.Sprintf("%s reviewed again after the last triage", by)}
+			Reason: fmt.Sprintf("%s reviewed again after the last triage", by) + ignoredTriageNote(pr, reg, triaged)}
 	}
 	return Status{PR: pr, Reviewer: by, At: out.Spoken(), Reason: "triaged"}
 }

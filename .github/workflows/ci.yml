@@ -153,17 +153,30 @@ jobs:
             bash -n "$script"
           done
 
-      - name: Check for shellcheck issues (scripts/)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
-        with:
-          scandir: './scripts'
-          severity: error
-
-      - name: Check for shellcheck issues (root scripts)
+      # The pin from versions.conf, not the runner's or an action's bundled
+      # shellcheck: a different version reports clean on code the local pin
+      # rejects (BUG-071, #1330). tests/ci-shellcheck-pin.bats holds both this
+      # and the file list below.
+      - name: Install shellcheck (pinned release)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
-          shellcheck --severity=error setup-linux.sh
+          . ./versions.conf
+          [ -n "${SHELLCHECK_VERSION:-}" ] || { echo "SHELLCHECK_VERSION missing from versions.conf" >&2; exit 1; }
+          url="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "$url" -o shellcheck.tar.xz
+          tar xJf shellcheck.tar.xz && rm shellcheck.tar.xz
+          sudo install -m0755 "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf "shellcheck-v${SHELLCHECK_VERSION}"
+          got="$(shellcheck --version | sed -n 's/^version: //p')"
+          [ "$got" = "$SHELLCHECK_VERSION" ] || { echo "shellcheck is $got, expected $SHELLCHECK_VERSION" >&2; exit 1; }
+
+      # Every hook is found, not listed, so a new one is linted from its first PR.
+      - name: Check for shellcheck issues
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        run: |
+          mapfile -t hooks < <(find git-hooks/ .github/hooks/ -type f | sort)
+          [ "${#hooks[@]}" -gt 0 ] || { echo "no hook files found" >&2; exit 1; }
+          shellcheck --severity=error scripts/*.sh setup-linux.sh install.sh "${hooks[@]}"
 
       - name: Lint bats @test names (no silent-skipped tests)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'

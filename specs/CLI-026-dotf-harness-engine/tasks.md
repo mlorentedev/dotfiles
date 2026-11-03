@@ -113,3 +113,21 @@ created: "2026-06-21"
 - [ ] `go build`, `go vet`, `go test`, `golangci-lint`, `GOOS=windows go vet` pass
 - [ ] `verification.md` filled in
 - [ ] Independent review (`dotf spec review CLI-026-dotf-harness-engine`) before archive
+
+## Follow-up the proposal deferred: #2851
+
+Out of scope for the port itself (proposal, "Out of scope"), because the parity oracles held the Go deploy
+to the shell's behaviour. Nothing in Go depends on the oracles for this surface any more, so it can change.
+
+- [x] A record owns its deployed skill directory once the deployed SKILL.md carries the marker (the issue's
+  option A): a file the record no longer ships is removed, then the directories that leaves empty
+  (`dropStaleAuxFiles`). SKILL.md is the render's; top-level dotfiles are left, as the copy never writes
+  them. An unmarked directory keeps its files on the run that first renders into it
+- [x] A dry run reports the output as deployed and removes nothing
+- [x] Prune owns an output by its provenance, not by a substring: `generated: true` as a line of the leading
+  frontmatter block, or a prompt's leading comment (`isGeneratedOutput`). A hand-written skill that quotes
+  the marker in its body is no longer pruned with its directory
+- [x] Tests first: `TestDeploySkills_DropsAuxFilesTheRecordNoLongerShips`,
+  `TestDeploySkills_AnUnmarkedDirKeepsItsFilesUntilTheRenderOwnsIt`, `TestDeploySkills_ADryRunKeepsTheDroppedAuxFile`,
+  `TestDeploySkills_KeepsAnAuxFileTheRecordShipsAsASymlink` (a symlinked record file is still shipped), `TestIsGeneratedOutput`,
+  `TestDeploySkills_KeepsAHandWrittenSkillThatQuotesTheMarker`

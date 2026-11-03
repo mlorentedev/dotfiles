@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // The embedded pool is a build-time copy: go:embed cannot reach the repo's
@@ -69,5 +72,19 @@ func TestEmbeddedPoolCarriesTheRouteBlocks(t *testing.T) {
 	}
 	if risk != 1 || weighted == 0 || p.PRAgentRisk == nil || p.PRAgentRisk.MinChangedLines == nil {
 		t.Errorf("risk members %d, weighted %d, risk line %+v", risk, weighted, p.PRAgentRisk)
+	}
+}
+
+func TestNaNChain_OrdersByWeightAndNamesEachModelOnce(t *testing.T) {
+	member := func(model string, weight int) spec.ReviewerEntry {
+		return spec.ReviewerEntry{PRAgent: &spec.PRAgentBlock{Model: model, Weight: weight}}
+	}
+	p := spec.ReviewerPool{Pool: []spec.ReviewerEntry{
+		member("openai/light", 1), {ID: "no-pr-agent"}, member("anthropic/heavy", 99),
+		member("openai/first-tie", 5), member("openai/second-tie", 5), member("openai/light", 9),
+	}}
+	got, want := NaNChain(p), []string{"openai/light", "openai/first-tie", "openai/second-tie"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }

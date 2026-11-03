@@ -42,19 +42,23 @@ type execFlags struct {
 	session, script string
 	secretIDs       []string
 	timeout         time.Duration
+	elevated        bool
 	asJSON          bool
 }
 
 // options checks everything that needs no guest; every failure is a refusal,
 // exit 2. The program is what follows `--`: it is never parsed as flags, and
 // prose stays out of argv (ADR-055 decision 4).
-func (f execFlags) options(cmd *cobra.Command, args []string) (vm.ExecOptions, error) {
-	o := vm.ExecOptions{Session: f.session, Script: f.script, Timeout: f.timeout, Stdin: cmd.InOrStdin()}
+func (f execFlags) options(cmd *cobra.Command, args []string, g sessionGuest) (vm.ExecOptions, error) {
+	o := vm.ExecOptions{Session: f.session, Script: f.script, Timeout: f.timeout, Elevated: f.elevated, Stdin: cmd.InOrStdin()}
+	if g.os == "windows" && !stdinGiven(o.Stdin) {
+		o.Stdin = nil
+	}
 	if err := vm.ValidSessionName(f.session); err != nil {
 		return o, err
 	}
 	if dash := cmd.ArgsLenAtDash(); len(args) > 0 && dash != 0 {
-		return o, errors.New("the program follows --: dotf vm linux exec --session <name> -- <program> [args...]")
+		return o, fmt.Errorf("the program follows --: dotf vm %s exec --session <name> -- <program> [args...]", g.os)
 	}
 	switch {
 	case (len(args) == 0) == (f.script == ""):
@@ -78,28 +82,31 @@ func (f execFlags) options(cmd *cobra.Command, args []string) (vm.ExecOptions, e
 	return o, nil
 }
 
-func newVMExecCmd() *cobra.Command {
+// stdinGiven tells a caller's stdin from a terminal or /dev/null, which a
+// harness hands every command and which carry nothing to forward.
+func stdinGiven(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok {
+		return true
+	}
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice == 0
+}
+
+func newVMExecCmd(g sessionGuest) *cobra.Command {
 	var f execFlags
 	c := &cobra.Command{
-		Use:   "exec --session <name> [flags] [-- <program> [args...]]",
-		Short: "Run one command in a session, with no shell, and report it in one record",
-		Long: "exec runs the program after -- directly, with no shell, or --script <file>\n" +
-			"copied in and run by sh. Its stdin is forwarded.\n\n" +
-			"--secret <id> resolves a registry value and writes it on the guest's stdin, as\n" +
-			"the variable the registry names; it is never in argv or on the guest's disk,\n" +
-			"and the guest's output is masked for it. A value the guest got elsewhere is\n" +
-			"not masked, nor is piped stdin. A guest command that exits non-zero is status\n" +
-			"ok with its code in exit, and dotf exits 1. A code of 255 can also be ssh\n" +
-			"losing the guest. --json bounds each stream at 1 MiB (truncated says so);\n" +
-			"without it stdout and stderr are the guest's.\n\n" + sessionVerbs,
-		Example:      "  dotf vm linux exec --session proof --json -- uname -a\n  dotf vm linux exec --session proof --secret GITHUB_TOKEN --timeout 10m --script check.sh",
+		Use:          "exec --session <name> [flags] [-- <program> [args...]]",
+		Short:        "Run one command in a session, with no shell, and report it in one record",
+		Long:         g.exec + "\n\n" + sessionVerbs,
+		Example:      "  dotf vm " + g.os + " exec --session proof --json -- uname -a\n  dotf vm " + g.os + " exec --session proof --timeout 10m --script check",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			o, err := f.options(cmd, args)
+			o, err := f.options(cmd, args, g)
 			if err != nil {
 				return withExitCode(2, err)
 			}
-			s, err := linuxSessions()
+			s, err := g.open()
 			if err != nil {
 				return err
 			}
@@ -116,8 +123,9 @@ func newVMExecCmd() *cobra.Command {
 		},
 	}
 	sessionFlags(c, &f.session, &f.asJSON, "session name (required)")
-	c.Flags().StringVar(&f.script, "script", "", "host file to copy in and run with sh")
+	c.Flags().StringVar(&f.script, "script", "", "host file to copy in and run with "+g.script)
 	c.Flags().StringArrayVar(&f.secretIDs, "secret", nil, "registry id or variable to forward on stdin (repeatable)")
+	c.Flags().BoolVar(&f.elevated, "elevated", false, "run as an administrator, for this call only")
 	c.Flags().DurationVar(&f.timeout, "timeout", 0, "stop the command after this long (default none)")
 	return c
 }

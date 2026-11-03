@@ -36,14 +36,17 @@ const forwardEnv = `while [ "$1" != -- ]; do IFS= read -r v || true; export "$1=
 type ExecOptions struct {
 	Session string
 	Argv    []string  // run with no shell; empty when Script is set
-	Script  string    // a host file, copied in and run by sh
-	Stdin   io.Reader // the caller's, forwarded as it is
+	Script  string    // a host file, copied in and run by the guest's interpreter
+	Stdin   io.Reader // the caller's: forwarded on Linux, refused on Windows when not nil
 	// Secrets resolves the KEY=value pairs to forward. It is called only once a
 	// guest can serve the call, so a refusal never costs a decryption.
 	Secrets func() ([]string, error)
 	Timeout time.Duration // 0 is none
-	Stdout  io.Writer
-	Stderr  io.Writer
+	// Elevated runs the call as an administrator: under sudo on Linux, in a
+	// high-integrity token on Windows (ADR-055 decision 6).
+	Elevated bool
+	Stdout   io.Writer
+	Stderr   io.Writer
 }
 
 // capped keeps the first maxRecordOutput bytes and swallows the rest, so it
@@ -181,6 +184,10 @@ func (s LinuxSessions) guestRun(ctx context.Context, o ExecOptions, pairs []stri
 	}
 	if o.Timeout > 0 {
 		argv = append([]string{"timeout", "-k", "5", strconv.FormatFloat(o.Timeout.Seconds(), 'f', 3, 64)}, argv...)
+	}
+	// Outside the timeout: an unprivileged timeout cannot kill a root command.
+	if o.Elevated {
+		argv = append([]string{"sudo", "-n"}, argv...)
 	}
 	return s.L(ctx, stdin, stdout, stderr, append([]string{"shell", instance, "--"}, argv...)...)
 }

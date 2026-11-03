@@ -1,6 +1,10 @@
 ---
 tags: [spec, verification, templates]
 created: "{{date:YYYY-MM-DD}}"
+id: "{{title}}"
+type: spec-verification
+status: active
+owner: manu
 ---
 
 # Verification - <feature-id>

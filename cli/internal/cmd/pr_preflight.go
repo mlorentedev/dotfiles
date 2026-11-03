@@ -25,9 +25,14 @@ func newPrPreflightCmd() *cobra.Command {
 		Short: "Find the first model of PR-Agent's declared NaN chain that NaN answers",
 		Long: `Probe each model of PR-Agent's declared NaN chain once, with a small request
 and a timeout, and report the first that answers followed by the other models
-that answered, in declared order. The chain is --model, then --fallbacks. It
-never chooses a model: it only skips dead entries, and a model outside the chain
-is never considered.
+that answered, in declared order. It never chooses a model: it only skips dead
+entries, and a model outside the chain is never considered.
+
+The chain comes from one of two places. --pool reads it from the reviewer pool,
+"embedded" or a file path: the NaN members for PR-Agent, by descending weight,
+pool order breaking a tie. A file that cannot be read is an error, never the
+embedded pool. Otherwise it is --model, then --fallbacks. Giving both, or
+neither, is a usage error.
 
 A model that did not answer becomes a ::warning:: naming the fix for its status
 class (a refused key, quota or concurrency, an outage) and a row in the job
@@ -49,16 +54,17 @@ setup error.`,
 		SilenceErrors: true,
 		RunE:          o.run,
 	}
-	cmd.Flags().StringVar(&o.model, "model", "", "the declared primary, openai/<id> (required)")
-	cmd.Flags().StringVar(&o.fallbacks, "fallbacks", "", "the other declared models, a JSON array of openai/<id> (required)")
+	cmd.Flags().StringVar(&o.model, "model", "", "the declared primary, openai/<id> (required without --pool)")
+	cmd.Flags().StringVar(&o.fallbacks, "fallbacks", "", "the other declared models, a JSON array of openai/<id> (required without --pool)")
+	cmd.Flags().StringVar(&o.pool, "pool", "", "read the chain from the reviewer pool: \"embedded\", or the path of a pool file")
 	cmd.Flags().StringVar(&o.output, "output", "", "append the key=value lines to this file (default: stdout)")
 	cmd.Flags().BoolVar(&o.asJSON, "json", false, "write the result as one JSON object instead of key=value lines")
 	return cmd
 }
 
 type preflightOpts struct {
-	model, fallbacks, output string
-	asJSON                   bool
+	model, fallbacks, pool, output string
+	asJSON                         bool
 }
 
 // run probes the chain and reports in the order the workflow expects:
@@ -66,6 +72,10 @@ type preflightOpts struct {
 func (o *preflightOpts) run(c *cobra.Command, _ []string) error {
 	in := prreview.PreflightInputs{Model: o.model, Fallbacks: o.fallbacks, Key: os.Getenv("NAN_API_KEY"),
 		APIBase: os.Getenv("NAN_API_BASE"), Timeout: os.Getenv("PREFLIGHT_TIMEOUT")}
+	explicit := c.Flags().Changed("model") || c.Flags().Changed("fallbacks")
+	if err := o.readPool(&in, explicit); err != nil {
+		return preflightUsage(c, err.Error())
+	}
 	res, err := prreview.Preflight(c.Context(), in, prreview.PreflightEnv{Out: c.OutOrStdout()})
 	var setup prreview.PreflightSetupError
 	if errors.As(err, &setup) {
@@ -93,6 +103,25 @@ func (o *preflightOpts) run(c *cobra.Command, _ []string) error {
 	}
 	if err := appendText(o.output, text); err != nil {
 		return preflightUsage(c, "pr preflight: "+err.Error())
+	}
+	return nil
+}
+
+// readPool sets the chain from --pool, when it is given. A pool with no NaN member
+// is a usage error: exit 1 would read as NaN being down and move the review.
+func (o *preflightOpts) readPool(in *prreview.PreflightInputs, explicit bool) error {
+	if o.pool == "" {
+		return nil
+	}
+	if explicit {
+		return errors.New("pr preflight: --pool cannot be combined with --model or --fallbacks")
+	}
+	p, err := prreview.LoadPool(o.pool)
+	if err != nil {
+		return err
+	}
+	if in.Chain, in.Pool = prreview.NaNChain(p), o.pool; len(in.Chain) == 0 {
+		return fmt.Errorf("pr preflight: the pool %q has no NaN member for PR-Agent", o.pool)
 	}
 	return nil
 }

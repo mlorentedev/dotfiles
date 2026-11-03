@@ -2,6 +2,7 @@ package vm
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -56,47 +57,25 @@ func Run(h Host, o RunOptions) (err error) {
 	if !done {
 		return fmt.Errorf("no clean-base at %s: run `dotf vm windows build` first", l.BaseDisk())
 	}
-	if err := errors.Join(removeIfPresent(l.Disk()), removeIfPresent(l.Vars())); err != nil {
-		return err
-	}
 	defer func() {
 		if !o.Keep {
 			err = errors.Join(err, removeIfPresent(l.Disk()), removeIfPresent(l.Vars()))
 		}
 	}()
-	if err := h.Img("create", "-q", "-f", "qcow2", "-b", l.BaseDisk(), "-F", "qcow2", l.Disk()); err != nil {
-		return fmt.Errorf("qemu-img create: %w", err)
+	p, q, err := bootGuest(h, o)
+	if p != nil {
+		defer func() {
+			if o.Keep {
+				step(o.Progress, "kept: the guest is still running; `dotf vm windows stop` stops it")
+				return
+			}
+			kill(p)
+		}()
 	}
-	if err := copyFile(l.BaseVars(), l.Vars()); err != nil {
-		return err
+	if q != nil {
+		defer func() { _ = q.Close() }()
 	}
-	log, err := os.OpenFile(l.Log(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
-		return err
-	}
-	defer func() { _ = log.Close() }()
-
-	step(o.Progress, "boot a throwaway overlay of clean-base (QEMU's output in %s)", l.Log())
-	p, err := start(h, o.Machine, log)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if o.Keep {
-			step(o.Progress, "kept: the guest is still running; `dotf vm windows stop` stops it")
-			return
-		}
-		kill(p)
-	}()
-	q, err := agent(h, l, o.Agent, p)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = q.Close() }()
-	if err := syncClock(q, o); err != nil {
-		return err
-	}
-	if err := waitLogon(q, o); err != nil {
 		return err
 	}
 
@@ -127,6 +106,42 @@ func Run(h Host, o RunOptions) (err error) {
 	}
 	step(o.Progress, "converged, and the second run changed nothing")
 	return nil
+}
+
+// bootGuest boots a fresh overlay of clean-base and waits until the test user
+// is logged on, which is when a scheduled task can run. It returns what it got
+// as far as it got: the caller decides whether a guest that failed halfway is
+// kept or killed.
+func bootGuest(h Host, o RunOptions) (Process, *QGA, error) {
+	l := o.Machine.Layout
+	if err := errors.Join(removeIfPresent(l.Disk()), removeIfPresent(l.Vars())); err != nil {
+		return nil, nil, err
+	}
+	if err := h.Img("create", "-q", "-f", "qcow2", "-b", l.BaseDisk(), "-F", "qcow2", l.Disk()); err != nil {
+		return nil, nil, fmt.Errorf("qemu-img create: %w", err)
+	}
+	if err := copyFile(l.BaseVars(), l.Vars()); err != nil {
+		return nil, nil, err
+	}
+	log, err := os.OpenFile(l.Log(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = log.Close() }()
+
+	step(o.Progress, "boot a throwaway overlay of clean-base (QEMU's output in %s)", l.Log())
+	p, err := start(h, o.Machine, log)
+	if err != nil {
+		return nil, nil, err
+	}
+	q, err := agent(h, l, o.Agent, p)
+	if err != nil {
+		return p, nil, err
+	}
+	if err := syncClock(q, o); err != nil {
+		return p, q, err
+	}
+	return p, q, waitLogon(q, o)
 }
 
 // copyDotf copies a dotf source build in, where guestrun.ps1 puts it on PATH
@@ -254,22 +269,15 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 	}
 	task := "dotf-" + name
 	action := `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ` + guestWork + `\guestrun.ps1 -Step ` + name
-	for _, args := range [][]string{
-		{"/create", "/tn", task, "/tr", action, "/sc", "once", "/st", "00:00", "/ru", guestUser, "/it", "/f"},
-		{"/run", "/tn", task},
-	} {
-		r, err := q.Run("schtasks.exe", args)
-		if err != nil {
-			return err
-		}
-		if r.ExitCode != 0 {
-			return fmt.Errorf("schtasks %s: exit %d: %s", args[0], r.ExitCode, strings.TrimSpace(string(r.Stdout)+string(r.Stderr)))
-		}
+	if err := startTask(q, task, action); err != nil {
+		return err
 	}
 
-	code, werr := waitExit(q, o, guestWork+`\`+name+".exit")
+	limit, cancel := context.WithTimeout(context.Background(), o.Step)
+	defer cancel()
+	code, werr := pollExit(limit, q, o.Poll, guestWork+`\`+name+".exit")
 	if out, err := q.ReadFile(guestWork + `\` + name + ".log"); err == nil {
-		_, _ = o.Out.Write(bytes.TrimPrefix(out, []byte("\xef\xbb\xbf")))
+		_, _ = o.Out.Write(bytes.TrimPrefix(out, []byte(utf8BOM)))
 	}
 	if werr != nil {
 		return fmt.Errorf("%s did not finish in %s: %w", label, o.Step, werr)
@@ -289,20 +297,39 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 	return errors.Join(runErr, check(rep))
 }
 
-// waitExit polls for a step's exit file, which guestrun.ps1 writes last.
-func waitExit(q *QGA, o RunOptions, path string) (string, error) {
-	deadline := time.Now().Add(o.Step)
+// startTask starts action in the test user's session, with the flags added to
+// its creation.
+func startTask(q *QGA, task, action string, flags ...string) error {
+	create := []string{"/create", "/tn", task, "/tr", action, "/sc", "once", "/st", "00:00", "/ru", guestUser, "/it", "/f"}
+	for _, args := range [][]string{
+		append(create, flags...),
+		{"/run", "/tn", task},
+	} {
+		r, err := q.Run("schtasks.exe", args)
+		if err != nil {
+			return err
+		}
+		if r.ExitCode != 0 {
+			return fmt.Errorf("schtasks %s: exit %d: %s", args[0], r.ExitCode, strings.TrimSpace(string(r.Stdout)+string(r.Stderr)))
+		}
+	}
+	return nil
+}
+
+// pollExit polls for an exit file, which a step writes last, until ctx ends.
+func pollExit(ctx context.Context, q *QGA, poll time.Duration, path string) (string, error) {
 	for {
 		b, err := q.ReadFile(path)
-		if code := strings.TrimSpace(string(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")))); err == nil && code != "" {
+		if code := strings.TrimSpace(string(bytes.TrimPrefix(b, []byte(utf8BOM)))); err == nil && code != "" {
 			return code, nil
 		}
-		if time.Now().After(deadline) {
+		select {
+		case <-ctx.Done():
 			if err == nil {
 				err = errors.New("its exit file stayed empty")
 			}
 			return "", err
+		case <-time.After(poll):
 		}
-		time.Sleep(o.Poll)
 	}
 }

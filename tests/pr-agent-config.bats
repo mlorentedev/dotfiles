@@ -1414,7 +1414,9 @@ repo = sys.argv[1]
 marker = json.load(open(os.path.join(repo, "harness/review-attestation.json")))["triage"]["marker"]
 writers = ["harness/skills/pr-review-triage/SKILL.md",
            "docs/runbooks/release-dotf.md",
-           "docs/runbooks/guide-pr-agent-reviewer.md"]
+           "docs/runbooks/guide-pr-agent-reviewer.md",
+           # Read only: the grant names the record as a merge condition (#2896).
+           ".github/merge-grant.yml"]
 errors = []
 for w in writers:
     text = open(os.path.join(repo, w)).read()

@@ -129,6 +129,7 @@ func Render(id, date, repoSlug string, issueNum int, issueTitle string) (map[str
 		s := string(raw)
 		s = strings.ReplaceAll(s, "<feature-id>", id)
 		s = strings.ReplaceAll(s, "{TITLE}", id)
+		s = strings.ReplaceAll(s, "{{title}}", id) // Obsidian's note-name placeholder (#3050)
 		s = strings.ReplaceAll(s, "{{date:YYYY-MM-DD}}", date)
 		if name == "proposal.md" {
 			if issueNum > 0 {

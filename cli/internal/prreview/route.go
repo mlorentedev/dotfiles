@@ -69,6 +69,7 @@ type router struct {
 	nan       []string
 	anthropic []string
 	notes     []string
+	answered  map[string]bool // each Anthropic member's probe, so none runs twice
 }
 
 // Route draws which pool member reviews a PR first, and on which provider.
@@ -92,7 +93,7 @@ type router struct {
 // it may be a misspelt nan-only, and spending against a switch someone meant to
 // turn off is the one outcome this must not produce.
 func Route(ctx context.Context, pool spec.ReviewerPool, source string, in Inputs, env Env) (Result, error) {
-	r := &router{pool: pool, source: source, in: in, env: env, provider: in.Provider}
+	r := &router{pool: pool, source: source, in: in, env: env, provider: in.Provider, answered: map[string]bool{}}
 	if r.provider == "" {
 		r.provider = providerDraw
 	}
@@ -131,6 +132,15 @@ func (r *router) refuse() error {
 			" (a missing NAN_API_KEY, tool or argument). Nothing is drawn, so a broken setup cannot move every"+
 			" review onto the paid Anthropic key.")
 		return ErrRefused
+	}
+	// Read as "no fallbacks", a broken value would shrink the chain unnoticed and
+	// leave a NaN outage on one model with nothing behind it.
+	if r.nanAnswered() {
+		if _, err := r.fallbacks(); err != nil {
+			r.annotate("error", "NAN_FALLBACKS is not a JSON array of model names (%v). Nothing is drawn:"+
+				" the preflight writes this value, so the step between them is broken.", err)
+			return ErrRefused
+		}
 	}
 	return nil
 }
@@ -180,19 +190,28 @@ func (r *router) route(ctx context.Context) (Result, error) {
 
 // nanChain is the NaN members that answered, in declared order.
 func (r *router) nanChain() []string {
-	if r.in.NanOutcome != "success" || r.in.NanModel == "" {
+	if !r.nanAnswered() {
 		return nil
 	}
 	chain := []string{r.in.NanModel}
-	var rest []string
-	if json.Unmarshal([]byte(r.in.NanFallbacks), &rest) == nil {
-		for _, m := range rest {
-			if m != "" {
-				chain = append(chain, m)
-			}
+	rest, _ := r.fallbacks() // refuse has already stopped a malformed value
+	for _, m := range rest {
+		if m != "" {
+			chain = append(chain, m)
 		}
 	}
 	return chain
+}
+
+func (r *router) nanAnswered() bool { return r.in.NanOutcome == "success" && r.in.NanModel != "" }
+
+// fallbacks reads NAN_FALLBACKS; empty is a chain of one, not a malformed value.
+func (r *router) fallbacks() ([]string, error) {
+	if r.in.NanFallbacks == "" {
+		return nil, nil
+	}
+	var rest []string
+	return rest, json.Unmarshal([]byte(r.in.NanFallbacks), &rest)
 }
 
 // riskReason says why the PR is risky: past the line count, or carrying the
@@ -234,7 +253,7 @@ func (r *router) candidates() []string {
 		candidates = r.anthropic
 	}
 	if len(candidates) == 0 && r.provider != providerDraw && r.provider != providerNaNOnly {
-		r.annotate("warning", "PR_AGENT_PROVIDER=%s, but no %s member answered; drawing from the rest of the pool.", r.provider, r.provider)
+		r.note(fmt.Sprintf("PR_AGENT_PROVIDER=%s, but no %s member answered; drawing from the rest of the pool.", r.provider, r.provider))
 		candidates = slices.Concat(r.nan, r.anthropic)
 	}
 	return candidates
@@ -323,15 +342,20 @@ func (r *router) attempts(res *Result) {
 	}
 }
 
-// answers probes one Anthropic member; on anything but a 2xx it adds the note
-// naming the fix and reports false.
+// answers probes one Anthropic member once per route; on anything but a 2xx it
+// adds the note naming the fix and reports false. A member can be both drawn and
+// the risk route, and a second probe would spend and repeat the note.
 func (r *router) answers(ctx context.Context, model string) bool {
+	if ok, probed := r.answered[model]; probed {
+		return ok
+	}
 	code := Probe(ctx, r.env.Client, cmpOr(r.in.APIBase, "https://api.anthropic.com"), r.in.AnthropicKey, model,
 		ParseTimeout(r.in.ProbeTimeout))
 	ok, note := Verdict(model, code, r.in.ProbeTimeout)
 	if !ok {
 		r.note(note)
 	}
+	r.answered[model] = ok
 	return ok
 }
 
