@@ -126,6 +126,9 @@ func filesAnswer(files string) ([]byte, error) {
 
 // apiAnswer answers both `gh api` reads Land makes for a ready PR.
 func apiAnswer(line string) ([]byte, error) {
+	if strings.HasSuffix(line, "--jq .merged") { // a merge gh reported failed did not land
+		return []byte("false\n"), nil
+	}
 	if strings.Contains(line, "/pulls/") {
 		return filesAnswer("")
 	}
@@ -764,9 +767,11 @@ func TestLand_AnyOtherChecksFailureWithNoOutputIsAnError(t *testing.T) {
 	}
 }
 
-// gh can fail after the merge landed: the head branch deletion is refused, or
-// the client times out. The PR then reads MERGED, so it is a landing with a
-// warning, and the dependents stay on the base, where they belong now.
+// gh can fail after the merge landed: the head branch deletion is refused, the
+// client times out, or GraphQL is rate-limited. The PR then reads merged, so it
+// is a landing with a warning, and the dependents stay on the base, where they
+// belong now. The question is asked of REST: a GraphQL budget that failed the
+// merge fails a GraphQL read too, and REST has its own (#3082).
 func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 	run, calls := failingMergeGH(false)
 	attempted := false
@@ -776,7 +781,10 @@ func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 			attempted = true
 		}
 		if attempted && strings.HasPrefix(line, "pr view") {
-			return []byte(strings.Replace(readyView, `"OPEN"`, `"MERGED"`, 1)), nil
+			return nil, errors.New("exit status 1: GraphQL: API rate limit already exceeded for user ID 1")
+		}
+		if attempted && strings.HasSuffix(line, "--jq .merged") {
+			return []byte("true\n"), nil
 		}
 		return run(ctx, args...)
 	}
@@ -797,6 +805,32 @@ func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 	}
 	if strings.Join(*calls, "\n") != strings.Join(want, "\n") {
 		t.Errorf("calls:\n%s\nwant (no restore):\n%s", strings.Join(*calls, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// When the read that would tell whether the merge landed fails too, the outcome
+// is unknown: land reports the failure with both errors, so the unknown says
+// so, and restores the dependents as for any failed merge.
+func TestLand_AnUnconfirmableMergeNamesTheReadThatFailed(t *testing.T) {
+	run, calls := failingMergeGH(false)
+	unconfirmed := func(ctx context.Context, args ...string) ([]byte, error) {
+		if strings.HasSuffix(strings.Join(args, " "), "--jq .merged") {
+			return nil, errors.New("HTTP 502: Bad Gateway")
+		}
+		return run(ctx, args...)
+	}
+
+	res, err := Land(context.Background(), Options{Run: unconfirmed, Untriaged: noneUntriaged}, 30)
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	for _, want := range []string{"head branch was modified", "read whether #30 merged", "HTTP 502"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error lacks %q: %v", want, err)
+		}
+	}
+	if res.Merged || !strings.HasSuffix(strings.Join(*calls, "\n"), "pr edit 31 --base feat/x") {
+		t.Errorf("want not merged and #31 restored, got %+v, calls %v", res, *calls)
 	}
 }
 
