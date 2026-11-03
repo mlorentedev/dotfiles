@@ -64,6 +64,16 @@ Round 1 (`nan/mimo-v2.6-flash`, FAIL) is kept as `review-round1.md`.
 - Minor, `WindowsSessions.Exec` at 70 lines: ticketed in #3106, which touches the same function.
 - Minor, f5 named only a darwin-only test: applied. f5 now also names the portable `TestVMUpWritesProgressToStderrAndTheNameToStdout` and the new test.
 
+## Review round 2 dispositions
+
+Round 2 (`nan/qwen3.8-flash`, PASS) reviewed `1280b8ad`. That commit includes #3107, which fixed round 1's Major.
+
+- Minor, a usage refusal writes no record under `--json`: ticketed as #3111.
+- Minor, an undefined flag exits 1 where decision 8 lists "bad flag" under exit 2: ticketed as #3111.
+- Minor, the `errors.Join` branch of `openFor` is untested: ticketed as #3111.
+- Minor, carried from round 1: #3105 and #3106 are still open.
+- Question, the review range spans other specs' commits: the range is the one `dotf spec review` resolved from the spec's base. Both rounds judged only PLAT-005's own surface, and the archive gates on that.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
@@ -74,10 +84,10 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/PLAT-005-vm-session-verbs/` -> `specs/archive/PLAT-005-vm-session-verbs/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/PLAT-005-vm-session-verbs/` -> `specs/archive/PLAT-005-vm-session-verbs/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 ## Windows fixture and acceptance (AC10)
 
