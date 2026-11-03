@@ -37,6 +37,12 @@ owner: manu
 - Minor, bare `404` substring match: applied. The match is now `HTTP 404`.
 - Minor, `--limit 1000` on `label list`: declined. No repository is near 1000 labels, and a label past it would be a duplicate create, which fails loudly.
 
+## Review round 2 dispositions (PASS, c4a003c1)
+
+- Minor, the `dependabot.yaml` fallback is untested: ticketed as #3121. Landing it here would move the head off the reviewed commit for a THEORETICAL finding.
+- Minor, `--limit 1000`: declined in round 1 (above).
+- PR: #3116.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: the one finding (Dependabot never creates a custom label) is the issue's premise and is recorded in the code comment and the proposal; nothing new was learned building it.
@@ -45,7 +51,7 @@ owner: manu
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-081-dependabot-labels-provisioned/` -> `specs/archive/HARNESS-081-dependabot-labels-provisioned/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-081-dependabot-labels-provisioned/` -> `specs/archive/HARNESS-081-dependabot-labels-provisioned/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)

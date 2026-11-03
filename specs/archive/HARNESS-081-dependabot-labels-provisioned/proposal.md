@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-081-dependabot-labels-provisioned"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-02"
 issue: "mlorentedev/dotfiles#1222"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
