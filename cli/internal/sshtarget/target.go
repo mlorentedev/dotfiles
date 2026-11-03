@@ -209,7 +209,9 @@ type Service interface {
 	Validate(root Root) error // `sshd -t` on the installed config
 	// Effective is `sshd -T` on the installed config: the values sshd would
 	// run with. Validate proves the file parses, Effective that it was read.
-	Effective(root Root) ([]byte, error)
+	// A non-empty conn is an `sshd -C` spec: the values for that connection,
+	// where a Match block applies, which the plain dump leaves out.
+	Effective(root Root, conn string) ([]byte, error)
 }
 
 // Target is one machine's SSH posture.
@@ -477,14 +479,28 @@ func (t Target) apply(p Plan, undo *[]func() error) error {
 // fails when it does not carry the drop-in's values. It runs in the apply, where
 // root is ready, and not in Prove: Prove also runs on a converged plan and in
 // the post-condition of a headless converge, which has no root to ask for. The
-// dump does not depend on the connecting address (the drop-in has no Match
-// block, measured on OpenSSH 10.3p1), so one dump covers the mesh and the LAN.
+// plain dump does not show the drop-in's Match block, so a fenced drop-in is
+// asked about once more for each side of the fence.
 func (t Target) proveEffective(dropIn []byte) error {
-	out, err := t.Service.Effective(t.Root)
+	out, err := t.Service.Effective(t.Root, "")
 	if err != nil {
 		return fmt.Errorf("read sshd's effective config: %w", err)
 	}
-	return checkEffective(dropIn, out, t.Paths.DropIn)
+	if err := checkEffective(dropIn, out, t.Paths.DropIn); err != nil {
+		return err
+	}
+	if !fenced(dropIn) {
+		return nil
+	}
+	outside, err := t.Service.Effective(t.Root, connSpec(t.User, outsideAddr))
+	if err != nil {
+		return fmt.Errorf("read sshd's effective config: %w", err)
+	}
+	inside, err := t.Service.Effective(t.Root, connSpec(t.User, insideAddr))
+	if err != nil {
+		return fmt.Errorf("read sshd's effective config: %w", err)
+	}
+	return checkFence(outside, inside, t.Paths.DropIn)
 }
 
 // Prove asks sshd, through the mesh address, whether it accepts the owner's
@@ -492,7 +508,7 @@ func (t Target) proveEffective(dropIn []byte) error {
 // `Server accepts key` from the client's debug output, so it needs neither
 // the key's passphrase nor an agent, and never opens a session.
 //
-// What this proves is the sshd layer: the listener, AllowUsers and the
+// What this proves is the sshd layer: the listener, the drop-in's fence and the
 // authorized key. A connection to the node's own address does not cross its
 // firewall, so the firewall is proven from another node (OBS-036).
 func (t Target) Prove(p Plan) error {

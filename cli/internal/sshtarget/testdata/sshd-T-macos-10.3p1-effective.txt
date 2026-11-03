@@ -78,7 +78,7 @@ loglevel INFO
 syslogfacility AUTH
 authorizedkeysfile .ssh/authorized_keys .ssh/authorized_keys2
 hostkey /scratch/hk
-allowusers dotf@100.64.0.0/10
+allowusers dotf
 authenticationmethods publickey
 channeltimeout none
 maxstartups 10:30:100

@@ -32,10 +32,11 @@ func sshdDump(t *testing.T, name string) []byte {
 // config whose Include reads the drop-in (effective), and over one whose
 // Include matches no file (ignored). The second is #2763: `sshd -t` passes it,
 // the dump shows the defaults. Each was run as the user with a scratch host
-// key, so no root and no change to the machine.
+// key, so no root and no change to the machine. The third dump, outside, adds
+// `-C user=dotf,host=h,addr=192.0.2.1`.
 var platforms = []string{
 	"macos-10.3p1",  // macOS, OpenSSH 10.3p1
-	"ubuntu-10.2p1", // msi, Ubuntu, OpenSSH 10.2p1
+	"ubuntu-10.2p1", // Ubuntu 26.04 in a throwaway container, OpenSSH 10.2p1
 	"ubuntu-8.9p1",  // Ubuntu 22.04 in a throwaway container, OpenSSH 8.9p1 (1:8.9p1-3ubuntu0.18)
 }
 
@@ -59,6 +60,54 @@ func TestCheckEffectiveTellsADropInThatWasReadFromOneThatWasNot(t *testing.T) {
 	}
 }
 
+// The plain dump never shows the Match block, so the fence has its own proof:
+// `outside` is the dump with `-C addr=` from outside the mesh, and on every
+// build a dump from inside it was byte-identical to the plain one.
+func TestCheckFenceTellsAClosedLANFromAnOpenOne(t *testing.T) {
+	if !fenced(realDropIn(t)) {
+		t.Fatal("the shipped drop-in has no DenyUsers, so no apply proves its fence")
+	}
+	for _, plat := range platforms {
+		t.Run(plat, func(t *testing.T) {
+			effective := sshdDump(t, "sshd-T-"+plat+"-effective.txt")
+			outside := sshdDump(t, "sshd-T-"+plat+"-outside.txt")
+			if err := checkFence(outside, effective, "/drop-in"); err != nil {
+				t.Errorf("the measured pair failed: %v", err)
+			}
+			if err := checkFence(effective, effective, "/drop-in"); err == nil || !strings.Contains(err.Error(), "leaves it open") {
+				t.Errorf("a LAN with no DenyUsers = %v", err)
+			}
+			if err := checkFence(outside, outside, "/drop-in"); err == nil || !strings.Contains(err.Error(), "shuts the mesh out") {
+				t.Errorf("a mesh under DenyUsers = %v", err)
+			}
+		})
+	}
+}
+
+func TestProveEffectiveAsksAboutBothSidesOfTheFence(t *testing.T) {
+	var got []string
+	dropIn := realDropIn(t)
+	root := rootFunc(func(argv ...string) ([]byte, error) {
+		got = append(got, strings.Join(argv, " "))
+		if strings.Contains(strings.Join(argv, " "), outsideAddr) {
+			return sshdDump(t, "sshd-T-macos-10.3p1-outside.txt"), nil
+		}
+		return sshdDump(t, "sshd-T-macos-10.3p1-effective.txt"), nil
+	})
+	tg := Target{User: "dotf", Root: root, Service: Launchd{}}
+	if err := tg.proveEffective(dropIn); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"/usr/sbin/sshd -T",
+		"/usr/sbin/sshd -T -C user=dotf,host=target,addr=192.0.2.1",
+		"/usr/sbin/sshd -T -C user=dotf,host=target,addr=100.64.0.1",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("ran %q, want %q", got, want)
+	}
+}
+
 func TestCheckEffectiveNamesEachDirectiveItChecks(t *testing.T) {
 	dropIn := realDropIn(t)
 	for _, plat := range platforms {
@@ -74,8 +123,8 @@ func namesEachDirective(t *testing.T, dropIn []byte, good string) {
 		{"passwordauthentication no", "passwordauthentication yes", "passwordauthentication yes"},
 		{"kbdinteractiveauthentication no", "kbdinteractiveauthentication yes", "kbdinteractiveauthentication yes"},
 		{"permitrootlogin no", "permitrootlogin prohibit-password", "permitrootlogin prohibit-password"},
-		{"allowusers dotf@100.64.0.0/10\n", "", "allowusers unset"},
-		{"allowusers dotf@100.64.0.0/10", "allowusers dotf@0.0.0.0/0", "allowusers dotf@0.0.0.0/0"},
+		{"allowusers dotf\n", "", "allowusers unset"},
+		{"allowusers dotf\n", "allowusers root\n", "allowusers root"},
 	} {
 		dump := strings.Replace(good, c.line, c.with, 1)
 		if dump == good {
@@ -184,7 +233,7 @@ func TestApplyNamesAFailedDump(t *testing.T) {
 
 func TestSystemdEffectiveCreatesTheMissingPrivsepDir(t *testing.T) {
 	l := &linux{}
-	if _, err := (Systemd{Run: l.user}).Effective(l); err != nil {
+	if _, err := (Systemd{Run: l.user}).Effective(l, ""); err != nil {
 		t.Fatalf("Effective = %v on a valid config with no /run/sshd", err)
 	}
 	want := []string{"/usr/sbin/sshd -T", "install -d -m 0755 /run/sshd", "/usr/sbin/sshd -T"}
@@ -199,14 +248,14 @@ func TestWindowsEffectiveDumpsTheConfigItValidates(t *testing.T) {
 		got = argv
 		return []byte("passwordauthentication no\n"), nil
 	})
-	out, err := WindowsService{Config: `C:\ProgramData\ssh\sshd_config`}.Effective(root)
+	out, err := WindowsService{Config: `C:\ProgramData\ssh\sshd_config`}.Effective(root, "")
 	if err != nil || !strings.Contains(string(out), "passwordauthentication no") {
 		t.Fatalf("Effective = %q, %v", out, err)
 	}
 	if want := []string{"sshd", "-T", "-f", `C:\ProgramData\ssh\sshd_config`}; !slices.Equal(got, want) {
 		t.Errorf("ran %q, want %q", got, want)
 	}
-	_, err = WindowsService{Config: "c"}.Effective(rootFunc(func(...string) ([]byte, error) { return []byte("boom"), errors.New("exit status 255") }))
+	_, err = WindowsService{Config: "c"}.Effective(rootFunc(func(...string) ([]byte, error) { return []byte("boom"), errors.New("exit status 255") }), "")
 	if err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Errorf("a failing sshd -T = %v, want its output", err)
 	}
