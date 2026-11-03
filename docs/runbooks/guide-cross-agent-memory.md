@@ -88,3 +88,13 @@ GitHub Copilot CLI operates as a standalone CLI tool without background event ho
 Per ADR-020 (Go CLI Convergence), the legacy `session-handoff.sh` and `session-handoff.ps1` twins were replaced by the cross-platform Go binary `dotf mem`:
 - `dotf mem session-start`: Prepares and injects context briefs.
 - `dotf mem session-end`: Parses the handoff payload, filters out trivial sessions, and writes the persistent markdown session record.
+
+## Lost handoff entries: `dotf doctor` "Handoff threads"
+
+`dotf mem handoff-write` keeps one file per thread under `threads/` beside `MEMORY.md`, and an entry in `MEMORY.md` derived from it. A hand edit, a wrongly resolved merge conflict or an older agent can delete the entry and leave the file. `dotf doctor` WARNs for each worktree of the repository whose `threads/<key>.md` exists with no `### thread: <key>` entry (a fork `<key>+<agent>` counts). It is read-only and never fails.
+
+Two remedies, depending on whether the thread is live:
+- **Live:** re-run `dotf mem handoff-write --thread <key>` with the body the file still holds.
+- **Finished:** move the file to `archive/` (the documented archive step, which also drops the entry). A file left behind after a hand-deleted entry looks identical to a loss, so this is the usual case.
+
+Only the per-thread layout is covered. A project that keeps its handoffs inline has no `threads/` directory, and the check says so instead of passing. Spec: `HARNESS-185-handoff-loss-check`.
