@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/converge"
+	"github.com/mlorentedev/dotfiles/cli/internal/redact"
 )
 
 // LinuxTemplate is the Lima template of the Linux guest.
@@ -40,18 +41,27 @@ type Options struct {
 // directory: Lima's virtiofs, 9p and sshfs mounts, and network shares.
 var hostShares = map[string]bool{"virtiofs": true, "9p": true, "fuse.sshfs": true, "sshfs": true, "nfs": true, "nfs4": true, "cifs": true, "smb3": true}
 
-// withToken runs its arguments with GITHUB_TOKEN set from the first line of
-// stdin, when there is one, and DOTFILES_REPO_DIR set to the working
-// directory. The token is never an argument, so it is in no process listing
-// and no Lima log, and never on the guest's disk.
-const withToken = `IFS= read -r t || true; if [ -n "$t" ]; then export GITHUB_TOKEN="$t"; fi; unset t; export DOTFILES_REPO_DIR="$PWD"; exec "$@"`
+// inRepo runs its arguments with DOTFILES_REPO_DIR set to the working directory.
+const inRepo = `export DOTFILES_REPO_DIR="$PWD"; exec "$@"`
 
 // Verify boots the guest, checks it shares nothing with the host, converges a
 // copy of o.Source with install.sh, and converges again: the first run must
-// end with no failed step and the second must change nothing.
+// end with no failed step and the second must change nothing. A run shares
+// `start` and the guest's command line with the verbs, not the verbs themselves:
+// it holds no session record, and it keeps a guest `up` could not (#2842). The
+// token reaches a converge as an `exec --secret` value does: on stdin, masked.
 func Verify(ctx context.Context, l Limactl, o Options) (err error) {
 	if o.Source == "" {
 		return errors.New("no source archive to converge")
+	}
+	pairs, err := forwardable(func() ([]string, error) {
+		if o.Token == "" {
+			return nil, nil
+		}
+		return []string{"GITHUB_TOKEN=" + o.Token}, nil
+	})
+	if err != nil {
+		return err
 	}
 	tmpl, cleanup, err := writeTemplate()
 	if err != nil {
@@ -123,8 +133,13 @@ func Verify(ctx context.Context, l Limactl, o Options) (err error) {
 		if _, err := capture("rm", "-f", report); err != nil {
 			return err
 		}
-		cmd := append([]string{"shell", "--workdir", repo, o.Name, "--", "bash", "-c", withToken, "_"}, args...)
-		runErr := l(ctx, strings.NewReader(o.Token+"\n"), o.Out, o.Out, cmd...)
+		masked := redact.New(o.Out, pairs)
+		runErr := LinuxSessions{L: l}.guestRun(ctx, o.Name, ExecOptions{
+			Argv:    append([]string{"bash", "-c", inRepo, "_"}, args...),
+			Stdin:   strings.NewReader(""),
+			Workdir: repo,
+		}, pairs, masked, masked)
+		_ = masked.Flush()
 		raw, rerr := capture("cat", report)
 		if rerr != nil {
 			return errors.Join(runErr, fmt.Errorf("%s left no report: %w", label, rerr))

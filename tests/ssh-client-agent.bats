@@ -42,3 +42,17 @@ setup() {
     run /usr/bin/ssh -F "$BATS_TEST_TMPDIR/apple.conf" -G msi </dev/null
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
+
+# kubelab VPN-ACL-015: ts-bridge's control-plane bootstrap reaches the VPS through
+# this alias alone. It must offer only its own key and refuse an unpinned host key.
+@test "hs-bootstrap offers only its own key and pins the VPS host key" {
+    command -v ssh >/dev/null 2>&1 || skip "no ssh client"
+    run ssh -F "$CONF" -G hs-bootstrap </dev/null
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    for want in 'user hs-bootstrap' 'identitiesonly yes' 'stricthostkeychecking true' \
+                'identityfile ~/.ssh/hs-bootstrap'; do
+        [[ "$output" == *$'\n'"$want"* ]] || { echo "missing: $want"; echo "$output" | grep -iE 'user |identit|stricthost|knownhosts'; false; }
+    done
+    printf '%s\n' "$output" | grep -q '^userknownhostsfile .*/known_hosts_pinned$' || { echo "$output" | grep knownhosts; false; }
+    [ "$(printf '%s\n' "$output" | grep -c '^identityfile ')" -eq 1 ] || { echo "$output" | grep '^identityfile'; false; }
+}

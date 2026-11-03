@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CLI-133-init-actionlint-every-stack-f1",
+    "behavior": "dotf init lists and writes lint.yml for every stack, none included, and --dry-run lists it without writing",
+    "verification": "cd cli && go test ./internal/initrepo/ -count=1 -run 'TestWriteLintForEveryStack|TestInitDryRunListsLint'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-133-init-actionlint-every-stack-f2",
+    "behavior": "lint.yml triggers on the default branch, lints the forge's workflow directory, and an existing lint.yml in any forge directory is left untouched",
+    "verification": "cd cli && go test ./internal/initrepo/ -count=1 -run 'TestWriteLintFollowsForgeAndDefaultBranch|TestWriteLintSkipsAnExistingLintInAnyForgeDir'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-133-init-actionlint-every-stack-f3",
+    "behavior": "the emitted lint.yml passes actionlint and scripts/check-actions-pinned.sh",
+    "verification": "d=$(mktemp -d) && (cd cli && go build -o \"$d/dotf\" ./cmd/dotf) && (cd \"$d\" && ./dotf init . --stack none --skip-vault >/dev/null && actionlint -shellcheck=shellcheck .github/workflows/*.y*ml) && mkdir -p \"$d/scripts\" && cp scripts/check-actions-pinned.sh \"$d/scripts/\" && bash \"$d/scripts/check-actions-pinned.sh\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-133-init-actionlint-every-stack-f4",
+    "behavior": "a test fails when the template's actionlint version differs from versions.conf, or its checkout SHA from this repository's workflows",
+    "verification": "cd cli && go test ./internal/initrepo/ -count=1 -run TestLintTemplatePinsMatchTheRepository",
+    "state": "pending",
+    "evidence": ""
+  }
+]

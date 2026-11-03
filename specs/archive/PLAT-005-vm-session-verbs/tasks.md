@@ -13,7 +13,7 @@ created: "2026-10-22"
 
 ## Setup
 
-- [ ] Branch created from main: `feat/PLAT-005-vm-session-verbs`
+- [x] Branches created from main, one per slice, as the PR split below required
 - [x] `proposal.md` is complete and acceptance criteria are testable
 - [x] No open questions left in `proposal.md` "Risks / open questions"
 
@@ -55,8 +55,9 @@ created: "2026-10-22"
 
 ### PR 1d: `run` recomposed
 
-- [ ] [AC6] `run` composed of the verbs, with `--secret GITHUB_TOKEN`; the assertions of its tests are unchanged
-- [ ] [AC5] `run` writes progress where the verbs do; the description names the stream move as the one behaviour change
+- [x] [AC6] `run` composed below the verbs, as rewritten in the proposal; its token forwarded and masked as a secret is; the assertions of its tests are unchanged
+- [x] [AC5] `run` writes progress where the verbs do; it already did, so no stream moved
+- [x] A token that cannot be masked (under 6 bytes, or two lines) now refuses the run before it boots, the one behaviour change
 
 ### PR 2: elevation and the guest prerequisites
 
@@ -74,18 +75,18 @@ created: "2026-10-22"
 
 ### PR 3: the Windows fixture and acceptance
 
-- [ ] [AC10] Measure `sshd -T` 9.5p2 through the verbs; add `sshd-T-windows-9.5p2-{effective,ignored,outside}.txt` and the `platforms` entry
-- [ ] [AC10] Acceptance on the guest: converge applies the drop-in, the proof passes, a second converge is `changed` 0; record on #2763 and close it
+- [x] [AC10] Measure `sshd -T` 9.5p2 through the verbs; add `sshd-T-windows-9.5p2-{effective,ignored,outside}.txt` and the `platforms` entry
+- [x] [AC10] Acceptance on the guest: converge applies the drop-in, the proof passes, a second converge is `changed` 0; record on #2763, already closed, with no closing keyword
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 

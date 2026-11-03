@@ -1,0 +1,46 @@
+# Workflow lint scaffolded by `dotf init`, for every stack: actionlint checks
+# each workflow in this directory, and runs shellcheck over its `run:` blocks.
+# Copied from mlorentedev/ci-workflows' lint.yml.
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Superseded PR runs are cancelled; pushes to the default branch always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The release binary, verified against a pinned checksum: the same integrity
+      # a SHA pin gives an action, without a Go toolchain on the runner.
+      - name: Install actionlint
+        run: |
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "${tarball}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum -c -
+          tar -xzf "${tarball}" actionlint
+      # GitHub's ubuntu-latest ships shellcheck, but a Gitea or Forgejo runner
+      # image may not, and actionlint skips shell linting without an error when
+      # it is missing: fail instead. The directory is named, not left to
+      # actionlint's default, so a Gitea or Forgejo repository lints its own.
+      - name: Lint workflows and their shell (actionlint + shellcheck)
+        run: |
+          command -v shellcheck >/dev/null || { echo "shellcheck is not on PATH: actionlint would skip shell linting" >&2; exit 1; }
+          ./actionlint -color -shellcheck=shellcheck .github/workflows/*.y*ml

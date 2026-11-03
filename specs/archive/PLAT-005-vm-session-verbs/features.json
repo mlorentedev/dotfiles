@@ -1,0 +1,79 @@
+[
+  {
+    "id": "PLAT-005-vm-session-verbs-f1",
+    "behavior": "`up --session` creates a Linux session; a second Windows `up` is `busy` (exit 2); a gone guest is `stale` (exit 2, names `down`); `status` follows the hypervisor",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestUp|TestWindowsUp|TestListTreatsAStoppedInstanceAsStale|TestWindowsListIsEmptyNotNilAndReportsStale'",
+    "state": "passing",
+    "evidence": "2026-11-03: 13 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f2",
+    "behavior": "`exec` returns one JSON record, and the status, exit and process-code table holds",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecRunsArgvAndRecordsBothStreams|TestExecStatusTable|TestRecord|TestWindowsExecReportsTheCommandInOneRecord'",
+    "state": "passing",
+    "evidence": "2026-11-03: 10 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f3",
+    "behavior": "`exec` forwards stdin on Linux and refuses it on Windows with `unsupported`",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecForwardsStdin|TestWindowsExecRefusesStdinAndSecrets'",
+    "state": "passing",
+    "evidence": "2026-11-03: 2 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f4",
+    "behavior": "`cp` moves files both ways through the channel and the isolation checks stay green",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestCopy|TestWindowsCopy|SharesNothing'",
+    "state": "passing",
+    "evidence": "2026-11-03: 8 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f5",
+    "behavior": "with `--json` stdout is exactly one record and progress is on stderr, for the verbs and `run`",
+    "verification": "go -C cli test ./internal/cmd/ -run 'TestVMProgressGoesToStderr|TestVMUpWritesProgressToStderrAndTheNameToStdout|TestVMVerbsWriteAFailedRecordWhenTheStoreCannotOpen'",
+    "state": "passing",
+    "evidence": "2026-11-02: 3 tests and 5 subtests pass after review round 1; the darwin-only TestVMProgressGoesToStderr is no longer the only one named"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f6",
+    "behavior": "`run` composed of the verbs; the assertions of its existing tests are unchanged",
+    "verification": "go -C cli test ./internal/vm/ ./internal/cmd/ -run 'TestRun|TestVerify'",
+    "state": "passing",
+    "evidence": "2026-11-03: 41 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f7",
+    "behavior": "a guest that echoes a value `exec --secret` forwarded yields a masked record and masked plain stdout",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecForwardsASecretAndMasksIt|TestExecDoesNotRedactPlainStdin|TestExecRefusesASecretItCouldNotMask'",
+    "state": "passing",
+    "evidence": "2026-11-03: 3 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f8",
+    "behavior": "`exec --elevated` creates the Windows task with /rl highest and prefixes sudo on Linux",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestExecElevated|TestWindowsExecElevated'",
+    "state": "passing",
+    "evidence": "2026-11-03: 2 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f9",
+    "behavior": "every verb refusal test sets XDG_STATE_HOME and never reaches the hypervisor",
+    "verification": "go -C cli test ./internal/cmd/ -run 'TestVMVerbRefusals'",
+    "state": "passing",
+    "evidence": "2026-11-03: 20 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f10",
+    "behavior": "the Windows sshd -T fixture holds the proof and the guest acceptance converges twice at changed 0",
+    "verification": "go -C cli test ./internal/sshtarget/ -run 'CheckEffective'",
+    "state": "passing",
+    "evidence": "2026-11-03: 14 test runs pass on main at the close of PLAT-005"
+  },
+  {
+    "id": "PLAT-005-vm-session-verbs-f11",
+    "behavior": "`down` leaves no instance, overlay or state and never touches clean-base; an unknown name is `no-session` (exit 3); a timeout exits 1",
+    "verification": "go -C cli test ./internal/vm/ -run 'TestDown|TestWindowsDown|TestExecTimeout|TestWindowsExecOnNoSessionAndOnStale|TestWindowsExecTheGuestsTimeoutIsATimeout'",
+    "state": "passing",
+    "evidence": "2026-11-03: 11 test runs pass on main at the close of PLAT-005"
+  }
+]

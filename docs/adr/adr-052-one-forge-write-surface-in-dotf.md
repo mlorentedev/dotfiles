@@ -50,3 +50,11 @@ Agents reached forges through whatever was at hand: `gh` with the prose on the c
 2. **Clause 3 is unchanged.** The interface still has no merge, close, delete or reopen verb, and `TestNoMergeOrCloseVerb` still rejects any method whose name contains one. The guard is on actions; a read about merge state is named after what it returns ("landed", as `worktree done` already words it), not after the action, so the guard is not weakened.
 3. **The rejected alternative** was `git ls-remote origin 'refs/pull/*/head'` plus a containment check, which needs no token. It cannot tell a merged pull request from one closed unmerged, so a rejected PR's branch would read as landed and be deleted.
 4. **Scope.** Only `worktree done` takes the forge read, through `DoneOptions.LandedHeads`. `worktree list` and `sweep` keep the `gh` answer: on Gitea they under-report landed branches, which errs on the side of keeping them. `lane.REST` is also GitHub-only. Moving those readers to this interface belongs to CLI-123 (#2546) and is tracked in #2818.
+
+## Amendment (2026-11-02, #3072): Gitea looks a head up instead of listing
+
+The Gitea half of `LandedHeads` above could not finish on a real repository. `personal/resume` has 453 closed pull requests at about 5.5s a page, so it met the 30-second read limit at page 6 and the 10-page cap after that. Raising either would cost more than a minute per worktree and grow with the repository.
+
+Gitea now answers with `GET /repos/{owner}/{repo}/pulls/{base}/{head}` against the default branch: 1.2s, it resolves a deleted branch, and a 404 means no pull request. The price is that it returns the newest pull request against one base, so `LandedHeads` no longer returns every one on Gitea. A reused branch name or a pull request into another base can read "not landed". That is the safe side: `worktree done` refuses and the worktree stays, while the listing's failure left every branch `unknown`. GitHub is unchanged. The owner chose this on 2026-11-02.
+
+Clause 4 of the amendment above is out of date: `worktree list` and `sweep` already take this read through `forgeLandedHeads`, so on a Gitea origin they report landed branches too.

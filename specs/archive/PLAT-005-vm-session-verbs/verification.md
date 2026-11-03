@@ -1,0 +1,109 @@
+---
+tags: [spec, verification, templates]
+created: "2026-10-22"
+---
+
+# Verification - PLAT-005-vm-session-verbs
+
+## Evidence
+
+Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
+
+Each line names the PRs that landed it and the `features.json` entry whose command runs its tests; the real-guest runs are under "Test status".
+
+- [x] AC1 -> #2947, #2950, #3064 / f1 (`TestUp*`, `TestWindowsUp*`, the `List` stale tests)
+- [x] AC2 -> #2995, #3073 / f2 (`TestExecStatusTable`, `TestRecord*`, `TestWindowsExecReportsTheCommandInOneRecord`)
+- [x] AC3 -> #2995, #3073 / f3
+- [x] AC4 -> #2999, #3078 / f4
+- [x] AC5 -> #2930; held before 1d, per #3092 / f5
+- [x] AC6 -> #3092, as rewritten on #2842 / f6; real Lima run below
+- [x] AC7 -> #2931, #2995 / f7
+- [x] AC8 -> #3079 / f8; real tokens on both guests below
+- [x] AC9 -> every slice / f9 (`TestVMVerbRefusals`, 20 runs)
+- [x] AC10 -> #3090, #3102 / f10; real guest acceptance below
+- [x] AC11 -> #2950, #2995, #3064, #3073 / f11
+
+## Test status
+
+- Test suite: `go -C cli test ./... -count=1` -> exit 0, 50 packages ok (Linux exec and cp, 2026-10-30).
+- Manual smoke test, Linux exec and cp, Lima 2.2.1 on macOS, session `plat005-probe`:
+  - AC2: `printf` with `a b`, `$HOME`, `;id` came back literal, `ok`, `exit: 0`; `exit 3` gave `ok`, `exit: 3`, process code 1.
+  - AC2: `--script` ran from a temporary guest path and left none behind.
+  - AC3: piped stdin reached the guest, on argv and on `--script`.
+  - AC4: a file went host to guest to host byte-identical through `/tmp/a b`; `findmnt` in the guest listed no share.
+  - AC7: the wire protocol ran on the guest with synthetic values only. The masking is proved by unit tests, never against a live store (lesson 261).
+  - AC11: `--timeout 2s` on `sleep 20` gave `timeout`, process code 1, in 2068 ms, with no `sleep` left in the guest; `no-session` exit 3; a stopped guest `stale` exit 2.
+- Manual smoke test, Windows session verbs on the real guest, macOS Arm64, session `plat005-win`:
+  - AC1: `up` booted an overlay in 36 s and returned; QEMU outlived dotf, and `status` answered `ok`. A second `up` under another name was `busy`, exit 2, naming the holder.
+  - AC1: with the guest stopped behind the record, `status` answered `stale` and `up` was `stale`, exit 2, naming `down`.
+  - AC2: `exec -- whoami` gave `dotf-win\\dotf`, `ok`, `exit: 0`, in 6.5 s; a program exiting 3 gave `ok`, `exit: 3`, process code 1; a missing one `ok`, `exit: 127`; a UTF-8 `--script` printed its text whole and exited 4.
+  - AC3: piped stdin was `unsupported`, exit 2.
+  - AC4: 200 kB of random bytes went host to guest to host byte-identical through `C:\Users\Public\a b.bin`; a directory and a missing guest file both failed out loud.
+  - AC4: unit tests pin that a failed `cp proof:C:\nothing <target>` leaves `<target>` unchanged with no temporary file beside it; the real-guest copy above ran on the streaming read.
+  - AC8: on the real guest `exec --elevated -- whoami /groups` showed `High Mandatory Level` with `BUILTIN\Administrators` enabled; without the flag it showed `Medium Mandatory Level` and `net session` was denied, and with it `net session` exited 0. On a real Lima guest `exec --elevated -- id -u` gave 0 and a plain call 501; `--elevated --timeout 2s` on a program ignoring TERM was `timeout`, with no `sleep` left.
+  - AC10: `exec --elevated` ran `Add-WindowsCapability` inside a session in 10.6 min, giving `OpenSSH_for_Windows_9.5p2`; `clean-base` is unchanged. With the NIC already static, it failed with `0x80240438` (no network).
+  - AC11: `--timeout 8s` on PowerShell running `ping -n 60` gave `timeout`, process code 1, with the output so far; no `ping` was left in the guest, and the call left no task or directory.
+  - AC11: `down` on an unknown name was `no-session`, exit 3. `down` cleared the stale session, `status` went back to `[]`, and `clean-base` stayed.
+- No regressions in existing test suite: yes. `TestEmbeddedTemplatesMatchVault` fails in `initrepo` and `vault` on main as on every branch here; it is #3050, not this spec.
+
+## Decisions made during implementation
+
+Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
+
+- AC6 was rewritten (#2842): `run` composes below the verbs, not over them, because a run holds no session record and its tests pin calls the verbs do differently.
+- The drop-in's mesh fence moved from `AllowUsers user@CIDR` to a final `Match Address` block with `DenyUsers *` (#3080, #3090), because Win32-OpenSSH rewrites the `/` of an AllowUsers value. The proof gained `sshd -T -C` dumps from each side.
+- `sudo -n` wraps the guest's `timeout`, not the other way round (#3079): an unprivileged `timeout` cannot kill a root command.
+
+## Review round 1 dispositions
+
+Round 1 (`nan/mimo-v2.6-flash`, FAIL) is kept as `review-round1.md`.
+
+- Major: under `--json`, a store that could not open wrote no record. Applied: every verb now writes one `failed` record, and the exit code stays the one the open error carries. Pinned by `TestVMVerbsWriteAFailedRecordWhenTheStoreCannotOpen`.
+- Minor, concurrent `up` on one name: ticketed as #3105.
+- Minor, Windows `exec` refusing stdin before an unknown session: ticketed as #3106.
+- Minor, `WindowsSessions.Exec` at 70 lines: ticketed in #3106, which touches the same function.
+- Minor, f5 named only a darwin-only test: applied. f5 now also names the portable `TestVMUpWritesProgressToStderrAndTheNameToStdout` and the new test.
+
+## Review round 2 dispositions
+
+Round 2 (`nan/qwen3.8-flash`, PASS) reviewed `1280b8ad`. That commit includes #3107, which fixed round 1's Major.
+
+- Minor, a usage refusal writes no record under `--json`: ticketed as #3111.
+- Minor, an undefined flag exits 1 where decision 8 lists "bad flag" under exit 2: ticketed as #3111.
+- Minor, the `errors.Join` branch of `openFor` is untested: ticketed as #3111.
+- Minor, carried from round 1: #3105 and #3106 are still open.
+- Question, the review range spans other specs' commits: the range is the one `dotf spec review` resolved from the spec's base. Both rounds judged only PLAT-005's own surface, and the archive gates on that.
+
+## Promotion candidates
+
+Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
+
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-546-sshd-t-prints-no-match-block.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-055-vm-guests-are-driven-through-session-verbs.md
+- [x] New pattern candidate for `00_meta/patterns/`? no: guest session verbs exist in this repo only
+
+## Archive checklist
+
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/PLAT-005-vm-session-verbs/` -> `specs/archive/PLAT-005-vm-session-verbs/`
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Promotions above executed (if any)
+
+## Windows fixture and acceptance (AC10)
+
+On the Windows 11 Arm64 guest, OpenSSH 9.5p2, inside a session and never in `clean-base`, with a `dotf` build of this tree. `exec --elevated` shaped the guest: OpenSSH Server, the first service start that writes `sshd_config`, `Include sshd_config.d/*.conf` at its top, `100.64.0.2/32` beside the static LAN address on the NIC renamed `Tailscale`, `dotf env role add ssh-target`, and a throwaway client key whose public half replaced `ssh/id_ed25519.pub` in the guest's copy, since the owner's private key never enters a guest.
+
+```
+=== converge 1
+  [CHANGE] workstation-target  13.2s  applied: firewall, authorized key, sshd drop-in, sshd service, power policy, state record; sshd accepts the key from 100.64.0.2, refused from 10.0.2.15
+=== converge 2
+  [ OK ]   workstation-target   7.0s  converged; sshd accepts the key from 100.64.0.2, refused from 10.0.2.15
+=== converge 3
+  [ OK ]   workstation-target   7.4s  converged; sshd accepts the key from 100.64.0.2, refused from 10.0.2.15
+```
+
+Real logins afterwards: `100.64.0.2` printed `dotf-win\dotf` and sshd logged `Accepted publickey`; `10.0.2.15` was `Permission denied (publickey)` and sshd logged `not allowed because listed in DenyUsers`. A connection to the node's own address does not cross the firewall rule, so the rule itself is not proven here (OBS-036).
+
+## `run` composed below the verbs (AC5, AC6)
+
+`dotf secrets run -- dotf vm linux` from `33ce746c`, on a real Lima guest: first converge, second converge, "converged, and the second run changed nothing", exit 0, guest deleted. The token was set, and the run's log carries 28 `[REDACTED:` markers. `vm_test.go`'s assertions are unchanged; `TestVerify_MasksTheTokenInAConvergesOutput` and `TestVerify_RefusesATokenItCouldNotMask` are new. The Windows `run` is untouched.
