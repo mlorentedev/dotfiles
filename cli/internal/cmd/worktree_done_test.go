@@ -389,19 +389,3 @@ func TestWorktreeDoneListsTheWorktreesItKnowsForAnUnknownName(t *testing.T) {
 		}
 	}
 }
-
-// A legacy <repo>-wt-<slug> sibling is listed by the slug done resolves, not by
-// its directory name (#3115 review).
-func TestWorktreeDoneListsALegacySiblingBySlug(t *testing.T) {
-	repo := worktreeTestRepo(t)
-	sibling := filepath.Join(filepath.Dir(repo), filepath.Base(repo)+"-wt-legacy")
-	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", "old", sibling).CombinedOutput(); err != nil {
-		t.Fatalf("git worktree add: %v\n%s", err, out)
-	}
-	t.Chdir(t.TempDir())
-
-	_, err := executeWorktree(t, "done", "nosuch", "--repo", repo)
-	if err == nil || !strings.Contains(err.Error(), "legacy (old)") || strings.Contains(err.Error(), "-wt-legacy (old)") {
-		t.Fatalf("done nosuch: error %v does not list the sibling as legacy (old)", err)
-	}
-}

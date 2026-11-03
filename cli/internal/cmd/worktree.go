@@ -588,7 +588,7 @@ func knownWorktreesNote(repoDir string) string {
 	}
 	var known []string
 	for _, w := range linked {
-		known = append(known, fmt.Sprintf("%s (%s)", strings.TrimPrefix(filepath.Base(w.Path), filepath.Base(root)+"-wt-"), w.Branch))
+		known = append(known, fmt.Sprintf("%s (%s)", filepath.Base(w.Path), w.Branch))
 	}
 	if len(known) == 0 {
 		return takes + "; this repository has no linked worktrees"
