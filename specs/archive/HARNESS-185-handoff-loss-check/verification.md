@@ -41,7 +41,7 @@ Each test was mutation-checked: an always-found entry fails AC1 and AC7; droppin
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-185-handoff-loss-check/` -> `specs/archive/HARNESS-185-handoff-loss-check/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-185-handoff-loss-check/` -> `specs/archive/HARNESS-185-handoff-loss-check/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
