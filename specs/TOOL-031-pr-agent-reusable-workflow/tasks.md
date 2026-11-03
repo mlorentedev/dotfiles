@@ -126,6 +126,8 @@ review, not per merge.
   - The step's `build-from-head` order moved: `dotf` is built before the first decision, so a draft costs a build. `push_gate` is gated on `reviewable`, the defect #3016's first comment names.
   - The port departs from the step in two places. It reads `AUTO_GENERATED_FILES_EXACT`, which the step had stopped finding (lesson-531), and drops one pattern RE2 cannot compile rather than the whole answer, as upstream does. Interior `**/` expansion, bounds included, came in #3036.
 - [ ] Make `declared_model` and `declared_fallback_models` optional with `pool: embedded`, and give `dotf_version` a default at each tag, so a bump of one pin brings the rest.
+  - D's half. `dotf pr preflight --pool embedded|<path>` reads the chain from the pool, so C's step needs neither input. The chain is the `openai/` members by descending weight, pool order breaking a tie, because the pool's order is provenance, not precedence. That yields `mimo`, `deepseek`, `glm`, today's declared chain. `--pool` with `--model` or `--fallbacks` exits 2, and so does a pool with no NaN member.
+  - C still has to adopt it in `v0.2.0`, after a dotf release, and give `dotf_version` its default. This item stays open for that.
 - [ ] The three items above ship as C's `v0.2.0`, with the kubelab fixture.
 - [x] [AC6] Add caller fixtures `tests/fixtures/callers/{dotfiles,hive}.yml`, plus a bats case that each fixture's `with:` and `secrets:` match the declared interface
 - [x] C: README (inputs, secrets, caller template with the `ci:` consumer step in dotfiles `secrets/registry.yaml` and `dotf secrets sync ci`, pinning rule) and a CI workflow (bats and actionlint); tag `v0.1.0`

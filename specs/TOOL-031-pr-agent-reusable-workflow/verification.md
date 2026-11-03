@@ -53,6 +53,17 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - `diff=reviewable` needs every filter source read. A lost source narrows the filter, which keeps files the whole one might drop, so that run says `unread`, and a declared label survives an outage.
 - The section check follows `check-review-attestation.sh`, not kubelab's `grep -qxF`: CRLF and trailing blanks do not count, and a heading with nothing under it is filled in place, because the gate reads the first heading and refuses an empty one. kubelab's step would report "already declared" and leave the gate red.
 - Departs from kubelab's test on one point. It asserts `lesson-376` and `#1527` in the rationale; those are kubelab's, and would link to something else in another repository. The rationale keeps the method, decrypt both sides and diff the key names, with no reference.
+- `dotf pr preflight --pool` orders the chain by descending weight, pool order breaking a tie. Document order would have made deepseek the primary, and the pool's own comment says its order is provenance, not precedence. A `forge_rank` field exists but no member sets it, and `harness/**` was out of scope for this change, so weight is what reproduces the declared chain.
+- A pool with no NaN member exits 2, not 1. Exit 1 is the workflow's signal that NaN is down, which moves the review to the other provider, so a bad pool must not look like an outage.
+- With a pool as the source, a refused model's remedy names the pool. The old text sent the reader to dotfiles' `.pr_agent.toml` and workflow, which a consumer does not have.
+- The chain the embedded pool yields, pinned by `TestPrPreflight_PoolYieldsTheDeclaredChainInOrder`:
+
+  ```
+  model=openai/mimo-v2.6-flash
+  fallbacks=["openai/deepseek-v4-flash","openai/glm5.3-flash"]
+  ```
+
+  dotfiles' own workflow keeps its literals, so `pr-agent-config.bats` still compares them with the pool.
 
 ## Promotion candidates
 
