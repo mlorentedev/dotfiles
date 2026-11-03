@@ -55,8 +55,9 @@ created: "2026-10-22"
 
 ### PR 1d: `run` recomposed
 
-- [ ] [AC6] `run` composed of the verbs, with `--secret GITHUB_TOKEN`; the assertions of its tests are unchanged
-- [ ] [AC5] `run` writes progress where the verbs do; the description names the stream move as the one behaviour change
+- [x] [AC6] `run` composed below the verbs, as rewritten in the proposal; its token forwarded and masked as a secret is; the assertions of its tests are unchanged
+- [x] [AC5] `run` writes progress where the verbs do; it already did, so no stream moved
+- [x] A token that cannot be masked (under 6 bytes, or two lines) now refuses the run before it boots, the one behaviour change
 
 ### PR 2: elevation and the guest prerequisites
 
@@ -65,10 +66,17 @@ created: "2026-10-22"
 - [x] [AC10] Decide and implement how the `ssh-target` role and a stand-in mesh address (100.64.0.0/10) reach a session (#2763 obstacle 3)
 - [x] [AC10] Install OpenSSH Server inside a session with `exec --elevated`, never in `clean-base`
 
+### PR 2b: the drop-in's fence (#3080)
+
+- [x] `AllowUsers {user}`, then `Match Address *,!{mesh}` with `DenyUsers *`, last in the file: AC10's proof could not pass while Win32-OpenSSH rewrote the `/` of the AllowUsers value
+- [x] The apply proves the fence with two `sshd -T -C` dumps, because the plain dump prints no Match block; the old fixtures are re-measured with one dump per build from outside the mesh
+- [x] Measured on OpenSSH 8.9p1, 10.2p1 and 10.3p1: a Match inside an Include does not swallow the lines after the Include; `-C` needs user, host and addr together on 8.9p1
+- [x] Real logins on 8.9p1 and 10.2p1: refused by `DenyUsers` outside the range, accepted inside it
+
 ### PR 3: the Windows fixture and acceptance
 
-- [ ] [AC10] Measure `sshd -T` 9.5p2 through the verbs; add `sshd-T-windows-9.5p2-{effective,ignored}.txt` and the `platforms` entry
-- [ ] [AC10] Acceptance on the guest: converge applies the drop-in, the proof passes, a second converge is `changed` 0; record on #2763 and close it
+- [x] [AC10] Measure `sshd -T` 9.5p2 through the verbs; add `sshd-T-windows-9.5p2-{effective,ignored,outside}.txt` and the `platforms` entry
+- [x] [AC10] Acceptance on the guest: converge applies the drop-in, the proof passes, a second converge is `changed` 0; record on #2763, already closed, with no closing keyword
 
 ## Closing
 

@@ -18,6 +18,47 @@ var proven = []string{
 	"allowusers",
 }
 
+// The two addresses the fence is asked about. outsideAddr is TEST-NET-1, which
+// no mesh hands out; insideAddr is the first host of MeshCIDR.
+const (
+	outsideAddr = "192.0.2.1"
+	insideAddr  = "100.64.0.1"
+)
+
+// connSpec is the `sshd -C` spec for a connection from addr. sshd 8.9 refuses
+// a spec without all three keywords; the host is never matched here.
+func connSpec(user, addr string) string {
+	return "user=" + user + ",host=target,addr=" + addr
+}
+
+// dumpArgv is argv with the connection appended, when there is one.
+func dumpArgv(conn string, argv ...string) []string {
+	if conn == "" {
+		return argv
+	}
+	return append(argv, "-C", conn)
+}
+
+// fenced says the drop-in closes sshd to everything outside the mesh.
+func fenced(dropIn []byte) bool {
+	_, ok := dumpFields(dropIn)["denyusers"]
+	return ok
+}
+
+// checkFence compares sshd's values for a connection from each side of the
+// mesh. `AllowUsers` names the account, so `DenyUsers *` under the drop-in's
+// Match is all that keeps the LAN out, and only a dump with -C shows it.
+func checkFence(outside, inside []byte, path string) error {
+	if got := dumpFields(outside)["denyusers"]; !contains(got, "*") {
+		return fmt.Errorf("sshd runs with denyusers %s for %s, not *: the Match block of %s leaves it open outside %s",
+			shown(got), outsideAddr, path, MeshCIDR)
+	}
+	if got := dumpFields(inside)["denyusers"]; contains(got, "*") {
+		return fmt.Errorf("sshd runs with denyusers * for %s: the Match block of %s shuts the mesh out too", insideAddr, path)
+	}
+	return nil
+}
+
 // checkEffective compares what `sshd -T` says sshd would run with against the
 // drop-in. `sshd -t` proves the config parses; an Include that matches no file
 // parses too, so only the dump shows the drop-in was read (#2763).

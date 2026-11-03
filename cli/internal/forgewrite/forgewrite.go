@@ -25,10 +25,11 @@ func (r Repo) String() string { return r.Host + "/" + r.Owner + "/" + r.Name }
 // Backend talks to one kind of forge. A third forge is a new Backend and one
 // Kind, with no change to the verbs.
 type Backend interface {
-	// LandedHeads returns the head commit of every merged pull request whose
-	// head is branch in r itself, never a fork's branch of the same name. It
-	// only reads. A forge that cannot answer in full is an error, never an
-	// empty list: an empty list reads as "never landed".
+	// LandedHeads returns the head commit of the merged pull requests whose
+	// head is branch in r itself, never a fork's branch of the same name: all
+	// of them on GitHub, the newest against the default branch on Gitea. It
+	// only reads. A forge that cannot answer is an error, never an empty list:
+	// an empty list reads as "never landed".
 	LandedHeads(ctx context.Context, r Repo, branch string) ([]string, error)
 	// CommentIssue posts body on issue or pull request number and returns the
 	// comment's URL. A pull request is an issue on both supported forges.

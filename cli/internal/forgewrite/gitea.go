@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -21,17 +23,16 @@ type Gitea struct {
 // maxErrBody bounds how much of a failing response is quoted back.
 const maxErrBody = 300
 
+// giteaStatusError is a non-2xx answer, so a caller can tell a 404 from a failure.
+type giteaStatusError struct {
+	code int
+	text string
+}
+
+func (e giteaStatusError) Error() string { return e.text }
+
 // maxLabelPages bounds the label lookup so a misbehaving server cannot loop it.
 const maxLabelPages = 20
-
-// giteaPullsPage is the page size the closed-PR listing asks for, and
-// maxPullPages bounds it, newest close first. The server may answer with fewer
-// rows per page ([api] MAX_RESPONSE_ITEMS clamps limit), so only an empty page
-// ends the listing; a short one does not.
-const (
-	giteaPullsPage = 50
-	maxPullPages   = 10
-)
 
 // CommentIssue implements Backend.
 func (g Gitea) CommentIssue(ctx context.Context, r Repo, number int, body string) (string, error) {
@@ -69,44 +70,58 @@ func (g Gitea) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
 		map[string]string{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base})
 }
 
-// LandedHeads implements Backend. Gitea 1.25's pull list has no head filter,
-// so the closed pull requests are read newest close first and matched here:
-// merged, from this repository and not a fork, with branch as their head
-// label. Not the head ref: once the branch is deleted, which a squash merge
-// usually leaves, Gitea reports the ref as refs/pull/<n>/head and names the
-// branch only in the label. Every merge closes its pull request, so a recent
-// one is on the first pages.
+// LandedHeads implements Backend. It asks for the pull request of branch against
+// the default branch, which Gitea finds by head even once the branch is deleted.
+// Reading the closed list instead took about 5.5s a page and could not finish
+// on a repository with hundreds of them (#3072). The lookup returns the newest
+// pull request only, against one base; what it misses reads "not landed", the
+// side that keeps a worktree (ADR-052).
 func (g Gitea) LandedHeads(ctx context.Context, r Repo, branch string) ([]string, error) {
-	var heads []string
-	for page := 1; page <= maxPullPages; page++ {
-		raw, err := g.do(ctx, http.MethodGet, g.repoPath(r, fmt.Sprintf("pulls?state=closed&sort=recentclose&limit=%d&page=%d", giteaPullsPage, page)), nil)
-		if err != nil {
-			return nil, err
-		}
-		var pulls []struct {
-			Merged bool `json:"merged"`
-			Head   struct {
-				Label  string `json:"label"`
-				SHA    string `json:"sha"`
-				RepoID int64  `json:"repo_id"`
-			} `json:"head"`
-			Base struct {
-				RepoID int64 `json:"repo_id"`
-			} `json:"base"`
-		}
-		if err := json.Unmarshal(raw, &pulls); err != nil {
-			return nil, fmt.Errorf("gitea pull request list for %s was not readable", r)
-		}
-		for _, p := range pulls {
-			if p.Merged && p.Head.Label == branch && p.Head.RepoID == p.Base.RepoID {
-				heads = append(heads, p.Head.SHA)
-			}
-		}
-		if len(pulls) == 0 {
-			return heads, nil
-		}
+	raw, err := g.do(ctx, http.MethodGet, fmt.Sprintf("/api/v1/repos/%s/%s", r.Owner, r.Name), nil)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("the closed pull requests of %s go on past %d pages, so an older one with %s as its head may be unread", r, maxPullPages, branch)
+	var repo struct {
+		DefaultBranch string `json:"default_branch"`
+	}
+	if err := json.Unmarshal(raw, &repo); err != nil || repo.DefaultBranch == "" {
+		return nil, fmt.Errorf("gitea names no default branch for %s", r)
+	}
+	raw, err = g.do(ctx, http.MethodGet, g.repoPath(r, "pulls/"+escapeRef(repo.DefaultBranch)+"/"+escapeRef(branch)), nil)
+	var status giteaStatusError
+	if errors.As(err, &status) && status.code == http.StatusNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var pull struct {
+		Merged bool `json:"merged"`
+		Head   struct {
+			SHA    string `json:"sha"`
+			RepoID int64  `json:"repo_id"`
+		} `json:"head"`
+		Base struct {
+			RepoID int64 `json:"repo_id"`
+		} `json:"base"`
+	}
+	if err := json.Unmarshal(raw, &pull); err != nil {
+		return nil, fmt.Errorf("gitea pull request of %s in %s was not readable", branch, r)
+	}
+	if !pull.Merged || pull.Head.RepoID != pull.Base.RepoID {
+		return nil, nil
+	}
+	return []string{pull.Head.SHA}, nil
+}
+
+// escapeRef escapes a ref for a URL path, keeping its slashes as separators:
+// Gitea's route takes the rest of the path as the head.
+func escapeRef(ref string) string {
+	parts := strings.Split(ref, "/")
+	for i, p := range parts {
+		parts[i] = url.PathEscape(p)
+	}
+	return strings.Join(parts, "/")
 }
 
 func (g Gitea) repoPath(r Repo, tail string) string {
@@ -216,13 +231,18 @@ func (g Gitea) do(ctx context.Context, method, path string, payload any) ([]byte
 		return nil, fmt.Errorf("gitea %s %s: %s", method, url, redact(err.Error(), token))
 	}
 	defer func() { _ = resp.Body.Close() }()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	raw, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	// The status outranks a cut-off body: a 404 is an answer however much of
+	// its page arrived.
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		quoted := redact(string(raw), token)
 		if len(quoted) > maxErrBody {
 			quoted = quoted[:maxErrBody] + "..."
 		}
-		return nil, fmt.Errorf("gitea %s %s: HTTP %d: %s", method, url, resp.StatusCode, quoted)
+		return nil, giteaStatusError{code: resp.StatusCode, text: fmt.Sprintf("gitea %s %s: HTTP %d: %s", method, url, resp.StatusCode, quoted)}
+	}
+	if readErr != nil {
+		return nil, fmt.Errorf("gitea %s %s: reading the answer: %s", method, url, redact(readErr.Error(), token))
 	}
 	return raw, nil
 }

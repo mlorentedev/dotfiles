@@ -44,6 +44,9 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - UAC consents without a prompt in the guest, so `--elevated` proves what an administrator can do, not that a prompt would appear. Documented in ADR-055; the verb's help repeats it.
 - Windows `exec` goes through a scheduled task and polling, so it is slower than Linux; `duration_ms` shows it.
 - The scheduled task needs `/rl highest` for `--elevated`; the stand-in mesh address for the `ssh-target` role had no injection point (#2763 obstacles 1 and 3); see the Resolved line on `exec --elevated`.
+- The range cannot stay in `AllowUsers`: Win32-OpenSSH rewrites its `/`, so the drop-in denied every login and AC10 could not pass (#3080).
+  - Resolved: `AllowUsers {user}` plus a final `Match Address *,!{mesh}` with `DenyUsers *`, one shape on every OS. Rendering sixty-four `100.x.*` patterns for Windows alone was rejected, as was a comparison that tolerates `\`, which would turn the lockout into a passing proof.
+  - The proof follows the fence: plain `sshd -T` prints no Match block, so the apply also reads `sshd -T -C` from each side of the range. Each build's fixtures gain an `outside` dump, so AC10's fixture is three files, not two.
 - Resolved: the hypervisor is the source of truth and a state file is only a name, never a liveness claim. ADR-055 decision 2's `busy` is a liveness question, and a leftover that outlived a crashed guest would make `up` say `busy` forever. `status` lists names with what the hypervisor answers (`limactl list` on Linux; on Windows the `running` check `vm/run.go` already uses to refuse a second run, shared by `up` and `status`, not written twice). `up` on a name whose guest is gone refuses with `stale`, exit 2, and names `down`; `down` on a stale name cleans the leftovers. Refuse and name, never silent cleanup: a crash that vanishes quietly is the absence this repo wants red. `stale` is an additive value in decision 7's status list, which by that decision's own rule does not bump `version`; the PR 1c description says so, and the ADR is not reopened.
 - Resolved: AC7 needs something to key on. A raw stdin pipe gives dotf no value to redact, so `exec --secret <registry-id>` is the forwarding path (see What), and `run` uses it for `GITHUB_TOKEN`.
 - Resolved (owner, 2026-10-30): `up` on a held, live Linux name stays `busy`, exit 2. It is not idempotent, so two callers that pick one name do not share a guest without knowing.
@@ -70,13 +73,13 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - [ ] AC2: `exec -- <argv>` and `exec --script <file>` run in the guest without a shell and return one `--json` record with `version` 1, whatever the outcome; a guest command that exits 1 is `status: ok, exit: 1` and the process exits 1.
 - [ ] AC3: `exec` forwards stdin on Linux and refuses it on Windows with `unsupported` and exit 2.
 - [ ] AC4: `cp` moves a file host to guest and back on both guests through the channel; the isolation checks (no share device, no mount) stay green.
-- [ ] AC5: With `--json`, stdout is exactly one record and the `==> ` progress lines are on stderr, for the verbs and for `run`.
-- [ ] AC6: `run` is composed of the verbs; the assertions of the tests that pin its flags, lifecycle, two converges and judgment are unchanged (a test that passes `Out: &bytes.Buffer{}` may take a mechanical edit for the split writers).
+- [x] AC5: With `--json`, stdout is exactly one record and the `==> ` progress lines are on stderr, for the verbs and for `run`.
+- [x] AC6: `run` is composed below the verbs: on Linux a converge goes through the same guest command line as `exec` (`guestRun`), so its token is forwarded and masked the same way; on Windows `run` already shares `bootGuest`, `startTask` and `pollExit`. The assertions of the tests that pin its flags, lifecycle, two converges and judgment are unchanged. Rewritten on #2842: over the verbs and with those assertions unchanged cannot both hold, because `Up`, `Exec` and `Copy` issue different calls, need a session record, and a `--keep` run holds none by this proposal's `down` decision. `run` over the verbs would be two PRs for no behaviour beyond this.
 - [ ] AC7: A guest command that prints a value `exec --secret <registry-id>` forwarded yields a masked record and masked plain stdout; piped stdin without `--secret` is not redacted.
 - [ ] AC8: `exec --elevated` runs in a high-integrity token on the Windows guest and under `sudo` on Linux.
 - [ ] AC9: Every refusal test sets `XDG_STATE_HOME` to an empty temp dir, so none reaches the hypervisor.
 - [ ] AC11: `down` leaves no instance, overlay or state and never touches `clean-base`; `exec`, `cp` and `down` on an unknown name answer `no-session` with exit 3; a `timeout` exits 1.
-- [ ] AC10: The Windows guest, with OpenSSH Server and the `ssh-target` role installed inside a session, produces an `sshd -T` dump that becomes a fixture, and the converge proof passes with a second run at `changed` 0 (closes #2763).
+- [x] AC10: The Windows guest, with OpenSSH Server and the `ssh-target` role installed inside a session, produces an `sshd -T` dump that becomes a fixture, and the converge proof passes with a second run at `changed` 0 (closes #2763).
 
 ## References
 
