@@ -181,3 +181,64 @@ func TestPrPreflight_HasNoFlagThatTakesTheKey(t *testing.T) {
 		}
 	})
 }
+
+// The embedded pool must yield the chain the dotfiles workflow declares by hand,
+// or a caller moving to --pool changes who reviews first.
+func TestPrPreflight_PoolYieldsTheDeclaredChainInOrder(t *testing.T) {
+	dir := preflightEnv(t, map[string]int{"mimo-v2.6-flash": 200, "deepseek-v4-flash": 200, "glm5.3-flash": 200})
+	out := filepath.Join(dir, "github_output")
+
+	if _, stderr, err := execute(t, "pr", "preflight", "--pool", "embedded", "--output", out); err != nil {
+		t.Fatalf("pr preflight --pool: %v\n%s", err, stderr)
+	}
+	got, _ := os.ReadFile(out)
+	want := "model=openai/mimo-v2.6-flash\nfallbacks=[\"openai/deepseek-v4-flash\",\"openai/glm5.3-flash\"]\n"
+	if string(got) != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestPrPreflight_PoolWarnsAgainstTheDerivedPrimaryAndNamesThePool(t *testing.T) {
+	preflightEnv(t, map[string]int{"mimo-v2.6-flash": 401, "deepseek-v4-flash": 200, "glm5.3-flash": 200})
+
+	stdout, stderr, err := execute(t, "pr", "preflight", "--pool", "embedded")
+	if err != nil {
+		t.Fatalf("pr preflight --pool: %v\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "not the declared primary openai/mimo-v2.6-flash") {
+		t.Errorf("the primary is not named: %s", stdout)
+	}
+	if !strings.Contains(stdout, "the pool embedded in this dotf") || strings.Contains(stdout, ".pr_agent.toml") {
+		t.Errorf("the remedy does not name the pool: %s", stdout)
+	}
+}
+
+func TestPrPreflight_PoolRefusals(t *testing.T) {
+	preflightEnv(t, map[string]int{})
+	dir := t.TempDir()
+	noNaN := filepath.Join(dir, "pool.json")
+	pool := `{"pool":[{"id":"agy/x","runner":"agy","model":"x","role":"primary","vendor":"google","auth":"login"}]}`
+	if err := os.WriteFile(noNaN, []byte(pool), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct {
+		args []string
+		want string
+	}{
+		"with a model":   {[]string{"--pool", "embedded", "--model", "openai/m"}, "cannot be combined"},
+		"with fallbacks": {[]string{"--pool", "embedded", "--fallbacks", "[]"}, "cannot be combined"},
+		"an unread file": {[]string{"--pool", filepath.Join(dir, "absent.json")}, "cannot read a pool"},
+		"no NaN member":  {[]string{"--pool", noNaN}, "no NaN member"},
+		"neither source": {nil, "usage:"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, stderr, err := execute(t, append([]string{"pr", "preflight"}, c.args...)...)
+			if code := ExitCode(err); code != 2 {
+				t.Errorf("exit %d (%v), want 2: 1 would read as NaN being down", code, err)
+			}
+			if !strings.Contains(stderr, c.want) {
+				t.Errorf("stderr %q does not name %q", stderr, c.want)
+			}
+		})
+	}
+}

@@ -33,8 +33,10 @@ const (
 // (NAN_API_BASE, default NaN's) and Timeout (PREFLIGHT_TIMEOUT, seconds, default
 // 90).
 type PreflightInputs struct {
-	Model     string // --model: the declared primary, `openai/<id>`
-	Fallbacks string // --fallbacks: JSON array of the other declared models
+	Model     string   // --model: the declared primary, `openai/<id>`
+	Fallbacks string   // --fallbacks: JSON array of the other declared models
+	Chain     []string // the pool's chain, NaNChain's answer; used in place of the two above
+	Pool      string   // --pool: where Chain came from, named when a model is refused
 	Key       string
 	APIBase   string
 	Timeout   string
@@ -94,7 +96,7 @@ func Preflight(ctx context.Context, in PreflightInputs, env PreflightEnv) (Prefl
 		if code == "000" {
 			what = "gave no answer within " + seconds + "s"
 		}
-		annotate(env.Out, "PR-Agent model %s %s and is skipped for this run: %s.", declared, what, remedy(code))
+		annotate(env.Out, "PR-Agent model %s %s and is skipped for this run: %s.", declared, what, remedy(code, in.Pool))
 	}
 	if len(answered) == 0 {
 		annotate(env.Out, "No model in PR-Agent's declared NaN chain answered, so NaN is out of the review pool for this run."+
@@ -102,19 +104,23 @@ func Preflight(ctx context.Context, in PreflightInputs, env PreflightEnv) (Prefl
 		return res, ErrNoModelAnswered
 	}
 	res.Model, res.Fallbacks = answered[0], answered[1:]
-	if res.Model != in.Model {
-		annotate(env.Out, "PR-Agent reviews this PR with %s, not the declared primary %s.", res.Model, in.Model)
+	if res.Model != chain[0] {
+		annotate(env.Out, "PR-Agent reviews this PR with %s, not the declared primary %s.", res.Model, chain[0])
 	}
 	return res, nil
 }
 
-// chain is the primary followed by the fallbacks, without the blank entries.
+// chain is the pool's chain when there is one, otherwise the primary followed by
+// the fallbacks, without the blank entries.
 func (in PreflightInputs) chain() ([]string, error) {
-	if in.Model == "" || in.Fallbacks == "" {
-		return nil, PreflightSetupError("usage: dotf pr preflight --model openai/<id> --fallbacks JSON_ARRAY [--output FILE]")
+	if len(in.Chain) == 0 && (in.Model == "" || in.Fallbacks == "") {
+		return nil, PreflightSetupError("usage: dotf pr preflight --pool SOURCE | --model openai/<id> --fallbacks JSON_ARRAY [--output FILE]")
 	}
 	if in.Key == "" {
 		return nil, PreflightSetupError("NAN_API_KEY is not set")
+	}
+	if len(in.Chain) > 0 {
+		return in.Chain, nil
 	}
 	var fallbacks []string
 	if err := json.Unmarshal([]byte(in.Fallbacks), &fallbacks); err != nil {
@@ -142,11 +148,18 @@ func preflightTimeout(raw string) (time.Duration, string) {
 // remedy is what the reader should do about a model that did not answer. Only a
 // refusal means the chain is wrong. Quota and NaN's per-model concurrency limit
 // (#1107) pass on their own, and so does an outage; telling the reader to edit
-// the chain for those would be wrong advice.
-func remedy(code string) string {
+// the chain for those would be wrong advice. pool is the chain's source when it
+// came from a pool, which is then where the fix goes.
+func remedy(code, pool string) string {
 	switch code {
 	case "401", "403", "404":
-		return "this key cannot call it. Fix the chain in .pr_agent.toml and .github/workflows/pr-agent.yml"
+		switch pool {
+		case "":
+			return "this key cannot call it. Fix the chain in .pr_agent.toml and .github/workflows/pr-agent.yml"
+		case EmbeddedSource:
+			return "this key cannot call it. Fix the key, or the pool embedded in this dotf"
+		}
+		return "this key cannot call it. Fix the key, or the pool at " + pool
 	case "402", "429":
 		return "quota or concurrency limit reached. Nothing to fix; it passes, or the quota resets"
 	}

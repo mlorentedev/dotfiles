@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
@@ -38,4 +40,23 @@ func LoadPool(source string) (spec.ReviewerPool, error) {
 		return spec.ReviewerPool{}, fmt.Errorf("cannot read a pool from %q: %w", source, err)
 	}
 	return p, nil
+}
+
+// NaNChain is the pool's NaN models for PR-Agent, the chain the preflight probes:
+// every `openai/` member, by descending weight, pool order breaking a tie. The
+// heaviest member is the primary. Document order alone will not do, because the
+// pool's own comment says its order is provenance, not precedence.
+func NaNChain(p spec.ReviewerPool) []string {
+	var members []spec.PRAgentBlock
+	for _, e := range p.Pool {
+		if e.PRAgent != nil && strings.HasPrefix(e.PRAgent.Model, "openai/") {
+			members = append(members, *e.PRAgent)
+		}
+	}
+	slices.SortStableFunc(members, func(a, b spec.PRAgentBlock) int { return b.Weight - a.Weight })
+	chain := make([]string, 0, len(members))
+	for _, m := range members {
+		chain = append(chain, m.Model)
+	}
+	return chain
 }
