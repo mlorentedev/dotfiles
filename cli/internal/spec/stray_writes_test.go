@@ -50,3 +50,35 @@ func TestStrayWritesSeeStagedChangesAndRenames(t *testing.T) {
 		t.Errorf("folder = %q, want the spec folder relative to the repository root", before.Folder())
 	}
 }
+
+// An untracked file the operator had before the run, deleted by the reviewer,
+// leaves no status line afterwards: only the before side names it.
+func TestStrayWritesSeeAnUntrackedFileRemoved(t *testing.T) {
+	repo := t.TempDir()
+	git(t, repo, "init", "-q")
+	git(t, repo, "commit", "-q", "--allow-empty", "-m", "init")
+	scratch := filepath.Join(repo, "notes.txt")
+	if err := os.WriteFile(scratch, []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	review := filepath.Join(repo, "specs", "AI-001-x", "review.md")
+	if err := os.MkdirAll(filepath.Dir(review), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	before, err := SnapshotTree(review)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(scratch); err != nil {
+		t.Fatal(err)
+	}
+	after, err := SnapshotTree(review)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := before.StrayWrites(after), []string{"notes.txt"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("stray writes = %q, want %q", got, want)
+	}
+}

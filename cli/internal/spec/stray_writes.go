@@ -51,11 +51,18 @@ func SnapshotTree(review string) (TreeSnapshot, error) {
 
 // StrayWrites lists the paths whose state after differs from before, sorted.
 // A file that was already dirty and is changed again keeps its status and is
-// not seen: the snapshot compares states, not contents.
+// not seen: the snapshot compares states, not contents. A path only the before
+// side names was dirty and is now clean or gone, such as an operator's
+// untracked file the reviewer deleted.
 func (before TreeSnapshot) StrayWrites(after TreeSnapshot) []string {
 	var stray []string
 	for path, code := range after.entries {
 		if before.entries[path] != code {
+			stray = append(stray, path)
+		}
+	}
+	for path := range before.entries {
+		if _, ok := after.entries[path]; !ok {
 			stray = append(stray, path)
 		}
 	}
