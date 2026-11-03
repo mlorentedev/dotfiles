@@ -31,8 +31,9 @@ func sshdDump(t *testing.T, name string) []byte {
 // platforms are the sshd builds a dump was measured on: `sshd -T -f` over a
 // config whose Include reads the drop-in (effective), and over one whose
 // Include matches no file (ignored). The second is #2763: `sshd -t` passes it,
-// the dump shows the defaults. Each was run as the user with a scratch host
-// key, so no root and no change to the machine. The third dump, outside, adds
+// the dump shows the defaults. The Unix dumps ran as the user with a scratch
+// host key, so no root and no change to the machine; the Windows ones ran as
+// an administrator in a throwaway guest it reshaped. The third dump, outside, adds
 // `-C user=dotf,host=h,addr=192.0.2.1`.
 var platforms = []string{
 	"macos-10.3p1",  // macOS, OpenSSH 10.3p1
