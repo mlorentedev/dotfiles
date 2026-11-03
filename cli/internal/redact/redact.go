@@ -1,7 +1,8 @@
 // Package redact masks injected secret values in a stream before it reaches a
 // transcript (ADR-028: never dump a secrets store to standard output). It is
 // shared by every command that hands a secret to a child or a guest, so the
-// guarantee is one implementation, not a copy per caller.
+// guarantee is one implementation, not a copy per caller. It also holds the
+// credential shapes masked in text nobody declared a value for (shapes.go).
 package redact
 
 import (

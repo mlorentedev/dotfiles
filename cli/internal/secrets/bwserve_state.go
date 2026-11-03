@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/redact"
 )
 
 // BWServeState is where a dotf-managed bw serve daemon leaves its trace: the
@@ -209,11 +211,14 @@ func sinceLastStart(lines []string) []string {
 	return lines
 }
 
-// tailLines keeps the last n non-empty lines, trimmed and width-capped.
+// tailLines keeps the last n non-empty lines, trimmed, credential-masked and
+// width-capped. The log is bw's own output and doctor prints it, so nothing
+// bounds what kind of text it is (#1750). Masking comes before the cut: a
+// token cut short no longer matches its shape, and its head would leak.
 func tailLines(lines []string, n int) []string {
 	kept := make([]string, 0, n)
 	for i := len(lines) - 1; i >= 0 && len(kept) < n; i-- {
-		line := strings.TrimSpace(lines[i])
+		line := redact.MaskShapes(redact.StripANSI(strings.TrimSpace(lines[i])))
 		if line == "" {
 			continue
 		}

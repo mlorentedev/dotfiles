@@ -7,11 +7,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/redact"
 )
 
 // A converge run keeps its own transcript beside its report (#1098):
@@ -213,6 +214,7 @@ func (rl *RunLog) tail() int {
 // A match that starts at the very beginning is longer than maxPartialLine; no
 // credential is, so the cut stays where it was.
 func (rl *RunLog) safeCut(data []byte, cut int) int {
+	patterns := redact.Patterns()
 	for moved := true; moved; {
 		moved = false
 		for _, m := range rl.masks {
@@ -222,7 +224,7 @@ func (rl *RunLog) safeCut(data []byte, cut int) int {
 				cut, moved = from+i, true
 			}
 		}
-		for _, re := range append([]*regexp.Regexp{ansiEscape}, tokenShapes...) {
+		for _, re := range patterns {
 			for _, loc := range re.FindAllIndex(data, -1) {
 				if loc[0] < cut && cut < loc[1] {
 					cut, moved = loc[0], true
@@ -236,37 +238,12 @@ func (rl *RunLog) safeCut(data []byte, cut int) int {
 	return cut
 }
 
-var (
-	// ansiEscape matches CSI and OSC sequences: colour, cursor and title codes.
-	ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)`)
-	// tokenShapes are credentials recognisable by their form alone. Each has
-	// two groups, the context before and after the secret, which survive; the
-	// secret between them is masked.
-	tokenShapes = []*regexp.Regexp{
-		regexp.MustCompile(`()\bgh[pousr]_[A-Za-z0-9]{30,}()`),
-		regexp.MustCompile(`()\bgithub_pat_[A-Za-z0-9_]{20,}()`),
-		regexp.MustCompile(`()\bsk-[A-Za-z0-9_-]{20,}()`),
-		regexp.MustCompile(`()\bAKIA[0-9A-Z]{16}\b()`),
-		regexp.MustCompile(`()\bxox[abprs]-[A-Za-z0-9-]{10,}()`),
-		regexp.MustCompile(`()\bAGE-SECRET-KEY-1[0-9A-Z]{20,}()`),
-		regexp.MustCompile(`()\bnpm_[A-Za-z0-9]{36}\b()`),
-		regexp.MustCompile(`()\bpypi-AgEI[A-Za-z0-9_-]{20,}()`),
-		regexp.MustCompile(`(?i)(\b(?:proxy-)?authorization:\s*(?:bearer|basic|token)\s+)[^\s'"]+()`),
-		regexp.MustCompile(`(?i)(\bbearer\s+)[A-Za-z0-9._~+/=-]{16,}()`),
-		// URL userinfo: scheme://user:password@host keeps the user, masks the password.
-		regexp.MustCompile(`(\b[A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:)[^@\s/]+(@)`),
-	}
-)
-
 func (rl *RunLog) redact(line string) string {
-	line = ansiEscape.ReplaceAllString(line, "")
+	line = redact.StripANSI(line)
 	for _, m := range rl.masks {
 		line = strings.ReplaceAll(line, m.value, m.replacement)
 	}
-	for _, re := range tokenShapes {
-		line = re.ReplaceAllString(line, "${1}[REDACTED]${2}")
-	}
-	return line
+	return redact.MaskShapes(line)
 }
 
 // PruneRuns leaves the newest keep runs in dir. A run is every file sharing a
