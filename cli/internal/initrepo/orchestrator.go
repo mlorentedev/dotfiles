@@ -175,7 +175,12 @@ func initGithubWithDryRun(root string, dryRun bool) (status, detail string) {
 	if res.Action == "skipped" {
 		return "skipped", res.Reason
 	}
-	return "ok", "delete_branch_on_merge " + res.Action + " on " + repo
+	detail = "delete_branch_on_merge " + res.Action + " on " + repo
+	labels, err := ApplyDependabotLabels(repo, dryRun)
+	if err != nil {
+		return "warn", detail + "; " + err.Error()
+	}
+	return "ok", detail + "; " + labels.Summary()
 }
 
 func okOrSkip(skipped bool) string {

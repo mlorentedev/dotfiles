@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-081-dependabot-labels-provisioned-f1",
+    "behavior": "Missing declared labels are created once, present ones (case-insensitive) left alone; a second run creates nothing",
+    "verification": "cd cli && go test ./internal/initrepo/ -run 'TestApplyDependabotLabels(CreatesOnlyTheMissingOnes|SecondRunCreatesNothing)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-081-dependabot-labels-provisioned-f2",
+    "behavior": "--dry-run lists the missing labels and creates none",
+    "verification": "cd cli && go test ./internal/initrepo/ -run 'TestApplyDependabotLabelsDryRunCreatesNone$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-081-dependabot-labels-provisioned-f3",
+    "behavior": "No dependabot.yml, or no labels: no label call beyond the read",
+    "verification": "cd cli && go test ./internal/initrepo/ -run 'TestApplyDependabotLabelsWithoutDeclarationsDoesNothing$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-081-dependabot-labels-provisioned-f4",
+    "behavior": "A failed gh label create is an error naming the label and repository",
+    "verification": "cd cli && go test ./internal/initrepo/ -run 'TestApplyDependabotLabelsFailsLoudlyWhenACreateFails$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-081-dependabot-labels-provisioned-f5",
+    "behavior": "bitacora-rollout.sh runs dotf init github per repo, --dry-run under --check, not under --backfill-only, failure or [WARN] is an error",
+    "verification": "bats tests/bitacora-rollout.bats --filter 'GitHub repo defaults|dotf init github'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

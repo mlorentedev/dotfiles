@@ -49,6 +49,19 @@ esac
 exit 0
 STUB
     chmod +x "$FIX/bin/gh"
+
+    # dotf stub: a provisioning run hands the GitHub repo defaults to
+    # `dotf init github` (#1222). It logs its arguments and prints STUB_DOTF_OUT,
+    # exiting STUB_DOTF_RC, so no test reaches a real repository.
+    DOTF_LOG="$FIX/dotf-calls.log"
+    export DOTF_LOG
+    cat > "$FIX/bin/dotf" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$DOTF_LOG"
+[ -n "${STUB_DOTF_OUT:-}" ] && printf '%s\n' "$STUB_DOTF_OUT"
+exit "${STUB_DOTF_RC:-0}"
+STUB
+    chmod +x "$FIX/bin/dotf"
     PATH="$FIX/bin:$PATH"
     export PATH
 }
@@ -205,4 +218,49 @@ STUB
     [ "$status" -ne 0 ]
     [[ "$output" == *"cannot resolve project #1"* ]] || false
     [[ "$output" != *"── demo ──"* ]] || false
+}
+
+# ── GitHub repo defaults via dotf (#1222) ─────────────────────────────────────
+
+@test "a provisioning run applies the GitHub repo defaults through dotf init github" {
+    export STUB_DOTF_OUT='[OK] created dependabot labels on mlorentedev/demo: dependencies'
+    BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 0 ]
+    grep -qx 'init github --repo mlorentedev/demo' "$DOTF_LOG"
+    [[ "$output" == *"📝 demo: GitHub repo defaults applied"* ]] || false
+}
+
+@test "--check passes --dry-run to dotf init github" {
+    export STUB_DOTF_OUT='[DRY-RUN] would create dependabot labels on mlorentedev/demo: dependencies'
+    BITACORA_PAT=stub run "$SCRIPT" --check demo
+    [ "$status" -eq 0 ]
+    grep -qx 'init github --repo mlorentedev/demo --dry-run' "$DOTF_LOG"
+    [[ "$output" == *"📝 demo: GitHub repo defaults applied"* ]] || false
+}
+
+@test "a converged repo reports its GitHub repo defaults current, with no change" {
+    export STUB_DOTF_OUT='[OK] delete_branch_on_merge already enabled on mlorentedev/demo
+[OK] dependabot labels present on mlorentedev/demo'
+    BITACORA_PAT=stub run "$SCRIPT" --check demo
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"✅ demo: GitHub repo defaults current"* ]] || false
+}
+
+@test "a failing or skipped dotf init github fails the rollout" {
+    STUB_DOTF_RC=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"❌ demo: GitHub repo defaults failed"* ]] || false
+
+    # A [WARN] skip exits 0 from dotf, but in a rollout nothing reads it: it is
+    # the notice-nobody-reads failure #1222 is about.
+    STUB_DOTF_OUT='[WARN] dependabot labels skipped: could not read' BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"❌ demo: GitHub repo defaults failed"* ]] || false
+}
+
+@test "--backfill-only never applies the GitHub repo defaults" {
+    default_issues
+    run "$SCRIPT" --backfill-only demo
+    [ "$status" -eq 0 ]
+    [ ! -e "$DOTF_LOG" ]
 }

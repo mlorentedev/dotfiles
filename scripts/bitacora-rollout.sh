@@ -12,6 +12,8 @@
 #      registry: dotf secrets run --only BITACORA_PAT -- ./scripts/bitacora-rollout.sh
 #   3. deploy .github/workflows/add-to-project.yml + bitacora-status.yml
 #      (canonical copies = THIS repo's .github/workflows/; deployed via the contents API)
+#   3b. apply the GitHub repo defaults through `dotf init github` (delete_branch_on_merge,
+#      and every label the repo's dependabot.yml declares); --check passes --dry-run
 #   4. backfill: put every open issue and PR on the board (item-add is idempotent)
 #
 # Usage: ./scripts/bitacora-rollout.sh [--check] [--backfill-only] [repo ...]
@@ -142,6 +144,27 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
     ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
 }
 
+# apply_github_defaults REPO — hand the repo-level defaults to `dotf init
+# github`, which owns them, rather than a second copy of the gh calls here.
+# dotf reports a skip (no gh, unreadable repo) as a [WARN] with exit 0, which is
+# right at a terminal and wrong here: in a rollout nobody reads a notice, and a
+# silently missing label is exactly the failure #1222 is about. So a [WARN]
+# fails the repo just like a non-zero exit.
+apply_github_defaults() {
+    local repo="$1" out rc=0
+    local args=(init github --repo "$OWNER/$repo")
+    [ "$CHECK" = 1 ] && args+=(--dry-run)
+    out=$(dotf "${args[@]}" 2>&1) || rc=$?
+    [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/   /'
+    if [ "$rc" -ne 0 ] || printf '%s\n' "$out" | grep -q '^\[WARN\]'; then
+        err "$repo: GitHub repo defaults failed"
+    elif printf '%s\n' "$out" | grep -qE '^\[DRY-RUN\]|^\[OK\] (enabled|created)'; then
+        chg "$repo: GitHub repo defaults applied"
+    else
+        ok "$repo: GitHub repo defaults current"
+    fi
+}
+
 # resolve_project_id — the board's GraphQL node ID, fetched once per run.
 #
 # Needed because the backfill adds items with the addProjectV2ItemById mutation
@@ -260,6 +283,10 @@ for repo in "${REPOS[@]}"; do
     if [ "${#PR_FILES[@]}" -gt 0 ]; then
         deploy_via_pr "$repo"
     fi
+
+    # 3b. GitHub repo defaults: delete_branch_on_merge and every label the
+    # repo's own dependabot.yml declares (#1222)
+    apply_github_defaults "$repo"
 
     # 4. Backfill open issues + PRs
     backfill_repo "$repo"

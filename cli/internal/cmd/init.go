@@ -199,10 +199,16 @@ func newInitGithubCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "github",
-		Short: "Apply GitHub repo defaults (delete_branch_on_merge)",
-		Long: `github applies opinionated GitHub repo-level defaults via the gh CLI —
-currently delete_branch_on_merge=true, which auto-deletes a PR's head branch on
-merge (the orphan-branch hygiene fix). Idempotent: a no-op when already enabled.
+		Short: "Apply GitHub repo defaults (delete_branch_on_merge, Dependabot labels)",
+		Long: `github applies opinionated GitHub repo-level defaults via the gh CLI:
+
+  - delete_branch_on_merge=true, which auto-deletes a PR's head branch on merge
+    (the orphan-branch hygiene fix);
+  - every label the repo's own .github/dependabot.yml declares exists. Dependabot
+    never creates a custom label and drops a missing one from its PRs.
+
+Idempotent: each default reads the repo first and is a no-op when it already
+holds. A label the server refuses to create fails the command.
 
 Without --repo it derives owner/name from the current repo's origin remote.
 Host-coupling degrades gracefully: a missing gh, missing remote, or an
@@ -244,6 +250,19 @@ unreadable repo is a [WARN] skip with exit 0, never fatal.`,
 				cmd.Printf("[DRY-RUN] would enable delete_branch_on_merge on %s\n", res.Repo)
 			case "enabled":
 				cmd.Printf("[OK] enabled delete_branch_on_merge on %s\n", res.Repo)
+			}
+
+			labels, err := initrepo.ApplyDependabotLabels(target, dryRun)
+			if err != nil {
+				return err
+			}
+			switch labels.Action {
+			case "skipped":
+				cmd.PrintErrf("[WARN] %s\n", labels.Summary())
+			case "dry-run":
+				cmd.Printf("[DRY-RUN] %s\n", labels.Summary())
+			default:
+				cmd.Printf("[OK] %s\n", labels.Summary())
 			}
 			return nil
 		},
