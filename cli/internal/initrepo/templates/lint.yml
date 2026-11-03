@@ -36,7 +36,11 @@ jobs:
             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
           echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum -c -
           tar -xzf "${tarball}" actionlint
-      # ubuntu-latest ships shellcheck. The directory is named, not left to
+      # GitHub's ubuntu-latest ships shellcheck, but a Gitea or Forgejo runner
+      # image may not, and actionlint skips shell linting without an error when
+      # it is missing: fail instead. The directory is named, not left to
       # actionlint's default, so a Gitea or Forgejo repository lints its own.
       - name: Lint workflows and their shell (actionlint + shellcheck)
-        run: ./actionlint -color -shellcheck=shellcheck .github/workflows/*.y*ml
+        run: |
+          command -v shellcheck >/dev/null || { echo "shellcheck is not on PATH: actionlint would skip shell linting" >&2; exit 1; }
+          ./actionlint -color -shellcheck=shellcheck .github/workflows/*.y*ml

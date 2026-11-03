@@ -21,7 +21,7 @@ func TestWriteLintForEveryStack(t *testing.T) {
 			t.Errorf("stack %s: lint step status = %q, want ok", stack, s)
 		}
 		got := readFile(t, filepath.Join(root, ".github", "workflows", "lint.yml"))
-		for _, want := range []string{"actionlint", "-shellcheck=shellcheck", "contents: read", "pull_request:"} {
+		for _, want := range []string{"actionlint", "-shellcheck=shellcheck", "command -v shellcheck", "contents: read", "pull_request:"} {
 			if !strings.Contains(got, want) {
 				t.Errorf("stack %s: lint.yml missing %q", stack, want)
 			}
