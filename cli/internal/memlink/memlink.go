@@ -306,3 +306,11 @@ func dirNotEmpty(p string) bool {
 func isUnder(path, base string) bool {
 	return base != "" && strings.HasPrefix(path, base)
 }
+
+// VaultMemory is the vault memory directory for project, or "" when none
+// resolves to a real directory. It is the read-only half of Ensure: a caller
+// that must find a project's MEMORY.md (and the thread files beside it) asks
+// the same resolver that links it, so the two cannot name different directories.
+func VaultMemory(cwd, project, vault string) string {
+	return resolveVaultMemory(cwd, project, vault)
+}

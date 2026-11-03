@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-185-handoff-loss-check"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-11-01"
 issue: "mlorentedev/dotfiles#1881"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -44,14 +44,14 @@ template_version: "1.0"
 
 ## Acceptance criteria
 
-- [ ] AC1: a fixture with a linked worktree, `threads/<key>.md` present and no `### thread: <key>` entry makes the check WARN, naming the key and the file.
-- [ ] AC2: the same fixture with the entry present, or with a `### thread: <key>+<agent>` fork entry, passes.
-- [ ] AC3: a thread whose file was moved to `archive/` (the sanctioned archive step) does not warn.
-- [ ] AC4: a worktree with no `threads/<key>.md` does not warn, even when a journal for it exists under `sessions/`.
-- [ ] AC5: with no vault, no vault project, no `MEMORY.md`, or no `threads/` directory the check SKIPs and says why; the no-`threads/` SKIP says the inline layout is not covered.
-- [ ] AC6: the check never writes to the vault and never FAILs; `dotf doctor --fix` leaves the vault byte-identical.
-- [ ] AC7: the worktree key is computed with `mem.ThreadKey`, and a test fails if the check derives it any other way (a detached worktree and a branch with `/` both resolve as `handoff-write` would key them).
-- [ ] AC8: run against the real vault once, the result is recorded in `verification.md` (which of today's seven entry-less files, if any, belong to a live worktree).
+- [x] AC1: a fixture with a linked worktree, `threads/<key>.md` present and no `### thread: <key>` entry makes the check WARN, naming the key and the file.
+- [x] AC2: the same fixture with the entry present, or with a `### thread: <key>+<agent>` fork entry, passes.
+- [x] AC3: a thread whose file was moved to `archive/` (the sanctioned archive step) does not warn.
+- [x] AC4: a worktree with no `threads/<key>.md` does not warn, even when a journal for it exists under `sessions/`.
+- [x] AC5: with no vault, no vault project, no `MEMORY.md`, or no `threads/` directory the check SKIPs and says why; the no-`threads/` SKIP says the inline layout is not covered.
+- [x] AC6: the check never writes to the vault and never FAILs; `dotf doctor --fix` leaves the vault byte-identical.
+- [x] AC7: the worktree key is computed with `mem.ThreadKey`, and a test fails if the check derives it any other way (a detached worktree and a branch with `/` both resolve as `handoff-write` would key them).
+- [x] AC8: run against the real vault once, the result is recorded in `verification.md` (which of today's seven entry-less files, if any, belong to a live worktree).
 
 ## References
 
