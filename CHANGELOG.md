@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.79.0](https://github.com/mlorentedev/dotfiles/compare/v0.78.0...v0.79.0) (2026-11-03)
+
+
+### Features
+
+* **doctor:** report a handoff thread whose entry left MEMORY.md ([#3085](https://github.com/mlorentedev/dotfiles/issues/3085)) ([9ce2c36](https://github.com/mlorentedev/dotfiles/commit/9ce2c36d3dd407f696c72165f7547345d51f70bf))
+* **harness:** catch a record edited without its vault source ([#3027](https://github.com/mlorentedev/dotfiles/issues/3027)) ([70a8d78](https://github.com/mlorentedev/dotfiles/commit/70a8d786f85843aa8bf1c803879538ee47a9101f))
+* **harness:** render the refresh in Go ([#3023](https://github.com/mlorentedev/dotfiles/issues/3023)) ([ac3c865](https://github.com/mlorentedev/dotfiles/commit/ac3c865a864deb1e61ee8e545530d5f1eb248f77)), closes [#495](https://github.com/mlorentedev/dotfiles/issues/495)
+* **init:** emit an actionlint workflow for every stack ([#3099](https://github.com/mlorentedev/dotfiles/issues/3099)) ([1a9fc3f](https://github.com/mlorentedev/dotfiles/commit/1a9fc3f897cc06236b316134dcb3f5d62339366e)), closes [#2965](https://github.com/mlorentedev/dotfiles/issues/2965)
+* **init:** provision the labels a repo's dependabot.yml declares ([#3116](https://github.com/mlorentedev/dotfiles/issues/3116)) ([30bdedb](https://github.com/mlorentedev/dotfiles/commit/30bdedbd004176f275a553ecbaa442def61cf634)), closes [#1222](https://github.com/mlorentedev/dotfiles/issues/1222)
+* **pr:** print the manual merge command when land refuses a PR ([#3119](https://github.com/mlorentedev/dotfiles/issues/3119)) ([05b8554](https://github.com/mlorentedev/dotfiles/commit/05b855433631a3b69e1d8131653e322f1c5ad701))
+* **prreview:** add dotf pr declare-unreviewed ([#3044](https://github.com/mlorentedev/dotfiles/issues/3044)) ([46b8db2](https://github.com/mlorentedev/dotfiles/commit/46b8db2227a5a346eca97cb00a7f728ab881e711))
+* **prreview:** add dotf pr reviewable, the decision to run PR-Agent ([#3037](https://github.com/mlorentedev/dotfiles/issues/3037)) ([d686ac5](https://github.com/mlorentedev/dotfiles/commit/d686ac5151dfdb59c9fb3e82465bde17c58b92d2))
+* **prreview:** read the preflight's NaN chain from the pool ([#3081](https://github.com/mlorentedev/dotfiles/issues/3081)) ([dace249](https://github.com/mlorentedev/dotfiles/commit/dace249b44820223651db0a9f57b8cf070452751))
+* **secrets:** deliver PR_AGENT_ANTHROPIC_API_KEY to hive's CI ([#3035](https://github.com/mlorentedev/dotfiles/issues/3035)) ([d90319b](https://github.com/mlorentedev/dotfiles/commit/d90319b40b6461607e5cad14b4ec341511b87cfd))
+* **ssh:** add the hs-bootstrap host for the control-plane SSH bootstrap ([#3091](https://github.com/mlorentedev/dotfiles/issues/3091)) ([8fafad9](https://github.com/mlorentedev/dotfiles/commit/8fafad954c9def8acab7070e8d127470c813da7f))
+* **vm:** copy a file through a Windows session with cp ([#3078](https://github.com/mlorentedev/dotfiles/issues/3078)) ([90bbfd8](https://github.com/mlorentedev/dotfiles/commit/90bbfd811f1244f9627d2260e1871af0b69d82ff))
+* **vm:** hold the Windows guest as a session with up, down and status ([#3064](https://github.com/mlorentedev/dotfiles/issues/3064)) ([cd72ea4](https://github.com/mlorentedev/dotfiles/commit/cd72ea426db06374af714cd37814e0fdbf14cb23))
+* **vm:** run a command in a Windows session with exec ([#3073](https://github.com/mlorentedev/dotfiles/issues/3073)) ([1cd1ec5](https://github.com/mlorentedev/dotfiles/commit/1cd1ec582bbc1b21189544a9c7d04233cb176392))
+* **vm:** run one exec as an administrator with --elevated ([#3079](https://github.com/mlorentedev/dotfiles/issues/3079)) ([b49c5ba](https://github.com/mlorentedev/dotfiles/commit/b49c5bad4f55951a61ecf3099bee97279829d3ac))
+
+
+### Bug Fixes
+
+* **claude:** bound the health check of claude mcp get ([#3038](https://github.com/mlorentedev/dotfiles/issues/3038)) ([48ef3e4](https://github.com/mlorentedev/dotfiles/commit/48ef3e4e3895f1f6162d18e495bc86ae7e00671c))
+* **forge:** declare the forge ssh alias ([#3088](https://github.com/mlorentedev/dotfiles/issues/3088)) ([29918f5](https://github.com/mlorentedev/dotfiles/commit/29918f51ad2beb12f2574704abe482b50b725086))
+* **forge:** look a landed branch up on Gitea instead of listing ([#3096](https://github.com/mlorentedev/dotfiles/issues/3096)) ([221dc76](https://github.com/mlorentedev/dotfiles/commit/221dc769782c1b14648d7369e3d751921b8382b5))
+* **forge:** read an ssh host alias as an origin ([#3058](https://github.com/mlorentedev/dotfiles/issues/3058)) ([ce49a5f](https://github.com/mlorentedev/dotfiles/commit/ce49a5f59ca1b7e35e83871518e226b0d2f7065b))
+* **forge:** refuse a pull request whose head is a run branch ([#3057](https://github.com/mlorentedev/dotfiles/issues/3057)) ([61b9985](https://github.com/mlorentedev/dotfiles/commit/61b9985e610c7eaf35f1c213b6e1d9b67901a38b))
+* **gittest:** quiet the remote side of a local push too ([#3046](https://github.com/mlorentedev/dotfiles/issues/3046)) ([75d8573](https://github.com/mlorentedev/dotfiles/commit/75d857364d6bdfbede17bdcce3989707d97b982d))
+* **harness:** drop aux files a skill record no longer ships ([#3070](https://github.com/mlorentedev/dotfiles/issues/3070)) ([c9b0020](https://github.com/mlorentedev/dotfiles/commit/c9b0020fe60b620a7b764aa2ded792a2647c8ff8))
+* **harness:** refresh the insights and vault-doctor records from the vault ([#3097](https://github.com/mlorentedev/dotfiles/issues/3097)) ([238ae94](https://github.com/mlorentedev/dotfiles/commit/238ae94e22f7b0b5d95cdf58b3d44f5fbd5ae17f))
+* **mem:** read every field under a label, and drop the first-match read ([#3034](https://github.com/mlorentedev/dotfiles/issues/3034)) ([e061a50](https://github.com/mlorentedev/dotfiles/commit/e061a50eb697edad63e127e7d52489b86a440e67))
+* **mem:** say when a resume context has no Next action ([#3030](https://github.com/mlorentedev/dotfiles/issues/3030)) ([0eb6e5c](https://github.com/mlorentedev/dotfiles/commit/0eb6e5cd3fb9ffbb7ee9527f4f3f0586fb3f3db0)), closes [#3003](https://github.com/mlorentedev/dotfiles/issues/3003)
+* **pi:** retry a failed package install once before counting it ([#3065](https://github.com/mlorentedev/dotfiles/issues/3065)) ([5074a28](https://github.com/mlorentedev/dotfiles/commit/5074a288e96c1fff4bb28016b75c3b456ba61add))
+* **prland:** confirm a failed merge over REST, not GraphQL ([#3087](https://github.com/mlorentedev/dotfiles/issues/3087)) ([c1706da](https://github.com/mlorentedev/dotfiles/commit/c1706daefdaaccffd601222feb45dc3336ef377e))
+* **prreview:** expand interior globstars as PR-Agent does ([#3039](https://github.com/mlorentedev/dotfiles/issues/3039)) ([167213b](https://github.com/mlorentedev/dotfiles/commit/167213b1d2d7642ca556fde851c0fa82e55571b6))
+* **prreview:** harden the route's fallbacks, probes and notes ([#3060](https://github.com/mlorentedev/dotfiles/issues/3060)) ([af4418e](https://github.com/mlorentedev/dotfiles/commit/af4418e526622e6e22a600231d818b68d23857d3))
+* **prtriage:** judge late findings and tell same-named files apart ([#3024](https://github.com/mlorentedev/dotfiles/issues/3024)) ([60ce367](https://github.com/mlorentedev/dotfiles/commit/60ce367337a01be834852934292848128bf80b8f))
+* **prtriage:** name a triage record the queue ignores, and say what is not one ([#3074](https://github.com/mlorentedev/dotfiles/issues/3074)) ([c1e9c0c](https://github.com/mlorentedev/dotfiles/commit/c1e9c0c38c777b26676aceec950aa93d74bb968c)), closes [#2896](https://github.com/mlorentedev/dotfiles/issues/2896)
+* **secrets:** mask credential shapes in the bw serve log doctor prints ([#3118](https://github.com/mlorentedev/dotfiles/issues/3118)) ([1930c33](https://github.com/mlorentedev/dotfiles/commit/1930c33189fdf1cb5241ffd419c575fbb6737d56))
+* **secrets:** read bw serve's doctor evidence from the current daemon's start ([#3067](https://github.com/mlorentedev/dotfiles/issues/3067)) ([7a4e2c4](https://github.com/mlorentedev/dotfiles/commit/7a4e2c47c91710aa0325c54fec6959a621b35b8d))
+* **skills:** show the Next action marker in autopilot's handoff example ([#3113](https://github.com/mlorentedev/dotfiles/issues/3113)) ([f6fd04e](https://github.com/mlorentedev/dotfiles/commit/f6fd04e57289b39e0aadc8959aa17668fe356829))
+* **spec:** digest a fast-track spec.md so its review records a real contract ([#3053](https://github.com/mlorentedev/dotfiles/issues/3053)) ([d8e53e0](https://github.com/mlorentedev/dotfiles/commit/d8e53e0127f4b0c215d4e0f89ebc8ba5e467ffca))
+* **spec:** read a promotion answer that follows a note in parentheses ([#3045](https://github.com/mlorentedev/dotfiles/issues/3045)) ([46738cb](https://github.com/mlorentedev/dotfiles/commit/46738cb11d14bb684352019f2b8bade290bcc83b))
+* **spec:** report what a review run wrote outside its spec folder ([#3117](https://github.com/mlorentedev/dotfiles/issues/3117)) ([e338e47](https://github.com/mlorentedev/dotfiles/commit/e338e47db640d76dfacd0c0b257a7a87352c27d9))
+* **spec:** resolve the issue home once, and refuse a non-GitHub origin ([#3047](https://github.com/mlorentedev/dotfiles/issues/3047)) ([9662250](https://github.com/mlorentedev/dotfiles/commit/966225010b4ad4ae2d88f83532039d6877652bdc)), closes [#1906](https://github.com/mlorentedev/dotfiles/issues/1906)
+* **spec:** vendor the vault's new template frontmatter and fill {{title}} ([#3063](https://github.com/mlorentedev/dotfiles/issues/3063)) ([0ed20bb](https://github.com/mlorentedev/dotfiles/commit/0ed20bbe39724a478d36224bc9c2ffc2441a2801)), closes [#3050](https://github.com/mlorentedev/dotfiles/issues/3050)
+* **spec:** warn the ordinary-scope review prompt about merged-in work ([#3026](https://github.com/mlorentedev/dotfiles/issues/3026)) ([83ed718](https://github.com/mlorentedev/dotfiles/commit/83ed718dbb28f7c7683b95b7865910d975a4ac25))
+* **sshtarget:** fence sshd to the mesh with Match Address ([#3090](https://github.com/mlorentedev/dotfiles/issues/3090)) ([a11b711](https://github.com/mlorentedev/dotfiles/commit/a11b7114283883fe7ebbb0677d52facb711f2a7d))
+* **vault:** re-vendor the work-sdk memory and agents-spec-section templates ([#3083](https://github.com/mlorentedev/dotfiles/issues/3083)) ([ffcc718](https://github.com/mlorentedev/dotfiles/commit/ffcc718355b101172e185213fc9abfe6ed7b87a1)), closes [#3062](https://github.com/mlorentedev/dotfiles/issues/3062)
+* **vm:** write a failed record when the session store cannot open ([#3107](https://github.com/mlorentedev/dotfiles/issues/3107)) ([1280b8a](https://github.com/mlorentedev/dotfiles/commit/1280b8ad4813acfc9f47ee08fd1f2785fb3db38c))
+* **worktree:** declare the ancestor-walk bound only where a walk reads it ([#3021](https://github.com/mlorentedev/dotfiles/issues/3021)) ([0f60a66](https://github.com/mlorentedev/dotfiles/commit/0f60a6643585d93b6108dca74e659d8c011cdd87))
+* **worktree:** name the slug done wants, and list the worktrees it knows ([#3115](https://github.com/mlorentedev/dotfiles/issues/3115)) ([694b282](https://github.com/mlorentedev/dotfiles/commit/694b28273b0e788fb529d76c87039ddd2cbae79e))
+* **worktree:** point at -b when the slug looks like a branch ([#3056](https://github.com/mlorentedev/dotfiles/issues/3056)) ([3ae5440](https://github.com/mlorentedev/dotfiles/commit/3ae5440ddd3c4c17ad8d2e5074cf7d677a249d3d))
+
 ## [0.78.0](https://github.com/mlorentedev/dotfiles/compare/v0.77.0...v0.78.0) (2026-11-01)
 
 
