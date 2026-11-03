@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: da95f19a047826e5
+generated_sha: 9c64789731c9bbb6
 id: autopilot-skill
 type: skill
 status: active
