@@ -226,7 +226,7 @@ func TestHarnessHelpListsSubcommands(t *testing.T) {
 		// the command list, followed by whitespace before its summary.
 		if !regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(sub) + `\s`).MatchString(out) {
 			t.Errorf("`dotf harness --help` does not list %q as a command.\n"+
-				"scripts/compile-harness.sh greps for exactly this to decide whether the "+
+				"a shell caller greps for exactly this to decide whether the "+
 				"installed dotf can resolve it; without it every agent renders without that "+
 				"field.\ngot:\n%s", sub, out)
 		}

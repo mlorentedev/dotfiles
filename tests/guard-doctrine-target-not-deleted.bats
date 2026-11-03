@@ -8,13 +8,13 @@
 # rules file, and records why the injection is append-and-replace-in-place:
 # Antigravity reads global rules from it, the file is shared with Gemini CLI, and
 # a user's own rules around the generated region are meant to survive a deploy.
-# `tests/compile-harness.bats` asserts exactly that survival.
+# `TestInjectDoctrine` in cli/internal/harness asserts exactly that survival.
 #
 # Both setup scripts nevertheless carried an SDD-007 block that `rm -f`'d that
 # same path on every run, describing it as "a legacy orphan pointing to the
 # retired binary". The description was wrong — the manifest says agy reads it —
 # and the two behaviours were in direct conflict. Only ordering hid it: setup
-# deleted the file early and `compile-harness.sh --deploy` rewrote it near the
+# deleted the file early and the harness deploy rewrote it near the
 # end, so the loss was invisible unless a run stopped in between, or the deploy
 # was skipped, or anything moved. Measured 2026-09-02 on msi: 12029 bytes of
 # generated doctrine present at the path setup deletes.

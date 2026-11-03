@@ -465,11 +465,10 @@ sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") ==
 }
 
 # --- Harness deploy-dir mirror (drift false-FAIL fix) ---
-# healthcheck section 12 runs `compile-harness.sh --check` from the deploy copy
+# healthcheck section 12 runs the harness check from the deploy copy
 # (~/.dotfiles), and the engine resolves its root from its own location. That
 # offline check needs the harness inputs mirrored into the deploy dir -- exactly
-# the complete non-git copy the rootresolve regression test models: scripts/
-# (compile-harness.sh, already copied) + harness/ + every file
+# the complete non-git copy: harness/ + every file
 # harness/manifest.json declares as an injection target. setup copied none of
 # them, so --check exited 2 (manifest not found) and section 12 reported a false
 # drift FAIL. These guards lock the mirror in, AND assert it runs AFTER --refresh

@@ -24,7 +24,7 @@ seed_copilot_base() {
 deploy_shared() {
     local home="$BATS_FILE_TMPDIR/home-$1" rc=0
     seed_copilot_base "$home"
-    (cd "$BATS_TEST_DIRNAME/.." && env HOME="$home" PATH="$2" "$COUNTING_SCRIPT" --deploy) > "$home.log" 2>&1 || rc=$?
+    (cd "$BATS_TEST_DIRNAME/.." && env HOME="$home" PATH="$2" "$DEPLOY") > "$home.log" 2>&1 || rc=$?
     echo "$rc" > "$home.status"
 }
 
@@ -36,44 +36,19 @@ shared_home() {
     [ "$(cat "$SHARED.status")" = 0 ] || { cat "$SHARED.log" >&2; return 1; }
 }
 
-# Every --deploy in this file goes through a counting wrapper, so the budget
-# test at the end measures invocations instead of grepping for them (CI-004
-# AC2). The tests call "$SCRIPT" by absolute path, which a PATH stub never sees.
+# Every deploy in this file goes through a counting wrapper, so the budget test
+# at the end measures invocations instead of grepping for them (CI-004 AC2). The
+# wrapper runs `dotf harness deploy` against this checkout into whatever HOME
+# its caller set, which is how the tests point it at a throwaway home.
 setup_file() {
-    local real
-    real="$(cd "$BATS_TEST_DIRNAME/.." && pwd)/scripts/compile-harness.sh"
+    load 'lib/dotf-bin'
+    dotf_bin_resolve "$BATS_FILE_TMPDIR/dotf-pipeline"
     export DEPLOY_COUNT="$BATS_FILE_TMPDIR/deploys"
-    export COUNTING_SCRIPT="$BATS_FILE_TMPDIR/compile-harness.sh"
+    export DEPLOY="$BATS_FILE_TMPDIR/deploy"
     : > "$DEPLOY_COUNT"
-    printf '#!/usr/bin/env bash\ncase " $* " in *" --deploy "*) echo deploy >> %q ;; esac\nexec %q "$@"\n' \
-        "$DEPLOY_COUNT" "$real" > "$COUNTING_SCRIPT"
-    chmod +x "$COUNTING_SCRIPT"
-
-    # `dotf harness instructions` is the only writer of the instruction files,
-    # and a deploy without it fails. What it writes is pinned in cli/internal/
-    # harness and tests/compile-harness.bats; this file is about skills. The
-    # shim answers that one command and hands everything else to a real dotf
-    # when one is on PATH, so a dev box runs as before and the unit job, which
-    # has no dotf, still deploys.
-    local shim="$BATS_FILE_TMPDIR/dotf-shim"
-    mkdir -p "$shim"
-    cat > "$shim/dotf" <<'SHIM'
-#!/usr/bin/env bash
-self="$(cd "$(dirname "$0")" && pwd)"
-rest="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "$self" | paste -sd: -)"
-real="$(PATH="$rest" command -v dotf || true)"
-case "$1 $2" in
-    "harness instructions") exit 0 ;;
-    "harness --help")
-        [ -z "$real" ] || "$real" harness --help
-        printf '  instructions  Deploy the agent instruction files\n'
-        exit 0 ;;
-esac
-[ -n "$real" ] && exec "$real" "$@"
-exit 127
-SHIM
-    chmod +x "$shim/dotf"
-    export PATH="$shim:$PATH"
+    printf '#!/usr/bin/env bash\necho deploy >> %q\nexec %q harness deploy --repo-root %q --home "$HOME"\n' \
+        "$DEPLOY_COUNT" "$DOTF_BIN" "$(cd "$BATS_TEST_DIRNAME/.." && pwd)" > "$DEPLOY"
+    chmod +x "$DEPLOY"
 
     # pi's targets require pi too (#2102), and a CI runner has none: the clean
     # home is a box where pi is installed, so it gets a fake `pi` on PATH.
@@ -101,7 +76,6 @@ teardown_file() {
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
-    SCRIPT="$COUNTING_SCRIPT"
     FAKEHOME="$(mktemp -d)"
     seed_copilot_base "$FAKEHOME"
     cd "$REPO" || exit 1
@@ -204,7 +178,7 @@ path_without() {
     printf -- '---\nname: userskill\n---\nuser-installed\n' \
         > "$FAKEHOME/.agents/skills/userskill/SKILL.md"
     ln -s "$FAKEHOME/.agents/skills/userskill" "$FAKEHOME/.pi/agent/skills/userskill"
-    run env HOME="$FAKEHOME" PATH="$BATS_FILE_TMPDIR/pistub:$PATH" "$SCRIPT" --deploy
+    run env HOME="$FAKEHOME" PATH="$BATS_FILE_TMPDIR/pistub:$PATH" "$DEPLOY"
     [ "$status" -eq 0 ]
     [ -L "$FAKEHOME/.pi/agent/skills/userskill" ]
     [ -f "$FAKEHOME/.pi/agent/skills/userskill/SKILL.md" ]
@@ -256,7 +230,7 @@ path_without() {
     run ! env PATH="$nocopilot" sh -c 'command -v copilot'
     run ! env PATH="$nocopilot" sh -c 'command -v pi'
 
-    run env HOME="$FAKEHOME" PATH="$nocopilot" "$SCRIPT" --deploy
+    run env HOME="$FAKEHOME" PATH="$nocopilot" "$DEPLOY"
     [ "$status" -eq 0 ]
     [ ! -e "$FAKEHOME/.copilot/skills" ]
     [ ! -e "$FAKEHOME/.pi" ]
@@ -271,7 +245,7 @@ path_without() {
         > "$FAKEHOME/.copilot/skills/user-skill/SKILL.md"
     printf -- '---\ngenerated: true\nname: stale-skill\ndescription: stale generated\n---\n' \
         > "$FAKEHOME/.copilot/skills/stale-skill/SKILL.md"
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    run env HOME="$FAKEHOME" "$DEPLOY"
     [ "$status" -eq 0 ]
     [ -f "$FAKEHOME/.copilot/skills/user-skill/SKILL.md" ]
     [ ! -d "$FAKEHOME/.copilot/skills/stale-skill" ]
@@ -289,7 +263,7 @@ path_without() {
         > "$FAKEHOME/.pi/agent/skills/enrich-us/SKILL.md"
     printf '<!-- generated: true; from: 00_meta/skills/writing-plans/SKILL.md; sha256:0 -->\nours\n' \
         > "$FAKEHOME/.gemini/prompts/writing-plans.md"
-    run env HOME="$FAKEHOME" "$SCRIPT" --deploy
+    run env HOME="$FAKEHOME" "$DEPLOY"
     [ "$status" -eq 0 ]
     grep -q '^foreign$' "$FAKEHOME/.claude/skills/audit/SKILL.md"
     [ ! -e "$FAKEHOME/.pi/agent/skills/enrich-us" ]
@@ -336,7 +310,7 @@ path_without() {
         # deploy_doctrine now normalises typographic punctuation in a capped
         # payload, so the two measures track each other. This assertion is the
         # backstop: a reintroduced multi-byte character fails the pure-ASCII test
-        # in tests/compile-harness.bats first, and this byte count second.
+        # (TestFoldToASCII in cli/internal/harness) first, and this byte count second.
         bytes="$(wc -c < "$SHARED/$f")"
         [ "$bytes" -lt "$cap" ] || { echo "$f is $bytes BYTES, at or over its $cap cap (chars: $chars)"; return 1; }
     done < <(jq -r '.doctrine.deploy[] | "\(.file)\t\(.char_cap)"' harness/manifest.json)
@@ -390,11 +364,11 @@ path_without() {
         cp "$target" "$copy/$target"
     done <<< "$targets"
 
-    run env HARNESS_REPO_ROOT="$copy" bash scripts/compile-harness.sh --check
+    run "$DOTF_BIN" harness check --repo-root "$copy"
     [ "$status" -eq 0 ] || { printf 'the unmodified copy fails --check:\n%s\n' "$output" >&2; return 1; }
 
     sed '/^owner: /d' harness/skills/test/SKILL.md > "$copy/harness/skills/test/SKILL.md"
-    run env HARNESS_REPO_ROOT="$copy" bash scripts/compile-harness.sh --check
+    run "$DOTF_BIN" harness check --repo-root "$copy"
     [ "$status" -ne 0 ]
     [[ "$output" == *"owner"* ]] || false
 }
@@ -426,5 +400,5 @@ path_without() {
 @test "skills-pipeline deploys at most 6 times per run" {
     local n
     n="$(wc -l < "$DEPLOY_COUNT")"
-    [ "$n" -le 6 ] || { echo "compile-harness.sh --deploy ran $n times, budget 6" >&2; return 1; }
+    [ "$n" -le 6 ] || { echo "dotf harness deploy ran $n times, budget 6" >&2; return 1; }
 }

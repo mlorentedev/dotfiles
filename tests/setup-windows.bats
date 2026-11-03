@@ -579,10 +579,10 @@ refute_legacy_mise_sync() {
 
 @test "parity: both setup scripts detect copilot via binary, not gh extension" {
     # Linux and macOS: the copilot instruction file is gated by its
-    # agents.presence[] requires_command, which compile-harness.sh checks with
-    # `command -v` (PLAT-001b); Windows checks the binary in the setup itself.
+    # agents.presence[] requires_command, which `dotf harness instructions`
+    # skips when the binary is not on PATH (TestDeployInstructions_WritesTheSource
+    # OnAFreshMachine); Windows checks the binary in the setup itself.
     [ "$(jq -r '.agents.presence[] | select(.agent=="copilot") | .requires_command' "$DOTFILES_DIR/harness/manifest.json")" = "copilot" ]
-    grep -qF 'command -v "$requires"' "$DOTFILES_DIR/scripts/compile-harness.sh"
     grep -qF "Get-Command copilot" "$PS1_SCRIPT"
     # Neither should still reference the legacy extension path
     refute_grep_fixed "github/gh-copilot" "$DOTFILES_DIR/setup-linux.sh"
@@ -612,7 +612,7 @@ refute_legacy_mise_sync() {
 
 @test "SDD-002: setup-linux.sh never copies ai/claude/settings.json verbatim" {
     # The bulk copy of ai/claude/* is gone (PLAT-001b): CLAUDE.md comes from
-    # compile-harness.sh --deploy, and settings.json only from the
+    # `dotf harness deploy`, and settings.json only from the
     # claude-settings merge entry of `dotf deploy`.
     refute_grep 'cp -rf "\$_claude_src"' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'cp .*ai/claude/settings\.json' "$DOTFILES_DIR/setup-linux.sh"
@@ -937,7 +937,7 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
 
 @test "PLAT-001b: every file under ai/claude has a deployer" {
     # setup-linux.sh no longer bulk-copies ai/claude/*. Each file there is
-    # deployed by name: CLAUDE.md by compile-harness.sh --deploy (an
+    # deployed by name: CLAUDE.md by `dotf harness deploy` (an
     # agents.presence[] source), settings.json by `dotf deploy` (claude-settings),
     # and plugins.json and marketplaces.json are read from the checkout by
     # `dotf deploy`. A new file needs a deployer before it is added to this list.

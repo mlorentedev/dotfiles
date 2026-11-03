@@ -194,47 +194,16 @@ func TestCheckInstructionDrift_RepoUnresolvable(t *testing.T) {
 	}
 }
 
-// TestHarnessMarkerConstants pins the Go region-strip constants against the
-// bash BEGIN_PREFIX/END_MARKER/AGENT_BEGIN_PREFIX/AGENT_END_MARKER definitions
-// in scripts/compile-harness.sh, the same drift-guard shape the SKILL.md
-// spec's idPattern comment describes: one string is the source of truth (bash,
-// since --deploy actually writes the markers), the Go copy is a mirror, and a
-// test asserts they stay identical. Skips (does not fail) when the repo
-// checkout is unreachable — CI always has it; a stray `go test` from a
-// detached GOPATH would not, and that is not this test's failure to report.
+// TestHarnessMarkerConstants pins doctor's region-strip markers to the harness
+// package's, which is the only writer of those regions since the shell engine
+// was retired (CLI-026). Two spellings of one marker is the drift class
+// HARNESS-092 (#1326) closed for the presence pair.
 func TestHarnessMarkerConstants(t *testing.T) {
-	sys := &System{
-		Getenv:   func(string) string { return "" },
-		LookPath: func(string) (string, error) { return "", errors.New("n/a") },
+	if harnessBeginPrefix != harness.GeneratedBeginPrefix || harnessEndMarker != harness.GeneratedEndMarker {
+		t.Errorf("doctor's GENERATED markers differ from the harness package's")
 	}
-	repo := resolveRepoDir(sys)
-	if repo == "" {
-		t.Skip("repo checkout not found from this working directory")
-	}
-	script := filepath.Join(repo, "scripts", "compile-harness.sh")
-	raw, err := os.ReadFile(script)
-	if err != nil {
-		t.Skipf("compile-harness.sh unreadable: %v", err)
-	}
-	content := string(raw)
-	for _, want := range []string{
-		"BEGIN_PREFIX='" + harnessBeginPrefix + "'",
-		"END_MARKER='" + harnessEndMarker + "'",
-	} {
-		if !strings.Contains(content, want) {
-			t.Errorf("scripts/compile-harness.sh no longer defines %q — update the Go mirror constants", want)
-		}
-	}
-	// The AGENT-PRESENCE pair moved to the harness package with HARNESS-092
-	// (#1326): doctor must read the package's constants, and the shell must
-	// not grow a copy back — two spellings of one marker is the drift class.
 	if agentPresenceBeginPrefix != harness.PresenceBeginPrefix || agentPresenceEndMarker != harness.PresenceEndMarker {
 		t.Errorf("doctor's AGENT-PRESENCE markers differ from the harness package's")
-	}
-	for _, stale := range []string{"AGENT_BEGIN_PREFIX=", "AGENT_END_MARKER="} {
-		if strings.Contains(content, stale) {
-			t.Errorf("scripts/compile-harness.sh defines %s again; the presence markers live in cli/internal/harness", stale)
-		}
 	}
 }
 

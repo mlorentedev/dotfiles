@@ -53,8 +53,8 @@ offenders() {
 @test "the guard scans files, so a clean result means something" {
     run bash_files
     [[ $status -eq 0 ]] || false
-    [[ $(printf '%s\n' "$output" | grep -c 'compile-harness.sh') -eq 1 ]] || false
-    [[ $(printf '%s\n' "$output" | grep -c 'tests/compile-harness.bats') -eq 1 ]] || false
+    [[ $(printf '%s\n' "$output" | grep -c 'scripts/utils.sh') -eq 1 ]] || false
+    [[ $(printf '%s\n' "$output" | grep -c 'tests/skills-pipeline.bats') -eq 1 ]] || false
     [[ $(printf '%s\n' "$output" | grep -c 'bash32-portable.bats') -eq 0 ]] || false
     [[ $(printf '%s\n' "$output" | wc -l) -gt 20 ]] || false
 }

@@ -88,10 +88,24 @@ created: "2026-06-21"
   - [x] Hand-written instruction files, runbooks and both frontmatter schemas name the Go verbs, so
     `check-doc-paths.bats` stays green once the script is gone
   - [x] Owner-landed (`harness/**`, `AGENTS.md`): left as a draft after triage, merged before the deletion PR
-- [ ] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
-  - [ ] The five `harness-*-parity.bats` oracles go with the script; `harness-doctrine-records.bats` and `harness-refresh-announce.bats` move to `dotf harness refresh --vault`
-  - [ ] Before closing #2884 with it, each of its three cases has a Go-side test, or gets one here
-  - [ ] Close #1733 with it: the shell render is the last reader of `targets:` by substring, and the deploy and doctor already use `harness.SkillTargetsAgent`
+- [x] `git rm scripts/compile-harness.sh tests/compile-harness*.bats tests/harness-skills-parity.bats`; guard-grep clean
+  - [x] The six `harness-*-parity.bats` oracles go with the script (agents, check, deploy, doctrine, refresh,
+    skills), and so do `compile-harness-{real,rootresolve,deploy-base}.bats`
+  - [x] `harness-doctrine-records.bats` holds the committed records to the real vault with
+    `dotf harness check --against-vault`; `harness-refresh-announce.bats` asserts neither setup script calls the
+    deleted script, comment lines aside
+  - [x] `skills-pipeline.bats` deploys through `dotf harness deploy` behind the same counting wrapper (24/24,
+    budget still 6), and its `--check` test runs `dotf harness check --repo-root`
+  - [x] `verify-setup.bats` runs `dotf harness check` from the deploy dir; `setup-windows.bats` drops the grep
+    of the script for the copilot gate, which `TestDeployInstructions_WritesTheSourceOnAFreshMachine` pins in Go
+  - [x] The two Go tests that read the script now pin Go to Go: the catalog BEGIN line `deployCatalog` writes
+    reads back as the catalog region, and doctor's markers equal the harness package's
+  - [x] #2884's three cases have Go tests: `TestDeployAgents_*` (empty `capabilities: [ ]`),
+    `TestInjectDoctrine_RefusesWhatWouldLoseTheUsersLines` (BEGIN with no END, END with a tail)
+  - [x] Close #1733 with it: the shell render was the last reader of `targets:` by substring, and the deploy and
+    doctor already use `harness.SkillTargetsAgent`
+  - Left as written: ADRs, lessons, archived specs, the `ci.yml` comment and `setup-linux.sh:268` (frozen
+    here), and Go comments that name the script as the origin of a port
 
 ## Closing
 
