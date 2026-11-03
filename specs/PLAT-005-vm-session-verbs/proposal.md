@@ -79,7 +79,7 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - [ ] AC8: `exec --elevated` runs in a high-integrity token on the Windows guest and under `sudo` on Linux.
 - [ ] AC9: Every refusal test sets `XDG_STATE_HOME` to an empty temp dir, so none reaches the hypervisor.
 - [ ] AC11: `down` leaves no instance, overlay or state and never touches `clean-base`; `exec`, `cp` and `down` on an unknown name answer `no-session` with exit 3; a `timeout` exits 1.
-- [ ] AC10: The Windows guest, with OpenSSH Server and the `ssh-target` role installed inside a session, produces an `sshd -T` dump that becomes a fixture, and the converge proof passes with a second run at `changed` 0 (closes #2763).
+- [x] AC10: The Windows guest, with OpenSSH Server and the `ssh-target` role installed inside a session, produces an `sshd -T` dump that becomes a fixture, and the converge proof passes with a second run at `changed` 0 (closes #2763).
 
 ## References
 

@@ -57,3 +57,18 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - [ ] Folder moved: `specs/PLAT-005-vm-session-verbs/` -> `specs/archive/PLAT-005-vm-session-verbs/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+## Windows fixture and acceptance (AC10)
+
+On the Windows 11 Arm64 guest, OpenSSH 9.5p2, inside a session and never in `clean-base`, with a `dotf` build of this tree. `exec --elevated` shaped the guest: OpenSSH Server, the first service start that writes `sshd_config`, `Include sshd_config.d/*.conf` at its top, `100.64.0.2/32` beside the static LAN address on the NIC renamed `Tailscale`, `dotf env role add ssh-target`, and a throwaway client key whose public half replaced `ssh/id_ed25519.pub` in the guest's copy, since the owner's private key never enters a guest.
+
+```
+=== converge 1
+  [CHANGE] workstation-target  13.2s  applied: firewall, authorized key, sshd drop-in, sshd service, power policy, state record; sshd accepts the key from 100.64.0.2, refused from 10.0.2.15
+=== converge 2
+  [ OK ]   workstation-target   7.0s  converged; sshd accepts the key from 100.64.0.2, refused from 10.0.2.15
+=== converge 3
+  [ OK ]   workstation-target   7.4s  converged; sshd accepts the key from 100.64.0.2, refused from 10.0.2.15
+```
+
+Real logins afterwards: `100.64.0.2` printed `dotf-win\dotf` and sshd logged `Accepted publickey`; `10.0.2.15` was `Permission denied (publickey)` and sshd logged `not allowed because listed in DenyUsers`. A connection to the node's own address does not cross the firewall rule, so the rule itself is not proven here (OBS-036).

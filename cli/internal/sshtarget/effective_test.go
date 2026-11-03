@@ -37,7 +37,10 @@ func sshdDump(t *testing.T, name string) []byte {
 var platforms = []string{
 	"macos-10.3p1",  // macOS, OpenSSH 10.3p1
 	"ubuntu-10.2p1", // Ubuntu 26.04 in a throwaway container, OpenSSH 10.2p1
-	"ubuntu-8.9p1",  // Ubuntu 22.04 in a throwaway container, OpenSSH 8.9p1 (1:8.9p1-3ubuntu0.18)
+	// Windows 11 Arm64 guest through `dotf vm windows exec --elevated`, OpenSSH
+	// 9.5p2. Windows ends each line with CRLF; these are stored with LF.
+	"windows-9.5p2",
+	"ubuntu-8.9p1", // Ubuntu 22.04 in a throwaway container, OpenSSH 8.9p1 (1:8.9p1-3ubuntu0.18)
 }
 
 func TestCheckEffectiveTellsADropInThatWasReadFromOneThatWasNot(t *testing.T) {
@@ -143,6 +146,14 @@ func TestCheckEffectiveAcceptsAnExtraAllowUsersPattern(t *testing.T) {
 	dump := string(sshdDump(t, "sshd-T-macos-10.3p1-effective.txt")) + "allowusers root@10.0.0.1\n"
 	if err := checkEffective(realDropIn(t), []byte(dump), "drop-in"); err != nil {
 		t.Errorf("an extra AllowUsers pattern failed the proof: %v", err)
+	}
+}
+
+// A Windows dump ends each line with CRLF, and the fixtures store LF.
+func TestCheckEffectiveReadsACRLFDump(t *testing.T) {
+	dump := strings.ReplaceAll(string(sshdDump(t, "sshd-T-windows-9.5p2-effective.txt")), "\n", "\r\n")
+	if err := checkEffective(realDropIn(t), []byte(dump), "drop-in"); err != nil {
+		t.Error(err)
 	}
 }
 
