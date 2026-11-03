@@ -16,7 +16,7 @@ tags: [runbook, dotfiles, ai, harness]
 
 | Converge step | What it does for agents | Declared in |
 |---|---|---|
-| `records-harness` | instruction files, skills, Claude subagents (`compile-harness.sh --deploy`) | `harness/manifest.json` (`presence`, `skills.deploy`, `doctrine.deploy`, `agents.deploy`) |
+| `records-harness` | instruction files, skills, Claude subagents (`dotf harness deploy`) | `harness/manifest.json` (`presence`, `skills.deploy`, `doctrine.deploy`, `agents.deploy`) |
 | `tools` | installs the agent CLIs the catalog holds | `packages.json` |
 | `pi-settings` | seeds pi's `settings.json` when it is absent, then keeps its `enabledModels` equal to the repo's; skipped while pi is not installed | `ai/pi/settings.json` |
 | `configs-deploy` | agent settings, models and MCP config files | `ai/deploy.json` |

@@ -108,7 +108,7 @@ admin needed; some changes show after an Explorer restart.
 │   ├── copilot/                # Copilot extensions (pointer to AGENTS.md)
 │   ├── opencode/opencode.jsonc # OpenCode config (providers + MCP)
 │   └── …                       # pi, hermes, nan
-├── harness/                    # Compiled AI-skill records (generated from the vault by compile-harness.sh)
+├── harness/                    # Compiled AI-skill records (generated from the vault by dotf harness refresh)
 ├── docs/                       # Docs-as-code: architecture.md, adr/, runbooks/, troubleshooting/, lessons.md
 ├── specs/                      # Spec-Driven Development feature folders (+ archive/)
 ├── git-hooks/                  # Global pre-commit/pre-push dispatcher (GUARD-001)
@@ -206,9 +206,9 @@ file rather than this README for the current model names, they change more often
 this doc does.
 
 **AI skills** are edited in the vault (`00_meta/skills/<name>/`), compiled to committed
-records under `harness/skills/`, and deployed per-agent by `scripts/compile-harness.sh`
+records under `harness/skills/`, and deployed per-agent by `dotf harness deploy`
 (Claude, OpenCode, Gemini/AGY, Copilot). Do not add skill directories to the repo — edit
-in the vault and re-run setup. Pipeline details: the vault's `pattern-cross-agent-skill-pipeline.md`.
+in the vault and run `dotf harness refresh`. Pipeline details: the vault's `pattern-cross-agent-skill-pipeline.md`.
 
 ### Sync
 

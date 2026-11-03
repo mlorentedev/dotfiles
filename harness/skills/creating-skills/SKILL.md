@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/creating-skills/SKILL.md
-generated_sha: 04d8792f0c5fb245
+generated_sha: c1c721018230fb03
 id: creating-skills-skill
 type: skill
 status: active
@@ -269,13 +269,15 @@ The context window is a public good. Only add context Claude doesn't already hav
 ## Deployment
 
 The vault is the single source of truth (SDD-008). Author the skill here
-(`00_meta/skills/<skill-name>/SKILL.md`); `compile-harness.sh` (invoked by setup,
-or run with `--deploy` standalone) renders it into the dotfiles `harness/skills/`
-record and deploys it to each agent's skill/command directory. The per-agent
+(`00_meta/skills/<skill-name>/SKILL.md`). `dotf harness refresh`, run in a dotfiles
+worktree, renders it into the committed `harness/skills/` record; once that PR
+merges, `dotf harness deploy` (also run by setup) copies the record to each agent's
+skill/command directory. The per-agent
 render targets (full directory copy, mechanical command transform,
 frontmatter-stripped prompt, or catalog entry) are owned by
 `pattern-cross-agent-skill-pipeline`.
 
 Add `targets: [claude]` (or any subset) to the frontmatter to limit which agents
-receive the skill; absent = all agents. Edit the skill here and run
-`compile-harness.sh --deploy` (or re-run setup) — no manual per-agent deployment.
+receive the skill; absent = all agents. Edit the skill here, run `dotf harness refresh`
+in a dotfiles worktree and land the PR, then `dotf harness deploy` (or re-run setup) — no
+manual per-agent deployment.

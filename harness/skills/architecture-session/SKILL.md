@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/architecture-session/SKILL.md
-generated_sha: e061b20c5634342a
+generated_sha: b49954fee1bb1743
 id: architecture-session-skill
 type: skill
 status: active
@@ -219,7 +219,7 @@ For **personal** projects on the placement model, ADRs ALSO go to the repo `docs
 ## Cross-OS notes
 
 - Linux / macOS: agent uses POSIX commands via `Bash`. Path joining uses `/`.
-- Windows: agent uses PowerShell tool. Path joining uses `\`. Hard-copy deployment (not symlinks): the skill in each agent's skills directory is a COPY of the vault SSOT rendered by `compile-harness.sh`. After editing the vault SSOT, run `compile-harness.sh --deploy` (or re-run setup) to refresh the copy — never edit the deployed copy directly.
+- Windows: agent uses PowerShell tool. Path joining uses `\`. Hard-copy deployment (not symlinks): the skill in each agent's skills directory is a COPY of the vault SSOT rendered by `dotf harness refresh` into the dotfiles record. After editing the vault SSOT, refresh the record, land its PR, and run `dotf harness deploy` (or re-run setup) to refresh the copy — never edit the deployed copy directly.
 
 ## Vault connections
 

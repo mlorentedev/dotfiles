@@ -23,7 +23,7 @@ repository; this file is the NOTICE-equivalent that preserves attribution as the
 All sources verified by reading the repository `LICENSE` file at vendor time (2026-06-03).
 Apache-2.0 and MIT both permit redistribution with attribution; this file plus the per-skill
 footer satisfy the notice requirement. If a skill is updated upstream, re-vendor the `SKILL.md`
-into the vault source and re-run `compile-harness.sh --refresh`.
+into the vault source and run `dotf harness refresh`.
 
 The `test-audit` row is a partial adaptation, not a vendored skill: its authoring gate, junk
 patterns, retention bar and candidate-evidence fields were folded into two existing skills

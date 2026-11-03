@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://mlorentedev.dev/schemas/skill-frontmatter.schema.json",
   "title": "SKILL.md frontmatter",
-  "description": "Contract for skill frontmatter, validated by compile-harness.sh before every render (SDD-008). Required = the store's Frontmatter Law (id/type/status/created/owner) plus the two keys every agent needs to find a skill at all (name/description). The engine previously required only the latter pair, which let three frontmatter dialects coexist in one library; requiring the full set is what makes the store's law and the engine's contract the same statement. Lives in the repo rather than the store so validation runs offline, consistent with ENGINE-001's committed source-of-record.",
+  "description": "Contract for skill frontmatter, validated by dotf harness refresh before every render (SDD-008). Required = the store's Frontmatter Law (id/type/status/created/owner) plus the two keys every agent needs to find a skill at all (name/description). The engine previously required only the latter pair, which let three frontmatter dialects coexist in one library; requiring the full set is what makes the store's law and the engine's contract the same statement. Lives in the repo rather than the store so validation runs offline, consistent with ENGINE-001's committed source-of-record.",
   "type": "object",
   "required": [
     "name",

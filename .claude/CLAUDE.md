@@ -105,7 +105,7 @@ dotf doctor
 | **Shell Foundation** | `scripts/utils.sh` | Portable bash/zsh functions and bootstrap |
 | **Versions SSOT** | `versions.conf` | Version pins for languages and CLI tools |
 | **Secrets SSOT** | `secrets/registry.yaml` | Secret mappings (managed via `dotf secrets`) |
-| **Harness & Skills** | `harness/skills/` | Agent skills deployed by `scripts/compile-harness.sh` |
+| **Harness & Skills** | `harness/skills/` | Agent skills rendered by `dotf harness refresh`, deployed by `dotf harness deploy` |
 
 ## Core Workflows & Commands
 

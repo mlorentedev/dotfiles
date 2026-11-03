@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://mlorentedev.dev/schemas/agent-frontmatter.schema.json",
   "title": "AGENT.md frontmatter",
-  "description": "Contract for neutral cross-harness agent definitions validated by compile-harness.sh before render (ADR-027). The definition is provider-neutral; the compile layer maps neutral fields (model tier, capabilities) and emits each harness's determinism hooks. Required = the universal subset every persona carries (name + description for the native agent file, kind to branch coexistence). Lives in the repo (not the vault) so validation runs offline, consistent with the skill pipeline (SDD-008).",
+  "description": "Contract for neutral cross-harness agent definitions validated by dotf harness refresh before render (ADR-027). The definition is provider-neutral; the compile layer maps neutral fields (model tier, capabilities) and emits each harness's determinism hooks. Required = the universal subset every persona carries (name + description for the native agent file, kind to branch coexistence). Lives in the repo (not the vault) so validation runs offline, consistent with the skill pipeline (SDD-008).",
   "type": "object",
   "required": ["name", "description", "kind"],
   "properties": {
@@ -12,7 +12,7 @@
     "model": { "type": "string", "description": "Neutral tier (top|mid|low); resolved to this harness's model id at deploy via harness/model-map.json, and emitted into the rendered frontmatter (#1161). A tier the map cannot answer fails the render rather than dropping the field — a definition naming no model is the degrade the routing registry exists to prevent (ADR-035). Absent = rendered with no model line." },
     "capabilities": { "description": "Neutral capability vocab (e.g. [read, search, edit, shell, web]); mapped to provider tools via capability-map at compile (H-044)." },
     "skills": {
-      "description": "Forced-consumption skills; compiled to the harness determinism hook (presence/action/dispatch). TWO FORMS, both accepted during the HARNESS-045 migration: the legacy flat list carries no severity and the gate refuses to act on it, while the mapping form declares per-skill `enforce` and is what makes a persona binding rather than merely present. NOTE, measured 2026-08-27: compile-harness.sh's validate_skill_frontmatter evaluates `required` keys ONLY and does not read the constraints below, so this subschema is the SSOT for the SHAPE (cli/internal/harness.parseSkills implements it, dotf harness resolve-skills serves it) and is NOT itself an enforced guard here.",
+      "description": "Forced-consumption skills; compiled to the harness determinism hook (presence/action/dispatch). TWO FORMS, both accepted during the HARNESS-045 migration: the legacy flat list carries no severity and the gate refuses to act on it, while the mapping form declares per-skill `enforce` and is what makes a persona binding rather than merely present. NOTE, measured 2026-08-27 and still true of the Go port: the render's frontmatter validation (schemaRequired) evaluates `required` keys ONLY and does not read the constraints below, so this subschema is the SSOT for the SHAPE (cli/internal/harness.parseSkills implements it, dotf harness resolve-skills serves it) and is NOT itself an enforced guard here.",
       "oneOf": [
         {
           "type": "array",
