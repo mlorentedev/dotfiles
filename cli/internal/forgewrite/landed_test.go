@@ -19,89 +19,119 @@ func giteaPR(branch, sha string, merged bool, headRepo int) string {
 	return fmt.Sprintf(`{"merged":%t,"head":{"label":%q,"ref":"refs/pull/9/head","sha":%q,"repo_id":%d},"base":{"ref":"main","repo_id":1}}`, merged, branch, sha, headRepo)
 }
 
-// giteaPulls serves page N of the closed-PR listing from pages[N-1].
-func giteaPulls(t *testing.T, pages ...[]string) (*httptest.Server, *[]string) {
+// giteaLookup answers the repository read and the by-head lookup: pulls maps a
+// request path under the repository to its body, and any other path is a 404.
+func giteaLookup(t *testing.T, pulls map[string]string) (*httptest.Server, *[]string) {
 	t.Helper()
 	var asked []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		asked = append(asked, r.URL.RequestURI())
-		var n int
-		_, _ = fmt.Sscanf(r.URL.Query().Get("page"), "%d", &n)
-		if n < 1 || n > len(pages) {
-			_, _ = w.Write([]byte("[]"))
+		asked = append(asked, r.URL.EscapedPath())
+		if r.URL.Path == "/api/v1/repos/o/n" {
+			_, _ = w.Write([]byte(`{"default_branch":"trunk"}`))
 			return
 		}
-		_, _ = w.Write([]byte("[" + strings.Join(pages[n-1], ",") + "]"))
+		body, ok := pulls[strings.TrimPrefix(r.URL.Path, "/api/v1/repos/o/n/")]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
 	return srv, &asked
 }
 
-func TestGiteaLandedHeadsKeepsOnlyMergedPRsOfThisBranchInThisRepo(t *testing.T) {
-	srv, asked := giteaPulls(t, []string{
-		giteaPR("fix/x", "aaa", true, 1),  // merged here: counts
-		giteaPR("fix/x", "bbb", false, 1), // closed without merging: the case B could not tell apart
-		giteaPR("fix/x", "ccc", true, 7),  // a fork's branch of the same name
-		giteaPR("fix/y", "ddd", true, 1),  // another branch
-		// a branch that still exists: head.ref names it too
-		`{"merged":true,"head":{"label":"fix/x","ref":"fix/x","sha":"eee","repo_id":1},"base":{"repo_id":1}}`,
-	})
-	g := Gitea{BaseURL: srv.URL, Token: tokenFn}
-	heads, err := g.LandedHeads(context.Background(), Repo{Host: "gitea.example", Owner: "o", Name: "n"}, "fix/x")
-	if err != nil {
+func TestGiteaLandedHeadsReadsThePullOfThisBranchAgainstTheDefaultBranch(t *testing.T) {
+	for name, tc := range map[string]struct {
+		pr   string
+		want []string
+	}{
+		"merged here":                {giteaPR("fix/x", "aaa", true, 1), []string{"aaa"}},
+		"closed without merging":     {giteaPR("fix/x", "bbb", false, 1), nil},
+		"a fork's branch":            {giteaPR("fix/x", "ccc", true, 7), nil},
+		"a branch that still exists": {`{"merged":true,"head":{"label":"fix/x","ref":"fix/x","sha":"eee","repo_id":1},"base":{"repo_id":1}}`, []string{"eee"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv, asked := giteaLookup(t, map[string]string{"pulls/trunk/fix/x": tc.pr})
+			g := Gitea{BaseURL: srv.URL, Token: tokenFn}
+			heads, err := g.LandedHeads(context.Background(), Repo{Host: "gitea.example", Owner: "o", Name: "n"}, "fix/x")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(heads, tc.want) {
+				t.Fatalf("heads = %v, want %v", heads, tc.want)
+			}
+			if len(*asked) != 2 {
+				t.Fatalf("asked %v, want the repository and one lookup", *asked)
+			}
+		})
+	}
+}
+
+// A 404 on the lookup is the answer "this branch has no pull request", and
+// only there: an error on either read must not read as "never landed".
+func TestGiteaLandedHeadsReadsA404AsNoPullRequest(t *testing.T) {
+	srv, _ := giteaLookup(t, nil)
+	heads, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
+	if err != nil || len(heads) != 0 {
+		t.Fatalf("heads = %v, err %v", heads, err)
+	}
+}
+
+func TestGiteaLandedHeadsRefusesAMissingRepository(t *testing.T) {
+	srv, _ := giteaLookup(t, nil)
+	_, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "gone"}, "fix/x")
+	if err == nil {
+		t.Fatal("a repository that is not there read as a branch with no pull request")
+	}
+}
+
+func TestGiteaLandedHeadsRefusesARepositoryWithNoDefaultBranch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
+	if err == nil || !strings.Contains(err.Error(), "default branch") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestGiteaLandedHeadsSaysWhenTheLookupFails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/repos/o/n" {
+			_, _ = w.Write([]byte(`{"default_branch":"main"}`))
+			return
+		}
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	t.Cleanup(srv.Close)
+	_, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
+	if err == nil || !strings.Contains(err.Error(), "502") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestGiteaLandedHeadsEscapesTheBranchButKeepsItsSlash(t *testing.T) {
+	srv, asked := giteaLookup(t, nil)
+	if _, err := (Gitea{BaseURL: srv.URL, Token: tokenFn}).LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/a#b"); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(heads, []string{"aaa", "eee"}) {
-		t.Fatalf("heads = %v, want [aaa eee]", heads)
-	}
-	if want := "/api/v1/repos/o/n/pulls?state=closed&sort=recentclose&limit=50&page=1"; (*asked)[0] != want {
-		t.Fatalf("asked %s, want %s", (*asked)[0], want)
+	if got := (*asked)[1]; got != "/api/v1/repos/o/n/pulls/trunk/fix/a%23b" {
+		t.Fatalf("asked %s", got)
 	}
 }
 
-func TestGiteaLandedHeadsReadsPastTheFirstPage(t *testing.T) {
-	full := make([]string, giteaPullsPage)
-	for i := range full {
-		full[i] = giteaPR("other", "x", true, 1)
-	}
-	srv, asked := giteaPulls(t, full, []string{giteaPR("fix/x", "aaa", true, 1)})
-	heads, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
-	if err != nil || !reflect.DeepEqual(heads, []string{"aaa"}) {
-		t.Fatalf("heads = %v, err %v; want [aaa] from page 2", heads, err)
-	}
-	if len(*asked) != 3 {
-		t.Fatalf("asked %d pages, want 3 (only the empty page 3 ends the listing)", len(*asked))
-	}
-}
-
-// A server whose MAX_RESPONSE_ITEMS is below the asked limit answers every
-// page short. Stopping at the first short page would read "never landed" for
-// a branch whose pull request is on page 2.
-func TestGiteaLandedHeadsReadsOnWhenTheServerClampsThePage(t *testing.T) {
-	short := []string{giteaPR("other", "x", true, 1)}
-	srv, _ := giteaPulls(t, short, []string{giteaPR("fix/x", "aaa", true, 1)})
-	heads, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
-	if err != nil || !reflect.DeepEqual(heads, []string{"aaa"}) {
-		t.Fatalf("heads = %v, err %v; want [aaa] from the second short page", heads, err)
-	}
-}
-
-// Past the page cap the answer is partial, even with a match: an older pull
-// request of the branch may hold the tip, and done would read "not landed".
-func TestGiteaLandedHeadsRefusesACutOffListing(t *testing.T) {
-	full := make([]string, giteaPullsPage)
-	for i := range full {
-		full[i] = giteaPR("other", "x", true, 1)
-	}
-	full[0] = giteaPR("fix/x", "aaa", true, 1)
-	pages := make([][]string, maxPullPages)
-	for i := range pages {
-		pages[i] = full
-	}
-	srv, _ := giteaPulls(t, pages...)
+// #3089: a body cut off mid-read is that failure, not an unreadable answer.
+func TestGiteaReadCutOffSaysSo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "1000")
+		_, _ = w.Write([]byte(`{"default`))
+	}))
+	t.Cleanup(srv.Close)
 	_, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
-	if err == nil || !strings.Contains(err.Error(), "past 10 pages") {
-		t.Fatalf("want an error naming the cut-off listing, got %v", err)
+	if err == nil || strings.Contains(err.Error(), "not readable") || !strings.Contains(err.Error(), "reading") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
@@ -151,5 +181,22 @@ func TestGitHubLandedHeadsSaysWhatFailed(t *testing.T) {
 	_, err := g.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
 	if err == nil || !strings.Contains(err.Error(), "HTTP 404") {
 		t.Fatalf("want gh's reason in the error, got %v", err)
+	}
+}
+
+func TestGiteaLandedHeadsReadsACutOff404AsNoPullRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/repos/o/n" {
+			_, _ = w.Write([]byte(`{"default_branch":"main"}`))
+			return
+		}
+		w.Header().Set("Content-Length", "1000")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"mess`))
+	}))
+	t.Cleanup(srv.Close)
+	heads, err := Gitea{BaseURL: srv.URL, Token: tokenFn}.LandedHeads(context.Background(), Repo{Owner: "o", Name: "n"}, "fix/x")
+	if err != nil || len(heads) != 0 {
+		t.Fatalf("heads = %v, err %v", heads, err)
 	}
 }
