@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/vault-doctor/SKILL.md
-generated_sha: e0780773a756d819
+generated_sha: d68296628da96bce
 id: vault-doctor-skill
 type: skill
 status: active
@@ -37,14 +37,15 @@ Run diagnostics in parallel:
 # Via Hive MCP (always available)
 vault_health(include_usage=True)
 
-# Via dotf CLI (if Obsidian GUI running)
+# Via dotf CLI (if Obsidian GUI running). Keep $VAULT_PATH if already set and non-empty;
+# otherwise assign it from `dotf env path VAULT_PATH`, and stop and ask the user if that is empty.
 dotf vault health
 python3 "$VAULT_PATH/00_meta/scripts/vault-validate.py" --strict
 ```
 
 Collect:
 - Unresolved links (broken wikilinks pointing to non-existent notes)
-- Frontmatter violations (files missing `id`, `type`, or `status` fields)
+- Frontmatter violations (files missing `id`, `type`, `status`, `owner`, or `created` fields)
 - Orphan notes (no incoming links — isolated content)
 - Dead-end notes (no outgoing links — terminal nodes)
 - Vault health test failures from Hive MCP
@@ -56,7 +57,7 @@ Collect:
 | **HIGH** | Unresolved links | Broken navigation, knowledge gaps |
 | **HIGH** | Frontmatter missing `type` or `status` | Breaks vault queries and templates |
 | **MEDIUM** | Orphan notes | Lost knowledge, may need connecting or archiving |
-| **MEDIUM** | Frontmatter missing `id` | Inconsistency but doesn't break functionality |
+| **MEDIUM** | Frontmatter missing `id`, `owner`, or `created` | Inconsistency but doesn't break functionality |
 | **LOW** | Dead-end notes | May be intentional (leaf content) |
 
 Present a severity report:
@@ -70,7 +71,7 @@ HIGH:
 
 MEDIUM:
   - 5 orphan notes
-  - 8 files missing id field
+  - 8 files missing id, owner or created
 
 LOW:
   - 12 dead-end notes
