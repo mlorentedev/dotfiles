@@ -16,7 +16,7 @@ owner: manu
 - creates `AGENTS.md` with a minimal header if missing, or
 - inserts/refreshes the `## Spec-Driven Development` section between its markers (idempotent), preserving the rest of the file.
 
-Pass `--force` to overwrite an existing SDD section in place. On Windows, until a Windows `dotf` install path exists, the legacy `dotf spec` remains the fallback (#380).
+Pass `--force` to overwrite an existing SDD section in place.
 
 **Manual fallback:** copy the section between BEGIN/END SNIPPET markers below into `AGENTS.md`, under a `## Workflow` heading or as its own section. No substitutions needed — the snippet is already self-contained.
 
