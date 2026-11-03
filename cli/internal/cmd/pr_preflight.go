@@ -72,7 +72,8 @@ type preflightOpts struct {
 func (o *preflightOpts) run(c *cobra.Command, _ []string) error {
 	in := prreview.PreflightInputs{Model: o.model, Fallbacks: o.fallbacks, Key: os.Getenv("NAN_API_KEY"),
 		APIBase: os.Getenv("NAN_API_BASE"), Timeout: os.Getenv("PREFLIGHT_TIMEOUT")}
-	if err := o.readPool(&in); err != nil {
+	explicit := c.Flags().Changed("model") || c.Flags().Changed("fallbacks")
+	if err := o.readPool(&in, explicit); err != nil {
 		return preflightUsage(c, err.Error())
 	}
 	res, err := prreview.Preflight(c.Context(), in, prreview.PreflightEnv{Out: c.OutOrStdout()})
@@ -108,11 +109,11 @@ func (o *preflightOpts) run(c *cobra.Command, _ []string) error {
 
 // readPool sets the chain from --pool, when it is given. A pool with no NaN member
 // is a usage error: exit 1 would read as NaN being down and move the review.
-func (o *preflightOpts) readPool(in *prreview.PreflightInputs) error {
+func (o *preflightOpts) readPool(in *prreview.PreflightInputs, explicit bool) error {
 	if o.pool == "" {
 		return nil
 	}
-	if o.model != "" || o.fallbacks != "" {
+	if explicit {
 		return errors.New("pr preflight: --pool cannot be combined with --model or --fallbacks")
 	}
 	p, err := prreview.LoadPool(o.pool)

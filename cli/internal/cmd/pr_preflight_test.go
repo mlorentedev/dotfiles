@@ -225,11 +225,12 @@ func TestPrPreflight_PoolRefusals(t *testing.T) {
 		args []string
 		want string
 	}{
-		"with a model":   {[]string{"--pool", "embedded", "--model", "openai/m"}, "cannot be combined"},
-		"with fallbacks": {[]string{"--pool", "embedded", "--fallbacks", "[]"}, "cannot be combined"},
-		"an unread file": {[]string{"--pool", filepath.Join(dir, "absent.json")}, "cannot read a pool"},
-		"no NaN member":  {[]string{"--pool", noNaN}, "no NaN member"},
-		"neither source": {nil, "usage:"},
+		"with a model":        {[]string{"--pool", "embedded", "--model", "openai/m"}, "cannot be combined"},
+		"with an empty model": {[]string{"--pool", "embedded", "--model", ""}, "cannot be combined"},
+		"with fallbacks":      {[]string{"--pool", "embedded", "--fallbacks", "[]"}, "cannot be combined"},
+		"an unread file":      {[]string{"--pool", filepath.Join(dir, "absent.json")}, "cannot read a pool"},
+		"no NaN member":       {[]string{"--pool", noNaN}, "no NaN member"},
+		"neither source":      {nil, "usage:"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, stderr, err := execute(t, append([]string{"pr", "preflight"}, c.args...)...)
