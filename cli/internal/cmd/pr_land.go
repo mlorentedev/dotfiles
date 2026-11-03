@@ -92,7 +92,12 @@ one condition that time alone cannot fix: when BEHIND is the only reason
 against the PR, it merges the base into the branch (a merge, not a rebase, so
 the reviewer's push gate does not re-review), waits for the new CI and decides
 again on the new head. A base that moves again during that wait is merged in
-again, up to three times. A refusal lists every failed condition and exits 1.
+again, up to three times. A refusal lists every failed condition and exits 1. Under them it prints the
+command that merges the head it read by hand (gh pr merge <N> --squash
+--match-head-commit <sha>), so the manual path is the same whatever the reason;
+land does not run it. It prints none where gh could not merge the PR (not open,
+a draft) or where policy, not a check, refused it: a release, a grant exclusion
+or change, a repository without the grant, reviewer output awaiting triage, a red CI check.
 
 Several numbers land as one queue, in the order given and one at a time. A PR is
 updated only during its own turn: landing PRs from separate processes makes
@@ -223,10 +228,19 @@ func printLandSummary(w io.Writer, results []prland.Result) error {
 			for _, reason := range r.Reasons {
 				_, _ = fmt.Fprintf(w, "      - %s\n", reason)
 			}
+			writeManualMerge(w, "      ", r)
 		}
 		return errNotLanded
 	}
 	return nil
+}
+
+// writeManualMerge prints the command that merges the head land refused, under
+// its reasons, when there is one (#3108). land does not run it.
+func writeManualMerge(w io.Writer, indent string, res prland.Result) {
+	if res.ManualMerge != "" {
+		_, _ = fmt.Fprintf(w, "%smerge it by hand instead: %s\n", indent, res.ManualMerge)
+	}
 }
 
 // writeLandResult prints one PR's outcome and returns errNotLanded when it was
@@ -242,6 +256,7 @@ func writeLandResult(w io.Writer, res prland.Result) error {
 		for _, r := range res.Reasons {
 			_, _ = fmt.Fprintf(w, "  - %s\n", r)
 		}
+		writeManualMerge(w, "  ", res)
 		return errNotLanded
 	}
 	if res.Updated {

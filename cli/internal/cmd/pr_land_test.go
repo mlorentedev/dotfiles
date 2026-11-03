@@ -359,3 +359,26 @@ func TestPrLand_VerdictWaitBoundsTheWaitForAnInFlightAttestation(t *testing.T) {
 		t.Errorf("stderr must name what land waits for:\n%s", stderr)
 	}
 }
+
+// A refusal prints the manual command under its reasons, in the single-PR
+// output and under the PR in a queue summary, so the manual path is the same
+// wherever the refusal is read (#3108).
+func TestPrLand_ARefusalPrintsTheManualMergeCommand(t *testing.T) {
+	q := &queueFake{states: map[string]string{"12": "BEHIND"}}
+	useQueue(t, q)
+	want := "gh pr merge 12 --squash --match-head-commit sha120000 --repo o/r"
+
+	single, _, _ := execute(t, "pr", "land", "12", "--repo", "o/r")
+	if !strings.Contains(single, "  merge it by hand instead: "+want+"\n") {
+		t.Errorf("single-PR output lacks the command:\n%s", single)
+	}
+
+	queued, _, _ := execute(t, "pr", "land", "12", "31", "--repo", "o/r")
+	summary := queued[strings.Index(queued, "summary:"):]
+	if !strings.Contains(summary, "      merge it by hand instead: "+want+"\n") {
+		t.Errorf("queue summary lacks the command:\n%s", summary)
+	}
+	if strings.Contains(queued, "gh pr merge 31 ") {
+		t.Errorf("a merged PR was offered a manual command:\n%s", queued)
+	}
+}
