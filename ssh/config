@@ -147,6 +147,18 @@ Host vps-pub
   StrictHostKeyChecking yes
   IdentityFile ~/.ssh/id_ed25519
 
+# Control-plane bootstrap (kubelab VPN-ACL-015): `ts-bridge connect --bootstrap-ssh
+# hs-bootstrap` on networks that block vpn.kubelab.live. The account can only forward
+# to the control plane. One key per machine, generated there and never copied; a
+# machine without ~/.ssh/hs-bootstrap is simply not enrolled.
+Host hs-bootstrap
+  Hostname 162.55.57.175
+  User hs-bootstrap
+  UserKnownHostsFile ~/.ssh/known_hosts_pinned
+  StrictHostKeyChecking yes
+  IdentityFile ~/.ssh/hs-bootstrap
+  IdentitiesOnly yes
+
 # --- Bastion access (*-ext): jump via VPS public IP. Use from outside the LAN on
 #     a box without native Tailscale (mesh IPs not locally routable there). The VPS
 #     (vps-pub) is always reachable by public IP and is itself on the mesh. ---
