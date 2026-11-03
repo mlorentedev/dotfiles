@@ -97,7 +97,7 @@ command that merges the head it read by hand (gh pr merge <N> --squash
 --match-head-commit <sha>), so the manual path is the same whatever the reason;
 land does not run it. It prints none where gh could not merge the PR (not open,
 a draft) or where policy, not a check, refused it: a release, a grant exclusion
-or change, a repository without the grant, reviewer output awaiting triage.
+or change, a repository without the grant, reviewer output awaiting triage, a red CI check.
 
 Several numbers land as one queue, in the order given and one at a time. A PR is
 updated only during its own turn: landing PRs from separate processes makes

@@ -73,9 +73,31 @@ func TestLand_AnUntriagedPRCarriesNoManualCommand(t *testing.T) {
 	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`}
 	untriaged := func(context.Context) ([]int, error) { return []int{30}, nil }
 
-	res, _ := Land(context.Background(), Options{Run: g.run, Untriaged: untriaged}, 30)
-
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: untriaged}, 30)
+	if err != nil || len(res.Reasons) == 0 {
+		t.Fatalf("want a refusal with reasons, got %+v, err %v", res, err)
+	}
 	if res.Merged || res.ManualMerge != "" {
 		t.Errorf("want a refusal with no manual command, got %+v", res)
+	}
+}
+
+// A failing check other than a reviewer's keeps the command back: printing it
+// there would hand the reader a merge past CI (#3119 review).
+func TestLand_AFailingCICheckCarriesNoManualCommand(t *testing.T) {
+	for name, checks := range map[string]string{
+		"red test":     `[{"name":"test","bucket":"fail"},{"name":"review","bucket":"fail"}]`,
+		"pending lint": `[{"name":"lint","bucket":"pending"},{"name":"review","bucket":"pass"}]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			g := &fakeGH{view: readyView, checks: checks, deps: `[]`}
+			res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+			if err != nil || res.Merged || len(res.Reasons) == 0 {
+				t.Fatalf("want a refusal, got %+v, err %v", res, err)
+			}
+			if res.ManualMerge != "" {
+				t.Errorf("ManualMerge = %q, want none", res.ManualMerge)
+			}
+		})
 	}
 }

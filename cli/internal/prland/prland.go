@@ -245,14 +245,17 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	return merge(ctx, gh, o, n, f, res)
 }
 
-// manualMerge is the command a human runs to merge the head Land refused, so the
-// manual path is the same whatever the reason (#3108). --match-head-commit pins
+// manualMerge is the command a human runs to merge the head Land refused, when
+// no check but a reviewer's is red, so it never merges past CI (#3108). --match-head-commit pins
 // the head Land read: gh refuses it if the head moved. There is none where gh
 // could not merge the PR (not open, a draft) or where the refusal is policy the
 // owner holds rather than a check: a release, a grant exclusion or change, a
 // repository without the grant, reviewer output still awaiting triage.
 func manualMerge(o Options, number int, f Facts) string {
-	if f.State != "OPEN" || f.IsDraft || f.HeadSHA == "" || ownerOnly(f) {
+	ciRed := slices.ContainsFunc(f.Checks, func(c Check) bool {
+		return c.Bucket != "pass" && c.Bucket != "skipping" && c.Name != "review" && c.Name != "review-attestation"
+	})
+	if f.State != "OPEN" || f.IsDraft || f.HeadSHA == "" || ownerOnly(f) || ciRed || len(f.Checks) == 0 {
 		return ""
 	}
 	cmd := fmt.Sprintf("gh pr merge %d --squash --match-head-commit %s", number, f.HeadSHA)
