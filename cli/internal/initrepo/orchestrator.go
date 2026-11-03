@@ -180,6 +180,9 @@ func initGithubWithDryRun(root string, dryRun bool) (status, detail string) {
 	if err != nil {
 		return "warn", detail + "; " + err.Error()
 	}
+	if labels.Action == "skipped" {
+		return "warn", detail + "; " + labels.Summary()
+	}
 	return "ok", detail + "; " + labels.Summary()
 }
 

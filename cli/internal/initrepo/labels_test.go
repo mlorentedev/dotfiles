@@ -197,3 +197,14 @@ func TestApplyDependabotLabelsSkipsWithoutGh(t *testing.T) {
 		t.Errorf("got %+v, %v; want a graceful skip", res, err)
 	}
 }
+
+// In `dotf init` a skipped label default is a degraded step, reported as warn
+// rather than folded into the delete-branch default's ok.
+func TestInitGithubStepWarnsWhenTheLabelsAreSkipped(t *testing.T) {
+	root := repoOn(t, "main", "https://github.com/owner/repo.git")
+	stubLabelsGh(t, twoEcosystems, "", "")
+	t.Setenv("STUB_API_FAIL", "1")
+	if status, detail := initGithubWithDryRun(root, true); status != "warn" || !strings.Contains(detail, "dependabot labels skipped") {
+		t.Errorf("got %s %q; want warn naming the skipped labels", status, detail)
+	}
+}
