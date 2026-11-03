@@ -70,8 +70,8 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 - [ ] AC2: `exec -- <argv>` and `exec --script <file>` run in the guest without a shell and return one `--json` record with `version` 1, whatever the outcome; a guest command that exits 1 is `status: ok, exit: 1` and the process exits 1.
 - [ ] AC3: `exec` forwards stdin on Linux and refuses it on Windows with `unsupported` and exit 2.
 - [ ] AC4: `cp` moves a file host to guest and back on both guests through the channel; the isolation checks (no share device, no mount) stay green.
-- [ ] AC5: With `--json`, stdout is exactly one record and the `==> ` progress lines are on stderr, for the verbs and for `run`.
-- [ ] AC6: `run` is composed of the verbs; the assertions of the tests that pin its flags, lifecycle, two converges and judgment are unchanged (a test that passes `Out: &bytes.Buffer{}` may take a mechanical edit for the split writers).
+- [x] AC5: With `--json`, stdout is exactly one record and the `==> ` progress lines are on stderr, for the verbs and for `run`.
+- [x] AC6: `run` is composed below the verbs: on Linux a converge goes through the same guest command line as `exec` (`guestRun`), so its token is forwarded and masked the same way; on Windows `run` already shares `bootGuest`, `startTask` and `pollExit`. The assertions of the tests that pin its flags, lifecycle, two converges and judgment are unchanged. Rewritten on #2842: over the verbs and with those assertions unchanged cannot both hold, because `Up`, `Exec` and `Copy` issue different calls, need a session record, and a `--keep` run holds none by this proposal's `down` decision. `run` over the verbs would be two PRs for no behaviour beyond this.
 - [ ] AC7: A guest command that prints a value `exec --secret <registry-id>` forwarded yields a masked record and masked plain stdout; piped stdin without `--secret` is not redacted.
 - [ ] AC8: `exec --elevated` runs in a high-integrity token on the Windows guest and under `sudo` on Linux.
 - [ ] AC9: Every refusal test sets `XDG_STATE_HOME` to an empty temp dir, so none reaches the hypervisor.
