@@ -126,6 +126,9 @@ func filesAnswer(files string) ([]byte, error) {
 
 // apiAnswer answers both `gh api` reads Land makes for a ready PR.
 func apiAnswer(line string) ([]byte, error) {
+	if strings.HasSuffix(line, "--jq .merged") { // a merge gh reported failed did not land
+		return []byte("false\n"), nil
+	}
 	if strings.Contains(line, "/pulls/") {
 		return filesAnswer("")
 	}
@@ -764,9 +767,11 @@ func TestLand_AnyOtherChecksFailureWithNoOutputIsAnError(t *testing.T) {
 	}
 }
 
-// gh can fail after the merge landed: the head branch deletion is refused, or
-// the client times out. The PR then reads MERGED, so it is a landing with a
-// warning, and the dependents stay on the base, where they belong now.
+// gh can fail after the merge landed: the head branch deletion is refused, the
+// client times out, or GraphQL is rate-limited. The PR then reads merged, so it
+// is a landing with a warning, and the dependents stay on the base, where they
+// belong now. The question is asked of REST: a GraphQL budget that failed the
+// merge fails a GraphQL read too, and REST has its own (#3082).
 func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 	run, calls := failingMergeGH(false)
 	attempted := false
@@ -776,7 +781,10 @@ func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 			attempted = true
 		}
 		if attempted && strings.HasPrefix(line, "pr view") {
-			return []byte(strings.Replace(readyView, `"OPEN"`, `"MERGED"`, 1)), nil
+			return nil, errors.New("exit status 1: GraphQL: API rate limit already exceeded for user ID 1")
+		}
+		if attempted && strings.HasSuffix(line, "--jq .merged") {
+			return []byte("true\n"), nil
 		}
 		return run(ctx, args...)
 	}

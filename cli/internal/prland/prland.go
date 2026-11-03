@@ -237,7 +237,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 	if len(res.Reasons) > 0 {
 		return res, nil
 	}
-	return merge(gh, n, f, res)
+	return merge(ctx, gh, o, n, f, res)
 }
 
 // gh runs gh for the repository the options name.
@@ -362,7 +362,7 @@ func settle(ctx context.Context, gh ghFunc, o Options, number int, wait bool) (F
 
 // merge re-reads the head, refuses if it moved, retargets the dependents and
 // squash-merges the head it checked.
-func merge(gh ghFunc, n string, f Facts, res Result) (Result, error) {
+func merge(ctx context.Context, gh ghFunc, o Options, n string, f Facts, res Result) (Result, error) {
 	again, err := readView(gh, n)
 	if err != nil {
 		return res, err
@@ -380,16 +380,35 @@ func merge(gh ghFunc, n string, f Facts, res Result) (Result, error) {
 	// head branch, so a refused landing leaves the stack as it found it.
 	if _, err := gh("pr", "merge", n, "--squash", "--delete-branch", "--match-head-commit", f.HeadSHA); err != nil {
 		// gh also fails after the merge landed: the head branch deletion is
-		// refused, or the client times out. A PR that reads MERGED landed, and
-		// its dependents belong on the base, so it is a warning, not a restore.
-		after, verr := readView(gh, n)
-		if verr != nil || after.State != "MERGED" {
-			return res, errors.Join(fmt.Errorf("gh pr merge: %w", err), restoreDependents(gh, moved, f.HeadRef))
+		// refused, the client times out, or GraphQL is rate-limited. A PR that
+		// reads merged landed, and its dependents belong on the base, so it is
+		// a warning, not a restore.
+		landed, verr := mergedOverREST(ctx, o, n)
+		if verr != nil || !landed {
+			return res, errors.Join(fmt.Errorf("gh pr merge: %w", err), verr, restoreDependents(gh, moved, f.HeadRef))
 		}
 		res.Warnings = append(res.Warnings, fmt.Sprintf("merged, but gh pr merge reported: %v", err))
 	}
 	res.Retargeted, res.Merged = moved, true
 	return res, nil
+}
+
+// mergedOverREST asks the REST API whether the PR merged. Not `gh pr view`:
+// that is GraphQL, and when GraphQL is what failed the merge, it fails this
+// read too, while REST draws on a budget of its own (#3082).
+func mergedOverREST(ctx context.Context, o Options, n string) (bool, error) {
+	out, err := o.Run(ctx, "api", "repos/"+apiRepo(o)+"/pulls/"+n, "--jq", ".merged")
+	if err != nil {
+		return false, fmt.Errorf("read whether #%s merged: %w", n, err)
+	}
+	switch v := strings.TrimSpace(string(out)); v {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("read whether #%s merged: got %q, want true or false", n, v)
+	}
 }
 
 // restoreDependents points each PR back at the head branch it was stacked on.
