@@ -19,7 +19,7 @@ type Firewall interface {
 	Prove() error
 }
 
-// MeshInterface is the interface the mesh arrives on. sshd's AllowUsers
+// MeshInterface is the interface the mesh arrives on. sshd's drop-in
 // already limits who may log in from the mesh range; the firewall limits where
 // a connection may come from at all, so a LAN peer never reaches sshd.
 const MeshInterface = "tailscale0"
@@ -47,10 +47,10 @@ func FirewallFor(goos string, paths Paths, run Runner, addrs func() ([]net.IP, e
 			}}, ""
 	}
 	if goos != "linux" {
-		return nil, "firewall not managed on " + goos + " yet: sshd's AllowUsers is the only fence"
+		return nil, "firewall not managed on " + goos + " yet: sshd's Match Address is the only fence"
 	}
 	if _, err := os.Stat(paths.UFWConf); err != nil {
-		return nil, "no ufw on this machine (" + paths.UFWConf + "): sshd's AllowUsers is the only fence"
+		return nil, "no ufw on this machine (" + paths.UFWConf + "): sshd's Match Address is the only fence"
 	}
 	return UFW{
 		Conf:     paths.UFWConf,

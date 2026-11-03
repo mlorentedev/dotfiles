@@ -323,7 +323,7 @@ func (f *PF) Prove() error {
 // the anchor after pfConfirmSec seconds, releases the references Token names,
 // and disables the LaunchDaemon, so the next boot does not load it again. A
 // run killed with its session, the one case nothing else could undo, is undone
-// by it: the worst it leaves is port 22 fenced by sshd's AllowUsers alone,
+// by it: the worst it leaves is port 22 fenced by sshd's Match Address alone,
 // never a machine nobody can reach.
 func (f *PF) arm(root Root) error {
 	script := fmt.Sprintf("nohup /bin/sh -c '%s' >/dev/null 2>&1 & echo $!", pfTimer(f.Token))

@@ -3,6 +3,7 @@ package sshtarget
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 )
@@ -64,10 +65,11 @@ func (Launchd) Validate(root Root) error {
 }
 
 // Effective is `sshd -T`.
-func (Launchd) Effective(root Root) ([]byte, error) {
-	out, err := root.Run("/usr/sbin/sshd", "-T")
+func (Launchd) Effective(root Root, conn string) ([]byte, error) {
+	argv := dumpArgv(conn, "/usr/sbin/sshd", "-T")
+	out, err := root.Run(argv...)
 	if err != nil {
-		return nil, fmt.Errorf("/usr/sbin/sshd -T: %w: %s", err, bytes.TrimSpace(out))
+		return nil, fmt.Errorf("%s: %w: %s", strings.Join(argv, " "), err, bytes.TrimSpace(out))
 	}
 	return out, nil
 }

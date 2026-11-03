@@ -29,7 +29,7 @@ section 4.
 | Layer | Linux | macOS | Windows |
 |---|---|---|---|
 | Network | UFW: port 22 only `in on tailscale0` (converged) | pf anchor: port 22 only from the mesh range (by hand) | Firewall rule: `Tailscale` adapter AND `100.64.0.0/10` (by hand) |
-| sshd | drop-in: key only, `AllowUsers manu@100.64.0.0/10` (converge) | same drop-in (converge) | `sshd_config`: key only, `AllowUsers` mesh range (by hand) |
+| sshd | drop-in: key only, `AllowUsers manu`, `DenyUsers *` outside `100.64.0.0/10` (converge) | same drop-in (converge) | `sshd_config`: key only, `AllowUsers` mesh range (by hand) |
 | Client | `ForwardAgent no`, keepalives, `IdentitiesOnly yes`, host key pinned with `StrictHostKeyChecking yes` (`ssh/config`, `ssh/known_hosts`) | same | same |
 
 The two server layers are independent. If the firewall is down, sshd still
@@ -145,13 +145,17 @@ set `PasswordAuthentication yes`, and macOS ships `100-macos.conf`. Name it
 
 The drop-in is `ssh/sshd-workstation.conf` in the checkout, identical on Linux
 and macOS. It sets key-only authentication, no root login, no agent or X11
-forwarding, client keepalives, and `AllowUsers {user}@{mesh}`. converge renders
+forwarding, client keepalives, `AllowUsers {user}`, and last a
+`Match Address *,!{mesh}` block with `DenyUsers *`. converge renders
 `{user}` as the account it runs as and `{mesh}` as `100.64.0.0/10`, and
 installs the rendered file.
 
-`AllowUsers manu@100.64.0.0/10` is the sshd half of the mesh-only rule. A
-connection from any other source address is refused after the key exchange,
-even with the right key.
+That `Match` block is the sshd half of the mesh-only rule. A connection from
+any other source address is refused after the key exchange, even with the
+right key. The range is not in `AllowUsers` because Win32-OpenSSH rewrites the
+`/` of an `AllowUsers` value, which denies every login (#3080). Plain `sshd -T`
+prints no `Match` block, so read the fence with
+`sshd -T -C user=manu,host=x,addr=192.0.2.1`, which must print `denyusers *`.
 
 **Linux and macOS:** one converge step does this section, idempotently: the
 authorized key, the host keys, the drop-in (validated with `sshd -t` before
@@ -238,7 +242,7 @@ The rules are readable by root only, so a plan without root reads ufw's
 switch, the input policy and a witness of the rule files the last apply read
 (`/var/lib/dotf/workstation-firewall`). A rule written later makes the plan
 pending, and the next converge reads the rules as root before accepting them.
-A Linux without ufw plans with a note saying so: there, sshd's `AllowUsers` is
+A Linux without ufw plans with a note saying so: there, sshd's `Match Address` is
 the only fence.
 
 Check: `sudo ufw status verbose` reads `Status: active`, `Default: deny (incoming)`,
@@ -269,7 +273,7 @@ cannot read: an `$SSH_CONNECTION` whose server address does not parse, and
 for sudo itself. Before loading, it arms a root timer that, after 120 s,
 flushes the anchor and disables the job; the timer is disarmed only once the
 whole proof has passed, so a run cut off with its session leaves port 22
-fenced by `AllowUsers` alone, never a Mac nobody can reach. A proof that
+fenced by sshd's `Match Address` alone, never a Mac nobody can reach. A proof that
 outlives the timer fails the run rather than reading converged: the disarm
 checks that the kill succeeded and that the anchor is still loaded. A failure
 flushes only this anchor; nothing ever runs `pfctl -d`.

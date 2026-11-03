@@ -153,22 +153,23 @@ func (Systemd) Validate(root Root) error {
 
 // Effective is `sshd -T`, which loads the config as `-t` does and so needs
 // the same directory.
-func (Systemd) Effective(root Root) ([]byte, error) {
-	return sshdRun(root, "-T")
+func (Systemd) Effective(root Root, conn string) ([]byte, error) {
+	return sshdRun(root, dumpArgv(conn, "-T")...)
 }
 
 // sshdRun runs sshd with one flag as root, creating privsepDir when sshd
 // reports it missing.
-func sshdRun(root Root, flag string) ([]byte, error) {
-	out, err := root.Run("/usr/sbin/sshd", flag)
+func sshdRun(root Root, flags ...string) ([]byte, error) {
+	argv := append([]string{"/usr/sbin/sshd"}, flags...)
+	out, err := root.Run(argv...)
 	if err != nil && bytes.Contains(out, []byte("Missing privilege separation directory")) {
 		if err := asRoot(root, "install", "-d", "-m", "0755", privsepDir); err != nil {
 			return nil, err
 		}
-		out, err = root.Run("/usr/sbin/sshd", flag)
+		out, err = root.Run(argv...)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("/usr/sbin/sshd %s: %w: %s", flag, err, bytes.TrimSpace(out))
+		return nil, fmt.Errorf("%s: %w: %s", strings.Join(argv, " "), err, bytes.TrimSpace(out))
 	}
 	return out, nil
 }
