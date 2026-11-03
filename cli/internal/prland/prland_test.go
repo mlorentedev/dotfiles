@@ -808,6 +808,32 @@ func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 	}
 }
 
+// When the read that would tell whether the merge landed fails too, the outcome
+// is unknown: land reports the failure with both errors, so the unknown says
+// so, and restores the dependents as for any failed merge.
+func TestLand_AnUnconfirmableMergeNamesTheReadThatFailed(t *testing.T) {
+	run, calls := failingMergeGH(false)
+	unconfirmed := func(ctx context.Context, args ...string) ([]byte, error) {
+		if strings.HasSuffix(strings.Join(args, " "), "--jq .merged") {
+			return nil, errors.New("HTTP 502: Bad Gateway")
+		}
+		return run(ctx, args...)
+	}
+
+	res, err := Land(context.Background(), Options{Run: unconfirmed, Untriaged: noneUntriaged}, 30)
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	for _, want := range []string{"head branch was modified", "read whether #30 merged", "HTTP 502"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error lacks %q: %v", want, err)
+		}
+	}
+	if res.Merged || !strings.HasSuffix(strings.Join(*calls, "\n"), "pr edit 31 --base feat/x") {
+		t.Errorf("want not merged and #31 restored, got %+v, calls %v", res, *calls)
+	}
+}
+
 // Blockers is Land's read without its merge: the same reasons, and nothing
 // mutated however the PR stands.
 func TestBlockers_ReadsTheReasonsLandWouldRefuseOnAndChangesNothing(t *testing.T) {
