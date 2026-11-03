@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: da95f19a047826e5
+generated_sha: 9c64789731c9bbb6
 id: autopilot-skill
 type: skill
 status: active
@@ -326,8 +326,15 @@ When the operator returns, the time window expires, the backlog empties, or a st
    ```bash
    MEMORY_MD="$(dotf env path VAULT_PATH)/10_projects/<repo>/memory/MEMORY.md"
    dotf mem thread                        # which thread am I: wt-<slug>, or main@<host>
-   printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD" --agent <agent>
+   printf '%s\n' \
+     '> Updated: <YYYY-MM-DD><br>' \
+     '**Last task:** <what this run did, with PR numbers><br>' \
+     '**Next action:** <the one concrete first step for the next session><br>' \
+     '**Awaiting Manu:** <decisions only the operator can take; drop the line if none>' |
+     dotf mem handoff-write --memory "$MEMORY_MD" --agent <agent>
    ```
+   The `**Next action:**` line is not optional: without it `handoff-write` warns
+   "no `**Next action:**` line" and still writes the thread, so the next session starts with no first step.
    The full checklist (journal, board reconciliation, artifact summary, one next action) is
    `00_meta/skills/handoff/SKILL.md`. `--memory "$REPO_ROOT/MEMORY.md"` — which an earlier draft used —
    would write the handoff nowhere near where the next session reads it.

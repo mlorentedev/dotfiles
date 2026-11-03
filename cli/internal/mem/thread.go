@@ -111,7 +111,7 @@ func ThreadWarnings(body string) []string {
 	th := ParseThread(body)
 	var out []string
 	if th.All("Next action") == "" {
-		out = append(out, "no Next action, so the next session has no first step")
+		out = append(out, "no `**Next action:**` line, so the next session has no first step")
 	}
 	for _, f := range th.Unknown() {
 		out = append(out, fmt.Sprintf("label %q is not one of: %s", f.Label, strings.Join(ThreadLabels, ", ")))
