@@ -9,9 +9,19 @@ created: "2026-10-22"
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+Each line names the PRs that landed it and the `features.json` entry whose command runs its tests; the real-guest runs are under "Test status".
+
+- [x] AC1 -> #2947, #2950, #3064 / f1 (`TestUp*`, `TestWindowsUp*`, the `List` stale tests)
+- [x] AC2 -> #2995, #3073 / f2 (`TestExecStatusTable`, `TestRecord*`, `TestWindowsExecReportsTheCommandInOneRecord`)
+- [x] AC3 -> #2995, #3073 / f3
+- [x] AC4 -> #2999, #3078 / f4
+- [x] AC5 -> #2930; held before 1d, per #3092 / f5
+- [x] AC6 -> #3092, as rewritten on #2842 / f6; real Lima run below
+- [x] AC7 -> #2931, #2995 / f7
+- [x] AC8 -> #3079 / f8; real tokens on both guests below
+- [x] AC9 -> every slice / f9 (`TestVMVerbRefusals`, 20 runs)
+- [x] AC10 -> #3090, #3102 / f10; real guest acceptance below
+- [x] AC11 -> #2950, #2995, #3064, #3073 / f11
 
 ## Test status
 
@@ -34,22 +44,23 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - AC10: `exec --elevated` ran `Add-WindowsCapability` inside a session in 10.6 min, giving `OpenSSH_for_Windows_9.5p2`; `clean-base` is unchanged. With the NIC already static, it failed with `0x80240438` (no network).
   - AC11: `--timeout 8s` on PowerShell running `ping -n 60` gave `timeout`, process code 1, with the output so far; no `ping` was left in the guest, and the call left no task or directory.
   - AC11: `down` on an unknown name was `no-session`, exit 3. `down` cleared the stale session, `status` went back to `[]`, and `clean-base` stayed.
-- No regressions in existing test suite: yes / no (if no, document)
+- No regressions in existing test suite: yes. `TestEmbeddedTemplatesMatchVault` fails in `initrepo` and `vault` on main as on every branch here; it is #3050, not this spec.
 
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
--
--
+- AC6 was rewritten (#2842): `run` composes below the verbs, not over them, because a run holds no session record and its tests pin calls the verbs do differently.
+- The drop-in's mesh fence moved from `AllowUsers user@CIDR` to a final `Match Address` block with `DenyUsers *` (#3080, #3090), because Win32-OpenSSH rewrites the `/` of an AllowUsers value. The proof gained `sshd -T -C` dumps from each side.
+- `sudo -n` wraps the guest's `timeout`, not the other way round (#3079): an unprivileged `timeout` cannot kill a root command.
 
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-546-sshd-t-prints-no-match-block.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-055-vm-guests-are-driven-through-session-verbs.md
+- [x] New pattern candidate for `00_meta/patterns/`? no: guest session verbs exist in this repo only
 
 ## Archive checklist
 

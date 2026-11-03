@@ -1,7 +1,7 @@
 ---
 id: "PLAT-005-vm-session-verbs"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-10-22"
 issue: "mlorentedev/dotfiles#2842"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -69,16 +69,16 @@ After the three PRs, `dotf vm <os> up | exec | cp | down | status` hold and driv
 
 ## Acceptance criteria
 
-- [ ] AC1: `up --session <name>` creates a session on Linux; on Windows a second `up` is refused with status `busy` and exit 2; `up` on a name whose guest is gone is refused with `stale`, exit 2, naming `down`; `status` reports what the hypervisor answers, never a state file alone.
-- [ ] AC2: `exec -- <argv>` and `exec --script <file>` run in the guest without a shell and return one `--json` record with `version` 1, whatever the outcome; a guest command that exits 1 is `status: ok, exit: 1` and the process exits 1.
-- [ ] AC3: `exec` forwards stdin on Linux and refuses it on Windows with `unsupported` and exit 2.
-- [ ] AC4: `cp` moves a file host to guest and back on both guests through the channel; the isolation checks (no share device, no mount) stay green.
+- [x] AC1: `up --session <name>` creates a session on Linux; on Windows a second `up` is refused with status `busy` and exit 2; `up` on a name whose guest is gone is refused with `stale`, exit 2, naming `down`; `status` reports what the hypervisor answers, never a state file alone.
+- [x] AC2: `exec -- <argv>` and `exec --script <file>` run in the guest without a shell and return one `--json` record with `version` 1, whatever the outcome; a guest command that exits 1 is `status: ok, exit: 1` and the process exits 1.
+- [x] AC3: `exec` forwards stdin on Linux and refuses it on Windows with `unsupported` and exit 2.
+- [x] AC4: `cp` moves a file host to guest and back on both guests through the channel; the isolation checks (no share device, no mount) stay green.
 - [x] AC5: With `--json`, stdout is exactly one record and the `==> ` progress lines are on stderr, for the verbs and for `run`.
 - [x] AC6: `run` is composed below the verbs: on Linux a converge goes through the same guest command line as `exec` (`guestRun`), so its token is forwarded and masked the same way; on Windows `run` already shares `bootGuest`, `startTask` and `pollExit`. The assertions of the tests that pin its flags, lifecycle, two converges and judgment are unchanged. Rewritten on #2842: over the verbs and with those assertions unchanged cannot both hold, because `Up`, `Exec` and `Copy` issue different calls, need a session record, and a `--keep` run holds none by this proposal's `down` decision. `run` over the verbs would be two PRs for no behaviour beyond this.
-- [ ] AC7: A guest command that prints a value `exec --secret <registry-id>` forwarded yields a masked record and masked plain stdout; piped stdin without `--secret` is not redacted.
-- [ ] AC8: `exec --elevated` runs in a high-integrity token on the Windows guest and under `sudo` on Linux.
-- [ ] AC9: Every refusal test sets `XDG_STATE_HOME` to an empty temp dir, so none reaches the hypervisor.
-- [ ] AC11: `down` leaves no instance, overlay or state and never touches `clean-base`; `exec`, `cp` and `down` on an unknown name answer `no-session` with exit 3; a `timeout` exits 1.
+- [x] AC7: A guest command that prints a value `exec --secret <registry-id>` forwarded yields a masked record and masked plain stdout; piped stdin without `--secret` is not redacted.
+- [x] AC8: `exec --elevated` runs in a high-integrity token on the Windows guest and under `sudo` on Linux.
+- [x] AC9: Every refusal test sets `XDG_STATE_HOME` to an empty temp dir, so none reaches the hypervisor.
+- [x] AC11: `down` leaves no instance, overlay or state and never touches `clean-base`; `exec`, `cp` and `down` on an unknown name answer `no-session` with exit 3; a `timeout` exits 1.
 - [x] AC10: The Windows guest, with OpenSSH Server and the `ssh-target` role installed inside a session, produces an `sshd -T` dump that becomes a fixture, and the converge proof passes with a second run at `changed` 0 (closes #2763).
 
 ## References
