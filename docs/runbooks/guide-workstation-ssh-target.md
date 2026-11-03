@@ -29,7 +29,7 @@ section 4.
 | Layer | Linux | macOS | Windows |
 |---|---|---|---|
 | Network | UFW: port 22 only `in on tailscale0` (converged) | pf anchor: port 22 only from the mesh range (by hand) | Firewall rule: `Tailscale` adapter AND `100.64.0.0/10` (by hand) |
-| sshd | drop-in: key only, `AllowUsers manu`, `DenyUsers *` outside `100.64.0.0/10` (converge) | same drop-in (converge) | `sshd_config`: key only, `AllowUsers` mesh range (by hand) |
+| sshd | drop-in: key only, `AllowUsers manu`, `DenyUsers *` outside `100.64.0.0/10` (converge) | same drop-in (converge) | `sshd_config`: key only, `AllowUsers manu`, `DenyUsers *` outside `100.64.0.0/10` (by hand) |
 | Client | `ForwardAgent no`, keepalives, `IdentitiesOnly yes`, host key pinned with `StrictHostKeyChecking yes` (`ssh/config`, `ssh/known_hosts`) | same | same |
 
 The two server layers are independent. If the firewall is down, sshd still
@@ -191,7 +191,7 @@ and its reason is the plan.
 
 **Windows:** `C:\ProgramData\ssh\sshd_config` has no `Include` by default, so
 the same keywords go into the file itself, above its `Match Group administrators`
-block. `scripts/windows-openssh-authorize.ps1` installs the key and the
+block, and the `Match Address` block beside that one, at the end of the file. `scripts/windows-openssh-authorize.ps1` installs the key and the
 firewall rule (section 3). It does not edit `sshd_config`.
 
 ```powershell
