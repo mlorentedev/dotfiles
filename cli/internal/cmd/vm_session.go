@@ -127,13 +127,33 @@ func sessionFlags(c *cobra.Command, session *string, asJSON *bool, usage string)
 	c.Flags().BoolVar(asJSON, "json", false, "write one JSON record to stdout")
 }
 
+// openFor opens the guest's session store. One that cannot open still owes
+// --json its one record (ADR-055 decision 7): a failed one, while the exit code
+// stays the one the open error carries.
+func (g sessionGuest) openFor(cmd *cobra.Command, session string, asJSON bool) (vm.Session, error) {
+	s, err := g.open()
+	if err != nil && asJSON {
+		rec := vm.NewRecord(session, g.os, vm.StatusFailed)
+		rec.Stderr = err.Error()
+		if werr := writeSessionJSON(cmd, rec); werr != nil {
+			return nil, werr
+		}
+	}
+	return s, err
+}
+
+// writeSessionJSON writes v on one line of stdout, with no HTML escaping.
+func writeSessionJSON(cmd *cobra.Command, v any) error {
+	enc := json.NewEncoder(cmd.OutOrStdout())
+	enc.SetEscapeHTML(false)
+	return enc.Encode(v)
+}
+
 // emitSession writes the record (a line with the session name when not --json)
 // and turns the record's process code into the exit code.
 func emitSession(cmd *cobra.Command, rec vm.Record, asJSON bool) error {
 	if asJSON {
-		enc := json.NewEncoder(cmd.OutOrStdout())
-		enc.SetEscapeHTML(false)
-		if err := enc.Encode(rec); err != nil {
+		if err := writeSessionJSON(cmd, rec); err != nil {
 			return err
 		}
 	} else if rec.Status == vm.StatusOK {
@@ -161,7 +181,7 @@ func newVMUpCmd(g sessionGuest) *cobra.Command {
 					return withExitCode(2, err)
 				}
 			}
-			s, err := g.open()
+			s, err := g.openFor(cmd, session, asJSON)
 			if err != nil {
 				return err
 			}
@@ -186,7 +206,7 @@ func newVMDownCmd(g sessionGuest) *cobra.Command {
 			if err := vm.ValidSessionName(session); err != nil {
 				return withExitCode(2, err)
 			}
-			s, err := g.open()
+			s, err := g.openFor(cmd, session, asJSON)
 			if err != nil {
 				return err
 			}
@@ -206,7 +226,7 @@ func newVMStatusCmd(g sessionGuest) *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			s, err := g.open()
+			s, err := g.openFor(cmd, "", asJSON)
 			if err != nil {
 				return err
 			}
@@ -217,9 +237,7 @@ func newVMStatusCmd(g sessionGuest) *cobra.Command {
 				return emitSession(cmd, rec, asJSON)
 			}
 			if asJSON {
-				enc := json.NewEncoder(cmd.OutOrStdout())
-				enc.SetEscapeHTML(false)
-				return enc.Encode(list)
+				return writeSessionJSON(cmd, list)
 			}
 			for _, r := range list {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\n", r.Session, r.Status)

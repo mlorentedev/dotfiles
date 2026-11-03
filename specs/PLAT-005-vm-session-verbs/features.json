@@ -30,9 +30,9 @@
   {
     "id": "PLAT-005-vm-session-verbs-f5",
     "behavior": "with `--json` stdout is exactly one record and progress is on stderr, for the verbs and `run`",
-    "verification": "go -C cli test ./internal/cmd/ -run 'TestVMProgressGoesToStderr'",
+    "verification": "go -C cli test ./internal/cmd/ -run 'TestVMProgressGoesToStderr|TestVMUpWritesProgressToStderrAndTheNameToStdout|TestVMVerbsWriteAFailedRecordWhenTheStoreCannotOpen'",
     "state": "passing",
-    "evidence": "2026-11-03: 1 test runs pass on main at the close of PLAT-005"
+    "evidence": "2026-11-02: 3 tests and 5 subtests pass after review round 1; the darwin-only TestVMProgressGoesToStderr is no longer the only one named"
   },
   {
     "id": "PLAT-005-vm-session-verbs-f6",

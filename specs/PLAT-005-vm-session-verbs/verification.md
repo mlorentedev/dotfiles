@@ -54,6 +54,16 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The drop-in's mesh fence moved from `AllowUsers user@CIDR` to a final `Match Address` block with `DenyUsers *` (#3080, #3090), because Win32-OpenSSH rewrites the `/` of an AllowUsers value. The proof gained `sshd -T -C` dumps from each side.
 - `sudo -n` wraps the guest's `timeout`, not the other way round (#3079): an unprivileged `timeout` cannot kill a root command.
 
+## Review round 1 dispositions
+
+Round 1 (`nan/mimo-v2.6-flash`, FAIL) is kept as `review-round1.md`.
+
+- Major: under `--json`, a store that could not open wrote no record. Applied: every verb now writes one `failed` record, and the exit code stays the one the open error carries. Pinned by `TestVMVerbsWriteAFailedRecordWhenTheStoreCannotOpen`.
+- Minor, concurrent `up` on one name: ticketed as #3105.
+- Minor, Windows `exec` refusing stdin before an unknown session: ticketed as #3106.
+- Minor, `WindowsSessions.Exec` at 70 lines: ticketed in #3106, which touches the same function.
+- Minor, f5 named only a darwin-only test: applied. f5 now also names the portable `TestVMUpWritesProgressToStderrAndTheNameToStdout` and the new test.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
