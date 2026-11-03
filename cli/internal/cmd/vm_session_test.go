@@ -100,10 +100,13 @@ func TestVMVerbRefusals(t *testing.T) {
 // answers --json with its one record, a failed one, for every verb (ADR-055
 // decision 7); the exit code stays the one the open error carries.
 func TestVMVerbsWriteAFailedRecordWhenTheStoreCannotOpen(t *testing.T) {
-	old := linuxSessions
-	t.Cleanup(func() { linuxSessions = old })
+	oldL, oldW := linuxSessions, windowsSessions
+	t.Cleanup(func() { linuxSessions, windowsSessions = oldL, oldW })
 	linuxSessions = func() (vm.LinuxSessions, error) {
 		return vm.LinuxSessions{}, withExitCode(2, errors.New("limactl is not on PATH"))
+	}
+	windowsSessions = func() (vm.Session, error) {
+		return nil, withExitCode(2, errors.New("qemu-system-aarch64 is not on PATH"))
 	}
 	for _, args := range [][]string{
 		{"up", "--session", "proof"},
@@ -127,6 +130,18 @@ func TestVMVerbsWriteAFailedRecordWhenTheStoreCannotOpen(t *testing.T) {
 			}
 		})
 	}
+	t.Run("windows status", func(t *testing.T) {
+		c := newVMWindowsCmd()
+		c.SetArgs([]string{"status", "--json"})
+		var out bytes.Buffer
+		c.SetOut(&out)
+		c.SetErr(io.Discard)
+		err := c.Execute()
+		var rec vm.Record
+		if jerr := json.Unmarshal(out.Bytes(), &rec); jerr != nil || rec.Status != vm.StatusFailed || rec.OS != "windows" || ExitCode(err) != 2 {
+			t.Errorf("windows status --json = %q (%v), exit %d; want one failed record and 2", out.String(), jerr, ExitCode(err))
+		}
+	})
 }
 
 // With --json stdout is exactly the record; an empty list is [] (AC5).

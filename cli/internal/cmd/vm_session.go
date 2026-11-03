@@ -136,7 +136,8 @@ func (g sessionGuest) openFor(cmd *cobra.Command, session string, asJSON bool) (
 		rec := vm.NewRecord(session, g.os, vm.StatusFailed)
 		rec.Stderr = err.Error()
 		if werr := writeSessionJSON(cmd, rec); werr != nil {
-			return nil, werr
+			// Joined, so the open error's exit code still decides.
+			return nil, errors.Join(err, werr)
 		}
 	}
 	return s, err
