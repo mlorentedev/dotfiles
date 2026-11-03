@@ -38,11 +38,29 @@ func WriteCIOpts(root, stack string, dryRun bool) (string, error) {
 	if !ok {
 		return "none", nil
 	}
+	return writeWorkflow(root, "ci.yml", tmpl, dryRun)
+}
+
+// lintDirToken is the workflow directory lint.yml's actionlint step names;
+// writeWorkflow replaces it with the forge's directory.
+const lintDirToken = ".github/workflows/*.y*ml"
+
+// WriteLintOpts writes lint.yml, which runs actionlint over the repository's
+// workflows, beside ci.yml. Unlike ci.yml it applies to every stack, none
+// included: every scaffolded repository holds workflows (#2965). Same
+// skip-if-present, forge directory and default-branch rules as WriteCIOpts.
+func WriteLintOpts(root string, dryRun bool) (string, error) {
+	return writeWorkflow(root, "lint.yml", "lint.yml", dryRun)
+}
+
+// writeWorkflow renders template tmpl to name in the forge's workflow directory,
+// skip-if-present, with the push trigger on the default branch.
+func writeWorkflow(root, name, tmpl string, dryRun bool) (string, error) {
 	// Every forge's directory, not only the one WorkflowDir picks: a checkout
-	// migrated between Gitea and Forgejo can hold a ci.yml under the other one.
+	// migrated between Gitea and Forgejo can hold the file under the other one.
 	for _, d := range []string{".forgejo", ".gitea", ".github"} {
 		dir := filepath.Join(d, "workflows")
-		if _, err := os.Stat(filepath.Join(root, dir, "ci.yml")); err == nil {
+		if _, err := os.Stat(filepath.Join(root, dir, name)); err == nil {
 			return "skipped", nil
 		}
 	}
@@ -57,7 +75,8 @@ func WriteCIOpts(root, stack string, dryRun bool) (string, error) {
 		return "", fmt.Errorf("template %s must hold %q exactly once", tmpl, ciBranchToken)
 	}
 	body := strings.Replace(string(raw), ciBranchToken, "branches: ["+yamlBranch(DefaultBranch(root))+"]", 1)
-	dest := filepath.Join(root, WorkflowDir(root), "ci.yml")
+	body = strings.ReplaceAll(body, lintDirToken, filepath.ToSlash(WorkflowDir(root))+"/*.y*ml")
+	dest := filepath.Join(root, WorkflowDir(root), name)
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return "", err
 	}
