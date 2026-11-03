@@ -112,7 +112,7 @@ func dependabotLabels(repo string) ([]string, error) {
 		out, err := cmd.Output()
 		if err != nil {
 			var exit *exec.ExitError
-			if errors.As(err, &exit) && strings.Contains(string(exit.Stderr), "404") {
+			if errors.As(err, &exit) && strings.Contains(string(exit.Stderr), "HTTP 404") {
 				continue
 			}
 			return nil, fmt.Errorf("could not read .github/%s of %s via gh (not authenticated, offline, or repo not found)", name, repo)

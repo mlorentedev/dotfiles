@@ -20,7 +20,9 @@ updates:
 
 // stubLabelsGh installs a fake gh that serves dependabot (the contents of
 // .github/dependabot.yml, or a 404 when empty), lists existing (one label per
-// line), and fails `label create` for failName. It returns the calls log.
+// line), and fails `label create` for failName. STUB_API_FAIL fails the
+// dependabot.yml read with a non-404 error; STUB_LIST_FAIL fails `label list`.
+// It returns the calls log.
 func stubLabelsGh(t *testing.T, dependabot, existing, failName string) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -46,10 +48,11 @@ func stubLabelsGh(t *testing.T, dependabot, existing, failName string) string {
 		"printf '%s\\n' \"$*\" >> " + shq(calls) + "\n" +
 		"case \"$*\" in\n" +
 		"  *contents/.github/dependabot.yml*)\n" +
+		"    [ -n \"$STUB_API_FAIL\" ] && { echo 'gh: Server Error (HTTP 502)' >&2; exit 1; }\n" +
 		"    [ -f " + shq(dep) + " ] || { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }\n" +
 		"    base64 < " + shq(dep) + " ;;\n" +
 		"  *contents/.github/dependabot.yaml*) echo 'gh: Not Found (HTTP 404)' >&2; exit 1 ;;\n" +
-		"  'label list'*) cat " + shq(labels) + " ;;\n" +
+		"  'label list'*) [ -n \"$STUB_LIST_FAIL\" ] && { echo 'HTTP 502' >&2; exit 1; }; cat " + shq(labels) + " ;;\n" +
 		failCase +
 		"  'label create'*) : ;;\n" +
 		"  *) printf 'true' ;;\n" +
@@ -92,6 +95,41 @@ func TestApplyDependabotLabelsCreatesOnlyTheMissingOnes(t *testing.T) {
 	}
 	if !strings.Contains(readFileOrEmpty(calls), "--color 0366d6") {
 		t.Errorf("a created label should carry the default color; calls:\n%s", readFileOrEmpty(calls))
+	}
+}
+
+// The other direction of the case-insensitive match: the declaration, not the
+// existing label, carries the capital.
+func TestApplyDependabotLabelsMatchesDeclaredCaseInsensitively(t *testing.T) {
+	declared := "version: 2\nupdates:\n  - package-ecosystem: gomod\n    directory: /\n    labels: [\"Dependencies\"]\n"
+	calls := stubLabelsGh(t, declared, "dependencies\n", "")
+	res, err := ApplyDependabotLabels("owner/repo", false)
+	if err != nil {
+		t.Fatalf("ApplyDependabotLabels: %v", err)
+	}
+	if got := creates(t, calls); len(got) != 0 || res.Action != "present" {
+		t.Errorf("created %v, action %q; want none, present", got, res.Action)
+	}
+}
+
+// An unreadable repository is a skip, never "nothing declared": the rollout
+// fails a skip, and it would report a "none" as current.
+func TestApplyDependabotLabelsSkipsWhenTheRepoCannotBeRead(t *testing.T) {
+	for name, env := range map[string]string{
+		"contents read fails, not a 404": "STUB_API_FAIL",
+		"label list fails":               "STUB_LIST_FAIL",
+	} {
+		t.Run(name, func(t *testing.T) {
+			calls := stubLabelsGh(t, twoEcosystems, "", "")
+			t.Setenv(env, "1")
+			res, err := ApplyDependabotLabels("owner/repo", false)
+			if err != nil || res.Action != "skipped" {
+				t.Errorf("got %+v, %v; want a skip", res, err)
+			}
+			if got := creates(t, calls); len(got) != 0 {
+				t.Errorf("created %v after a failed read", got)
+			}
+		})
 	}
 }
 
