@@ -75,8 +75,8 @@ created: "2026-10-22"
 
 ### PR 3: the Windows fixture and acceptance
 
-- [ ] [AC10] Measure `sshd -T` 9.5p2 through the verbs; add `sshd-T-windows-9.5p2-{effective,ignored,outside}.txt` and the `platforms` entry
-- [ ] [AC10] Acceptance on the guest: converge applies the drop-in, the proof passes, a second converge is `changed` 0; record on #2763 and close it
+- [x] [AC10] Measure `sshd -T` 9.5p2 through the verbs; add `sshd-T-windows-9.5p2-{effective,ignored,outside}.txt` and the `platforms` entry
+- [x] [AC10] Acceptance on the guest: converge applies the drop-in, the proof passes, a second converge is `changed` 0; record on #2763, already closed, with no closing keyword
 
 ## Closing
 
