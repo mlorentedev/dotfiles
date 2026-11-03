@@ -117,7 +117,7 @@ func TestThreadWarningsNameOnlyWhatIsMissingOrUnknown(t *testing.T) {
 		t.Errorf("a canonical thread drew warnings: %q", w)
 	}
 	w := ThreadWarnings("**Last task:** x.\n**Next action:**\n**Trap:** y.\n")
-	if len(w) != 2 || !strings.Contains(w[0], "Next action") || !strings.Contains(w[1], `"Trap"`) {
+	if len(w) != 2 || !strings.Contains(w[0], "**Next action:**") || !strings.Contains(w[1], `"Trap"`) {
 		t.Errorf("warnings = %q, want the empty Next action and the unknown Trap", w)
 	}
 }
