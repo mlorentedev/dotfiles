@@ -2,17 +2,16 @@ package harness
 
 import "strings"
 
-// The GENERATED region pair, written by scripts/compile-harness.sh
-// (BEGIN_PREFIX/END_MARKER) for the enforced patterns and the copilot skill
-// catalog. The AGENT-PRESENCE pair lives in presence.go.
+// The GENERATED region pair, written by `dotf harness instructions` for the
+// enforced patterns and by the skills deploy for the copilot skill catalog. The AGENT-PRESENCE pair lives in presence.go.
 const (
 	GeneratedBeginPrefix = "<!-- BEGIN HARNESS GENERATED"
 	GeneratedEndMarker   = "<!-- END HARNESS GENERATED -->"
 )
 
 // CatalogMarker identifies the copilot skill-catalog region among the GENERATED
-// ones: compile-harness.sh writes it into the BEGIN line ("— skill catalog from
-// vault …"). TestCatalogMarkerMatchesCompileHarness pins the two together.
+// ones: deployCatalog writes it into the BEGIN line ("— skill catalog from
+// vault …"). TestTheDeployedCatalogIsDeployOnly pins the two together.
 const CatalogMarker = "skill catalog"
 
 // catalogSlot is the empty BEGIN line a source carries where the catalog is
@@ -28,7 +27,7 @@ const (
 	sourceRegion regionKind = iota
 	// presenceRegion is the persona roster `dotf harness presence` appends.
 	presenceRegion
-	// catalogRegion is the copilot skill catalog compile-harness.sh writes.
+	// catalogRegion is the copilot skill catalog deployCatalog writes.
 	catalogRegion
 	// catalogSlotRegion is the empty region a source reserves for the catalog.
 	catalogSlotRegion

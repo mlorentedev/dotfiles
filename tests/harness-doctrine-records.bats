@@ -1,14 +1,15 @@
 #!/usr/bin/env bats
-# Guards on the REAL doctrine records under harness/enforced/. The HARNESS-056
-# cases in tests/compile-harness.bats prove the full-only MECHANISM on a
-# synthetic fixture, and they stayed green while the real auto-merge record was
-# one `--refresh` away from losing its markers (#1525): #1495 added them to the
+# Guards on the REAL doctrine records under harness/enforced/. The Go tests in
+# cli/internal/harness prove the full-only MECHANISM on a synthetic fixture, and
+# its shell predecessor stayed green while the real auto-merge record was one
+# refresh away from losing its markers (#1525): #1495 added them to the
 # generated record but not to its vault source. The second case needs the real
 # vault, and CI has none, so it runs wherever one resolves.
 
+load 'lib/dotf-bin'
+
 setup() {
     DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
-    SCRIPT="$DOTFILES_DIR/scripts/compile-harness.sh"
 }
 
 @test "no-auto-merge: the auto-merge exception sits inside a full-only region" {
@@ -27,39 +28,22 @@ setup() {
             "${begin:-none}" "${exception:-none}" "${end:-none}" >&2
         printf 'into the capped payload next to the prohibition it qualifies.\n' >&2
         printf 'Fix the vault source (00_meta/patterns/pattern-git-workflow.md),\n' >&2
-        printf 'then --refresh. Editing only the record is reverted by the next refresh.\n' >&2
+        printf 'then dotf harness refresh. Editing only the record is reverted by the next refresh.\n' >&2
         return 1
     fi
 }
 
-@test "--refresh against the real vault leaves the working tree's records unchanged" {
-    # A record edited without its vault source is reverted by the next
-    # --refresh. That happened twice (#1490, #1525). Re-rendering every record
-    # from the vault must therefore be a no-op. A vault ahead of this checkout
-    # turns this red on purpose: the records have drifted from their source.
+@test "the committed records match what a refresh would render from the real vault" {
+    # A record edited without its vault source is reverted by the next refresh.
+    # That happened twice (#1545, #1525). `dotf harness check --against-vault`
+    # renders every record from the vault without writing anything, and fails on
+    # either side: a vault ahead of this checkout, or a record edited by hand.
     local vault="${VAULT_PATH:-}"
     [ -n "$vault" ] || vault="$(dotf env path VAULT_PATH 2>/dev/null || true)"
     [ -n "$vault" ] && [ -d "$vault/00_meta/patterns" ] \
-        || skip "no vault resolves here; compile-harness.bats pins the logic"
+        || skip "no vault resolves here; the Go tests pin the logic"
+    dotf_bin_resolve "${BATS_FILE_TMPDIR}/dotf-doctrine"
 
-    local copy="$BATS_TEST_TMPDIR/repo" target targets
-    mkdir -p "$copy"
-    cp -R "$DOTFILES_DIR/harness" "$copy/harness"
-    targets="$(jq -r '.targets[].file' "$DOTFILES_DIR/harness/manifest.json")"
-    [ -n "$targets" ]
-    while IFS= read -r target; do
-        mkdir -p "$copy/$(dirname "$target")"
-        cp "$DOTFILES_DIR/$target" "$copy/$target"
-    done <<< "$targets"
-
-    run env HOME="$BATS_TEST_TMPDIR/home" HARNESS_REPO_ROOT="$copy" VAULT_PATH="$vault" \
-        "$SCRIPT" --refresh
-    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; return 1; }
-
-    run diff -r "$DOTFILES_DIR/harness" "$copy/harness"
-    [ "$status" -eq 0 ] || { printf 'records drift from the vault (run --refresh):\n%s\n' "$output" >&2; return 1; }
-    while IFS= read -r target; do
-        run diff "$DOTFILES_DIR/$target" "$copy/$target"
-        [ "$status" -eq 0 ] || { printf '%s drifts from the vault:\n%s\n' "$target" "$output" >&2; return 1; }
-    done <<< "$targets"
+    run "$DOTF_BIN" harness check --repo-root "$DOTFILES_DIR" --against-vault --vault "$vault"
+    [ "$status" -eq 0 ] || { printf 'records drift from the vault:\n%s\n' "$output" >&2; return 1; }
 }

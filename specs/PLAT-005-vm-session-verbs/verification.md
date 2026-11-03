@@ -72,3 +72,7 @@ On the Windows 11 Arm64 guest, OpenSSH 9.5p2, inside a session and never in `cle
 ```
 
 Real logins afterwards: `100.64.0.2` printed `dotf-win\dotf` and sshd logged `Accepted publickey`; `10.0.2.15` was `Permission denied (publickey)` and sshd logged `not allowed because listed in DenyUsers`. A connection to the node's own address does not cross the firewall rule, so the rule itself is not proven here (OBS-036).
+
+## `run` composed below the verbs (AC5, AC6)
+
+`dotf secrets run -- dotf vm linux` from `33ce746c`, on a real Lima guest: first converge, second converge, "converged, and the second run changed nothing", exit 0, guest deleted. The token was set, and the run's log carries 28 `[REDACTED:` markers. `vm_test.go`'s assertions are unchanged; `TestVerify_MasksTheTokenInAConvergesOutput` and `TestVerify_RefusesATokenItCouldNotMask` are new. The Windows `run` is untouched.

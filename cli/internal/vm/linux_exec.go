@@ -42,6 +42,7 @@ type ExecOptions struct {
 	// guest can serve the call, so a refusal never costs a decryption.
 	Secrets func() ([]string, error)
 	Timeout time.Duration // 0 is none
+	Workdir string        // the guest directory to run in; "" is limactl's default
 	// Elevated runs the call as an administrator: under sudo on Linux, in a
 	// high-integrity token on Windows (ADR-055 decision 6).
 	Elevated bool
@@ -103,7 +104,7 @@ func (s LinuxSessions) Exec(ctx context.Context, o ExecOptions) Record {
 	var outRec, errRec capped
 	stdout := redact.New(io.MultiWriter(&outRec, o.Stdout), pairs)
 	stderr := redact.New(io.MultiWriter(&errRec, o.Stderr), pairs)
-	runErr := s.guestRun(ctx, o, pairs, stdout, stderr)
+	runErr := s.guestRun(ctx, instanceOf(o.Session), o, pairs, stdout, stderr)
 	_ = stdout.Flush()
 	_ = stderr.Flush()
 
@@ -159,8 +160,7 @@ func settle(ctx context.Context, r *Record, err error, limit time.Duration) {
 // the guest's own timeout, because killing limactl leaves the command running
 // in a session that outlives the call. The host deadline starts first, so it is
 // the one that fires, and a command that exits 124 by itself is not a timeout.
-func (s LinuxSessions) guestRun(ctx context.Context, o ExecOptions, pairs []string, stdout, stderr io.Writer) error {
-	instance := instanceOf(o.Session)
+func (s LinuxSessions) guestRun(ctx context.Context, instance string, o ExecOptions, pairs []string, stdout, stderr io.Writer) error {
 	argv := o.Argv
 	if o.Script != "" {
 		guest, remove, err := s.pushScript(ctx, instance, o.Script, stderr)
@@ -189,7 +189,11 @@ func (s LinuxSessions) guestRun(ctx context.Context, o ExecOptions, pairs []stri
 	if o.Elevated {
 		argv = append([]string{"sudo", "-n"}, argv...)
 	}
-	return s.L(ctx, stdin, stdout, stderr, append([]string{"shell", instance, "--"}, argv...)...)
+	shell := []string{"shell"}
+	if o.Workdir != "" {
+		shell = append(shell, "--workdir", o.Workdir)
+	}
+	return s.L(ctx, stdin, stdout, stderr, append(append(shell, instance, "--"), argv...)...)
 }
 
 // pushScript copies a host file to a temporary guest path. Its errors are flat

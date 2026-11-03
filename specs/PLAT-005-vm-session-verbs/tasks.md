@@ -55,8 +55,9 @@ created: "2026-10-22"
 
 ### PR 1d: `run` recomposed
 
-- [ ] [AC6] `run` composed of the verbs, with `--secret GITHUB_TOKEN`; the assertions of its tests are unchanged
-- [ ] [AC5] `run` writes progress where the verbs do; the description names the stream move as the one behaviour change
+- [x] [AC6] `run` composed below the verbs, as rewritten in the proposal; its token forwarded and masked as a secret is; the assertions of its tests are unchanged
+- [x] [AC5] `run` writes progress where the verbs do; it already did, so no stream moved
+- [x] A token that cannot be masked (under 6 bytes, or two lines) now refuses the run before it boots, the one behaviour change
 
 ### PR 2: elevation and the guest prerequisites
 

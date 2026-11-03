@@ -206,7 +206,7 @@ setup() {
 @test "the linux probe captures before grepping, never pipes into grep -q" {
     # `cmd | grep -q` closes the pipe on first match; under pipefail the SIGPIPE'd
     # producer makes the pipeline exit 141 -- "too old" for a binary that just
-    # proved it is current (measured, compile-harness.sh:369).
+    # proved it is current (measured in the since-retired compile-harness.sh).
     refute_grep_fixed 'harness --help 2>/dev/null | grep' "$DOTFILES_DIR/setup-linux.sh"
 }
 

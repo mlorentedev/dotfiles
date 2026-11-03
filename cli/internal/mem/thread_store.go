@@ -302,3 +302,11 @@ func ReplaceFile(path, content string, newMode os.FileMode) error {
 	}
 	return nil
 }
+
+// ThreadsDir is the directory beside MEMORY.md that holds one file per thread.
+const ThreadsDir = threadsDir
+
+// ThreadFileName is the file a thread key is stored in under ThreadsDir, the
+// name StoreThreadAs writes. A reader that must find a thread's file derives
+// the name here, so it cannot disagree with the writer.
+func ThreadFileName(key string) (string, error) { return threadFileName(key) }

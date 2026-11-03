@@ -5,6 +5,7 @@ status: active
 owner: manu
 tags: [memory, work, sdk]
 updated: "{{date}}"
+created: "{{date}}"
 ---
 
 # {{component}} — Work SDK Session Memory

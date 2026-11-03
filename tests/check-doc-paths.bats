@@ -4,7 +4,7 @@
 # #907 committed .claude/CLAUDE.md while it named seven files that no longer
 # existed, and two sessions in two days acted on one of them. Nothing in the
 # repo checked it: docs-drift.bats checks content sync between two copies,
-# check-md-escapes.sh checks corruption, compile-harness --check checks harness
+# check-md-escapes.sh checks corruption, dotf harness check checks harness
 # drift. None of them ask whether a path in prose still resolves.
 
 load 'lib/both-shells'
@@ -58,7 +58,7 @@ instruction_files() {
 }
 # Exclusions above, each for a stated reason:
 #   harness/  — generated records; the vault source is the thing to fix, and
-#               `compile-harness.sh --check` already guards their rendering
+#               `dotf harness check` already guards their rendering
 #   specs/    — per-feature proposals, frozen once archived; they describe a
 #               change at a moment, not standing instructions
 #   docs/     — historical records (docs/lessons.md names retired scripts on

@@ -265,6 +265,7 @@ func (e sweepEnv) knowledgeAndSecrets() []check {
 		{kind: kindMachine, run: func() { checkGitConfig(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkGitLFS(e.sys, e.rep) }},
 		{kind: kindIdentity, section: "Auto-memory vault link", restore: restoreVault, run: func() { checkAutoMemoryLink(e.sys, e.start, e.rep, e.opts.Fix) }},
+		{kind: kindIdentity, section: "Handoff threads", restore: restoreVault, run: func() { checkHandoffThreads(e.sys, e.start, e.rep) }},
 		{kind: kindIdentity, section: "Auto-memory file shape", restore: restoreVault, run: func() { checkMemoryShape(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkPathFiles(e.sys, e.cfg, e.rep) }},
 		{kind: kindIdentity, section: "Secrets integrity", restore: restoreAge, run: func() { checkSecrets(e.sys, e.cfg, e.rep, e.opts.Fix) }},
