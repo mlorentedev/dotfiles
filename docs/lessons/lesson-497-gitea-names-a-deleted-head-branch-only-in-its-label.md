@@ -28,4 +28,4 @@ When the head branch no longer exists, Gitea sets `head.ref` to the pull ref, an
 
 ## Check
 
-`TestGiteaLandedHeadsKeepsOnlyMergedPRsOfThisBranchInThisRepo` uses the measured shape (`ref` is `refs/pull/9/head`, `label` is the branch) together with a branch that still exists. If the backend goes back to matching on `ref`, the test fails.
+`TestGiteaLandedHeadsReadsThePullOfThisBranchAgainstTheDefaultBranch` uses the measured shape (`ref` is `refs/pull/9/head`, `label` is the branch) together with a branch that still exists. If the backend goes back to matching on `ref`, the test fails.
