@@ -24,12 +24,12 @@ owner: manu
 
 ## Decisions made during implementation
 
-- The template names the workflow directory for actionlint instead of keeping ci-workflows' no-argument call, because actionlint's default is `.github/workflows` only and a Gitea or Forgejo repository would lint nothing (lesson 547).
+- The template names the workflow directory for actionlint instead of keeping ci-workflows' no-argument call, because actionlint's default is `.github/workflows` only and a Gitea or Forgejo repository would lint nothing (lesson 548).
 - The SHA-256 of the actionlint tarball cannot be tied to `versions.conf` offline; a bump without it fails loudly at `sha256sum -c`, and the test's message says to update both.
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-547-actionlint-with-no-arguments-lints-only-github-workflows.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-548-actionlint-with-no-arguments-lints-only-github-workflows.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the owner's choice of option B is recorded on #2965; no architecture changed
 - [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: one project, one template
 

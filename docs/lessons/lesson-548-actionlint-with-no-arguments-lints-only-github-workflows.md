@@ -1,5 +1,5 @@
 ---
-id: "lesson-547-actionlint-with-no-arguments-lints-only-github-workflows"
+id: "lesson-548-actionlint-with-no-arguments-lints-only-github-workflows"
 type: lesson
 status: active
 title: "actionlint with no arguments lints only .github/workflows"
