@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/insights/SKILL.md
-generated_sha: 4ba24d3ca2ab6e9d
+generated_sha: 9467faa75bb0f0cf
 id: insights-skill
 type: skill
 status: active
@@ -38,8 +38,8 @@ Run `vault_health(include_usage=True)` via Hive MCP.
 
 If Obsidian GUI is running, also run:
 ```bash
-obs-cli.sh unresolved    # Broken wikilinks
-obs-cli.sh orphans       # No incoming links
+dotf vault health
+python3 "$VAULT_PATH/00_meta/scripts/vault-validate.py" --strict
 ```
 
 Report:

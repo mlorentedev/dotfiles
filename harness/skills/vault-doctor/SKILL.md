@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/vault-doctor/SKILL.md
-generated_sha: 477bbfbc0aed2551
+generated_sha: 44c7027af3c69b2c
 id: vault-doctor-skill
 type: skill
 status: active
@@ -23,9 +23,9 @@ Structural maintenance for the Obsidian knowledge vault. Diagnoses issues, prior
 ## Prerequisites
 
 - **Hive MCP** — `vault_health`, `vault_query`, `vault_search`, `vault_patch`, `vault_write`
-- **obs-cli.sh** (optional) — `orphans`, `dead-ends`, `unresolved`, `backlinks` (requires Obsidian GUI)
+- **`dotf vault health`** (optional) — 7-section CLI diagnostics including `orphans`, `dead-ends`, `unresolved`, `frontmatter`, `tag hygiene` (requires Obsidian GUI for graph checks)
 
-If Obsidian GUI is not running, use Hive MCP only (headless, always available). obs-cli commands that require the GUI will exit with code 2 — degrade gracefully.
+If Obsidian GUI is not running, use Hive MCP only (headless, always available). `dotf vault health` degrades gracefully when the GUI is unavailable.
 
 ## Protocol
 
@@ -37,10 +37,9 @@ Run diagnostics in parallel:
 # Via Hive MCP (always available)
 vault_health(include_usage=True)
 
-# Via obs-cli (if Obsidian GUI running)
-obs-cli.sh unresolved        # Broken wikilinks
-obs-cli.sh orphans           # No incoming links
-obs-cli.sh dead-ends         # No outgoing links
+# Via dotf CLI (if Obsidian GUI running)
+dotf vault health
+python3 00_meta/scripts/vault-validate.py --strict
 ```
 
 Collect:
@@ -93,12 +92,14 @@ For each unresolved link:
 
 ### Step 4 — Fix Frontmatter
 
-For files missing required frontmatter fields (`id`, `type`, `status`):
+For files missing required frontmatter fields (`id`, `type`, `status`, `owner`, `created`):
 
 1. **Infer values** from file location and content:
    - `id`: derive from filename slug (e.g., `my-note.md` → `my-note`)
    - `type`: derive from directory (e.g., `30-architecture/` → `adr`, `00_meta/patterns/` → `pattern`). Note: per [[pattern-knowledge-placement]], project ADRs/lessons now live in the repo's `docs/`; these vault types apply only to residual or meta-project files, not new project knowledge.
    - `status`: default to `active` unless content suggests otherwise
+   - `owner`: default to `manu`
+   - `created`: derive from git history or file date (`"YYYY-MM-DD"`)
 2. **Apply in bulk** using `vault_patch` — inject frontmatter at file top
 3. **Preserve existing fields** — only add missing ones, never overwrite
 
@@ -108,6 +109,8 @@ For files missing required frontmatter fields (`id`, `type`, `status`):
 id: "<inferred-slug>"
 type: <inferred-type>
 status: active
+owner: manu
+created: "YYYY-MM-DD"
 tags: []
 ---
 ```
