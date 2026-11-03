@@ -25,7 +25,8 @@ func newVMCpCmd(g sessionGuest) *cobra.Command {
 			if len(args) != 2 {
 				return withExitCode(2, fmt.Errorf("usage: dotf vm %s cp <source> <target>", g.os))
 			}
-			if _, err := vm.CopySession(args[0], args[1]); err != nil {
+			session, err := vm.CopySession(args[0], args[1])
+			if err != nil {
 				return withExitCode(2, err)
 			}
 			if _, guest := vm.GuestSide(args[0]); !guest {
@@ -33,7 +34,7 @@ func newVMCpCmd(g sessionGuest) *cobra.Command {
 					return withExitCode(2, fmt.Errorf("source: %w", err))
 				}
 			}
-			s, err := g.open()
+			s, err := g.openFor(cmd, session, asJSON)
 			if err != nil {
 				return err
 			}

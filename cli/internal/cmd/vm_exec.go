@@ -106,7 +106,7 @@ func newVMExecCmd(g sessionGuest) *cobra.Command {
 			if err != nil {
 				return withExitCode(2, err)
 			}
-			s, err := g.open()
+			s, err := g.openFor(cmd, f.session, f.asJSON)
 			if err != nil {
 				return err
 			}

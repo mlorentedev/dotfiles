@@ -96,6 +96,54 @@ func TestVMVerbRefusals(t *testing.T) {
 	}
 }
 
+// A store that cannot open (limactl or QEMU missing, no state dir) still
+// answers --json with its one record, a failed one, for every verb (ADR-055
+// decision 7); the exit code stays the one the open error carries.
+func TestVMVerbsWriteAFailedRecordWhenTheStoreCannotOpen(t *testing.T) {
+	oldL, oldW := linuxSessions, windowsSessions
+	t.Cleanup(func() { linuxSessions, windowsSessions = oldL, oldW })
+	linuxSessions = func() (vm.LinuxSessions, error) {
+		return vm.LinuxSessions{}, withExitCode(2, errors.New("limactl is not on PATH"))
+	}
+	windowsSessions = func() (vm.Session, error) {
+		return nil, withExitCode(2, errors.New("qemu-system-aarch64 is not on PATH"))
+	}
+	for _, args := range [][]string{
+		{"up", "--session", "proof"},
+		{"down", "--session", "proof"},
+		{"status"},
+		{"exec", "--session", "proof", "--", "true"},
+		{"cp", "vm_session.go", "proof:/tmp/f"},
+	} {
+		t.Run(args[0], func(t *testing.T) {
+			stdout, _, err := runVerb(t, append([]string{args[0], "--json"}, args[1:]...)...)
+			var rec vm.Record
+			if jerr := json.Unmarshal([]byte(stdout), &rec); jerr != nil || rec.Version != 1 || rec.Status != vm.StatusFailed || rec.OS != "linux" || !strings.Contains(rec.Stderr, "limactl") {
+				t.Errorf("--json stdout = %q (%v), want one failed record", stdout, jerr)
+			}
+			if ExitCode(err) != 2 {
+				t.Errorf("--json exit = %d (%v), want 2", ExitCode(err), err)
+			}
+			stdout, _, err = runVerb(t, args...)
+			if stdout != "" || ExitCode(err) != 2 {
+				t.Errorf("without --json: stdout = %q, exit = %d; want empty and 2", stdout, ExitCode(err))
+			}
+		})
+	}
+	t.Run("windows status", func(t *testing.T) {
+		c := newVMWindowsCmd()
+		c.SetArgs([]string{"status", "--json"})
+		var out bytes.Buffer
+		c.SetOut(&out)
+		c.SetErr(io.Discard)
+		err := c.Execute()
+		var rec vm.Record
+		if jerr := json.Unmarshal(out.Bytes(), &rec); jerr != nil || rec.Status != vm.StatusFailed || rec.OS != "windows" || ExitCode(err) != 2 {
+			t.Errorf("windows status --json = %q (%v), exit %d; want one failed record and 2", out.String(), jerr, ExitCode(err))
+		}
+	})
+}
+
 // With --json stdout is exactly the record; an empty list is [] (AC5).
 func TestVMStatusWithNoSessionsIsAnEmptyArray(t *testing.T) {
 	noGuest(t)
