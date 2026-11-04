@@ -96,6 +96,29 @@ func TestVMVerbRefusals(t *testing.T) {
 	}
 }
 
+// brokenStdout fails every write, as a closed pipe or a full disk does.
+type brokenStdout struct{}
+
+func (brokenStdout) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+
+// When the failed record itself cannot be written, the exit code is still the
+// open error's, not the write error's default 1 (#3111).
+func TestVMOpenFailureKeepsItsExitCodeWhenTheRecordCannotBeWritten(t *testing.T) {
+	old := linuxSessions
+	t.Cleanup(func() { linuxSessions = old })
+	linuxSessions = func() (vm.LinuxSessions, error) {
+		return vm.LinuxSessions{}, withExitCode(2, errors.New("limactl is not on PATH"))
+	}
+	c := newVMLinuxCmd()
+	c.SetArgs([]string{"status", "--json"})
+	c.SetOut(brokenStdout{})
+	c.SetErr(io.Discard)
+	err := c.Execute()
+	if ExitCode(err) != 2 || !strings.Contains(err.Error(), "limactl") || !strings.Contains(err.Error(), "broken pipe") {
+		t.Errorf("exit = %d (%v), want 2 naming both errors", ExitCode(err), err)
+	}
+}
+
 // A store that cannot open (limactl or QEMU missing, no state dir) still
 // answers --json with its one record, a failed one, for every verb (ADR-055
 // decision 7); the exit code stays the one the open error carries.
