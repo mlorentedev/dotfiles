@@ -8,7 +8,8 @@
 # to contain "uses:" do not), and the SHA is validated on the reference itself, never on
 # text elsewhere in the line. Local (./) and docker:// references are out of scope.
 # Usage: check-actions-pinned.sh [ROOT]. ROOT defaults to the repository holding this
-# script, which is what pre-commit and CI rely on; pass a directory to judge another tree.
+# script, which is what CI's repo-hygiene job relies on (no pre-commit hook calls it, so
+# no filename list ever arrives as an argument); pass a directory to judge another tree.
 # A bad argument exits 2 (usage), never a verdict about some other tree (#3103).
 set -euo pipefail
 usage() { echo "usage: check-actions-pinned.sh [ROOT_DIR]" >&2; exit 2; }
@@ -26,7 +27,7 @@ while IFS= read -r -d '' f; do files+=("$f"); done < <(
     find "$ROOT/.github/actions" -mindepth 2 -maxdepth 2 -type f \
       \( -name 'action.yml' -o -name 'action.yaml' \) -print0 2>/dev/null; } || true
 )
-[ "${#files[@]}" -gt 0 ] || { echo "check-actions-pinned: no workflows"; exit 0; }
+[ "${#files[@]}" -gt 0 ] || { echo "check-actions-pinned: no workflows under $ROOT"; exit 0; }
 
 # A `uses` key: optional indentation, optional "- ", the key, then the reference.
 # The reference is captured up to whitespace, a quote or a comment. -H because
