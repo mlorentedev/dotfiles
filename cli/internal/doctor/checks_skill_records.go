@@ -12,8 +12,8 @@ import (
 // skills and agents; `dotf harness refresh` copies it into the
 // committed harness/{skills,agents}/<name>/ records and stamps `generated_from`
 // (the vault path) and `generated_sha` (the first 16 hex of the source's
-// sha256). `--check` validates the records offline and never reads the vault,
-// so a vault edit nobody refreshed left main's record stale with nothing
+// sha256). The offline check (then `compile-harness.sh --check`) never read
+// the vault, so a vault edit nobody refreshed left main's record stale with nothing
 // saying so: on 2026-10-13 msi's checkout carried the refreshed teardown skill
 // as an "uncommitted change" while main was the stale side.
 //

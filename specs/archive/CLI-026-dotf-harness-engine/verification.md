@@ -19,7 +19,7 @@ created: "2026-06-21"
   - [x] `dotf doctor` calls it in process on every OS -> #2921, `TestCheckRecordDrift` (the Windows case passes instead of skipping)
   - [x] `ci.yml` calls it on Linux, macOS and Windows -> #2923 (`5ce566b2`), green on all three test jobs
 - [x] AC6 `--against-vault` -> #2936, `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
-- [x] AC7 refresh in Go -> slice 7: #3023 (`ac3c865a`) renders the refresh in Go; #3066 (`aa802f19`) moved every caller and record onto `dotf harness refresh`. `TestRefresh*` and `tests/harness-doctrine-records.bats` (2/2 against the real vault on 2026-11-03)
+- [x] AC7 refresh in Go -> slice 7: #3023 (`ac3c865a`) renders the refresh in Go; #3066 (`aa802f19`) moved every caller and record onto `dotf harness refresh`. `TestRefresh*`. `tests/harness-doctrine-records.bats` against the real vault gave 2/2 on #3097's branch (2026-11-03, after #3095). On this branch merged with `main` `ae94679d` it gives 1/2: the real-vault test reports `[STALE] harness/skills/autopilot`, from vault `b886b972` (#3086), whose refresh is open PR #3132. That is the drift check reporting an unrefreshed vault edit, which is what AC6 asks of it
 - [x] AC8 callers rewired -> slices 3 and 5
   - [x] converge -> #2902, `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout`
   - [x] `setup-linux.sh` -> #2912, `tests/setup-fails-loudly.bats`
