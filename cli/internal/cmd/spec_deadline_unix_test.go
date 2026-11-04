@@ -51,7 +51,7 @@ func TestSpecDeadlineStopsAStalledRunAndNamesTheLastCall(t *testing.T) {
 	if got := ExitCode(err); got != 125 {
 		t.Fatalf("exit %d, want 125, the stall's own status (err %v)", got, err)
 	}
-	for _, want := range []string{"stalled", "bash: find ~/Projects", "review.md was not rewritten by this run", "not a verdict"} {
+	for _, want := range []string{"stalled", "bash: find ~/Projects", "review.md was not rewritten by this run", "not a verdict", "longer --stall-timeout"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr must mention %q:\n%s", want, stderr)
 		}

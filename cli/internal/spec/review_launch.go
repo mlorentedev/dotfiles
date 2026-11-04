@@ -416,7 +416,13 @@ func ReviewPromptForScope(slot ReviewSlot, specID, repoRoot, reviewerID, runner,
 		"  Leave the working tree clean apart from your review: put probes and scratch\n" +
 		"  files under a `mktemp -d` directory, never in the repository. When the run\n" +
 		"  ends, every file left changed outside the spec folder is listed and the run\n" +
-		"  fails.\n\n")
+		"  fails.\n")
+	// A slow test piped through `tail` prints nothing until it ends, and the
+	// stall detector cannot tell that silence from a wedge (#2979).
+	b.WriteString("- Let long commands print as they run: never pipe a test or build through `| tail`\n" +
+		"  or `| head`, and bound test runs (`go test -run <pattern> -timeout 5m`, a single\n" +
+		"  bats file). A command silent for the stall window (10 minutes by default) is\n" +
+		"  stopped as a wedge, and the round with it.\n\n")
 	b.WriteString("You are reviewing a change you did not write. Do not rubber-stamp it. Assume gaps\n" +
 		"exist until you have argued against them with evidence.\n")
 	return b.String()
