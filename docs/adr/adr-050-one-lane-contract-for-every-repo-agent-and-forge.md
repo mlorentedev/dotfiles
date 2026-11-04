@@ -1,7 +1,7 @@
 ---
 id: "ADR-050-one-lane-contract-for-every-repo-agent-and-forge"
 type: adr
-status: proposed
+status: accepted
 owner: manu
 date: "2026-10-15"
 supersedes: []
