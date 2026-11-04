@@ -345,6 +345,17 @@ func TestReviewPromptKeepsTheReviewerInsideTheRepository(t *testing.T) {
 	}
 }
 
+// A slow test piped through `tail` prints nothing until it ends, and the stall
+// detector stopped such a run as a wedge (#2979).
+func TestReviewPromptAsksForStreamingAndBoundedTestRuns(t *testing.T) {
+	p := ReviewPromptIn(FirstSigner, "AI-001-x", "/repo", "nan/deepseek-v4-flash", "pi", "/skill/SKILL.md", "basebasebase")
+	for _, want := range []string{"never pipe a test or build through `| tail`", "-timeout", "stall window"} {
+		if !strings.Contains(p, want) {
+			t.Errorf("the prompt must carry %q", want)
+		}
+	}
+}
+
 // The time budget is advice and the cap discards the round (#2448): a reviewer
 // that was still collecting evidence when the cap fired left no verdict and a
 // review.md byte-identical to the previous round's. The prompt asks for a

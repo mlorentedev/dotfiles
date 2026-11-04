@@ -70,14 +70,12 @@ func (s WindowsSessions) connect() (*QGA, error) {
 // Windows guest (ADR-055 decisions 4 and 12): both are refused, never dropped.
 func (s WindowsSessions) Exec(ctx context.Context, o ExecOptions) Record {
 	start := time.Now()
-	if o.Stdin != nil {
-		return s.rec(o.Session, StatusUnsupported, start, "the Windows guest has no stdin: `cp` the data in and read it from there")
-	}
-	if o.Secrets != nil {
-		return s.rec(o.Session, StatusUnsupported, start, "a Windows session receives no credential")
-	}
+	// The session first: an unknown name is no-session whatever its input (AC11).
 	if refused, ok := s.serving(o.Session, start); !ok {
 		return refused
+	}
+	if msg := unsupportedInput(o); msg != "" {
+		return s.rec(o.Session, StatusUnsupported, start, msg)
 	}
 	if o.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -101,39 +99,70 @@ func (s WindowsSessions) Exec(ctx context.Context, o ExecOptions) Record {
 		remove()
 		return s.rec(o.Session, StatusFailed, start, err.Error())
 	}
-	code, werr := pollExit(ctx, q, s.Poll, dir+`\exit`)
-	timedOut := code == guestTimedOut || (werr != nil && errors.Is(ctx.Err(), context.DeadlineExceeded))
-	settled := werr == nil
-	if werr != nil && timedOut {
+	w := s.await(ctx, q, dir)
+	r := s.collect(q, o, dir, start)
+	if w.settled {
+		remove()
+	}
+	return w.outcome(r, o.Timeout)
+}
+
+// unsupportedInput names the input a Windows session cannot take, "" when
+// there is none: the guest agent has no stdin, and the guest gets no secret.
+func unsupportedInput(o ExecOptions) string {
+	switch {
+	case o.Stdin != nil:
+		return "the Windows guest has no stdin: `cp` the data in and read it from there"
+	case o.Secrets != nil:
+		return "a Windows session receives no credential"
+	}
+	return ""
+}
+
+// waited is how a guest command ended: its exit code, or why none came.
+type waited struct {
+	code     string
+	err      error
+	timedOut bool
+	settled  bool // the command ended, so its directory can go
+}
+
+// await polls for the command's exit file until ctx ends.
+func (s WindowsSessions) await(ctx context.Context, q *QGA, dir string) waited {
+	code, err := pollExit(ctx, q, s.Poll, dir+`\exit`)
+	w := waited{code: code, err: err, settled: err == nil}
+	w.timedOut = code == guestTimedOut || (err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded))
+	if err != nil && w.timedOut {
 		// The guest's own limit started after the host's: give it the moment it
 		// needs to end the command, so the record holds the output and the
 		// directory is not pulled from under a process that still writes it.
 		grace, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.Grace)
 		defer cancel()
 		_, gerr := pollExit(grace, q, s.Poll, dir+`\exit`)
-		settled = gerr == nil
+		w.settled = gerr == nil
 	}
-	r := s.collect(q, o, dir, start)
-	if settled {
-		remove()
-	}
+	return w
+}
+
+// outcome sets the record's status and exit from how the command ended.
+func (w waited) outcome(r Record, timeout time.Duration) Record {
 	switch {
-	case timedOut:
+	case w.timedOut:
 		r.Status = StatusTimeout
-		r.Stderr += fmt.Sprintf("dotf: timed out after %s\n", o.Timeout)
-	case werr != nil:
+		r.Stderr += fmt.Sprintf("dotf: timed out after %s\n", timeout)
+	case w.err != nil:
 		r.Status = StatusFailed
-		r.Stderr += werr.Error() + "\n"
+		r.Stderr += w.err.Error() + "\n"
 	default:
-		n, err := strconv.Atoi(code)
+		n, err := strconv.Atoi(w.code)
 		if err != nil {
 			r.Status = StatusFailed
-			r.Stderr += fmt.Sprintf("the guest reported %q, not an exit code\n", code)
+			r.Stderr += fmt.Sprintf("the guest reported %q, not an exit code\n", w.code)
 			break
 		}
 		r.Exit = &n
 	}
-	if !settled {
+	if !w.settled {
 		r.Stderr += "dotf: the guest command may still be running\n"
 	}
 	return r

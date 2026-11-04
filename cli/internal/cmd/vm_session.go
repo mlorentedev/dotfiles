@@ -111,12 +111,13 @@ func windowsSessionGuest() sessionGuest {
 }
 
 const sessionVerbs = "A session is a named guest that `up` holds until `down`. With --json\n" +
-	"stdout is exactly one record: {version, session, os, status, exit, stdout,\n" +
+	"stdout is exactly one record for any call that parses: {version, session, os, status, exit, stdout,\n" +
 	"stderr, truncated, duration_ms, state_dir}. Read status and exit, never the\n" +
 	"process code. Status is ok, failed, busy, unsupported, no-session, timeout or\n" +
 	"stale (a session record whose guest is gone: down clears it). Exit codes: 0 ok;\n" +
-	"1 failure or timeout; 2 refused before any work (busy, stale, bad flag);\n" +
-	"3 no such session. Progress goes to stderr."
+	"1 failure or timeout; 2 refused before any work (busy, stale, bad flag\n" +
+	"value; a usage error writes no record); 3 no such session. Progress goes to\n" +
+	"stderr."
 
 func addSessionVerbs(c *cobra.Command, g sessionGuest) {
 	c.AddCommand(newVMUpCmd(g), newVMDownCmd(g), newVMStatusCmd(g), newVMExecCmd(g), newVMCpCmd(g))

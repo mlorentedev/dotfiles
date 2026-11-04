@@ -114,6 +114,21 @@ func TestWindowsExecRefusesStdinAndSecrets(t *testing.T) {
 	}
 }
 
+// The session is resolved before the input is judged (#3106): an unknown
+// name is no-session, exit 3, whatever stdin or --secret it came with (AC11).
+func TestWindowsExecOnAnUnknownSessionIsNoSessionWhateverItsInput(t *testing.T) {
+	g := newFakeGuest(t, okStep, nothingStep)
+	s := windowsStore(t, g)
+	for name, o := range map[string]ExecOptions{
+		"stdin":  {Session: "ghost", Argv: []string{"x"}, Stdin: strings.NewReader("data")},
+		"secret": {Session: "ghost", Argv: []string{"x"}, Secrets: func() ([]string, error) { return nil, nil }},
+	} {
+		if rec := s.Exec(context.Background(), o); rec.Status != StatusNoSession || rec.ProcessCode() != 3 {
+			t.Errorf("%s: %+v, want no-session, exit 3", name, rec)
+		}
+	}
+}
+
 func TestWindowsExecOnNoSessionAndOnStale(t *testing.T) {
 	g := newFakeGuest(t, okStep, nothingStep)
 	s := windowsStore(t, g)

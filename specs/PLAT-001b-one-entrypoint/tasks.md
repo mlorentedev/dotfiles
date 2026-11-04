@@ -59,7 +59,8 @@ created: "2026-10-06"
 - [x] PR 2c-2: `harness.DeployInstructions` and `dotf harness instructions [--dry-run]` write each source verbatim with the deployed file's deploy-only regions, so a refreshed source region replaces the stale one and the presence roster and skill catalog survive
   - The catalog fills the source's empty slot in place, the position `compile-harness.sh` `replace_region` writes it to, so the two writers agree byte for byte and neither duplicates it; the presence roster is appended, as `dotf harness presence` does
   - `compile-harness.sh` delegates `deploy_instructions` to it when the installed dotf carries the subcommand (the `dotf_knows_subcommand` probe) and keeps the copy as the fallback, so no release is needed to land it
-- [ ] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`
+- [x] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`.
+  Done in #2914 (`c07b51ae`). The Claude bulk copy now passes `-Exclude 'settings.json', 'CLAUDE.md'`, `copilot-instructions.md` is no longer copied, and both files come from `dotf harness deploy`, whose first surface is `instructions`. The pinned 0.79.0 carries the command
 - [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
 - [x] `records-bind` (#2232): `harness.Bind` returns one outcome per target and `dotf harness bind` renders it, so converge and doctor count changes without parsing text
   - Every OS, after `configs-deploy` (which seeds the settings files the hooks merge into); the plan writes nothing, the probe re-plans and requires zero writes, and a second run reports 0 changes; with no dotf path resolver wired the step is skipped and says so, as the other steps report a runner they were not given
@@ -106,7 +107,8 @@ created: "2026-10-06"
 
 - [x] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory
 - [x] [AC3] Implement the report (JSON, one entry per reconciler, the run's result and error), written atomically under `env.StateDir()`, which the skill gate's ledger now shares; a plan writes none. `cli/README.md` documents `converge`, which shipped in PR 2a without a section
-- [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file
+- [x] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file.
+  Measured 2026-11-03 with the installed 0.79.0: `dotf converge --plan --repo <checkout> --only records-harness` reports `[ OK ] instruction files current`, 0 to change, so `~/.claude/CLAUDE.md` matches its source. The plan does not judge skills, because every apply re-renders them. For skills the evidence is a content comparison: `dotf harness deploy --dry-run` from the checkout reports `skills: 0 would be deployed, 204 current, 0 would be pruned`. That covers every agent's skill directory, and `~/.claude/skills` holds 35 of them. `dotf doctor` reports no instruction-file finding: `Repo↔deploy-dir drift` and `Agent presence` are all ok. Its one FAIL is the OpenRouter model limit flap recorded on #902
 
 ### PR 4a — the checkout step, so converge can run from zero
 

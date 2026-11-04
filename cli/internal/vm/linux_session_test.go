@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 )
 
 // listLima answers `limactl list --json` from the instances it holds, with
@@ -101,6 +103,26 @@ func TestUpOnAHeldNameIsBusy(t *testing.T) {
 	rec := s.Up(context.Background(), "held", io.Discard, io.Discard)
 	if rec.Status != StatusBusy || rec.ProcessCode() != 2 || !strings.Contains(rec.Stderr, "down --session held") {
 		t.Errorf("second Up = %+v, want busy, exit 2, naming down", rec)
+	}
+}
+
+// Two ups on one name race between the check and the claim (#3105). The
+// loser must answer busy before it touches anything, or its cleanup deletes
+// the winner's instance. Holding the lock stands in for the winner mid-boot.
+func TestUpWhileAnotherUpClaimsTheNameIsBusyAndTouchesNothing(t *testing.T) {
+	f := &listLima{instances: map[string]string{}}
+	s := newSessions(t, f)
+	release, err := filelock.TryLock(s.upLock("race"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	rec := s.Up(context.Background(), "race", io.Discard, io.Discard)
+	if rec.Status != StatusBusy || rec.ProcessCode() != 2 || !strings.Contains(rec.Stderr, "another `up`") {
+		t.Errorf("Up = %+v, want busy naming the other up", rec)
+	}
+	if len(f.instances) != 0 || s.held("race") {
+		t.Errorf("a refused up touched the session: instances %v, held %v", f.instances, s.held("race"))
 	}
 }
 

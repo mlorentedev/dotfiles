@@ -46,12 +46,18 @@ type AddRunner interface {
 	// it creates the local branch of the same name tracking remote's.
 	WorktreeAttach(repo, target, branch, remote string) error
 	WorktreeListPorcelain(repo string) (string, error)
+	// Dirt reports what a worktree holds that git would not recreate.
+	Dirt(path string) (Dirt, error)
 }
 
 type RealAddRunner struct{}
 
 func (r *RealAddRunner) WorktreeListPorcelain(repo string) (string, error) {
 	return (&RealGitRunner{}).WorktreeListPorcelain(repo)
+}
+
+func (r *RealAddRunner) Dirt(path string) (Dirt, error) {
+	return (&RealGitRunner{}).Dirt(path)
 }
 
 // remoteBaseRefs is the order the remote's default branch is looked for in:
@@ -341,10 +347,29 @@ func refuseHeldIssue(opts AddOptions, runner AddRunner, now time.Time) error {
 		if err != nil || meta == nil || meta.Issue != opts.Issue || !now.Before(meta.LeaseExpiresAt) {
 			continue
 		}
+		until := meta.LeaseExpiresAt.Format(time.RFC3339)
+		if idleHolder(raw, runner) {
+			return fmt.Errorf("#%d is held until %s by an idle worktree at %s (detached, nothing uncommitted): if its work is done, release it with `dotf worktree done %s`, or pass --share-issue for a second worktree on it",
+				opts.Issue, until, raw.Path, raw.Path)
+		}
 		return fmt.Errorf("#%d is held by the worktree at %s (branch %s) until %s: work there, or pass --share-issue for a second worktree on it",
-			opts.Issue, raw.Path, raw.Branch, meta.LeaseExpiresAt.Format(time.RFC3339))
+			opts.Issue, raw.Path, raw.Branch, until)
 	}
 	return nil
+}
+
+// idleHolder reports a lease holder with no work in progress: detached, so no
+// branch is being built there, and clean. A finished slice of a multi-PR issue
+// leaves its worktree like this for the rest of the lease (#3076). It is still
+// refused, since a session can sit in a clean detached tree it has just
+// entered, but the refusal can then say how to release it. A state that cannot
+// be read is not idle.
+func idleHolder(raw RawWorktree, runner AddRunner) bool {
+	if !raw.Detached {
+		return false
+	}
+	dirt, err := runner.Dirt(raw.Path)
+	return err == nil && !dirt.Any()
 }
 
 // createBranch starts branch from opts.BaseRef, or from origin's default branch.

@@ -27,6 +27,12 @@ type WindowsSessions struct {
 	Now     func() time.Time
 }
 
+// upLock is the lock every up holds, whatever its name: the host has one
+// guest. Beside the sessions directory, so holder never sees it.
+func (s WindowsSessions) upLock() string {
+	return filepath.Join(filepath.Dir(s.Machine.Layout.Sessions()), "up.lock")
+}
+
 // holder names the session that holds the guest, "" when none does.
 func (s WindowsSessions) holder() (string, error) {
 	entries, err := os.ReadDir(s.Machine.Layout.Sessions())
@@ -91,6 +97,14 @@ func (s WindowsSessions) Up(_ context.Context, name string, progress, _ io.Write
 	if err := ValidSessionName(name); err != nil {
 		return s.rec(name, StatusFailed, start, err.Error())
 	}
+	release, busy, err := claimUp(s.upLock())
+	switch {
+	case err != nil:
+		return s.rec(name, StatusFailed, start, err.Error())
+	case busy:
+		return s.rec(name, StatusBusy, start, "another `up` is booting the Windows guest: wait for it")
+	}
+	defer release()
 	if refused, ok := s.refusal(name, start); ok {
 		return refused
 	}

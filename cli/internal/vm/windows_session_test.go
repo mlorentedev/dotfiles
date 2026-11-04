@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 )
 
 func windowsStore(t *testing.T, g *fakeGuest) WindowsSessions {
@@ -60,6 +62,25 @@ func TestWindowsUpRefusesASecondSession(t *testing.T) {
 		t.Errorf("Up = %+v, want busy naming the holder", rec)
 	}
 	if len(g.starts) != 1 {
+		t.Errorf("a refused up started QEMU: %d starts", len(g.starts))
+	}
+}
+
+// The host has one Windows guest, so two ups under any names race for it
+// (#3105): the loser answers busy and never starts QEMU.
+func TestWindowsUpWhileAnotherUpBootsIsBusy(t *testing.T) {
+	g := newFakeGuest(t, okStep, nothingStep)
+	s := windowsStore(t, g)
+	release, err := filelock.TryLock(s.upLock())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	rec := s.Up(context.Background(), "second", io.Discard, io.Discard)
+	if rec.Status != StatusBusy || rec.ProcessCode() != 2 || !strings.Contains(rec.Stderr, "another `up`") {
+		t.Errorf("Up = %+v, want busy naming the other up", rec)
+	}
+	if len(g.starts) != 0 {
 		t.Errorf("a refused up started QEMU: %d starts", len(g.starts))
 	}
 }
