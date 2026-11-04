@@ -2,8 +2,13 @@ package vm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 )
 
 // Status is what a verb reports about itself, never about the guest command it
@@ -92,4 +97,19 @@ func (r Record) Summary() string {
 		msg = string(r.Status)
 	}
 	return fmt.Sprintf("%s: %s", r.Session, msg)
+}
+
+// claimUp takes the lock an up holds from its checks to its claim, so two ups
+// cannot both pass the checks (#3105). busy means another up holds it: the
+// caller refuses before it touches anything, so its cleanup can never delete
+// the other's guest. The kernel drops the lock if dotf dies.
+func claimUp(path string) (release func(), busy bool, err error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, false, err
+	}
+	release, err = filelock.TryLock(path)
+	if errors.Is(err, filelock.ErrLocked) {
+		return nil, true, nil
+	}
+	return release, false, err
 }
