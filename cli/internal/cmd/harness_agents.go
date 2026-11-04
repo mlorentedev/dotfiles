@@ -10,9 +10,8 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
-// newHarnessAgentsCmd deploys the committed agent records: the Go form of
-// compile-harness.sh's deploy_agents, which moves onto it once a release
-// carries it (CLI-026).
+// newHarnessAgentsCmd deploys the committed agent records. It replaced
+// compile-harness.sh's deploy_agents (CLI-026).
 func newHarnessAgentsCmd() *cobra.Command {
 	var (
 		repoRoot, home string

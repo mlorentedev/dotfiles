@@ -10,9 +10,8 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
-// newHarnessDoctrineCmd deploys the compact doctrine payload: the Go form of
-// compile-harness.sh's deploy_doctrine, which moves onto it once a release
-// carries it (CLI-026).
+// newHarnessDoctrineCmd deploys the compact doctrine payload. It replaced
+// compile-harness.sh's deploy_doctrine (CLI-026).
 func newHarnessDoctrineCmd() *cobra.Command {
 	var (
 		repoRoot, home string

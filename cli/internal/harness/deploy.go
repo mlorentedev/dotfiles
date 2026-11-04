@@ -15,7 +15,7 @@ type Deployment struct {
 }
 
 // Deploy runs every harness surface in the order compile-harness.sh --deploy
-// runs them: instructions first, because the skill catalog and the presence
+// ran them: instructions first, because the skill catalog and the presence
 // roster are regions inside those files; then skills, agents, presence and
 // doctrine. A failed surface does not stop the ones after it, except agents.
 // Presence has no preview, so dryRun skips it. The returned error joins every

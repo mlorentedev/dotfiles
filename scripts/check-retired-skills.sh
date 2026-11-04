@@ -35,7 +35,7 @@ type -P jq >/dev/null 2>&1 || fail "jq is required"
 
 # list prints one jq query's answer with any CR removed: the winget build of jq
 # on Windows ends every line with CRLF, which would leave a \r in each path (the
-# same shadow compile-harness.sh keeps).
+# same shadow compile-harness.sh kept).
 list() {
     local out
     out="$(jq -r "$1" "$manifest")" || fail "cannot read $manifest as JSON"

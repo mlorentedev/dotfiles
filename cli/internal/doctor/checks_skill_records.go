@@ -9,7 +9,7 @@ import (
 
 // checkSkillRecordsAgainstVault compares each committed harness record with the
 // vault source it was refreshed from. The vault is the source of record for
-// skills and agents; `compile-harness.sh --refresh` copies it into the
+// skills and agents; `dotf harness refresh` copies it into the
 // committed harness/{skills,agents}/<name>/ records and stamps `generated_from`
 // (the vault path) and `generated_sha` (the first 16 hex of the source's
 // sha256). `--check` validates the records offline and never reads the vault,

@@ -13,9 +13,9 @@ import (
 // newHarnessPresenceCmd injects the agent-presence roster into every harness
 // instructions file the manifest names (HARNESS-092, #1326).
 //
-// It is the fourth member of the family the shell renderer delegates to, and
-// the first that writes: compile-harness.sh --deploy calls it on Linux, and
-// setup-windows.ps1 calls it on Windows, where no port of the shell's
+// It was the fourth member of the family the shell renderer delegated to, and
+// the first that writes; `dotf harness deploy` now runs it on every OS. Before
+// that, setup-windows.ps1 called it on Windows, where no port of the shell's
 // deploy_agent_presence ever existed — so no harness on that OS had ever been
 // told which skills a persona forces. One implementation, one sha, both OSes.
 func newHarnessPresenceCmd() *cobra.Command {
