@@ -111,7 +111,7 @@ func windowsSessionGuest() sessionGuest {
 }
 
 const sessionVerbs = "A session is a named guest that `up` holds until `down`. With --json\n" +
-	"stdout is exactly one record: {version, session, os, status, exit, stdout,\n" +
+	"stdout is exactly one record for any call that parses: {version, session, os, status, exit, stdout,\n" +
 	"stderr, truncated, duration_ms, state_dir}. Read status and exit, never the\n" +
 	"process code. Status is ok, failed, busy, unsupported, no-session, timeout or\n" +
 	"stale (a session record whose guest is gone: down clears it). Exit codes: 0 ok;\n" +
