@@ -347,6 +347,8 @@ func TestForgeHeadCarriesEnvelopeComparesWithTheBase(t *testing.T) {
 		git("add", runEnvelopePath)
 	}
 	git("init", "-q", "-b", "master")
+	git("commit", "-q", "--allow-empty", "-m", "root")
+	git("tag", "root")
 	envelope("version: 1\n")
 	git("commit", "-q", "-m", "arm on the default branch")
 	git("checkout", "-q", "-b", "fix/change")
@@ -354,6 +356,13 @@ func TestForgeHeadCarriesEnvelopeComparesWithTheBase(t *testing.T) {
 	git("checkout", "-q", "-b", "chore/rearm", "master")
 	envelope("version: 1\nrun_id: x\n")
 	git("commit", "-q", "-m", "rearm")
+	// The default branch is re-armed after fix/change left it.
+	git("checkout", "-q", "-b", "next", "master")
+	envelope("version: 1\nrun_id: y\n")
+	git("commit", "-q", "-m", "arm the next run")
+	// origin's stale has no envelope; the local stale does.
+	git("branch", "stale", "master")
+	git("update-ref", "refs/remotes/origin/stale", "root")
 	git("checkout", "-q", "master")
 	t.Chdir(dir)
 	for _, c := range []struct {
@@ -363,6 +372,8 @@ func TestForgeHeadCarriesEnvelopeComparesWithTheBase(t *testing.T) {
 		{"fix/change", "master", false},      // carries the base's own envelope
 		{"chore/rearm", "master", true},      // changes it
 		{"fix/change", "no/such-base", true}, // no base to compare with: refuse as before
+		{"fix/change", "next", false},        // the base moved on; the head changed nothing
+		{"fix/change", "stale", true},        // adds it to the base the forge holds
 	} {
 		if got := forgeHeadCarriesEnvelope(c.head, c.base); got != c.want {
 			t.Errorf("%s into %s: got %v, want %v", c.head, c.base, got, c.want)
