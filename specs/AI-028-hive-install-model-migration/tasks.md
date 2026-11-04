@@ -110,7 +110,7 @@ Owner: "lo que recomiende el advisor", which was C on #2991. A box holding a `uv
 - [x] The doctor names a copy outside the launcher's directory, and dotf never removes it (`TestCheckShadowedCatalogTools_NamesACopyBesideASelfInstalledTool`)
 - [x] `legacyshim.go`, its test and the `verifyOnPath` hook are deleted (#2956)
 - [x] ADR-036 amendment 2026-10-31, `docs/architecture.md`, lesson 528
-- [ ] Live: egw-len029 (uv copy at the pin, launcher deleted by hand) converges onto hive's layout with a dotf that carries this PR, and doctor names the uv copy
+- [x] Live: egw-len029 (uv copy at the pin, launcher deleted by hand) converges onto hive's layout with a dotf that carries this PR, and doctor names the uv copy. *Measured 2026-11-03 on dotf 0.79.0 (carries #3013):* `Test-Path "$env:LOCALAPPDATA\hive\bin\hive.cmd"` is `True`, `dotf tools version hive` (which reads only that launcher) answers `4.4.2`, and `dotf doctor` warns `hive also runs from C:\Users\mlorente\.local\bin, outside the launcher it installs itself at (...\hive\bin\hive.cmd)`, naming `uv tool uninstall hive-vault`
 
 ## Closing
 
