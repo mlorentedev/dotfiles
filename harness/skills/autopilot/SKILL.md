@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 9c64789731c9bbb6
+generated_sha: d97f8da8655475bb
 id: autopilot-skill
 type: skill
 status: active
@@ -100,6 +100,8 @@ When the operator says (any variant): *"Me voy a ausentar / a dormir / a trabaja
    ```
 
    Defaults when the operator gave no numbers: 3–5 tickets, 30 min per ticket, and `merge: standing-grant` only where `.github/merge-grant.yml` exists (otherwise `never`). **Ask degrades to deny:** in unattended mode any ambiguity, missing input or interactive prompt degrades to **Deny / Escalate / Parked**, never to silent approval ("idle is not authorization").
+
+   **Arming is not a stopping point.** Writing and committing the envelope is the first half of the arming turn, not its end. Start iteration 1 in this same response: go straight to §2 and select the first ticket. Say the run is armed only as the opening line of a response that goes on to work. A turn that stops after arming leaves a committed envelope and a claim comment with no PR and no report, which reads exactly like a crashed run (dotfiles#3086). If this harness cannot start iteration 1 in the arming response, say so and do not call the run armed.
 
 ---
 
