@@ -106,7 +106,8 @@ created: "2026-10-06"
 
 - [x] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory
 - [x] [AC3] Implement the report (JSON, one entry per reconciler, the run's result and error), written atomically under `env.StateDir()`, which the skill gate's ledger now shares; a plan writes none. `cli/README.md` documents `converge`, which shipped in PR 2a without a section
-- [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file
+- [x] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file.
+  Measured 2026-11-03 with the installed 0.79.0: `dotf converge --plan --repo <checkout> --only records-harness` reports `[ OK ] instruction files current`, 0 to change. `~/.claude/CLAUDE.md` is present, and `~/.claude/skills` holds 35 skills. `dotf doctor` reports no instruction-file finding: `Repo↔deploy-dir drift` and `Agent presence` are all ok. Its one FAIL is the OpenRouter model limit flap recorded on #902
 
 ### PR 4a — the checkout step, so converge can run from zero
 
