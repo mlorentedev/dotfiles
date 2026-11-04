@@ -62,7 +62,7 @@ func stubForgeWrite(t *testing.T, origin string) *commentRecorder {
 	oldO, oldB, oldE := forgeWriteOrigin, forgeWriteBackend, forgeHeadCarriesEnvelope
 	forgeWriteOrigin = func() (string, error) { return origin, nil }
 	forgeWriteBackend = func(forgewrite.Repo) (forgewrite.Backend, error) { return rec, nil }
-	forgeHeadCarriesEnvelope = func(string) bool { return false }
+	forgeHeadCarriesEnvelope = func(string, string) bool { return false }
 	t.Cleanup(func() { forgeWriteOrigin, forgeWriteBackend, forgeHeadCarriesEnvelope = oldO, oldB, oldE })
 	return rec
 }
@@ -269,7 +269,7 @@ func TestForgePRCreateRefusesACrossForkHead(t *testing.T) {
 // kubelab#2524: the default head was the launch worktree's run branch (#2784).
 func TestForgePRCreateRefusesARunBranchHead(t *testing.T) {
 	rec := stubForgeWrite(t, "https://github.com/o/n.git")
-	forgeHeadCarriesEnvelope = func(head string) bool { return head == "chore/autopilot-run" }
+	forgeHeadCarriesEnvelope = func(head, _ string) bool { return head == "chore/autopilot-run" }
 	old := forgeWriteBranch
 	forgeWriteBranch = func() (string, error) { return "chore/autopilot-run", nil }
 	t.Cleanup(func() { forgeWriteBranch = old })
@@ -316,8 +316,56 @@ func TestForgeHeadCarriesEnvelopeReadsTheBranchTree(t *testing.T) {
 	git("checkout", "-q", "main")
 	t.Chdir(dir)
 	for head, want := range map[string]bool{"chore/autopilot-run": true, "main": false, "no/such-branch": false} {
-		if got := forgeHeadCarriesEnvelope(head); got != want {
+		if got := forgeHeadCarriesEnvelope(head, "main"); got != want {
 			t.Errorf("%s: got %v, want %v", head, got, want)
+		}
+	}
+}
+
+// #3125: a repository whose default branch carries the envelope, so its guard
+// reads it from the base. Every branch then holds the file; only a head that
+// changes it is a run branch.
+func TestForgeHeadCarriesEnvelopeComparesWithTheBase(t *testing.T) {
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "commit.gpgsign=false", "-c", "core.hooksPath=" + os.DevNull}, args...)...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	envelope := func(text string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(dir, ".agent"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, runEnvelopePath), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		git("add", runEnvelopePath)
+	}
+	git("init", "-q", "-b", "master")
+	envelope("version: 1\n")
+	git("commit", "-q", "-m", "arm on the default branch")
+	git("checkout", "-q", "-b", "fix/change")
+	git("commit", "-q", "--allow-empty", "-m", "change")
+	git("checkout", "-q", "-b", "chore/rearm", "master")
+	envelope("version: 1\nrun_id: x\n")
+	git("commit", "-q", "-m", "rearm")
+	git("checkout", "-q", "master")
+	t.Chdir(dir)
+	for _, c := range []struct {
+		head, base string
+		want       bool
+	}{
+		{"fix/change", "master", false},      // carries the base's own envelope
+		{"chore/rearm", "master", true},      // changes it
+		{"fix/change", "no/such-base", true}, // no base to compare with: refuse as before
+	} {
+		if got := forgeHeadCarriesEnvelope(c.head, c.base); got != c.want {
+			t.Errorf("%s into %s: got %v, want %v", c.head, c.base, got, c.want)
 		}
 	}
 }

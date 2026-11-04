@@ -25,6 +25,11 @@ carries `.agent/unattended.yml` and the ledger and is never merged. The command 
 `origin/<head>`, and names `--head` as the fix. The refusal reads the branch's content, not its name, so it
 also covers an attended session that is in the wrong directory.
 
+The shape is a head whose envelope differs from the base's, not a head that holds one. A repository whose
+merge guard reads the envelope from its default branch commits it there, and a check on presence alone
+refused every pull request in it (#3125). A head that adds or changes the envelope still refuses, and so does
+any envelope when the base is unknown.
+
 ## Why
 
 A default derived from the working directory is a guess about which change the caller means. When the caller
