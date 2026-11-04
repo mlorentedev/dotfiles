@@ -10,22 +10,22 @@ created: "2026-06-21"
 - [x] AC1 (skills block, slice 1) -> `tests/harness-skills-parity.bats` (5 tests): every output but the prompts byte-identical to `compile-harness.sh --deploy`; prompts differ only by the body rules the shell dropped; a prompt keeps every body rule; executable bits match; a second Go run reports `0 deployed`
 - [x] AC2 (skills) -> `TestRenderSkillRecord_CRLFRendersTheLFBytes`
 - [x] AC3 copilot catalog (slice 2) -> `tests/harness-skills-parity.bats` "the catalog lists what the oracle lists, in byte order" over a seeded instructions file on both sides; `TestDeploySkills_WritesTheCatalogIntoItsRegion` pins the exact bytes and sha, `TestDeploySkills_SkipsAnAbsentOrUnmarkedCatalogFile`, `TestReplaceCatalogRegion_RefusesBadMarkers`, `TestCatalogBullets_ByteOrder`
-- [ ] AC4 agents, doctrine, deploy -> slices 4–5
+- [x] AC4 agents, doctrine, deploy -> slices 4–5 (the parity oracles named below ran until #3069 deleted them with the script; the `Test*` cases stay)
   - [x] agents -> `tests/harness-agents-parity.bats`: every agent file byte-identical to `compile-harness.sh --deploy` with the binary under test as the shell's resolver; a second run reports `0 deployed`. `TestDeployAgents_*` cover the resolved lines, a bad record failing alone with its previous output kept, the block-capabilities refusal, no-tier records and dry run
   - [x] doctrine -> `tests/harness-doctrine-parity.bats`: both rules files byte-identical to `compile-harness.sh --deploy` from three starting states (absent, a region among user lines with the legacy preamble, no region and no final newline); a second Go run reports both current. `TestCompactDoctrine_*`, `TestFoldToASCII`, `TestInjectDoctrine`, `TestMigratePreamble_ExactLineOnly`, `TestCapWarnings_NameWhoseContentBreached`, `TestDeployDoctrine_*`
   - [x] deploy -> `tests/harness-deploy-parity.bats`: the full committed manifest deployed by `compile-harness.sh --deploy` and `dotf harness deploy` into two HOMEs, byte-identical but for agy's prompts and the copilot file, which differs only by the catalog's bullet order; a second Go deploy writes nothing. `TestHarnessDeploy_*` cover convergence and a failed agent record stopping presence and doctrine
-- [ ] AC5 check -> slice 6
+- [x] AC5 check -> slice 6
   - [x] the Go verb -> `tests/harness-check-parity.bats` (5 tests): the same exit status and the same report lines as `compile-harness.sh --check` on the committed checkout and on each kind of drift (an edited, a missing and a doubly-marked region, an END line with a tail, a coverage gap, skill and agent records without their required frontmatter). `TestCheckDrift_*` (including a CRLF record that validates), `TestFirstDifference`
   - [x] `dotf doctor` calls it in process on every OS -> #2921, `TestCheckRecordDrift` (the Windows case passes instead of skipping)
-  - [ ] `ci.yml` calls it on Linux, macOS and Windows -> #2923, green on all three test jobs, waiting for the owner to land it
+  - [x] `ci.yml` calls it on Linux, macOS and Windows -> #2923 (`5ce566b2`), green on all three test jobs
 - [x] AC6 `--against-vault` -> #2936, `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
-- [ ] AC7 refresh in Go -> slice 7
+- [x] AC7 refresh in Go -> slice 7: #3023 (`ac3c865a`) renders the refresh in Go; #3066 (`aa802f19`) moved every caller and record onto `dotf harness refresh`. `TestRefresh*` and `tests/harness-doctrine-records.bats` (2/2 against the real vault on 2026-11-03)
 - [ ] AC8 callers rewired -> slices 3 and 5
   - [x] converge -> #2902, `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout`
   - [x] `setup-linux.sh` -> #2912, `tests/setup-fails-loudly.bats`
   - [x] `setup-windows.ps1` -> #2914, `tests/setup-windows.bats`, `tests/setup-fails-loudly.bats`
   - [ ] live acceptance on the work-lab Windows box after a release carries it (#1387)
-- [ ] AC9 bash engine deleted -> slice 7
+- [x] AC9 bash engine deleted -> slice 7: #3069 (`79abe7e5`) deletes `scripts/compile-harness.sh`, `tests/compile-harness*.bats` and the parity oracles. Guard-grep over `cli/`, `setup-*` and `ci.yml` on `origin/main` `d5457e55`: no invocation is left. The 39 remaining mentions are comments naming the script as what a port replaced (declared in tasks.md), plus one glob test datum (`triggers_test.go:38`). The comments that described the script as still running were rewritten in the closing PR
 
 ## Test status
 
@@ -94,9 +94,9 @@ created: "2026-06-21"
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons.md`? yes: `docs/lessons/lesson-504-a-fence-counter-that-never-stops-counting-eats-the-body.md`, `docs/lessons/lesson-505-a-directory-glob-sorts-by-the-slash-not-by-the-name.md`
-- [ ] ADR-worthy decision? <to answer at archive>
-- [ ] New pattern candidate for `00_meta/patterns/`? <to answer at archive>
+- [x] Lesson for the repo's `docs/lessons.md`? yes, written: `docs/lessons/lesson-504-a-fence-counter-that-never-stops-counting-eats-the-body.md`, `docs/lessons/lesson-505-a-directory-glob-sorts-by-the-slash-not-by-the-name.md`, `docs/lessons/lesson-537-a-parity-oracle-pins-the-defects-it-shares-with-its-twin.md`
+- [x] ADR-worthy decision? no: the port follows ADR-020 §5 (strangler-fig) and audit-007 row 10; the per-slice choices are recorded under *Decisions made during implementation*
+- [x] New pattern candidate for `00_meta/patterns/`? no: lesson 537 (a parity oracle pins the defects it shares with its twin) is repo-scoped until a second project ports an engine against an oracle
 
 ## Archive checklist
 

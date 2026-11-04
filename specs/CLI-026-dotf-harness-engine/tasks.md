@@ -32,7 +32,7 @@ created: "2026-06-21"
 
 - [x] ~~`deploy_skills`/`deploy_prune`/`build_skill_catalog` in `compile-harness.sh` delegate to `dotf harness skills`~~ superseded: no caller runs `compile-harness.sh --deploy` once the slice 5 rewire lands, and slice 7 deletes it
 - [x] `setup-windows.ps1` calls `dotf harness deploy` (slice 5), which runs the skills surface; `Deploy-SkillRecord`, `Test-SkillTargetsAgent`, `Get-SkillField`, `Test-SkillFrontmatterKeyKept`, `Convert-SkillRecord` and their bats parity tests deleted; the copilot smoke test runs `dotf harness skills`
-- [ ] Note the skills half fixed on #1733
+- [x] Note the skills half fixed on #1733 (closed by #3069)
 - [x] `doctor`'s agent-tier check reads targets and tier with the Go render's own predicates (`harness.SkillTargetsAgent`, `harness.RecordModelTier`); `recordTargets`, `readAgentFrontmatter` and the two awk-agreement tests are gone, because the shell render they followed no longer deploys
 
 ## Slice 4 — agents and doctrine (AC4)
@@ -109,8 +109,8 @@ created: "2026-06-21"
 
 ## Closing
 
-- [ ] Every acceptance criterion is covered by at least one test
-- [ ] `go build`, `go vet`, `go test`, `golangci-lint`, `GOOS=windows go vet` pass
+- [x] Every acceptance criterion is covered by at least one test (verification.md maps each AC)
+- [x] `go build`, `go vet`, `go test`, `golangci-lint`, `GOOS=windows go vet` pass (2026-11-03, `d5457e55`)
 - [ ] `verification.md` filled in
 - [ ] Independent review (`dotf spec review CLI-026-dotf-harness-engine`) before archive
 
