@@ -88,7 +88,9 @@ created: "2026-10-06"
 - [x] [AC10] Failing test, then `deploy.ErrRenderIncomplete`: a strict renderer turns a placeholder the store could not resolve into a skip that keeps the installed file (lesson 378)
 - [x] [AC10] [AC3] `configs-deploy` between `tools` and `git-config` (git-config's probe needs the include target a config entry deploys); plan, apply, probe and a second plan with 0 changes; a template change fails the probe until applied; no renderer wired fails loudly
 - [x] On the Mac: `go run ./cmd/dotf converge --plan --only configs-deploy` reports 20 configs in sync, `agy-settings` to deploy, 1 not for this machine
-- [ ] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+- [x] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+  - MCP servers and plugins: `agent-extensions` (PR 8, PR 10)
+  - Orca's hooks: `orca-hooks`, right after `configs-deploy`, runs `orca.TuneHooks`, the code the bare deploy and `dotf orca tune-hooks` already use. It plans, applies and probes, and a second plan reports 0 changes. A script whose POST line the swap does not know is named and left alone; it is never planned, so it never fails the probe. Without Orca's files the step is skipped. Mutations caught: counting an unrecognised script, a plan that writes, a probe that never fails. On the Mac, `converge --plan --only orca-hooks` reports a skip, because Orca has generated no hooks there
 
 ### PR 2e — the macOS environment step: `env-persist` (#2013 S3)
 

@@ -58,7 +58,7 @@ func newOrcaTuneHooksCmd() *cobra.Command {
 			"--check reports drift without writing and exits non-zero while any remains.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			defConfig, defScript := orcaHookPaths(env.Home())
+			defConfig, defScript := orca.HookPaths(env.Home())
 			if hookConfig == "" {
 				hookConfig = defConfig
 			}
@@ -75,18 +75,12 @@ func newOrcaTuneHooksCmd() *cobra.Command {
 	return c
 }
 
-// orcaHookPaths is where Orca writes its generated Copilot hooks for home.
-func orcaHookPaths(home string) (config, script string) {
-	return filepath.Join(home, ".copilot", "hooks", "orca.json"),
-		filepath.Join(home, ".orca", "agent-hooks", "copilot-hook.ps1")
-}
-
 // deployOrcaHooks is the converge step `dotf deploy` runs after the declared
 // configs (CLI-093, #1953). Orca regenerates its hooks on every install, so a
 // setup that deploys configs has to re-tune them; doing it here reaches both
 // setups through the one call they already make.
 func deployOrcaHooks(w io.Writer, home string, dryRun bool) error {
-	config, script := orcaHookPaths(home)
+	config, script := orca.HookPaths(home)
 	rep, err := orca.TuneHooks(config, script, orca.DefaultHookTimeout, dryRun, time.Now)
 	if err != nil {
 		return fmt.Errorf("orca-hooks: %w", err)
