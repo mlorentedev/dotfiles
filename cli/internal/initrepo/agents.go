@@ -128,9 +128,12 @@ func BootstrapAgentsOpts(repoRoot string, force bool, dryRun bool) (AgentsResult
 
 // hasSDDSection reports whether content already carries a `## Spec-Driven
 // Development` H2 (matched as a full line, like the script's anchored grep).
-func hasSDDSection(content string) bool {
+func hasSDDSection(content string) bool { return hasSection(content, sddHeading) }
+
+// hasSection reports whether content carries heading as a full line.
+func hasSection(content, heading string) bool {
 	for _, ln := range strings.Split(content, "\n") {
-		if ln == sddHeading {
+		if ln == heading {
 			return true
 		}
 	}
@@ -142,11 +145,17 @@ func hasSDDSection(content string) bool {
 // init-repo-agents.sh's awk: at the SDD heading print the fresh snippet and skip
 // until the next `## ` heading.
 func replaceSDDSection(content, snippet string) string {
+	return replaceSection(content, sddHeading, snippet)
+}
+
+// replaceSection swaps the section opened by heading for snippet, keeping
+// everything before it and from the next H2 (or EOF) onward.
+func replaceSection(content, heading, snippet string) string {
 	var out []string
 	skipping := false
 	for _, ln := range strings.Split(content, "\n") {
 		switch {
-		case ln == sddHeading:
+		case ln == heading:
 			out = append(out, snippet)
 			skipping = true
 		case skipping && strings.HasPrefix(ln, "## "):

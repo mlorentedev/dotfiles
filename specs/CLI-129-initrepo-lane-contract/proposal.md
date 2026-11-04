@@ -1,7 +1,7 @@
 ---
 id: "CLI-129-initrepo-lane-contract"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-11-04"
 issue: "mlorentedev/dotfiles#2552"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -44,14 +44,14 @@ Existing files are left alone. `--force` replaces the lane prompt and the AGENTS
 
 ## Acceptance criteria
 
-- [ ] AC1: `dotf init lane` on an empty repository writes `.dotf/lane.json`, and `lane.LoadConfig` loads it with an empty queue and the documented defaults.
-- [ ] AC2: it writes `.dotf/lane-prompt.md`, and the lane renderer renders it with `PromptData` without error.
-- [ ] AC3: it appends the `## Lanes` section to `AGENTS.md`, creating the file when it is absent and keeping prior content when it exists.
-- [ ] AC4: a second run changes nothing: every file is byte-identical and the report says `unchanged`.
-- [ ] AC5: an existing `.dotf/lane.json`, prompt or section is left alone without `--force`.
-- [ ] AC6: `--force` replaces the prompt and the `## Lanes` section in place and leaves `.dotf/lane.json` untouched.
-- [ ] AC7: `dotf init` runs the lane step after the AGENTS.md step, and `--dry-run` writes nothing.
-- [ ] AC8: the follow-up ticket for the kubelab rollout exists and is linked from `verification.md`.
+- [x] AC1: `dotf init lane` on an empty repository writes `.dotf/lane.json`, and `lane.LoadConfig` loads it with an empty queue and the documented defaults.
+- [x] AC2: it writes `.dotf/lane-prompt.md`, and the lane renderer renders it with `PromptData` without error.
+- [x] AC3: it appends the `## Lanes` section to `AGENTS.md`, creating the file when it is absent and keeping prior content when it exists.
+- [x] AC4: a second run changes nothing: every file is byte-identical and the report says `unchanged`.
+- [x] AC5: an existing `.dotf/lane.json`, prompt or section is left alone without `--force`.
+- [x] AC6: `--force` replaces the prompt and the `## Lanes` section in place and leaves `.dotf/lane.json` untouched.
+- [x] AC7: `dotf init` runs the lane step after the AGENTS.md step, and `--dry-run` writes nothing.
+- [x] AC8: the follow-up ticket for the kubelab rollout exists and is linked from `verification.md`.
 
 ## References
 

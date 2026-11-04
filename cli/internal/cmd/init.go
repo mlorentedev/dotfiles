@@ -27,6 +27,7 @@ func newInitCmd() *cobra.Command {
 		skipVault  bool
 		skipGithub bool
 		skipAgents bool
+		skipLane   bool
 		dryRun     bool
 	)
 
@@ -80,6 +81,7 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 				Date:              now().Format("2006-01-02"),
 				DryRun:            dryRun,
 				SkipAgents:        skipAgents,
+				SkipLane:          skipLane,
 				SkipGithub:        skipGithub,
 				VaultPath:         vaultPath,
 				ClaudeProjectsDir: claudeDir,
@@ -104,10 +106,12 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without modifying disk")
 	cmd.Flags().BoolVar(&skipVault, "skip-vault", false, "skip the vault project entry")
 	cmd.Flags().BoolVar(&skipGithub, "skip-github", false, "skip applying GitHub repo defaults")
-	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "skip writing AGENTS.md + the SDD section")
+	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "skip writing AGENTS.md + the SDD section (also skips the lane contract, which extends it)")
+	cmd.Flags().BoolVar(&skipLane, "skip-lane", false, "skip scaffolding the lane contract (.dotf/lane.json, prompt, AGENTS.md ## Lanes)")
 
 	cmd.AddCommand(newInitAgentsCmd())
 	cmd.AddCommand(newInitGithubCmd())
+	cmd.AddCommand(newInitLaneCmd())
 	return cmd
 }
 
@@ -136,17 +140,9 @@ the current git repo.`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			root := repo
-			if root == "" {
-				cwd, err := os.Getwd()
-				if err != nil {
-					return err
-				}
-				if root, err = spec.RepoRoot(cwd); err != nil {
-					return err
-				}
-			} else if info, err := os.Stat(root); err != nil || !info.IsDir() {
-				return fmt.Errorf("--repo is not a directory: %s", root)
+			root, err := resolveInitRepo(repo)
+			if err != nil {
+				return err
 			}
 
 			res, err := initrepo.BootstrapAgentsOpts(root, force, dryRun)
