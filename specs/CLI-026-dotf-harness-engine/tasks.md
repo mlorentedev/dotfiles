@@ -48,7 +48,8 @@ created: "2026-06-21"
   - [x] `records-harness` calls `harness.Deploy` in process (`converge.HarnessDeploy`); `CompileHarnessDeploy` deleted
   - [x] `setup-linux.sh` calls `dotf harness deploy` (supersedes slice 3's shell delegation line)
   - [x] `setup-windows.ps1` calls `dotf harness deploy`; `Deploy-SkillRecord` and its helpers deleted; `records-harness` gains `windows`
-  - [ ] Live acceptance on the work-lab Windows box after a release carries it: setup, then `dotf converge` reports `records-harness` changed=0, and `~/.claude/agents/` holds the seven personas (#1387)
+  - [x] Live acceptance on the work-lab Windows box after a release carries it: setup, then `dotf converge` reports `records-harness` changed=0, and `~/.claude/agents/` holds the seven personas (#1387)
+    - Proved in a clean `dotf vm windows` guest (Windows 11 Arm64), not on the work-lab box: see verification.md, 2026-11-03
   - [x] doctor's `instructionsRemedy` (`checks_deploy.go`) is gone: every OS is told `run: dotf harness deploy`
 
 ## Slice 6 — `dotf harness check` (AC5, AC6)
@@ -111,7 +112,7 @@ created: "2026-06-21"
 
 - [x] Every acceptance criterion is covered by at least one test (verification.md maps each AC)
 - [x] `go build`, `go vet`, `go test`, `golangci-lint`, `GOOS=windows go vet` pass (2026-11-03, `d5457e55`)
-- [ ] `verification.md` filled in
+- [x] `verification.md` filled in
 - [ ] Independent review (`dotf spec review CLI-026-dotf-harness-engine`) before archive
 
 ## Follow-up the proposal deferred: #2851

@@ -20,11 +20,11 @@ created: "2026-06-21"
   - [x] `ci.yml` calls it on Linux, macOS and Windows -> #2923 (`5ce566b2`), green on all three test jobs
 - [x] AC6 `--against-vault` -> #2936, `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
 - [x] AC7 refresh in Go -> slice 7: #3023 (`ac3c865a`) renders the refresh in Go; #3066 (`aa802f19`) moved every caller and record onto `dotf harness refresh`. `TestRefresh*` and `tests/harness-doctrine-records.bats` (2/2 against the real vault on 2026-11-03)
-- [ ] AC8 callers rewired -> slices 3 and 5
+- [x] AC8 callers rewired -> slices 3 and 5
   - [x] converge -> #2902, `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout`
   - [x] `setup-linux.sh` -> #2912, `tests/setup-fails-loudly.bats`
   - [x] `setup-windows.ps1` -> #2914, `tests/setup-windows.bats`, `tests/setup-fails-loudly.bats`
-  - [ ] live acceptance on the work-lab Windows box after a release carries it (#1387)
+  - [x] live acceptance on Windows after a release carries it (#1387): a clean `dotf vm windows` guest, dotf 0.79.0 (carries #3069), main `d5457e55`; see *Test status*
 - [x] AC9 bash engine deleted -> slice 7: #3069 (`79abe7e5`) deletes `scripts/compile-harness.sh`, `tests/compile-harness*.bats` and the parity oracles. Guard-grep over `cli/`, `setup-*` and `ci.yml` on `origin/main` `d5457e55`: no invocation is left. The 39 remaining mentions are comments naming the script as what a port replaced (declared in tasks.md), plus one glob test datum (`triggers_test.go:38`). The comments that described the script as still running were rewritten in the closing PR
 
 ## Test status
@@ -64,6 +64,10 @@ created: "2026-06-21"
 - `tests/copilot-native-skills-smoke.ps1` deploys with `dotf harness skills --home <scratch>` instead of importing the PowerShell functions; its LF, BOM, filtering and discovery assertions are unchanged.
 - The bats files referencing either setup script or `compile-harness`: 725 of 726 tests pass; the one failure is the real-vault refresh (#2913). `dotf lint powershell` clean; both PowerShell files parse with 0 errors; both are ASCII.
 - `records-harness` runs on Windows; `TestConverge_AStepsOutputPrecedesItsResultLine` now expects it first on every OS. Windows behaviour is held by `test-windows` and `test (windows-latest)`; the live run on the work-lab box is the open task above.
+
+- Closing, 2026-11-03, macOS arm64, `origin/main` `d5457e55` plus the closing commits: `go build ./...`, `go vet ./...`, `GOOS=windows go vet ./...` and `go test ./...` exit 0; `golangci-lint` (pinned 2.12.2) 0 issues after a cache clean (the first run reported a file of another worktree, lesson 353). The bats files that reference the edited scripts: 36/36.
+- Live acceptance, Windows, 2026-11-03: in a clean Windows 11 Arm64 guest (`dotf vm windows up`), with the repo archive at `d5457e55` and a dotf built from that tree, `dotf converge --only records-mirror,records-harness` ran twice. Run 1: `records-mirror` CHANGE (141 updated), `records-harness` CHANGE (`.claude/CLAUDE.md`, `.config/opencode/AGENTS.md`), 0 failed. Run 2: both `[ OK ]`, `0 changed`. `~/.claude/agents/` holds architect, builder, curator, hermes-nan, planner, reviewer and shipper; `~/.claude/skills/` holds 34 skill dirs. The full from-zero `dotf vm windows --ref d5457e55` ran `records-harness` the same way, then stopped at `tools` on an unrelated winget defect, #3142.
+- Substitution, stated: the task named the work-lab box. The guest proves the same claim, a from-zero Windows deploy that converges, under three differences. It is Arm64, not x64; it is a fresh clean-base, not a machine upgraded from the shell deploy; and it does not show the `changed=0` second plan for skills, because `records-harness` does not plan skills yet (PLAT-001b L63).
 
 ## Decisions made during implementation
 
