@@ -46,6 +46,34 @@ func TestAddRefusesAnIssueALiveLeaseHolds(t *testing.T) {
 	}
 }
 
+// #3076: a holder whose slice merged sits detached and clean, and still holds
+// the lease. The refusal says it is idle and how to release it, instead of
+// sending the caller to work in a tree that has nothing in progress.
+func TestAddNamesAnIdleLeaseHolderAndHowToReleaseIt(t *testing.T) {
+	now := time.Now()
+	runner, other := heldIssueRunner(t, now.Add(time.Hour))
+	runner.OnWorktreeList = func(string) (string, error) {
+		return "worktree " + other + "\nHEAD abc\ndetached\n\n", nil
+	}
+	_, err := AddWithRunner(heldIssueOpts(t, 2824), runner, now)
+	if err == nil {
+		t.Fatal("add took an issue an idle worktree's live lease holds")
+	}
+	for _, want := range []string{"idle", other, "dotf worktree done " + other, "--share-issue"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal %q does not name %q", err, want)
+		}
+	}
+	runner.OnDirt = func(string) (Dirt, error) { return Dirt{Tracked: true}, nil }
+	if _, err = AddWithRunner(heldIssueOpts(t, 2824), runner, now); err == nil || strings.Contains(err.Error(), "idle") {
+		t.Errorf("a detached holder with uncommitted work was called idle: %v", err)
+	}
+	runner.OnDirt = func(string) (Dirt, error) { return Dirt{}, errors.New("git status failed") }
+	if _, err = AddWithRunner(heldIssueOpts(t, 2824), runner, now); err == nil || strings.Contains(err.Error(), "idle") {
+		t.Errorf("a holder whose state could not be read was called idle: %v", err)
+	}
+}
+
 func TestAddTakesAnIssueWhoseLeaseExpired(t *testing.T) {
 	now := time.Now()
 	runner, _ := heldIssueRunner(t, now.Add(-time.Minute))
