@@ -79,8 +79,9 @@ Seven things now stand between that and a silent green:
 2. **One review at a time across the repository, none dropped (AI-045 AC10, #1923)**:
    the `review` job joins `pr-agent-review-${{ github.repository }}` with
    `cancel-in-progress: false` and `queue: max`. Without `queue`, GitHub keeps one
-   pending run per group and cancels the older one, which is why #1135 removed an
-   earlier repository-wide group; `queue: max` keeps up to 100 pending, in order.
+   pending run per group and cancels the older one, which is why #1146 removed an
+   earlier repository-wide group (#1110's `pr-agent-nan-inference`, whose comment
+   claimed it queued; #1147); `queue: max` keeps up to 100 pending, in order.
    Parallel reviews were measured contending for the same NaN model, so they now
    wait instead. The per-PR workflow group still supersedes a PR's own older
    push. GitHub accepted the job-level key (run 36835280780); that two
