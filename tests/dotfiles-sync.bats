@@ -57,11 +57,3 @@ setup() {
     [ ! -e "$inst/sensitive/tracked.secret.age" ]
     [ -f "$inst/file" ]
 }
-
-# #1795: scripts/test.sh runs as a pre-commit hook against the real $HOME, so it
-# may check this script's syntax (`bash -n`) but must never execute it: neither
-# as a command, env assignments allowed before it, nor through an interpreter.
-@test "scripts/test.sh never executes dotfiles-sync.sh" {
-    run grep -nE '^[[:space:]]*([A-Za-z_]+=[^[:space:]]*[[:space:]]+)*"\$SCRIPTS_DIR/dotfiles-sync\.sh"|(bash|zsh|sh)[[:space:]]+"\$SCRIPTS_DIR/dotfiles-sync\.sh"' "$SCRIPTS_DIR/test.sh"
-    [ "$status" -eq 1 ]
-}

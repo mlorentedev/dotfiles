@@ -30,14 +30,7 @@ repos:
         language: script
         stages: [commit-msg]
 
-      - id: dotfiles-test
-        name: Run dotfiles tests
-        entry: ./scripts/test.sh
-        language: script
-        pass_filenames: false
-        stages: [pre-commit]
-
-      # #925: scripts/test.sh (above) is a legacy smoke suite that never ran
+      # #925: the legacy scripts/test.sh hook (retired in #1327) never ran
       # bats and never ran this script. An em-dash in a new @test name
       # (bats silently drops such a test, CURATOR-001/#615) shipped past a
       # local commit ("dotfiles-test: Passed") and was only caught by a
