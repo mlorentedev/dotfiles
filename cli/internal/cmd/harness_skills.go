@@ -11,9 +11,9 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
-// newHarnessSkillsCmd deploys the committed skill records: the Go form of
-// compile-harness.sh's deploy_skills and of Deploy-SkillRecord in
-// setup-windows.ps1, which both move onto it once a release carries it (CLI-026).
+// newHarnessSkillsCmd deploys the committed skill records. It replaced
+// compile-harness.sh's deploy_skills and setup-windows.ps1's Deploy-SkillRecord
+// (CLI-026).
 func newHarnessSkillsCmd() *cobra.Command {
 	var (
 		repoRoot, home string

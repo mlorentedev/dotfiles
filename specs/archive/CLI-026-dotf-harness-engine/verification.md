@@ -10,22 +10,22 @@ created: "2026-06-21"
 - [x] AC1 (skills block, slice 1) -> `tests/harness-skills-parity.bats` (5 tests): every output but the prompts byte-identical to `compile-harness.sh --deploy`; prompts differ only by the body rules the shell dropped; a prompt keeps every body rule; executable bits match; a second Go run reports `0 deployed`
 - [x] AC2 (skills) -> `TestRenderSkillRecord_CRLFRendersTheLFBytes`
 - [x] AC3 copilot catalog (slice 2) -> `tests/harness-skills-parity.bats` "the catalog lists what the oracle lists, in byte order" over a seeded instructions file on both sides; `TestDeploySkills_WritesTheCatalogIntoItsRegion` pins the exact bytes and sha, `TestDeploySkills_SkipsAnAbsentOrUnmarkedCatalogFile`, `TestReplaceCatalogRegion_RefusesBadMarkers`, `TestCatalogBullets_ByteOrder`
-- [ ] AC4 agents, doctrine, deploy -> slices 4–5
+- [x] AC4 agents, doctrine, deploy -> slices 4–5 (the parity oracles named below ran until #3069 deleted them with the script; the `Test*` cases stay)
   - [x] agents -> `tests/harness-agents-parity.bats`: every agent file byte-identical to `compile-harness.sh --deploy` with the binary under test as the shell's resolver; a second run reports `0 deployed`. `TestDeployAgents_*` cover the resolved lines, a bad record failing alone with its previous output kept, the block-capabilities refusal, no-tier records and dry run
   - [x] doctrine -> `tests/harness-doctrine-parity.bats`: both rules files byte-identical to `compile-harness.sh --deploy` from three starting states (absent, a region among user lines with the legacy preamble, no region and no final newline); a second Go run reports both current. `TestCompactDoctrine_*`, `TestFoldToASCII`, `TestInjectDoctrine`, `TestMigratePreamble_ExactLineOnly`, `TestCapWarnings_NameWhoseContentBreached`, `TestDeployDoctrine_*`
   - [x] deploy -> `tests/harness-deploy-parity.bats`: the full committed manifest deployed by `compile-harness.sh --deploy` and `dotf harness deploy` into two HOMEs, byte-identical but for agy's prompts and the copilot file, which differs only by the catalog's bullet order; a second Go deploy writes nothing. `TestHarnessDeploy_*` cover convergence and a failed agent record stopping presence and doctrine
-- [ ] AC5 check -> slice 6
+- [x] AC5 check -> slice 6
   - [x] the Go verb -> `tests/harness-check-parity.bats` (5 tests): the same exit status and the same report lines as `compile-harness.sh --check` on the committed checkout and on each kind of drift (an edited, a missing and a doubly-marked region, an END line with a tail, a coverage gap, skill and agent records without their required frontmatter). `TestCheckDrift_*` (including a CRLF record that validates), `TestFirstDifference`
   - [x] `dotf doctor` calls it in process on every OS -> #2921, `TestCheckRecordDrift` (the Windows case passes instead of skipping)
-  - [ ] `ci.yml` calls it on Linux, macOS and Windows -> #2923, green on all three test jobs, waiting for the owner to land it
+  - [x] `ci.yml` calls it on Linux, macOS and Windows -> #2923 (`5ce566b2`), green on all three test jobs
 - [x] AC6 `--against-vault` -> #2936, `TestHarnessCheck_AgainstVaultFlagsAnUnrefreshedVaultEdit`
-- [ ] AC7 refresh in Go -> slice 7
-- [ ] AC8 callers rewired -> slices 3 and 5
+- [x] AC7 refresh in Go -> slice 7: #3023 (`ac3c865a`) renders the refresh in Go; #3066 (`aa802f19`) moved every caller and record onto `dotf harness refresh`. `TestRefresh*`. `tests/harness-doctrine-records.bats` against the real vault gave 2/2 on #3097's branch (2026-11-03, after #3095). On this branch merged with `main` `ae94679d` it gives 1/2: the real-vault test reports `[STALE] harness/skills/autopilot`, from vault `b886b972` (#3086), whose refresh is open PR #3132. That is the drift check reporting an unrefreshed vault edit, which is what AC6 asks of it
+- [x] AC8 callers rewired -> slices 3 and 5
   - [x] converge -> #2902, `TestRecordsHarness_TheGoDeployConvergesTheRealCheckout`
   - [x] `setup-linux.sh` -> #2912, `tests/setup-fails-loudly.bats`
   - [x] `setup-windows.ps1` -> #2914, `tests/setup-windows.bats`, `tests/setup-fails-loudly.bats`
-  - [ ] live acceptance on the work-lab Windows box after a release carries it (#1387)
-- [ ] AC9 bash engine deleted -> slice 7
+  - [x] live acceptance on Windows after a release carries it (#1387): a clean `dotf vm windows` guest, dotf 0.79.0 (carries #3069), main `d5457e55`; see *Test status*
+- [x] AC9 bash engine deleted -> slice 7: #3069 (`79abe7e5`) deletes `scripts/compile-harness.sh`, `tests/compile-harness*.bats` and the parity oracles. Guard-grep over `cli/`, `setup-*` and `ci.yml` on `origin/main` `d5457e55`: no invocation is left. The 39 remaining mentions are comments naming the script as what a port replaced (declared in tasks.md), plus one glob test datum (`triggers_test.go:38`). The comments that described the script as still running were rewritten in the closing PR
 
 ## Test status
 
@@ -65,6 +65,10 @@ created: "2026-06-21"
 - The bats files referencing either setup script or `compile-harness`: 725 of 726 tests pass; the one failure is the real-vault refresh (#2913). `dotf lint powershell` clean; both PowerShell files parse with 0 errors; both are ASCII.
 - `records-harness` runs on Windows; `TestConverge_AStepsOutputPrecedesItsResultLine` now expects it first on every OS. Windows behaviour is held by `test-windows` and `test (windows-latest)`; the live run on the work-lab box is the open task above.
 
+- Closing, 2026-11-03, macOS arm64, `origin/main` `d5457e55` plus the closing commits: `go build ./...`, `go vet ./...`, `GOOS=windows go vet ./...` and `go test ./...` exit 0; `golangci-lint` (pinned 2.12.2) 0 issues after a cache clean (the first run reported a file of another worktree, lesson 353). The bats files that reference the edited scripts: 36/36.
+- Live acceptance, Windows, 2026-11-03: in a clean Windows 11 Arm64 guest (`dotf vm windows up`), with the repo archive at `d5457e55` and a dotf built from that tree, `dotf converge --only records-mirror,records-harness` ran twice. Run 1: `records-mirror` CHANGE (141 updated), `records-harness` CHANGE (`.claude/CLAUDE.md`, `.config/opencode/AGENTS.md`), 0 failed. Run 2: both `[ OK ]`, `0 changed`. `~/.claude/agents/` holds architect, builder, curator, hermes-nan, planner, reviewer and shipper; `~/.claude/skills/` holds 34 skill dirs. The full from-zero `dotf vm windows --ref d5457e55` ran `records-harness` the same way, then stopped at `tools` on an unrelated winget defect, #3142.
+- Substitution, stated: the task named the work-lab box. The guest proves the same claim, a from-zero Windows deploy that converges, under three differences. It is Arm64, not x64; it is a fresh clean-base, not a machine upgraded from the shell deploy; and it does not show the `changed=0` second plan for skills, because `records-harness` does not plan skills yet (PLAT-001b L63).
+
 ## Decisions made during implementation
 
 - Slice 5 rewire, Windows setup: the hand copies of the instruction files went in the same change as the skill renderer. Left in place they would be a second writer of files the verb owns, and the verb deploys them anyway.
@@ -94,12 +98,12 @@ created: "2026-06-21"
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons.md`? yes: `docs/lessons/lesson-504-a-fence-counter-that-never-stops-counting-eats-the-body.md`, `docs/lessons/lesson-505-a-directory-glob-sorts-by-the-slash-not-by-the-name.md`
-- [ ] ADR-worthy decision? <to answer at archive>
-- [ ] New pattern candidate for `00_meta/patterns/`? <to answer at archive>
+- [x] Lesson for the repo's `docs/lessons.md`? yes, written: `docs/lessons/lesson-504-a-fence-counter-that-never-stops-counting-eats-the-body.md`, `docs/lessons/lesson-505-a-directory-glob-sorts-by-the-slash-not-by-the-name.md`, `docs/lessons/lesson-537-a-parity-oracle-pins-the-defects-it-shares-with-its-twin.md`
+- [x] ADR-worthy decision? no: the port follows ADR-020 §5 (strangler-fig) and audit-007 row 10; the per-slice choices are recorded under *Decisions made during implementation*
+- [x] New pattern candidate for `00_meta/patterns/`? no: lesson 537 (a parity oracle pins the defects it shares with its twin) is repo-scoped until a second project ports an engine against an oracle
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-026-dotf-harness-engine/` -> `specs/archive/CLI-026-dotf-harness-engine/`
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-026-dotf-harness-engine/` -> `specs/archive/CLI-026-dotf-harness-engine/`
+- [x] Promotions above executed (if any)

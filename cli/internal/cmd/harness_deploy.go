@@ -10,9 +10,8 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
-// newHarnessDeployCmd runs every harness surface in the order
-// compile-harness.sh --deploy runs them, which it replaces once a release
-// carries it (CLI-026).
+// newHarnessDeployCmd runs every harness surface, in the order
+// compile-harness.sh --deploy ran them before it replaced the script (CLI-026).
 func newHarnessDeployCmd() *cobra.Command {
 	var (
 		repoRoot, home string

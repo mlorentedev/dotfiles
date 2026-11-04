@@ -641,7 +641,7 @@ func checkInstalledAgentsHaveInstructions(sys *System, rep *Report) int {
 }
 
 // Harness marker-region delimiters, owned by package harness (DeployedMatchesSource).
-// TestHarnessMarkerConstants pins them against scripts/compile-harness.sh.
+// TestHarnessMarkerConstants pins them against package harness.
 const (
 	harnessBeginPrefix       = harness.GeneratedBeginPrefix
 	harnessEndMarker         = harness.GeneratedEndMarker
@@ -757,8 +757,8 @@ type skillSymlinkRoot struct {
 // the same for `~/.claude/skills` (e.g. computer-use, orca-cli). Flagging
 // those fights another tool's filesystem layout — the exact class of bug
 // BUG-100 was about in the first place — so a symlink at an unmanaged name is
-// silent here, mirroring compile-harness.sh's warn_unmanaged_output policy on
-// the deploy side.
+// silent here, mirroring the deploy side, which reports an unmarked copy as
+// unmanaged and never prunes it.
 func checkDeployedSkillSymlinks(sys *System, cfg *Config, rep *Report) {
 	home := sys.home()
 	roots := []skillSymlinkRoot{

@@ -16,8 +16,8 @@ import (
 // already printed.
 var errHarnessDrift = errors.New("harness drift detected")
 
-// newHarnessCheckCmd is the offline drift gate: the Go form of
-// compile-harness.sh --check, which ci.yml and dotf doctor run (CLI-026).
+// newHarnessCheckCmd is the offline drift gate that ci.yml and dotf doctor run.
+// It replaced compile-harness.sh --check (CLI-026).
 func newHarnessCheckCmd() *cobra.Command {
 	var repoRoot, vault string
 	var againstVault bool
