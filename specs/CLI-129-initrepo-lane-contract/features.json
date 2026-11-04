@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CLI-129-initrepo-lane-contract-f1",
+    "behavior": "AC1: dotf init lane on an empty repository writes .dotf/lane.json that lane.LoadConfig loads with an empty queue and the defaults",
+    "verification": "cd cli && go test ./internal/initrepo -run 'TestBootstrapLane_ConfigLoads' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-129-initrepo-lane-contract-f2",
+    "behavior": "AC2: the scaffolded .dotf/lane-prompt.md renders with lane.PromptData without error",
+    "verification": "cd cli && go test ./internal/initrepo -run 'TestBootstrapLane_PromptRenders' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-129-initrepo-lane-contract-f3",
+    "behavior": "AC3: the ## Lanes section is created or appended to AGENTS.md, keeping prior content",
+    "verification": "cd cli && go test ./internal/initrepo -run 'TestBootstrapLane_AgentsSection' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-129-initrepo-lane-contract-f4",
+    "behavior": "AC4: a second run changes nothing and reports unchanged",
+    "verification": "cd cli && go test ./internal/initrepo -run 'TestBootstrapLane_Idempotent' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-129-initrepo-lane-contract-f5",
+    "behavior": "AC5: an existing lane.json, prompt or section is left alone without --force",
+    "verification": "cd cli && go test ./internal/initrepo -run 'TestBootstrapLane_KeepsExisting' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-129-initrepo-lane-contract-f6",
+    "behavior": "AC6: --force replaces the prompt and the section in place and never touches lane.json",
+    "verification": "cd cli && go test ./internal/initrepo -run 'TestBootstrapLane_Force' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-129-initrepo-lane-contract-f7",
+    "behavior": "AC7: dotf init runs the lane step after AGENTS.md and --dry-run writes nothing",
+    "verification": "cd cli && go test ./internal/initrepo ./internal/cmd -run 'TestInit_LaneStep|TestInitLane_DryRun' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-129-initrepo-lane-contract-f8",
+    "behavior": "AC8: the kubelab rollout follow-up ticket is linked from verification.md",
+    "verification": "grep -q '#3154' specs/CLI-129-initrepo-lane-contract/verification.md && grep -qi 'kubelab' specs/CLI-129-initrepo-lane-contract/verification.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
