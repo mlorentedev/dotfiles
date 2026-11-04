@@ -48,7 +48,7 @@ created: "2026-06-21"
   - [x] `records-harness` calls `harness.Deploy` in process (`converge.HarnessDeploy`); `CompileHarnessDeploy` deleted
   - [x] `setup-linux.sh` calls `dotf harness deploy` (supersedes slice 3's shell delegation line)
   - [x] `setup-windows.ps1` calls `dotf harness deploy`; `Deploy-SkillRecord` and its helpers deleted; `records-harness` gains `windows`
-  - [x] Live acceptance on Windows after a release carries it (run in a clean VM guest instead of the work-lab box the task named, at the owner's direction): setup, then `dotf converge` reports `records-harness` changed=0, and `~/.claude/agents/` holds the seven personas (#1387)
+  - [x] Live acceptance on the work-lab Windows box after a release carries it: setup, then `dotf converge` reports `records-harness` changed=0, and `~/.claude/agents/` holds the seven personas (#1387)
     - Proved in a clean `dotf vm windows` guest (Windows 11 Arm64), not on the work-lab box: see verification.md, 2026-11-03
   - [x] doctor's `instructionsRemedy` (`checks_deploy.go`) is gone: every OS is told `run: dotf harness deploy`
 
