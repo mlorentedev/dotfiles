@@ -7,8 +7,18 @@
 # actions. Only YAML `uses:` mapping keys count (comments and scalar values that happen
 # to contain "uses:" do not), and the SHA is validated on the reference itself, never on
 # text elsewhere in the line. Local (./) and docker:// references are out of scope.
+# Usage: check-actions-pinned.sh [ROOT]. ROOT defaults to the repository holding this
+# script, which is what pre-commit and CI rely on; pass a directory to judge another tree.
+# A bad argument exits 2 (usage), never a verdict about some other tree (#3103).
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+usage() { echo "usage: check-actions-pinned.sh [ROOT_DIR]" >&2; exit 2; }
+[ "$#" -le 1 ] || usage
+if [ "$#" -eq 1 ]; then
+  [ -d "$1" ] || { echo "check-actions-pinned: not a directory: $1" >&2; usage; }
+  ROOT="$(cd "$1" && pwd -P)"
+else
+  ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+fi
 files=()
 while IFS= read -r -d '' f; do files+=("$f"); done < <(
   { find "$ROOT/.github/workflows" "$ROOT/.gitea/workflows" -maxdepth 1 -type f \
