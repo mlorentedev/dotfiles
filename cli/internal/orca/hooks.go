@@ -26,6 +26,12 @@ import (
 // them. It lived in scripts/orca-hook-tune.ps1; it lives here (CLI-062, #1338)
 // so doctor, setup and a hand invocation share one implementation.
 
+// HookPaths is where Orca writes its generated Copilot hooks for home.
+func HookPaths(home string) (config, script string) {
+	return filepath.Join(home, ".copilot", "hooks", "orca.json"),
+		filepath.Join(home, ".orca", "agent-hooks", "copilot-hook.ps1")
+}
+
 // DefaultHookTimeout is the floor a hook timeout is raised to.
 const DefaultHookTimeout = 30
 

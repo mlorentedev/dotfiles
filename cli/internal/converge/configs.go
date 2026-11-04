@@ -17,8 +17,8 @@ import (
 // a template change merged to main reaches the machine on the next converge
 // with no manual step. Every OS.
 //
-// Not here: Claude Code's MCP servers and plugins (agent-extensions, #1843
-// B10), and Orca's hooks, which only a bare `dotf deploy` converges.
+// Not here: Claude Code's MCP servers and plugins (agent-extensions) and
+// Orca's hooks (orca-hooks), the two halves of #1843 B10.
 type configsDeploy struct {
 	render  deploy.Renderer     // strict: ErrRenderIncomplete when the store is locked
 	resolve func(string) string // env.ResolvePath in production

@@ -122,6 +122,7 @@ func Registry(o Options) []Reconciler {
 		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
+		orcaHooks{},
 		shellCompletions{run: o.CompletionRun, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath, resolve: o.ResolvePath},
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},

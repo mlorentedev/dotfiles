@@ -89,7 +89,9 @@ created: "2026-10-06"
 - [x] [AC10] Failing test, then `deploy.ErrRenderIncomplete`: a strict renderer turns a placeholder the store could not resolve into a skip that keeps the installed file (lesson 378)
 - [x] [AC10] [AC3] `configs-deploy` between `tools` and `git-config` (git-config's probe needs the include target a config entry deploys); plan, apply, probe and a second plan with 0 changes; a template change fails the probe until applied; no renderer wired fails loudly
 - [x] On the Mac: `go run ./cmd/dotf converge --plan --only configs-deploy` reports 20 configs in sync, `agy-settings` to deploy, 1 not for this machine
-- [ ] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+- [x] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+  - MCP servers and plugins: `agent-extensions` (PR 8, PR 10)
+  - Orca's hooks: `orca-hooks` (PR 15)
 
 ### PR 2e — the macOS environment step: `env-persist` (#2013 S3)
 
@@ -305,6 +307,17 @@ Measured on from-zero run 38516177380 (#2452, pi under mise): `tools` installed 
 - [x] Second half (#1948): delete the shell seed and the jq/PowerShell model sync from both setup scripts, once the release carrying this step is the `DOTF_VERSION` pin. An older dotf has no step, and on the plain `setup-linux.sh` path the shell seed is still what runs before `dotf deploy`
   - Not a pure deletion: a plain `./setup-linux.sh` (the `integration` job runs one) has no converge run before its bare `dotf deploy`, so each twin's seed and sync become one `dotf converge --only pi-settings` call placed before that deploy, the shape the `git-config` and `git-hooks` calls in the same block already use. Under converge's `legacy-setup` the call finds the step already in sync. Verified before deleting: the pin is 0.70.0, which carries the step (#2457); `dotf converge --plan --only pi-settings` on the Mac prints `[ OK ] pi-settings settings.json present, enabledModels in sync`
   - Guards in `tests/pi-config.bats`: both twins call the step before the bare deploy, and neither has an executable line naming the settings paths or `enabledModels` (three mutations caught). The seed-only-when-absent and model-sync behaviour they replaced is held by the Go tests of PR 14
+
+### PR 15 — the orca-hooks step (#1843 B10, the Orca half)
+
+Orca regenerates `~/.copilot/hooks/orca.json` and `~/.orca/agent-hooks/copilot-hook.ps1` on every install, with the 5 s timeouts and the Invoke-WebRequest POST that DX-006 repairs (lesson 111). Only a bare `dotf deploy` re-applied the repair (CLI-093, #1953), so a machine that `dotf converge` brought up kept every Copilot tool call failing with "hook errored" on Windows until someone ran the deploy.
+
+- [x] `orca.HookPaths` moves from `cmd` into the orca package, so `dotf orca tune-hooks`, the bare deploy and the step resolve the two files the same way
+- [x] Converge step `orca-hooks`, inserted right after `configs-deploy`, the position the bare deploy tunes them in (an insertion; no step moved). It calls `orca.TuneHooks`: the plan counts the files the repair would change and writes nothing, and the apply tunes them and backs each one up beside itself. Every OS: the timeout floor waives itself where Orca registers bash hooks (#2252)
+- [x] A script whose POST line the swap does not know is named ("review it by hand") and left alone. It is not counted as a change, so the step cannot plan it on every run and then fail its own probe. Without Orca's files the step is skipped
+- [x] Tests: plan, apply, probe and a second plan with 0 changes; no Orca is a skip; tuned hooks are in sync; an unrecognised script is named and never planned or probed; the registry order names the step after `configs-deploy`. Mutations killed: counting an unrecognised script, a plan that applies, a probe that never fails
+- [x] On the Mac, `go run ./cmd/dotf converge --plan --only orca-hooks` reports `[SKIP] orca-hooks  Orca has generated no Copilot hooks for this user`. Orca is not installed there
+- [ ] Follow-up, once the release carrying this step is the `DOTF_VERSION` pin: decide whether the bare `dotf deploy` keeps its own Orca call. It is the path a plain `setup-*.sh` run takes without converge, so it stays until both setups converge first
 
 ## Closing
 
