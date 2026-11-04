@@ -65,6 +65,11 @@ func (s LinuxSessions) instances(ctx context.Context) (map[string]lima, error) {
 	return found, sc.Err()
 }
 
+// upLock is the lock an up on name holds; beside Dir, so List never sees it.
+func (s LinuxSessions) upLock(name string) string {
+	return filepath.Join(filepath.Dir(s.Dir), "up-"+name+".lock")
+}
+
 func (s LinuxSessions) held(name string) bool {
 	_, err := os.Stat(filepath.Join(s.Dir, name))
 	return err == nil
@@ -87,6 +92,14 @@ func (s LinuxSessions) Up(ctx context.Context, name string, progress, out io.Wri
 	if err := ValidSessionName(name); err != nil {
 		return s.rec(name, StatusFailed, start, err.Error())
 	}
+	release, busy, err := claimUp(s.upLock(name))
+	switch {
+	case err != nil:
+		return s.rec(name, StatusFailed, start, err.Error())
+	case busy:
+		return s.rec(name, StatusBusy, start, fmt.Sprintf("another `up` is creating session %s: wait for it, or use another name", name))
+	}
+	defer release()
 	down := fmt.Sprintf("dotf vm linux down --session %s", name)
 	found, err := s.instances(ctx)
 	if err != nil {
