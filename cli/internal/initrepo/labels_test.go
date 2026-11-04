@@ -22,7 +22,8 @@ updates:
 // .github/dependabot.yml, or a 404 when empty), lists existing (one label per
 // line), and fails `label create` for failName. STUB_API_FAIL fails the
 // dependabot.yml read with a non-404 error; STUB_LIST_FAIL fails `label list`.
-// It returns the calls log.
+// STUB_SERVE_YAML serves the contents as .github/dependabot.yaml instead, with
+// a 404 for .yml. It returns the calls log.
 func stubLabelsGh(t *testing.T, dependabot, existing, failName string) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -49,9 +50,11 @@ func stubLabelsGh(t *testing.T, dependabot, existing, failName string) string {
 		"case \"$*\" in\n" +
 		"  *contents/.github/dependabot.yml*)\n" +
 		"    [ -n \"$STUB_API_FAIL\" ] && { echo 'gh: Server Error (HTTP 502)' >&2; exit 1; }\n" +
-		"    [ -f " + shq(dep) + " ] || { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }\n" +
+		"    [ -z \"$STUB_SERVE_YAML\" ] && [ -f " + shq(dep) + " ] || { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }\n" +
 		"    base64 < " + shq(dep) + " ;;\n" +
-		"  *contents/.github/dependabot.yaml*) echo 'gh: Not Found (HTTP 404)' >&2; exit 1 ;;\n" +
+		"  *contents/.github/dependabot.yaml*)\n" +
+		"    [ -n \"$STUB_SERVE_YAML\" ] && [ -f " + shq(dep) + " ] || { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }\n" +
+		"    base64 < " + shq(dep) + " ;;\n" +
 		"  'label list'*) [ -n \"$STUB_LIST_FAIL\" ] && { echo 'HTTP 502' >&2; exit 1; }; cat " + shq(labels) + " ;;\n" +
 		failCase +
 		"  'label create'*) : ;;\n" +
@@ -130,6 +133,20 @@ func TestApplyDependabotLabelsSkipsWhenTheRepoCannotBeRead(t *testing.T) {
 				t.Errorf("created %v after a failed read", got)
 			}
 		})
+	}
+}
+
+// GitHub accepts either extension; a repository that spells it .yaml still has
+// its labels provisioned.
+func TestApplyDependabotLabelsReadsTheYamlSpelling(t *testing.T) {
+	calls := stubLabelsGh(t, twoEcosystems, "", "")
+	t.Setenv("STUB_SERVE_YAML", "1")
+	res, err := ApplyDependabotLabels("owner/repo", false)
+	if err != nil {
+		t.Fatalf("ApplyDependabotLabels: %v", err)
+	}
+	if got := creates(t, calls); strings.Join(got, ",") != "ci,dependencies" || res.Action != "created" {
+		t.Errorf("created %v, action %q; want [ci dependencies], created; calls:\n%s", got, res.Action, readFileOrEmpty(calls))
 	}
 }
 
