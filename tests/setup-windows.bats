@@ -494,7 +494,8 @@ refute_legacy_mise_sync() {
 @test "parity: both OSes get uv from mise through dotf" {
     grep -q '^    dotf tools sync ' "$DOTFILES_DIR/setup-linux.sh"
     grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
-    grep -qE '^[[:space:]]+& dotf converge --only tools[[:space:]]*$' "$PS1_SCRIPT"
+    # setup-windows.ps1 reaches the same sync through the converge tools step,
+    # asserted by the tools-step test above.
 }
 
 @test "parity: neither script installs poetry itself; the catalog does on every OS" {
