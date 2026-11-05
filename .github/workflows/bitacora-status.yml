@@ -82,7 +82,8 @@ jobs:
                   // other limit waits a minute. A secondary limit arrives while the
                   // primary reset is still up to an hour away, so that reset is not
                   // its wait. A wait past five minutes would outlast the job: fail
-                  // now, and the reconciler heals it.
+                  // now. Nothing moves the Status later (the reconciler only adds
+                  // items, mlorentedev/dotfiles#3189), so the red run is the signal.
                   const spent = String(headers['x-ratelimit-remaining']) === '0';
                   const reset = spent ? Number(headers['x-ratelimit-reset']) || 0 : 0;
                   const untilReset = reset ? Math.ceil(reset - Date.now() / 1000) : 0;
