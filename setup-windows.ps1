@@ -224,21 +224,12 @@ Write-Info "Installing developer tools..."
 $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
 if ($wingetCmd) {
     $tools = @(
-        @{ Name = "age"; Cmd = "age"; Id = "FiloSottile.age" },
-        @{ Name = "eza"; Cmd = "eza"; Id = "eza-community.eza" },
-        @{ Name = "jq"; Cmd = "jq"; Id = "jqlang.jq" },
-        @{ Name = "GitHub CLI"; Cmd = "gh"; Id = "GitHub.cli" },
-        @{ Name = "zoxide"; Cmd = "zoxide"; Id = "ajeetdsouza.zoxide" },
-        # copilot left this list for packages.json (npm on every OS, AI-038/#1321,
-        # ADR-036): `dotf tools install` below converges it, pin as floor.
-        # Node.js is the prerequisite of the npm channel (ADR-036 class 3: no
-        # cross-OS channel, so winget here, nvm on Linux). It must exist before
-        # `dotf tools install` runs below, or bw and opencode cannot install on
-        # a clean box. A scoop/nvm node already on PATH is left alone.
-        @{ Name = "Node.js LTS"; Cmd = "node"; Id = "OpenJS.NodeJS.LTS" }
-        # opencode left this list for packages.json (npm on every OS, AI-034/#1294,
-        # ADR-036): `dotf tools install` below converges it. No winget tool carries
-        # a version pin any more, so the loop only installs what is absent.
+        @{ Name = "eza"; Cmd = "eza"; Id = "eza-community.eza" }
+        # age, jq, gh, zoxide and Node.js left this list for their versions.conf
+        # `# mise: cli` pins (PLAT-001c): the converge tools step below installs
+        # them through mise, as on Linux and macOS, and the npm catalog entries
+        # wait for its node. copilot and opencode left it for packages.json
+        # (npm on every OS, AI-038/AI-034, ADR-036).
     )
     foreach ($tool in $tools) {
         if (-not (Get-Command $tool.Cmd -ErrorAction SilentlyContinue)) {
@@ -402,24 +393,27 @@ if (Test-Path -LiteralPath $registrySource) {
     Write-Warn "secrets/registry.yaml not found at $registrySource"
 }
 
-# Catalog tools (CLI-029): download + checksum-verify the declarative packages.json
-# tools (currently sops) into ~/.local/bin via dotf - the same deterministic pattern
-# as Install-Dotf, driven by data instead of a per-OS winget loop. Best-effort: an
-# offline box or a single failed download must not abort setup (parity with the
-# Install-Dotf warning above). Guarded on dotf being on PATH, mirroring the env
-# blocks below.
+# The tool layer (PLAT-001c): converge's tools step installs the packages.json
+# catalog (mise among it), syncs the versions.conf `# mise: cli` pins, and
+# retries the catalog entries that waited on them (uv tools on uv, npm tools on
+# node) -- the step install.ps1 runs, so this script adds no sync of its own.
+# Best-effort: an offline box or a single failed download must not abort setup
+# (parity with the Install-Dotf warning above).
 if (Get-Command dotf -ErrorAction SilentlyContinue) {
-    dotf tools install
+    & dotf converge --only tools
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "dotf tools install failed (continuing; re-run 'dotf tools install')"
+        Write-Warn "dotf converge --only tools failed (continuing; re-run it, or see 'dotf doctor')"
     }
-    # The catalog installs uv through winget (astral-sh.uv, #2754), which puts
-    # its directory on the user PATH only; the MCP block below needs uvx here.
+    # The blocks below need uvx and node from mise in this session; the
+    # profile activates mise for every later shell.
     Sync-SessionPath
+    if (Get-Command mise -ErrorAction SilentlyContinue) {
+        . ([ScriptBlock]::Create((& mise activate pwsh --shims | Out-String)))
+    }
 }
 
 # Register MCP servers (requires Claude Code CLI, Node.js, uv for the uvx servers)
-# It runs after `dotf tools install`, which installs uv: registered before uv,
+# It runs after the tools step, which installs uv: registered before uv,
 # a clean box's first run skipped the uvx servers with "prerequisite 'uv' not
 # found" and only the second converged (OPS-044, #1361).
 # Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
@@ -600,8 +594,8 @@ if ((Get-Command hive -ErrorAction SilentlyContinue) -and $hiveVer -and ([versio
 # into committed records, and rendered to a regular copy by `dotf harness
 # deploy` near the end of this script (SDD-008, CLI-026).
 
-# poetry is a packages.json uv-tool entry, converged by `dotf tools install`
-# above; uv is installed earlier in this script (OPS-044).
+# poetry is a packages.json uv-tool entry, converged by the tools step above,
+# which installs uv first (OPS-044).
 
 # Bun was installed here until OPS-040, for "some Claude Code plugin workers for
 # bun:sqlite" -- the conversation-memory plugin worker MEM-002 retired on
