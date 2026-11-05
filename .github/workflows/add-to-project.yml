@@ -34,6 +34,8 @@ on:
   pull_request:
     types: [opened, reopened]
 
+permissions: {}  # authenticates with BITACORA_PAT, not the default GITHUB_TOKEN
+
 jobs:
   add-to-project:
     # Fork PRs run without repository secrets — BITACORA_PAT would be empty and the
@@ -145,10 +147,14 @@ jobs:
               # Green on purpose. The item IS off the board, and that is recorded
               # for the reconciler rather than pretended away — failing the job
               # here would only add a red run nobody reads to a drop nobody sees.
-              printf '::warning::primary GraphQL pool exhausted (billed per account, not per token) — this item is NOT on the board; bitacora-reconcile.yml will add it within a day\n'
+              printf '%s%s\n' \
+                '::warning::primary GraphQL pool exhausted (billed per account, not per token) — ' \
+                'this item is NOT on the board; bitacora-reconcile.yml will add it within a day'
               ;;
             *)
-              printf '::error::could not add this item to the bitácora board — this is not a rate limit, so it will not self-heal\n'
+              printf '%s%s\n' \
+                '::error::could not add this item to the bitácora board — ' \
+                'this is not a rate limit, so it will not self-heal'
               exit 1
               ;;
           esac
