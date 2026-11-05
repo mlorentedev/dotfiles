@@ -43,8 +43,11 @@ esac
 # the list is empty. A stub that drops the trailing newline makes `while read`
 # discard the final item — a failure the live script does not have.
 case "$1 $2" in
-    "issue list") [ -n "${STUB_ISSUES:-}" ] && printf '%s\n' "$STUB_ISSUES" ;;
-    "pr list")    [ -n "${STUB_PRS:-}" ] && printf '%s\n' "$STUB_PRS" ;;
+    "repo list")  [ -z "${STUB_REPO_LIST_RC:-}" ] || exit "$STUB_REPO_LIST_RC"
+                  printf '%s\n' "${STUB_REPOS:-}" ;;
+    "issue list") [ -z "${STUB_LIST_RC:-}" ] || exit "$STUB_LIST_RC"
+                  if [ -n "${STUB_ISSUES:-}" ]; then printf '%s\n' "$STUB_ISSUES"; fi ;;
+    "pr list")    if [ -n "${STUB_PRS:-}" ]; then printf '%s\n' "$STUB_PRS"; fi ;;
 esac
 exit 0
 STUB
@@ -155,8 +158,9 @@ esac
 # the list is empty. A stub that drops the trailing newline makes `while read`
 # discard the final item — a failure the live script does not have.
 case "$1 $2" in
-    "issue list") [ -n "${STUB_ISSUES:-}" ] && printf '%s\n' "$STUB_ISSUES" ;;
-    "pr list")    [ -n "${STUB_PRS:-}" ] && printf '%s\n' "$STUB_PRS" ;;
+    "issue list") [ -z "${STUB_LIST_RC:-}" ] || exit "$STUB_LIST_RC"
+                  if [ -n "${STUB_ISSUES:-}" ]; then printf '%s\n' "$STUB_ISSUES"; fi ;;
+    "pr list")    if [ -n "${STUB_PRS:-}" ]; then printf '%s\n' "$STUB_PRS"; fi ;;
 esac
 exit 0
 STUB
@@ -164,6 +168,39 @@ STUB
     run "$SCRIPT" --backfill-only demo
     [ "$status" -ne 0 ]
     [[ "$output" == *"1 ensured, 1 failed"* ]] || false
+}
+
+@test "a listing that fails fails the repo, never a green partial backfill" {
+    default_issues
+    STUB_LIST_RC=1 run "$SCRIPT" --backfill-only demo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"❌ demo: backfill — cannot list every open issue and PR"* ]] || false
+    [[ "$output" != *"✅ demo: backfill"* ]] || false
+    [ "$(count_calls addProjectV2ItemById)" -eq 0 ]
+}
+
+@test "a listing that reaches the limit fails rather than drop what is past it" {
+    default_issues
+    LIST_LIMIT=2 run "$SCRIPT" --backfill-only demo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"reached 2"* ]] || false
+}
+
+@test "with no repo named, discovery takes every repo that is neither archived nor a fork" {
+    export STUB_REPOS='false false live
+true false archived
+false true forked'
+    run "$SCRIPT" --backfill-only
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"1 repo(s)"* ]] || false
+    [[ "$output" == *"live: backfill"* ]] || false
+    [[ "$output" != *"archived"* && "$output" != *"forked"* ]] || false
+}
+
+@test "a repository listing that fails stops the run, never a green run over no repo" {
+    STUB_REPO_LIST_RC=1 run "$SCRIPT" --backfill-only
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"cannot list the repositories"* ]] || false
 }
 
 @test "a repo with nothing to add stays green - the healthy no-op" {

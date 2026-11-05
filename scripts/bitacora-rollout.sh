@@ -56,12 +56,21 @@ ok()  { echo "✅ $1"; }
 err() { echo "❌ $1"; FAILED=1; }
 run() { if [ "$CHECK" = 1 ]; then echo "   (dry-run) $*"; else "$@"; fi; }
 
+# Every listing asks for up to LIST_LIMIT rows, and one that reaches it fails:
+# gh truncates silently, and a cut list reads exactly like a complete one.
+LIST_LIMIT="${LIST_LIMIT:-2000}"
+
 # ── Repo discovery: every non-archived, non-fork repo (forks never run our CI) ──
 if [ "${#REPOS[@]}" -eq 0 ]; then
+    all_repos="$(gh repo list "$OWNER" --limit "$LIST_LIMIT" --json name,isArchived,isFork \
+        -q '.[] | "\(.isArchived) \(.isFork) \(.name)"')" \
+        || { echo "❌ cannot list the repositories of $OWNER"; exit 1; }
+    if [ "$(printf '%s' "$all_repos" | grep -c . || true)" -ge "$LIST_LIMIT" ]; then
+        echo "❌ the repository listing reached ${LIST_LIMIT}; raise LIST_LIMIT"; exit 1
+    fi
     # A read loop, not mapfile: macOS bash 3.2 has none (ADR-003, PLAT-001 W3).
-    while IFS= read -r repo; do REPOS+=("$repo"); done < <(gh repo list "$OWNER" --limit 100 \
-        --json name,isArchived,isFork \
-        -q '.[] | select(.isArchived == false and .isFork == false) | .name' | sort)
+    while IFS= read -r repo; do REPOS+=("$repo"); done < <(
+        printf '%s\n' "$all_repos" | awk '$1 == "false" && $2 == "false" { print $3 }' | sort)
 fi
 echo "=== bitácora rollout$( [ "$CHECK" = 1 ] && echo ' (--check, read-only)') — ${#REPOS[@]} repo(s) ==="
 
@@ -204,6 +213,20 @@ resolve_project_id() {
     fi
 }
 
+# list_open KIND REPO — every open issue or PR (KIND = issue | pr) of REPO, one
+# "<node id> <url>" per line. gh pages up to --limit itself. A listing that fails,
+# or that reaches the limit, fails rather than hand the backfill a partial list:
+# the reconciler is what the add workflow's warning promises, so a silent cut
+# would break that promise with a green run.
+list_open() {
+    local out n
+    out="$(gh "$1" list --repo "$OWNER/$2" --state open --limit "$LIST_LIMIT" \
+        --json id,url -q '.[] | "\(.id) \(.url)"')" || return 1
+    n="$(printf '%s' "$out" | grep -c . || true)"
+    [ "$n" -lt "$LIST_LIMIT" ] || return 1
+    [ -z "$out" ] || printf '%s\n' "$out"
+}
+
 # backfill_repo REPO — ensure every OPEN issue and PR of REPO is on the board.
 # addProjectV2ItemById returns the existing item when the content is already
 # there, so this is idempotent and safe to run on a schedule; that idempotence is
@@ -214,7 +237,11 @@ resolve_project_id() {
 # it for `id` alongside `url` yields the GraphQL node ID the mutation wants
 # without a second round-trip per item.
 backfill_repo() {
-    local repo="$1" node_id url backfilled=0 failed=0
+    local repo="$1" node_id url backfilled=0 failed=0 issues prs
+    if ! issues="$(list_open issue "$repo")" || ! prs="$(list_open pr "$repo")"; then
+        err "$repo: backfill — cannot list every open issue and PR (the listing failed, or reached ${LIST_LIMIT})"
+        return
+    fi
     while IFS=' ' read -r node_id url; do
         [ -z "$node_id" ] && continue
         # SC2016: $project and $contentId are GraphQL variables bound by the -f
@@ -231,10 +258,7 @@ backfill_repo() {
             failed=$((failed + 1))
             err "$repo: item-add failed for $url"
         fi
-    done < <(
-        gh issue list --repo "$OWNER/$repo" --state open --limit 200 --json id,url -q '.[] | "\(.id) \(.url)"' 2>/dev/null
-        gh pr list    --repo "$OWNER/$repo" --state open --limit 200 --json id,url -q '.[] | "\(.id) \(.url)"' 2>/dev/null
-    )
+    done < <(printf '%s\n%s\n' "$issues" "$prs")
     # The tag has to come from the outcome, not from the count. `0 ensured` is
     # the healthy no-op AND the total-failure case, so a hardcoded ✅ reported a
     # repo where every add failed exactly like one with nothing to do (#887).
