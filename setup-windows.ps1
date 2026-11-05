@@ -122,49 +122,6 @@ if (Test-Path -LiteralPath $utilsPs1Path -PathType Leaf) {
     . $utilsPs1Path
 }
 
-# BUG-004: defense-in-depth wrapper around `claude plugin install`. Snapshots
-# ~/.claude/.claude.json before the action; if the post-action size drops below
-# 50% of the snapshot (and the snapshot was >= 10 KB), restores the snapshot.
-# Defends against upstream anthropics/claude-code#59870: the CLI's deserialize-
-# modify-serialize cycle drops fields outside its internal struct (organizationType,
-# organizationRateLimitTier, projects map, onboarding flags), shrinking the file
-# from ~75 KB to ~1.5 KB and forcing re-authentication in every project. The
-# existing `installedPlugins -match` idempotence guard against `claude plugin list`
-# can yield a false negative for a plugin not present in that listing, so a setup
-# run can trigger a real install and hit #59870 -- this wrapper is the second
-# layer that catches the false-negative case.
-# Complementary to SDD-021 session-start canary in dotf mem session-start
-# (same 10240-byte threshold, same upstream issue, different detection moment).
-# See dotfiles#33 for the original incomplete trigger fix.
-function Backup-AndRestoreClaudeJson {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][scriptblock]$Action
-    )
-    $claudeJson = Join-Path $env:USERPROFILE '.claude\.claude.json'
-    $backup = $null
-    $snapshotSize = 0
-    if (Test-Path $claudeJson) {
-        $snapshotSize = (Get-Item $claudeJson).Length
-        $backup = [System.IO.Path]::GetTempFileName()
-        Copy-Item $claudeJson $backup -Force
-    }
-    try {
-        & $Action
-    } finally {
-        if ($backup -and (Test-Path $backup)) {
-            if ((Test-Path $claudeJson) -and $snapshotSize -ge 10240) {
-                $newSize = (Get-Item $claudeJson).Length
-                if ($newSize -lt ($snapshotSize / 2)) {
-                    Copy-Item $backup $claudeJson -Force
-                    Write-Warn ".claude.json shrunk from $snapshotSize to $newSize bytes after install (upstream #59870); restored from backup"
-                }
-            }
-            Remove-Item $backup -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
 # ============================================================================
 # BANNER
 # ============================================================================
@@ -418,91 +375,12 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
     Sync-SessionPath
 }
 
-# Register MCP servers (requires Claude Code CLI, Node.js, uv for the uvx servers)
-# It runs after `dotf tools install`, which installs uv: registered before uv,
-# a clean box's first run skipped the uvx servers with "prerequisite 'uv' not
-# found" and only the second converged (OPS-044, #1361).
-# Idempotent: server list lives in mcp-servers.json (SSOT shared with Linux);
-# `claude mcp get` is used to skip already-registered entries, and `add` errors
-# are surfaced rather than swallowed. BUG-011: every `claude mcp {get,add}`
-# invocation is wrapped with Backup-AndRestoreClaudeJson because both subcommands
-# hit the same #59870 deserialize-modify-serialize truncation path as
-# `plugin install`.
-$mcpConfig = "$DotfilesDir\mcp-servers.json"
-$claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
-$npxCmd = Get-Command npx -ErrorAction SilentlyContinue
-if (-not ($claudeCmd -and $npxCmd)) {
-    Write-Warn "Claude Code CLI or npx not found, skipping MCP server registration"
-} elseif (-not (Test-Path $mcpConfig)) {
-    Write-Warn "mcp-servers.json not found at $mcpConfig, skipping MCP registration"
-} else {
-    Write-Info "Registering Claude Code MCP servers from $mcpConfig..."
-    $mcpAdded = 0
-    $mcpSkipped = 0
-    $mcpFailed = 0
-    try {
-        $servers = (Get-Content $mcpConfig -Raw | ConvertFrom-Json).servers
-        # HIVE-118: migrate a stale `uvx hive-vault` entry by REMOVING it here so
-        # the skip-if-present loop below re-adds the current definition
-        # (`hive client`) from mcp-servers.json. Remove-only -- the loop owns every
-        # `claude mcp add` so this stays SSOT-driven (no hardcoded server add).
-        $hiveEntry = Backup-AndRestoreClaudeJson -Action { & claude mcp get hive 2>&1 }
-        if ($hiveEntry -match 'uvx|hive-vault') {
-            Backup-AndRestoreClaudeJson -Action { & claude mcp remove hive --scope user 2>&1 } | Out-Null
-            Write-Info "Migrating hive MCP entry: uvx hive-vault -> hive client (via mcp-servers.json)"
-        }
-        foreach ($srv in $servers) {
-            # mcp-servers.json only declares prerequisite_binary/_command for
-            # MCPs that need a runtime install (e.g. hive needs uv). Under
-            # `Set-StrictMode -Version Latest` direct $srv.prerequisite_binary
-            # access throws for servers that omit the field. Probe via
-            # PSObject.Properties so missing fields are $null, not an error.
-            # Linux side handles this via jq `(.prerequisite_binary // "")`.
-            $prereqBin = if ($srv.PSObject.Properties['prerequisite_binary']) { $srv.prerequisite_binary } else { $null }
-            $prereqCmdStr = if ($srv.PSObject.Properties['prerequisite_command']) { $srv.prerequisite_command } else { $null }
-            if ($prereqBin) {
-                $prereqCmd = Get-Command $prereqBin -ErrorAction SilentlyContinue
-                if (-not $prereqCmd) {
-                    Write-Warn "MCP $($srv.name): prerequisite '$prereqBin' not found, skipping"
-                    $mcpFailed++
-                    continue
-                }
-                if ($prereqCmdStr) {
-                    $prereqParts = $prereqCmdStr -split '\s+'
-                    & $prereqParts[0] @($prereqParts[1..($prereqParts.Length - 1)]) 2>&1 | Out-Null
-                }
-            }
-            # BUG-011: wrap the idempotence-check `claude mcp get` with the same
-            # guard used for install -- the CLI rewrites .claude.json on any
-            # invocation. $LASTEXITCODE is automatic and survives the scriptblock.
-            Backup-AndRestoreClaudeJson -Action {
-                $null = & claude mcp get $srv.name 2>&1
-            }
-            if ($LASTEXITCODE -eq 0) {
-                Write-Info "MCP $($srv.name) already registered, skipping"
-                $mcpSkipped++
-                continue
-            }
-            $argParts = $srv.args -split '\s+'
-            # BUG-011: wrap `claude mcp add` -- the unwrapped call here was the
-            # residual #59870 trigger after BUG-004 (PR #57) closed only the
-            # plugin-install path.
-            $mcpErr = Backup-AndRestoreClaudeJson -Action {
-                & claude mcp add --transport $srv.transport $srv.name --scope user -- @argParts 2>&1
-            }
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "Registered MCP $($srv.name)"
-                $mcpAdded++
-            } else {
-                Write-Warn "Failed to register MCP $($srv.name): $mcpErr"
-                $mcpFailed++
-            }
-        }
-        Write-Success "MCP servers: $mcpAdded added, $mcpSkipped already present, $mcpFailed failed"
-    } catch {
-        Write-Warn "Failed to register MCP servers: $_"
-    }
-}
+# Claude Code's MCP servers (mcp-servers.json) are registered by the bare
+# `dotf deploy` below (claude-mcp), which re-registers a server whose arguments
+# drifted and guards .claude.json against the upstream truncation (#59870). The
+# loop that did it here, with its own HIVE-118 remove and snapshot wrapper, went
+# once no server carried `prerequisite_command`: packages.json installs hive on
+# Windows too (#1993), so the loop registered what `dotf deploy` registers (#2000).
 
 # Mirror the harness inputs into the deploy dir (WIN-007/#1288): harness\ plus
 # every file harness\manifest.json declares as an injection target, so
@@ -523,10 +401,11 @@ if (Get-Command dotf -ErrorAction SilentlyContinue) {
 }
 
 # Phase C daemon supervision (HIVE-118 / hive#176). Install the supervised
-# `hive serve` Scheduled Task now that the MCP loop's prerequisite installed/upgraded
-# the tool. Gated on hive-vault >= 1.32.0 via the package version (NOT by probing
-# `hive service`, which an older hive routes to the blocking stdio server). The MCP
-# entry itself is already `hive client` (re-added from mcp-servers.json above).
+# `hive serve` Scheduled Task now that the tools step above installed hive
+# (packages.json; hive's own self-upgrade on Windows). Gated on hive-vault >= 1.32.0
+# via the package version (NOT by probing `hive service`, which an older hive routes
+# to the blocking stdio server). The MCP entry (`hive client`) is registered by the
+# bare `dotf deploy` below.
 # Non-fatal: any failure leaves the in-process `hive client` fallback.
 # Probe the BINARY, not the installer registry: hive moved to its own installer
 # and `uv tool list` stopped seeing a healthy install (AI-028/#791), so this gate
