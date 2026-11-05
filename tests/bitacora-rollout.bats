@@ -286,6 +286,7 @@ case "$all" in
         [ -n "${STUB_BRANCH_COPY:-}" ] && base64 < "$CANON/$wf"
         exit 0 ;;
     *"pr list"*"--head ci/bitacora-workflows"*)
+        [ -n "${STUB_PR_LIST_FAILS:-}" ] && exit 1
         [ -n "${STUB_OPEN_PR:-}" ] && printf '%s\n' "$STUB_OPEN_PR"
         exit 0 ;;
 esac
@@ -320,4 +321,13 @@ STUB
     grep -q 'force=true' "$GH_LOG"
     grep -q 'pr create' "$GH_LOG"
     [[ "$output" == *"PR opened for review"* ]] || false
+}
+
+@test "a failed open-PR lookup fails the repo and never resets the branch" {
+    protected_stub
+    STUB_PR_LIST_FAILS=1 STUB_BRANCH_EXISTS=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"demo: cannot list open PRs on ci/bitacora-workflows"* ]] || false
+    refute_grep 'force=true' "$GH_LOG"
+    refute_grep 'pr create' "$GH_LOG"
 }

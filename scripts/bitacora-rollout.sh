@@ -111,7 +111,10 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
     local repo="$1" branch="ci/bitacora-workflows" base base_sha wf wf_path src sha open_pr
     base="$(gh api "repos/$OWNER/$repo" -q '.default_branch')"
     base_sha="$(gh api "repos/$OWNER/$repo/git/ref/heads/$base" -q '.object.sha')"
-    open_pr="$(gh pr list --repo "$OWNER/$repo" --head "$branch" --state open --json number -q '.[].number')"
+    # A failed lookup stops this repo, not the run. It never reads as "no open PR":
+    # that would reset the branch and close the very PR this guards.
+    open_pr="$(gh pr list --repo "$OWNER/$repo" --head "$branch" --state open --json number -q '.[].number')" \
+        || { err "$repo: cannot list open PRs on $branch"; return; }
     # An open PR keeps its branch: the files below land as new commits on it. A
     # reset to base empties the PR's diff, GitHub closes it, and its reviews and
     # triage stay behind on a closed PR (#3160 item 9: kubelab#3077 → #3097 → #3100).
