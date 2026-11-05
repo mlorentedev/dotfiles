@@ -1,7 +1,7 @@
 ---
 id: "CLI-129-initrepo-lane-contract"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-04"
 issue: "mlorentedev/dotfiles#2552"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

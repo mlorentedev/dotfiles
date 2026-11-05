@@ -39,6 +39,15 @@ Each AC is covered by a named test. Three of them were also mutation-checked (se
 - `hasSDDSection` and `replaceSDDSection` now delegate to `hasSection` and `replaceSection`, so the lane section reuses the SDD section's surgery instead of copying it.
 - The command help does not name ADR-050: `TestHelpTextHasNoInternalReferences` rejects internal references in user-facing help.
 
+## Independent review dispositions
+
+Review `review.md` (nan/deepseek-v4-flash): PASS, four Minor findings.
+
+- `--skip-lane` untested at the CLI boundary -> applied: `TestInit_SkipFlagsReachTheLaneStep` drives `dotf init --skip-lane` / `--skip-agents` through cobra. Mutating `SkipLane: skipLane` to `skipAgents` turns it red.
+- `--skip-lane` and the `--skip-agents` coupling absent from the contract -> declined: the contract files are closed under the verdict, and the behaviour is recorded here and in the flag help.
+- ADR-022 subcommand table omits `dotf init lane` -> applied: row and `--skip-lane` added to the table.
+- `## Lanes` heading quoted inside a fenced block (SPECULATIVE) -> declined: not reproduced, and the SDD section has had the same behaviour since before this change.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
@@ -49,7 +58,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-129-initrepo-lane-contract/` -> `specs/archive/CLI-129-initrepo-lane-contract/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-129-initrepo-lane-contract/` -> `specs/archive/CLI-129-initrepo-lane-contract/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
