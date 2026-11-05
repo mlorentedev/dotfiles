@@ -53,7 +53,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - AC3 -> *withdrawn 2026-10-21* (hive ADR-020); AC9 replaces it
 - [x] AC4 (no uv install or `uv tool list` inference on Windows; no silent skip, rewritten 2026-10-21) -> the setup gate half is `016bf1a8` (#1311); the catalog half is #2901 (`a4e46b1e`): Windows installs hive through `hive self-upgrade`, never `uv tool install`, and an install that places nothing fails. V3 flipped on the x64 `test-windows` runner in the run that installed hive (run 39721972641)
 - AC7 -> *withdrawn 2026-10-21*: Baseline 2 replaces the broken-box table
-- [ ] AC9 (no unattended upgrade, added 2026-10-21) -> PR5 (#2876, `ec5170ff`): `tests/hive-daemon-gate.bats` `no setup script installs an unattended hive upgrade`, plus the retire step's changed=0 rerun. That rerun needs a machine that still holds the old trigger: a clean CI runner or guest never had one, so its changed=0 proves nothing. The guest cannot be seeded: the old setup installed `DotfilesHiveUpgrade` only when `Get-Command hive` succeeded, and on Arm64 it never got hive installed (V3, V6). Each `dotf vm windows` run also starts from a fresh clean-base. So the rerun needs msi (powered off as of 2026-10-22) or the work-lab box, in the batched Windows session. On the guest the step reports `no unattended hive upgrade is installed` on both runs, which is the clean-machine half. The removal itself is unit-proven against a fake `schedule.Backend` (`cli/internal/converge/hiveupgrade_test.go`: `TestHiveUpgradeRetire_RemovesTheTimerThenIsConverged`, `TestHiveUpgradeRetire_WindowsRemovesTheTaskAndTheScriptCopy`), so the live changed=0 is AC9's last open step
+- [x] AC9 (no unattended upgrade, added 2026-10-21) -> PR5 (#2876, `ec5170ff`): `tests/hive-daemon-gate.bats` `no setup script installs an unattended hive upgrade`, plus the retire step's changed=0 rerun. *Closed 2026-11-05:* Linux on msi, Windows on a seeded guest (see "AC9 on msi" and "AC9 on Windows"). The paragraph below is the reasoning as it stood before the guest was seeded directly. That rerun needs a machine that still holds the old trigger: a clean CI runner or guest never had one, so its changed=0 proves nothing. The old setup could not seed the guest: it installed `DotfilesHiveUpgrade` only when `Get-Command hive` succeeded, and on Arm64 it never got hive installed (V3, V6). Each `dotf vm windows` run also starts from a fresh clean-base. So the rerun needs msi (powered off as of 2026-10-22) or the work-lab box, in the batched Windows session. On the guest the step reports `no unattended hive upgrade is installed` on both runs, which is the clean-machine half. The removal itself is unit-proven against a fake `schedule.Backend` (`cli/internal/converge/hiveupgrade_test.go`: `TestHiveUpgradeRetire_RemovesTheTimerThenIsConverged`, `TestHiveUpgradeRetire_WindowsRemovesTheTaskAndTheScriptCopy`), so the live changed=0 is AC9's last open step
 - [x] AC5 (A1/A3 reconciliation) -> `AI-022/tasks.md` supersession block + `AI-023` forward pointer
 - [x] AC6 (Linux decision recorded) -> Linux keeps `uv tool`; recorded in both `proposal.md` and `AI-022/tasks.md`
 
@@ -168,7 +168,37 @@ Measured from msi's converge run records (`~/.local/state/dotfiles/converge/runs
 | `20261025T050456Z` | `[ OK ]   hive-upgrade-retire   10ms  no unattended hive upgrade is installed` |
 | `20261026T192529Z` | `[ OK ]   hive-upgrade-retire    9ms  no unattended hive upgrade is installed` |
 
-msi's user journal shows the timer's last run and its stop: `hive-upgrade.service` finished at 22:45:56 local time on 2026-10-24, and `Stopped hive-upgrade.timer` followed at 22:50:12, which is the 04:48Z run. `~/.config/systemd/user/` no longer holds a `hive-upgrade*` unit. The Windows half (the `DotfilesHiveUpgrade` task on the work-lab box, elevated) is still unmeasured.
+msi's user journal shows the timer's last run and its stop: `hive-upgrade.service` finished at 22:45:56 local time on 2026-10-24, and `Stopped hive-upgrade.timer` followed at 22:50:12, which is the 04:48Z run. `~/.config/systemd/user/` no longer holds a `hive-upgrade*` unit. The Windows half is below.
+
+## AC9 on Windows (seeded guest, 2026-11-05)
+
+The owner chose the VM over the work-lab box on 2026-11-04. That box had already converged and kept no output, so a rerun there would have shown only the clean-machine half. A clean guest never holds the trigger: the old setup registered it only when `Get-Command hive` resolved. So the guest was seeded directly. `tests/fixtures/windows/seed-hive-upgrade-task.ps1` reproduces the registration that `ec5170ff^:setup-windows.ps1` performed:
+
+- the task name `DotfilesHiveUpgrade`;
+- a `powershell.exe` action with the same arguments;
+- a 15-minute repetition;
+- a principal for `$env:USERNAME`, S4U when elevated, `-RunLevel Limited`;
+- the script copy at `~/.claude/scripts/hive-upgrade.ps1`.
+
+`check-hive-upgrade-task.ps1` reports both halves.
+
+Session `ai028-ac9b`, clean-base Windows 11 Arm64. `install.ps1` from an archive of `origin/main` installed released dotf 0.79.0 and converged. Every step after that ran through `dotf vm windows exec --session ai028-ac9b`:
+
+```
+seed (--elevated)      seeded DotfilesHiveUpgrade logon=S4U script=True
+check                  task=True script=True
+converge 1 (--elevated, full)   1 changed, 12 ok, 1 opaque, 5 skipped, 0 failed
+converge 2 (--elevated, full)   0 changed, 13 ok, 1 opaque, 5 skipped, 0 failed
+check                  task=False script=False
+```
+
+| Run (`~/.local/state/dotfiles/converge/runs/`) | `hive-upgrade-retire` |
+|---|---|
+| `20261105T045741Z` (install.ps1, before the seed) | `ok`, 0: no unattended hive upgrade is installed |
+| `20261105T063135Z` (converge 1) | `change`, 2: removed: task `\DotfilesHiveUpgrade`; `C:\Users\dotf\.claude\scripts\hive-upgrade.ps1` (hive ADR-020: nothing upgrades hive unattended) |
+| `20261105T063314Z` (converge 2) | `ok`, 0: no unattended hive upgrade is installed |
+
+The run did not need a Defender exclusion. An earlier guest that day, with signatures 1.463.130.0, quarantined the same release as `Trojan:Win32/Bearfoos.A!ml` (#3172). This one, with 1.463.132.0, reported no detection.
 
 ## Decisions made during implementation
 
