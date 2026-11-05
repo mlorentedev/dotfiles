@@ -17,21 +17,37 @@ owner: manu
 
 ## Setup
 
-- [ ] Branch created from main: `feat/HARNESS-142-reviewer-isolated-worktree`
+- [x] Branch created from main: `spec/reviewer-isolated-worktree`
 - [ ] `proposal.md` is complete and acceptance criteria are testable
 - [ ] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
-> Replace these with the actual steps for this feature. Keep them small (one commit each) and in TDD order.
-> The `[P]` / `[AC<n>]` markers are optional — see the legend above. Behaviors 1 and 2 below are independent, so their *first* test task carries `[P]`.
+Worktree package (`cli/internal/worktree/`):
 
-- [ ] [P] [AC1] Write failing test for <behavior 1>
-- [ ] [AC1] Implement <module/function> to make it pass
-- [ ] Refactor for clarity (extract, rename, dedupe)
-- [ ] [P] [AC2] Write failing test for <behavior 2>
-- [ ] [AC2] Implement to make it pass
-- [ ] ...
+- [ ] [P] [AC3] Test: `AddDetached` creates a worktree detached at a given sha, with metadata `Issue: 0`, `ReapOK: true`, a lease of the given TTL and `Kind: "review"`; fails red because `AddRunner` has no detached path. `go test ./internal/worktree/ -run AddDetached`
+- [ ] [AC3] Add `WorktreeAddDetached(repo, target, sha)` to `AddRunner` and `RealAddRunner`, a `Kind` field to `Metadata`, and `AddDetached`; test green.
+- [ ] [AC3] Test then code: `dotf worktree list` labels a `Kind: "review"` worktree, and `refuseHeldIssue` never counts it (it holds no issue).
+- [ ] [AC3] Test then code: `sweep` removes an expired review worktree whose `ReapOK` is true.
+
+Launch (`cli/internal/cmd/spec.go`, `cli/internal/spec/`):
+
+- [ ] [P] [AC5] Test then code: `spec review` refuses on tracked dirt (via `worktree.Dirt`) and names `--allow-dirty`; with the flag it launches and warns.
+- [ ] [AC4] Test: the launch path builds the agy argv with `--add-dir <worktree>`, `TmuxWrap` with the worktree as its start directory, and the prompt naming the fresh worktree at `<sha>`; red against today's repoRoot. Enumerate every `filepath.Join(repoRoot, "specs", id, ...)` on the launch path and assign it a root: reviewer-side (review file, transcript, `.stderr`, the `--review` and `--transcript` flags to `deadline`, the stray-write snapshot) is the worktree; caller-side (`review-request.json`, round rotation, the copy-back destination) is the caller's root.
+- [ ] [AC4] Implement: the launcher creates the review worktree (name: spec id, slot, nonce; TTL: deadline plus margin) and passes it and the caller's spec folder to `deadline`; test green.
+- [ ] [AC6] Test then code: before launch, copy the caller's `specs/<id>/` review history into the worktree's spec folder.
+- [ ] [AC4] Prompt sentence: fresh worktree at `<sha>`, no build artifacts, install what the suite needs first. Correct the `agyReviewerCommand` comment.
+
+Deadline (`spec deadline`):
+
+- [ ] [AC1] [AC3] Test: with a fake reviewer, outputs are copied back and the worktree removed on exit 0, 4, 124 and 125; red first.
+- [ ] [AC1] [AC3] Implement copy-back and removal on every exit path; a failed removal is reported on stderr and left for `sweep`.
+- [ ] [AC1] [AC2] Integration test: a fake reviewer creates `tests/probe_test.go` and edits a tracked file; the caller's `git status --porcelain` is unchanged, `review.md` and the transcript arrive, both paths are named and the run exits 4.
+
+Verification of the whole:
+
+- [ ] `go build ./... && go vet ./... && go test ./...`, `golangci-lint run`, `GOOS=windows go vet ./...`, `GOOS=windows golangci-lint run ./...` from `cli/`.
+- [ ] One real `dotf spec review` on this spec, recorded in `verification.md`: the caller tree is untouched and no review worktree is left.
 
 ## Closing
 

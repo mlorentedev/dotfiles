@@ -1,8 +1,43 @@
 [
   {
     "id": "HARNESS-142-reviewer-isolated-worktree-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "A reviewer that writes a probe test and edits a tracked file leaves the caller's git status unchanged, and review.md and the transcript arrive in the caller's tree",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewInWorktreeLeavesCallerTreeUntouched -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-142-reviewer-isolated-worktree-f2",
+    "behavior": "The same run names both stray paths on stderr and exits 4",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewInWorktreeStillReportsStrayWrites -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-142-reviewer-isolated-worktree-f3",
+    "behavior": "Outputs are copied back and the review worktree removed on exit 0, 4, 124 and 125; an interrupted cleanup leaves a labelled, lease-free worktree that sweep removes",
+    "verification": "cd cli && go test ./internal/cmd/ ./internal/worktree/ -run 'TestDeadlineCopiesBackAndRemovesReviewWorktree|TestReviewWorktree' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-142-reviewer-isolated-worktree-f4",
+    "behavior": "Both runners work in the review worktree: agy --add-dir, the tmux start directory and the prompt name it",
+    "verification": "cd cli && go test ./internal/spec/ ./internal/cmd/ -run TestReviewLaunchUsesReviewWorktree -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-142-reviewer-isolated-worktree-f5",
+    "behavior": "spec review refuses a caller tree with tracked uncommitted changes unless --allow-dirty",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewRefusesDirtyTreeWithoutAllowDirty -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-142-reviewer-isolated-worktree-f6",
+    "behavior": "A second-round review in the worktree sees the caller's uncommitted earlier rounds",
+    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewWorktreeCarriesEarlierRounds -count=1",
     "state": "pending",
     "evidence": ""
   }
