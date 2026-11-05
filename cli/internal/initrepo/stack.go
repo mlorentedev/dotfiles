@@ -41,8 +41,8 @@ func StackInit(root, stack string) (StackResult, error) {
 		} else {
 			res.Skipped = append(res.Skipped, "npm init (npm not found)")
 		}
-	case "none", "":
-		// nothing to do
+	case "none", "", "workflows":
+		// nothing to do: a workflows repository has no project manifest
 	default:
 		res.Skipped = append(res.Skipped, "unknown stack: "+stack)
 	}

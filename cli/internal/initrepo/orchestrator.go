@@ -15,7 +15,7 @@ import (
 // for --skip-vault or an absent vault).
 type InitOptions struct {
 	Root              string
-	Stack             string // go | python | node | ts | none
+	Stack             string // go | python | node | ts | workflows | none
 	Date              string // YYYY-MM-DD
 	DryRun            bool   // report what would change without modifying disk
 	SkipAgents        bool
@@ -51,7 +51,7 @@ func Init(opts InitOptions) (InitReport, error) {
 	report := InitReport{Root: opts.Root}
 
 	// 1. Structure + static files (core — fatal).
-	sc, err := ScaffoldOpts(opts.Root, opts.DryRun)
+	sc, err := ScaffoldOpts(opts.Root, opts.Stack, opts.DryRun)
 	if err != nil {
 		return report, fmt.Errorf("scaffold structure: %w", err)
 	}
