@@ -8,9 +8,10 @@ import (
 
 // scaffoldDirs is the knowledge-placement repo structure dotf init lays down
 // (ADR-022 / pattern-knowledge-placement): build/operate docs live in docs/,
-// specs in specs/, per-agent config in .claude/.
+// specs in specs/, per-agent config in .claude/. Every stack gets these; the
+// code directories come from the stack's profile (stacks.go).
 var scaffoldDirs = []string{
-	"src", "tests", "scripts", "specs",
+	"specs",
 	"docs",
 	filepath.Join("docs", "adr"),
 	filepath.Join("docs", "lessons"),
@@ -40,17 +41,19 @@ type ScaffoldResult struct {
 
 // Scaffold lays down the placement-model directory structure and the static
 // practice-stack files under root (which should be an absolute path),
-// substituting {{repo}} with the repo basename.
+// substituting {{repo}} with the repo basename. It scaffolds the default stack.
 func Scaffold(root string) (ScaffoldResult, error) {
-	return ScaffoldOpts(root, false)
+	return ScaffoldOpts(root, "none", false)
 }
 
-// ScaffoldOpts is the parameterised form of Scaffold, with dry-run support.
-func ScaffoldOpts(root string, dryRun bool) (ScaffoldResult, error) {
+// ScaffoldOpts is the parameterised form of Scaffold: the stack picks the code
+// directories, and dryRun writes nothing.
+func ScaffoldOpts(root, stack string, dryRun bool) (ScaffoldResult, error) {
 	var res ScaffoldResult
 
 	if !dryRun {
-		for _, d := range scaffoldDirs {
+		dirs := append(append([]string{}, stackOf(stack).dirs...), scaffoldDirs...)
+		for _, d := range dirs {
 			if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
 				return res, err
 			}

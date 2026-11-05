@@ -7,17 +7,6 @@ import (
 	"strings"
 )
 
-// ciTemplates maps a stack to its embedded CI workflow template. A stack with no
-// entry (notably "none") gets no CI scaffold. The Spec-Driven Development
-// convention is documented in the generated AGENTS.md, not enforced in CI here —
-// an enforced, portable spec-gate is deferred follow-up work (see ADR-022).
-var ciTemplates = map[string]string{
-	"go":     "ci-go.yml",
-	"python": "ci-python.yml",
-	"node":   "ci-node.yml",
-	"ts":     "ci-node.yml",
-}
-
 // ciBranchToken is the trigger branch as the templates spell it; WriteCIOpts
 // replaces it with the repository's default branch.
 const ciBranchToken = "branches: [main]"
@@ -34,8 +23,8 @@ func WriteCI(root, stack string) (string, error) {
 // default branch (DefaultBranch), so a Gitea repository on `master` gets CI
 // that runs (#1962).
 func WriteCIOpts(root, stack string, dryRun bool) (string, error) {
-	tmpl, ok := ciTemplates[stack]
-	if !ok {
+	tmpl := stackOf(stack).ci
+	if tmpl == "" {
 		return "none", nil
 	}
 	return writeWorkflow(root, "ci.yml", tmpl, dryRun)

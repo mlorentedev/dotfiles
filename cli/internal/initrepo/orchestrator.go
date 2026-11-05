@@ -50,7 +50,7 @@ func Init(opts InitOptions) (InitReport, error) {
 	report := InitReport{Root: opts.Root}
 
 	// 1. Structure + static files (core — fatal).
-	sc, err := ScaffoldOpts(opts.Root, opts.DryRun)
+	sc, err := ScaffoldOpts(opts.Root, opts.Stack, opts.DryRun)
 	if err != nil {
 		return report, fmt.Errorf("scaffold structure: %w", err)
 	}

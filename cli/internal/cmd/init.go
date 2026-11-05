@@ -100,7 +100,7 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 		},
 	}
 
-	cmd.Flags().StringVar(&stack, "stack", "none", "project stack to initialize: go|python|node|none")
+	cmd.Flags().StringVar(&stack, "stack", "none", "project stack to initialize: go|python|node|ts|workflows|none")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without modifying disk")
 	cmd.Flags().BoolVar(&skipVault, "skip-vault", false, "skip the vault project entry")
 	cmd.Flags().BoolVar(&skipGithub, "skip-github", false, "skip applying GitHub repo defaults")
