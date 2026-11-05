@@ -42,6 +42,14 @@ Mutation check (2026-11-04). Each change was reverted on its own and the three n
 - Minor, the `dotf vault project --stack` help omits `ts` and `workflows` (vault.go:227; pre-existing for `ts`) -> applied
 - Minor, ADR-022:76 stack list is stale -> declined: a dated decision record stays as written (see Decisions above); the flag help is the live list
 
+Changes after the reviewed SHA (`ecf307de`):
+- the two applied Minors: a struct comment and a flag help string;
+- from the PR's own review, a guard test, `TestStackInitKnowsEveryStackInTheTable` (mutation-killed). It fails when a stack is in the table but not in `StackInit`'s switch.
+
+None of these changes a behaviour the review judged, and the contract files are unchanged, so the digest still matches.
+
+PR: #3164 (`Closes #3093`; the board ticket closes on merge).
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: a missing table entry, no new failure mode
