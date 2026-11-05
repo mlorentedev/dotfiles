@@ -140,3 +140,52 @@ func stepStatus(r InitReport, name string) string {
 	}
 	return ""
 }
+
+func TestInit_LaneStep(t *testing.T) {
+	t.Run("runs after AGENTS.md and scaffolds the contract", func(t *testing.T) {
+		root := t.TempDir()
+		report, err := Init(InitOptions{Root: root, Stack: "none", SkipGithub: true, Date: "2026-06-14"})
+		if err != nil {
+			t.Fatalf("Init: %v", err)
+		}
+		agents, lane := -1, -1
+		for i, s := range report.Steps {
+			switch s.Name {
+			case "agents":
+				agents = i
+			case "lane":
+				lane = i
+			}
+		}
+		if lane < 0 || agents < 0 || lane < agents {
+			t.Fatalf("lane step must come after agents, got agents=%d lane=%d", agents, lane)
+		}
+		for _, f := range []string{".dotf/lane.json", ".dotf/lane-prompt.md"} {
+			if _, err := os.Stat(filepath.Join(root, f)); err != nil {
+				t.Errorf("expected %s: %v", f, err)
+			}
+		}
+		if !strings.Contains(readFile(t, filepath.Join(root, "AGENTS.md")), "## Lanes") {
+			t.Error("AGENTS.md should carry the Lanes section")
+		}
+	})
+	t.Run("--skip-lane and --skip-agents leave the contract out", func(t *testing.T) {
+		for name, opts := range map[string]InitOptions{
+			"skip-lane":   {SkipLane: true},
+			"skip-agents": {SkipAgents: true},
+		} {
+			root := t.TempDir()
+			opts.Root, opts.Stack, opts.SkipGithub, opts.Date = root, "none", true, "2026-06-14"
+			report, err := Init(opts)
+			if err != nil {
+				t.Fatalf("%s: Init: %v", name, err)
+			}
+			if s := stepStatus(report, "lane"); s != "skipped" {
+				t.Errorf("%s: lane step = %q, want skipped", name, s)
+			}
+			if _, err := os.Stat(filepath.Join(root, ".dotf")); err == nil {
+				t.Errorf("%s: .dotf was written", name)
+			}
+		}
+	})
+}

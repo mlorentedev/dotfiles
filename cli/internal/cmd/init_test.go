@@ -120,3 +120,28 @@ func TestInitAgentsDryRunCmd(t *testing.T) {
 		t.Errorf("dry-run wrote AGENTS.md to %s", dir)
 	}
 }
+
+// TestInitLane_DryRun asserts `dotf init lane --dry-run` reports intent and writes nothing, and a real run writes the contract.
+func TestInitLane_DryRun(t *testing.T) {
+	dir := t.TempDir()
+	stdout, stderr, err := execute(t, "init", "lane", "--repo", dir, "--dry-run")
+	if err != nil {
+		t.Fatalf("`dotf init lane --dry-run` errored: %v\n%s", err, stdout+stderr)
+	}
+	if !strings.Contains(stdout+stderr, "[DRY-RUN]") {
+		t.Errorf("expected [DRY-RUN] in output, got:\n%s", stdout+stderr)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("dry-run wrote %d entries to %s", len(entries), dir)
+	}
+
+	stdout, stderr, err = execute(t, "init", "lane", "--repo", dir)
+	if err != nil {
+		t.Fatalf("`dotf init lane` errored: %v\n%s", err, stdout+stderr)
+	}
+	for _, f := range []string{".dotf/lane.json", ".dotf/lane-prompt.md", "AGENTS.md"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			t.Errorf("expected %s after `dotf init lane`: %v", f, err)
+		}
+	}
+}
