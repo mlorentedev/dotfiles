@@ -105,7 +105,7 @@ $ go test ./... && go vet ./... && GOOS=windows go vet ./...   -> ok
 $ golangci-lint run ./internal/converge/...   -> 0 issues
 ```
 
-The tests run against a fake scheduler. The live proof is two runs on msi (Linux) and on the work-lab box (Windows, elevated), after a release carrying the step; both are open tasks in PR5.
+The tests run against a fake scheduler. The live proof is two runs after a release carrying the step: on msi (Linux), and on a seeded Windows guest, elevated, in place of the work-lab box. Both are closed: see "AC9 on msi" and "AC9 on Windows".
 
 ### PR6: hive self-installs on Windows (2026-10-21)
 
@@ -197,6 +197,8 @@ check                  task=False script=False
 | `20261105T045741Z` (install.ps1, before the seed) | `ok`, 0: no unattended hive upgrade is installed |
 | `20261105T063135Z` (converge 1) | `change`, 2: removed: task `\DotfilesHiveUpgrade`; `C:\Users\dotf\.claude\scripts\hive-upgrade.ps1` (hive ADR-020: nothing upgrades hive unattended) |
 | `20261105T063314Z` (converge 2) | `ok`, 0: no unattended hive upgrade is installed |
+
+This run used the first version of the checker, which read the task with `-ErrorAction SilentlyContinue`. Under that version a failed scheduler read would also print `task=False`. Review on #3183 made the checker fail closed. Its `task=False` after converge 1 was not the only evidence: the step's own probe in converge 2 read the scheduler and reported nothing left.
 
 The run did not need a Defender exclusion. An earlier guest that day, with signatures 1.463.130.0, quarantined the same release as `Trojan:Win32/Bearfoos.A!ml` (#3172). This one, with 1.463.132.0, reported no detection.
 

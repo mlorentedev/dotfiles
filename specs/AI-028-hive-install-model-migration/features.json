@@ -18,6 +18,6 @@
     "behavior": "No timer, task or hook upgrades hive unattended; hive-upgrade-retire removes hive-upgrade.timer, the DotfilesHiveUpgrade task and its script copy from a machine that has them, and a second run changes nothing",
     "verification": "bats tests/hive-daemon-gate.bats && cd cli && go test ./internal/converge/ -run TestHiveUpgradeRetire",
     "state": "passing",
-    "evidence": "verification exit 0 (2026-10-30): 2 bats tests, 7 TestHiveUpgradeRetire tests. Live on msi from its converge records: [CHANGE] at 20261025T044811Z, [ OK ] at 20261025T050456Z and 20261026T192529Z (verification.md). The Windows half is unmeasured"
+    "evidence": "verification exit 0 (2026-11-05): 2 bats tests, 7 TestHiveUpgradeRetire tests. Live on msi from its converge records: [CHANGE] at 20261025T044811Z, [ OK ] at 20261025T050456Z and 20261026T192529Z. Live on Windows on a seeded dotf vm windows guest: change 2 at 20261105T063135Z, ok 0 at 20261105T063314Z (verification.md, AC9 on Windows)"
   }
 ]
