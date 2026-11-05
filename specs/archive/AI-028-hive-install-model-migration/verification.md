@@ -211,6 +211,14 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - **#2956 runs against this model, and is ticketed as #2991** (2026-10-30). It deletes `%LOCALAPPDATA%\hive\bin\hive.cmd` as a "legacy shim" when it shadows a uv copy. That file is the launcher hive ADR-019 makes hive own. Its code is dead for hive in every release that carries it, because `selfInstall` returns before `verifyOnPath`. The harm is in the recovery it suggests: a box that keeps the uv copy at the pin never self-installs. The owner chooses the recovery shape (A/B/C on #2991) before this spec archives. *Decided 2026-10-31:* C, on the advisor's recommendation, which the owner delegated. The probe reads only the launcher `self_install` declares, so such a box self-installs on its next converge, and the doctor names the uv copy without dotf removing it. B was rejected because it has dotf delete a copy it did not install, the class #2956 got wrong. Implemented in PR8 (`tasks.md`), ADR-036 amendment 2026-10-31.
 - **PR1 sequenced before the model change.** The loud-vs-quiet fix does not depend on resolving the bootstrap question, and it is what makes the next recurrence visible. Shipping it first means the session produces a durable improvement even if the model migration proves deeper than expected.
 
+## Review findings, dispositioned (2026-11-05)
+
+The independent review (`review.md`, nan/mimo-v2.6-flash) returned PASS-WITH-GAPS with three Minor findings:
+
+- **Finding 1 (REAL):** `ai/hermes/setup.sh:83` upgrades hive-vault to PyPI latest, and nothing guards that line. Ticketed as #3184. The hermes instance it provisioned was retired, so deleting the block may be the fix.
+- **Finding 2 (REAL):** f8 still claims a registered-PATH refusal that PR8 deleted. Ticketed as #3185, a one-line correction to the archived record.
+- **Finding 3 (THEORETICAL):** the live proofs come from run records that are not committed here. Declined. The records are machine state, every acceptance criterion also has a named suite that the review re-ran green, and each live result is quoted verbatim above.
+
 ## Promotion candidates
 
 Before archiving, flag what (if anything) should be promoted to the vault. If all three are "no", archive in repo is the only persistence.
@@ -221,7 +229,7 @@ Before archiving, flag what (if anything) should be promoted to the vault. If al
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/AI-028-hive-install-model-migration/` -> `specs/archive/AI-028-hive-install-model-migration/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/AI-028-hive-install-model-migration/` -> `specs/archive/AI-028-hive-install-model-migration/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
