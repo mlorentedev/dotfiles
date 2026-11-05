@@ -1,7 +1,7 @@
 ---
 id: "AI-028-hive-install-model-migration"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-07"
 issue: "dotfiles#791"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
