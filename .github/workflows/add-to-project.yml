@@ -127,6 +127,8 @@ jobs:
           ' --jq '.data.user.projectV2.id') || rc=$?
 
           if [ "$rc" -eq 0 ] && [ -n "${PROJECT_ID}" ]; then
+            # $project and $contentId are GraphQL variables, not shell ones.
+            # shellcheck disable=SC2016
             gh_graphql -f query='
               mutation($project: ID!, $contentId: ID!) {
                 addProjectV2ItemById(input: {projectId: $project, contentId: $contentId}) {
