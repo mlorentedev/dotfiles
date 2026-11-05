@@ -44,12 +44,12 @@ STUB
     [ "$status" -eq 0 ]
     grep -q 'project=PVT_abc ' "$FIX/mutation.log"
     # The notice still reaches the log, outside the captured value.
-    [[ "$output" == *"::warning::transient failure (attempt 1/3)"* ]]
+    [[ "$output" == *"::warning::transient failure (attempt 1/3)"* ]] || false
 }
 
 @test "a project that resolves to null fails without sending the mutation" {
     STUB_PROJECT=null run bash "$FIX/script.sh"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"project id resolved empty"* ]]
+    [[ "$output" == *"project id resolved empty"* ]] || false
     [ ! -e "$FIX/mutation.log" ]
 }
