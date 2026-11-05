@@ -5,7 +5,8 @@
 # and each one runs its own workflow checks on the PR. The 2026-11-04 rollout
 # went red in two of seven: ts-bridge's check-workflow-permissions.sh wants a
 # top-level `permissions:` key, and kubelab's yamllint caps lines at 130
-# characters. Patching a consumer is undone by the next rollout, so the rules
+# characters. A third followed: ts-bridge runs actionlint with no ignore list,
+# so a shellcheck info note fails its job. Patching a consumer is undone by the next rollout, so the rules
 # are held here, against the files the script actually ships.
 #
 # Only rules that fail a consumer's check are held. kubelab's yamllint also
@@ -43,5 +44,15 @@ long = [n for n, line in enumerate(open(sys.argv[1], encoding="utf-8"), 1)
 print(" ".join(map(str, long)))
 sys.exit(1 if long else 0)' "$ROOT/.github/workflows/$wf"
         [ "$status" -eq 0 ] || { echo "$wf: lines over 130: $output"; return 1; }
+    done
+}
+
+@test "every canonical workflow passes actionlint with no ignores (ts-bridge hygiene)" {
+    # dotfiles' CI does not install actionlint, so this runs where it is on PATH
+    # (pre-commit on a workstation) and says so when it is not.
+    command -v actionlint >/dev/null || skip "actionlint not on PATH"
+    for wf in "${WORKFLOWS[@]}"; do
+        run actionlint -config-file /dev/null "$ROOT/.github/workflows/$wf"
+        [ "$status" -eq 0 ] || { echo "$wf: $output"; return 1; }
     done
 }
