@@ -3,6 +3,7 @@ package initrepo
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -72,6 +73,21 @@ func TestInitWorkflowsStackScaffoldsNoCodeAndNoCI(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(wf, "ci.yml")); err == nil {
 		t.Error("a workflows repo got ci.yml")
+	}
+}
+
+// StackInit keeps its own switch, so a stack added to the table and not to it
+// would report itself unknown. Tools are kept off PATH: only the switch is
+// under test.
+func TestStackInitKnowsEveryStackInTheTable(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	for stack := range stacks {
+		res, _ := StackInit(t.TempDir(), stack)
+		for _, s := range res.Skipped {
+			if strings.HasPrefix(s, "unknown stack") {
+				t.Errorf("stack %q is in the table but StackInit reports %q", stack, s)
+			}
+		}
 	}
 }
 
