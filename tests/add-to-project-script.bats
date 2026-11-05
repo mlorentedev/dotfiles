@@ -87,7 +87,10 @@ STUB
         STUB_FAIL_MSG='GraphQL: API rate limit already exceeded for user ID 13562150.' run bash "$FIX/script.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"primary GraphQL pool exhausted"* ]] || false
-    [[ "$output" == *"mlorentedev/dotfiles bitacora-reconcile.yml"* ]] || false
+    # One annotation line: a split message would leave its tail outside the warning.
+    [[ "$output" == *"::warning::primary GraphQL pool exhausted"*"if it is still open, mlorentedev/dotfiles bitacora-reconcile.yml adds it within a day"* ]] || false
+    [ "$(printf '%s\n' "$output" | grep -c 'bitacora-reconcile')" -eq 1 ]
+    printf '%s\n' "$output" | grep -q '^::warning::.*bitacora-reconcile.yml adds it within a day$'
     [ ! -e "$FIX/mutation.log" ]
 }
 
@@ -95,6 +98,6 @@ STUB
     STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 \
         STUB_FAIL_MSG='GraphQL: Resource not accessible by personal access token (user.projectV2)' run bash "$FIX/script.sh"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"this is not a rate limit"* ]] || false
+    [[ "$output" == *"(not a rate limit)"* ]] || false
     [ ! -e "$FIX/sleep.log" ]
 }
