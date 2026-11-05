@@ -65,14 +65,20 @@ jobs:
                   return await call();
                 } catch (err) {
                   const status = err.status ?? err.response?.status;
-                  const after = Number(err.response?.headers?.['retry-after']) || 0;
+                  const headers = err.response?.headers ?? {};
+                  const after = Number(headers['retry-after']) || 0;
                   const limited = status === 429
                     || (status === 403 && (after > 0 || /rate limit/i.test(err.message)))
                     || (err.errors ?? []).some((e) => e.type === 'RATE_LIMITED');
                   const transient = limited || status >= 500 || (status === undefined && !err.errors);
                   if (attempt === 3 || !transient) throw err;
-                  // GitHub asks for retry-after when given, else at least a minute.
-                  const wait = limited ? Math.max(after, 60) : attempt * 5;
+                  // GitHub asks for retry-after when given, then the primary limit's
+                  // reset time, else at least a minute. A wait past five minutes
+                  // would outlast the job: fail now, and the reconciler heals it.
+                  const reset = Number(headers['x-ratelimit-reset']) || 0;
+                  const untilReset = reset ? Math.ceil(reset - Date.now() / 1000) : 0;
+                  const wait = limited ? Math.max(after, untilReset, 60) : attempt * 5;
+                  if (wait > 300) throw err;
                   core.warning(`transient failure (attempt ${attempt}/3, ${status ?? err.message}); retrying in ${wait}s`);
                   await new Promise((r) => setTimeout(r, wait * 1000));
                 }
@@ -104,7 +110,8 @@ jobs:
               `query($itemId: ID!) {
                 node(id: $itemId) {
                   ... on ProjectV2Item {
-                    fieldValues(first: 30) {
+                    fieldValues(first: 100) {
+                      pageInfo { hasNextPage }
                       nodes {
                         ... on ProjectV2ItemFieldSingleSelectValue {
                           optionId name
@@ -117,8 +124,13 @@ jobs:
               }`,
               { itemId },
             );
-            const status = (current.node?.fieldValues?.nodes ?? [])
-              .find((v) => v?.field?.id === statusFieldId);
+            const values = current.node?.fieldValues;
+            const status = (values?.nodes ?? []).find((v) => v?.field?.id === statusFieldId);
+            // A project holds at most 50 fields, so one page of 100 is all of them.
+            // Should that change, an unseen Status must not read as unset.
+            if (!status && values?.pageInfo?.hasNextPage) {
+              throw new Error(`Issue #${number}: Status not in the first 100 field values; not moving it`);
+            }
             if (status && status.optionId !== backlogId) {
               core.info(`Issue #${number} is "${status.name}"; left as is`);
               return;

@@ -25,7 +25,9 @@ const maybeFail = () => {
   const f = fail.shift();
   if (!f) return;
   const err = new Error(f.message ?? 'boom');
-  if (f.status) { err.status = f.status; err.response = { status: f.status, headers: f.headers ?? {} }; }
+  const headers = { ...(f.headers ?? {}) };
+  if (f.resetIn) headers['x-ratelimit-reset'] = String(Math.floor(Date.now() / 1000) + f.resetIn);
+  if (f.status) { err.status = f.status; err.response = { status: f.status, headers }; }
   if (f.errors) err.errors = f.errors;
   throw err;
 };
@@ -37,7 +39,7 @@ const github = {
     calls.push(op === 'update' ? `update:${vars.optionId}` : op);
     maybeFail();
     if (op === 'add') return { addProjectV2ItemById: { item: { id: 'PVTI_1' } } };
-    if (op === 'read') return { node: { fieldValues: { nodes: sc.values ?? [] } } };
+    if (op === 'read') return { node: { fieldValues: { nodes: sc.values ?? [], pageInfo: { hasNextPage: !!sc.more } } } };
     return {};
   },
 };
@@ -111,4 +113,23 @@ PRIORITY_FIELD='{"id":"PVTSSF_priority"}'
     go '{"fail":[null,{"errors":[{"type":"NOT_FOUND"}]}]}'
     [ "$status" -eq 1 ]
     [[ "$output" == *'"waits":[]'* ]] || false
+}
+
+@test "a primary rate limit waits until its reset" {
+    go '{"fail":[{"status":403,"message":"API rate limit exceeded","resetIn":120}],"values":[]}'
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ \"waits\":\[1(19|20|21)\] ]] || false
+}
+
+@test "a rate limit that resets after the job's budget fails at once" {
+    go '{"fail":[{"status":403,"message":"API rate limit exceeded","resetIn":3600}]}'
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'"waits":[]'* ]] || false
+}
+
+@test "a Status beyond the values read fails rather than reading as unset" {
+    go "{\"more\":true,\"values\":[{\"optionId\":\"7705a647\",\"name\":\"P1\",\"field\":$PRIORITY_FIELD}]}"
+    [ "$status" -eq 1 ]
+    [[ "$output" != *'update:'* ]] || false
+    [[ "$output" == *'Status not in the first 100 field values'* ]] || false
 }
