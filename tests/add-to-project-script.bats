@@ -1,10 +1,11 @@
 #!/usr/bin/env bats
-# Runs add-to-project.yml's own `run:` script against a gh stub (#3160 items 10, 11).
+# Runs add-to-project.yml's own `run:` script against a gh stub (#3160 items 1, 2, 10, 11, 12).
 #
 # The script captures the project lookup with $(gh_graphql ...). A retry notice
 # printed to stdout landed inside PROJECT_ID, so a transient error that the retry
 # recovered still failed the mutation on a malformed id. And `--jq` prints the
-# string `null` for a missing project, which passed the non-empty guard. These
+# string `null` for a missing project, which passed the non-empty guard. A refused
+# connection went red with no retry, and a secondary rate limit got 5 s. These
 # tests read the script from the workflow, so they exercise what ships.
 
 setup() {
@@ -17,8 +18,9 @@ wf = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
 step = next(s for s in wf["jobs"]["add-to-project"]["steps"] if s.get("name") == "Add to bitácora board")
 print(step["run"])' "$ROOT/.github/workflows/add-to-project.yml" > "$FIX/script.sh"
 
-    # gh stub: the project query answers $STUB_PROJECT, failing first with a
-    # transient error when STUB_FAIL_ONCE is set; the mutation logs its args.
+    # gh stub: the project query answers $STUB_PROJECT. STUB_FAIL_ONCE makes its
+    # first call fail with STUB_FAIL_MSG (default a 502); the mutation logs its
+    # args. sleep logs how long it was asked to wait.
     cat > "$FIX/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
@@ -28,13 +30,13 @@ case "$*" in
     *projectV2*)
         if [ -n "${STUB_FAIL_ONCE:-}" ] && [ ! -e "$FIX/failed" ]; then
             touch "$FIX/failed"
-            echo "HTTP 502: Bad Gateway" >&2
+            echo "${STUB_FAIL_MSG:-HTTP 502: Bad Gateway}" >&2
             exit 1
         fi
         printf '%s\n' "$STUB_PROJECT" ;;
 esac
 STUB
-    printf '#!/bin/sh\nexit 0\n' > "$FIX/bin/sleep"
+    printf '#!/bin/sh\necho "$1" >> "$FIX/sleep.log"\n' > "$FIX/bin/sleep"
     chmod +x "$FIX/bin/gh" "$FIX/bin/sleep"
     export FIX PATH="$FIX/bin:$PATH" CONTENT_NODE_ID=I_node GITHUB_EVENT_NAME=issues
 }
@@ -52,4 +54,44 @@ STUB
     [ "$status" -eq 1 ]
     [[ "$output" == *"project id resolved empty"* ]] || false
     [ ! -e "$FIX/mutation.log" ]
+}
+
+@test "a refused connection is retried as transient (item 1)" {
+    STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 \
+        STUB_FAIL_MSG='Post "https://api.github.com/graphql": dial tcp 140.82.112.6:443: connect: connection refused' \
+        run bash "$FIX/script.sh"
+    [ "$status" -eq 0 ]
+    grep -q 'project=PVT_abc ' "$FIX/mutation.log"
+}
+
+@test "a secondary rate limit waits a minute before the retry (item 2)" {
+    STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 \
+        STUB_FAIL_MSG='HTTP 403: You have exceeded a secondary rate limit.' run bash "$FIX/script.sh"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$FIX/sleep.log")" = 60 ]
+}
+
+@test "a 5xx backs off 5 seconds, not a minute" {
+    STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 run bash "$FIX/script.sh"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$FIX/sleep.log")" = 5 ]
+}
+
+@test "a GraphQL RATE_LIMITED error, sent with HTTP 200, takes the rate-limit path (item 12)" {
+    # gh api graphql exits 1 on a response carrying `errors`, and prints this
+    # line for RATE_LIMITED: the exact text it returned on 2026-11-05.
+    STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 \
+        STUB_FAIL_MSG='GraphQL: API rate limit already exceeded for user ID 13562150.' run bash "$FIX/script.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"primary GraphQL pool exhausted"* ]] || false
+    [[ "$output" == *"mlorentedev/dotfiles bitacora-reconcile.yml"* ]] || false
+    [ ! -e "$FIX/mutation.log" ]
+}
+
+@test "a GraphQL permission error, sent with HTTP 200, fails the job (item 12)" {
+    STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 \
+        STUB_FAIL_MSG='GraphQL: Resource not accessible by personal access token (user.projectV2)' run bash "$FIX/script.sh"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"this is not a rate limit"* ]] || false
+    [ ! -e "$FIX/sleep.log" ]
 }
