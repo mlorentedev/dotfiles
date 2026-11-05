@@ -53,6 +53,11 @@ type recordKind struct {
 	Exclude      map[string]string `json:"exclude"`
 }
 
+// schema is the kind's frontmatter schema, defaulting by the record file name.
+func (k *recordKind) schema(file string) string {
+	return orDefault(k.Schema, "harness/"+strings.ToLower(strings.TrimSuffix(file, ".md"))+"-frontmatter.schema.json")
+}
+
 // excluded reports whether name is excluded, refusing an exclusion with no reason.
 func (k *recordKind) excluded(name string) (bool, error) {
 	reason, ok := k.Exclude[name]

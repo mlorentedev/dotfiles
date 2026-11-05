@@ -132,8 +132,36 @@ func TestCompareWithVault_AVaultRecordNeverRefreshedIsMissingUnlessExcluded(t *t
 
 	// An excluded record still committed is one the next refresh drops.
 	writeFile(t, filepath.Join(repo, "harness", "agents", "newcomer", "AGENT.md"), "---\nname: newcomer\n---\n")
-	if d := CompareWithVault(repo, vault); strings.Join(d.Stale, ",") != "agents/newcomer (excluded)" {
-		t.Fatalf("want the committed excluded record stale, got %+v", d)
+	d = CompareWithVault(repo, vault)
+	if strings.Join(d.Excluded, ",") != "agents/newcomer" {
+		t.Fatalf("want the committed excluded record reported, got %+v", d)
+	}
+	if lines := d.Lines(); !strings.Contains(lines[0].Text, "[EXCLUDED] harness/agents/newcomer") {
+		t.Errorf("want an EXCLUDED line, got %+v", lines)
+	}
+}
+
+// An exclusion whose vault dir is gone has outlived its reason.
+func TestCompareWithVault_AnExclusionTheVaultNoLongerHasIsUnused(t *testing.T) {
+	repo, vault := vaultPair(t)
+	writeFile(t, filepath.Join(repo, "harness", "agent-frontmatter.schema.json"), `{"required":["name"]}`)
+	writeFile(t, filepath.Join(repo, filepath.FromSlash(ManifestFile)), `{"targets":[],
+		"agents":{"vault_subpath":"00_meta/agents","record_dir":"harness/agents","exclude":{"gone":"was decided elsewhere"}}}`)
+	if d := CompareWithVault(repo, vault); strings.Join(d.Unused, ",") != "agents/gone" {
+		t.Fatalf("want agents/gone unused, got %+v", d)
+	}
+}
+
+// A vault record a refresh would refuse is not MISSING: committing cannot clear it.
+func TestCompareWithVault_AVaultRecordRefreshRefusesIsInvalidNotMissing(t *testing.T) {
+	repo, vault := vaultPair(t)
+	writeFile(t, filepath.Join(repo, "harness", "agent-frontmatter.schema.json"), `{"required":["name"]}`)
+	writeFile(t, filepath.Join(repo, filepath.FromSlash(ManifestFile)), `{"targets":[],
+		"agents":{"vault_subpath":"00_meta/agents","record_dir":"harness/agents"}}`)
+	writeFile(t, filepath.Join(vault, "00_meta", "agents", "nameless", "AGENT.md"), "---\ndescription: x\n---\n")
+	d := CompareWithVault(repo, vault)
+	if len(d.Missing) != 0 || len(d.Invalid) != 1 || !strings.Contains(d.Invalid[0], `"name"`) {
+		t.Fatalf("want one invalid record naming the key and none missing, got %+v", d)
 	}
 }
 

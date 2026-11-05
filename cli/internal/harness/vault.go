@@ -28,11 +28,14 @@ type VaultDrift struct {
 	Unstamped []string // records carrying no provenance, which cannot be compared
 	Unread    []string // records directories that could not be read
 	Missing   []string // kind/name of a vault record a refresh would write that the checkout lacks
+	Excluded  []string // kind/name of a record the manifest excludes that is still committed
+	Unused    []string // kind/name of a manifest exclusion the vault has no dir for
+	Invalid   []string // a vault record or exclusion a refresh refuses, with the reason
 }
 
 // HasDrift reports whether any record failed to match or could not be compared.
 func (d VaultDrift) HasDrift() bool {
-	return len(d.Stale)+len(d.Edited)+len(d.Unstamped)+len(d.Unread)+len(d.Missing) > 0
+	return len(d.Stale)+len(d.Edited)+len(d.Unstamped)+len(d.Unread)+len(d.Missing)+len(d.Excluded)+len(d.Unused)+len(d.Invalid) > 0
 }
 
 // Lines renders the comparison as check lines, problems first.
@@ -41,6 +44,18 @@ func (d VaultDrift) Lines() []CheckLine {
 	for _, n := range d.Missing {
 		out = append(out, CheckLine{Problem: true, Text: "[MISSING] harness/" + n + " is a vault record no refresh has committed",
 			Detail: []string{"      -> run dotf harness refresh in a worktree and commit it, or exclude it in the manifest with the reason"}})
+	}
+	for _, n := range d.Excluded {
+		out = append(out, CheckLine{Problem: true, Text: "[EXCLUDED] harness/" + n + " is excluded in the manifest but still committed",
+			Detail: []string{"      -> run dotf harness refresh in a worktree, which drops it, and commit the removal"}})
+	}
+	for _, n := range d.Unused {
+		out = append(out, CheckLine{Problem: true, Text: "[UNUSED] the manifest excludes " + n + ", which the vault no longer has",
+			Detail: []string{"      -> remove the exclusion: its reason no longer applies to anything"}})
+	}
+	for _, msg := range d.Invalid {
+		out = append(out, CheckLine{Problem: true, Text: "[INVALID] " + msg,
+			Detail: []string{"      -> fix it at the source; a refresh refuses it, so committing a record cannot clear this"}})
 	}
 	for _, n := range d.Stale {
 		out = append(out, CheckLine{Problem: true, Text: "[STALE] harness/" + n + " differs from its vault source",
@@ -101,10 +116,12 @@ func CompareWithVault(repoRoot, vault string) VaultDrift {
 	return d
 }
 
-// compareCoverage walks the vault side, which the stamps cannot see: a vault
-// record that a refresh would write and the checkout lacks is Missing (#3098),
-// and a committed record the manifest excludes is Stale, since a refresh drops
-// it. A checkout without a manifest has no record kinds to walk.
+// compareCoverage walks the vault side, which the stamps cannot see (#3098).
+// A vault record that a refresh would write and the checkout lacks is Missing,
+// and one a refresh would refuse is Invalid, since committing cannot clear it.
+// A committed record the manifest excludes is Excluded, since a refresh drops
+// it, and an exclusion naming no vault dir is Unused. A checkout without a
+// manifest has no record kinds to walk.
 func (d *VaultDrift) compareCoverage(repoRoot, vault string) {
 	m, err := loadCheckManifest(repoRoot)
 	if err != nil {
@@ -114,28 +131,49 @@ func (d *VaultDrift) compareCoverage(repoRoot, vault string) {
 		k         *recordKind
 		sub, file string
 	}{{m.Skills, "skills", "SKILL.md"}, {m.Agents, "agents", "AGENT.md"}} {
-		if kind.k == nil {
-			continue
+		if kind.k != nil {
+			d.coverKind(repoRoot, vault, kind.k, kind.sub, kind.file)
 		}
-		vaultDir := filepath.Join(vault, filepath.FromSlash(kind.k.VaultSubpath))
-		recDir := filepath.Join(repoRoot, filepath.FromSlash(kind.k.RecordDir))
-		names, err := visibleDirs(vaultDir)
-		if err != nil {
-			d.Unread = append(d.Unread, fmt.Sprintf("vault %s (%v)", kind.k.VaultSubpath, err))
-			continue
+	}
+	sort.Strings(d.Unused)
+}
+
+func (d *VaultDrift) coverKind(repoRoot, vault string, k *recordKind, sub, file string) {
+	vaultDir := filepath.Join(vault, filepath.FromSlash(k.VaultSubpath))
+	recDir := filepath.Join(repoRoot, filepath.FromSlash(k.RecordDir))
+	names, err := visibleDirs(vaultDir)
+	if err != nil {
+		d.Unread = append(d.Unread, fmt.Sprintf("vault %s (%v)", k.VaultSubpath, err))
+		return
+	}
+	schema := k.schema(file)
+	required, err := schemaRequired(filepath.Join(repoRoot, filepath.FromSlash(schema)))
+	if err != nil {
+		d.Unread = append(d.Unread, fmt.Sprintf("%s (%v)", schema, err))
+		return
+	}
+	for name := range k.Exclude {
+		if !isDir(filepath.Join(vaultDir, name)) {
+			d.Unused = append(d.Unused, sub+"/"+name)
 		}
-		for _, name := range names {
-			_, notRecord := os.Stat(filepath.Join(vaultDir, name, kind.file))
-			_, notCommitted := os.Stat(filepath.Join(recDir, name, kind.file))
-			excluded, err := kind.k.excluded(name)
-			switch {
-			case err != nil:
-				d.Unread = append(d.Unread, err.Error())
-			case excluded && notCommitted == nil:
-				d.Stale = append(d.Stale, kind.sub+"/"+name+" (excluded)")
-			case !excluded && notRecord == nil && notCommitted != nil:
-				d.Missing = append(d.Missing, kind.sub+"/"+name)
+	}
+	for _, name := range names {
+		src := filepath.Join(vaultDir, name, file)
+		_, notRecord := os.Stat(src)
+		_, notCommitted := os.Stat(filepath.Join(recDir, name, file))
+		excluded, err := k.excluded(name)
+		switch {
+		case err != nil:
+			d.Invalid = append(d.Invalid, err.Error())
+		case excluded:
+			if notCommitted == nil {
+				d.Excluded = append(d.Excluded, sub+"/"+name)
 			}
+		case notRecord != nil:
+		case frontmatterError(src, required) != "":
+			d.Invalid = append(d.Invalid, frontmatterError(src, required))
+		case notCommitted != nil:
+			d.Missing = append(d.Missing, sub+"/"+name)
 		}
 	}
 }

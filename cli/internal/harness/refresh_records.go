@@ -40,7 +40,7 @@ func (w *refreshWrites) records(repoRoot, vault string, k *recordKind, file stri
 	if !isDir(vaultDir) {
 		return fmt.Errorf("refresh needs the vault dir %s", vaultDir)
 	}
-	schema := orDefault(k.Schema, "harness/"+strings.ToLower(strings.TrimSuffix(file, ".md"))+"-frontmatter.schema.json")
+	schema := k.schema(file)
 	required, err := schemaRequired(filepath.Join(repoRoot, filepath.FromSlash(schema)))
 	if err != nil {
 		return fmt.Errorf("schema %s: %w", schema, err)
