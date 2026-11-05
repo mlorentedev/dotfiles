@@ -145,3 +145,37 @@ func TestInitLane_DryRun(t *testing.T) {
 		}
 	}
 }
+
+// TestInit_SkipFlagsReachTheLaneStep drives the real command so the flag-to-option
+// wiring is covered, not only InitOptions: a mis-mapped --skip-lane or
+// --skip-agents must change what lands on disk.
+func TestInit_SkipFlagsReachTheLaneStep(t *testing.T) {
+	cases := []struct {
+		name       string
+		flag       string
+		wantLane   bool
+		wantAgents bool
+	}{
+		{"no skip flag scaffolds both", "", true, true},
+		{"--skip-lane keeps AGENTS.md", "--skip-lane", false, true},
+		{"--skip-agents also skips the lane step", "--skip-agents", false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			args := []string{"init", dir, "--skip-github", "--skip-vault"}
+			if tc.flag != "" {
+				args = append(args, tc.flag)
+			}
+			if stdout, stderr, err := execute(t, args...); err != nil {
+				t.Fatalf("`dotf %s` errored: %v\n%s", strings.Join(args, " "), err, stdout+stderr)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".dotf", "lane.json")); (err == nil) != tc.wantLane {
+				t.Errorf(".dotf/lane.json present=%v, want %v", err == nil, tc.wantLane)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); (err == nil) != tc.wantAgents {
+				t.Errorf("AGENTS.md present=%v, want %v", err == nil, tc.wantAgents)
+			}
+		})
+	}
+}
