@@ -253,7 +253,8 @@ refute_legacy_mise_sync() {
     grep -qF -- '-NoProfile -ExecutionPolicy Bypass -File $installer' "$PS1_SCRIPT"
     install_line=$(grep -n 'Install-AgentBinary -Name "Claude Code"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     deploy_line=$(grep -nE '^[[:space:]]*& dotf deploy' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$deploy_line" ] && [ "$install_line" -lt "$deploy_line" ]
+    [ -n "$deploy_line" ]
+    [ "$install_line" -lt "$deploy_line" ]
     # parity: Linux and macOS get the same two from mise, at their newest
     # release (#2013 D9); setup-linux.sh no longer runs a vendor installer
     grep -A1 -xF '# mise: latest' "$DOTFILES_DIR/versions.conf" | grep -qE '^CLAUDE_VERSION='
