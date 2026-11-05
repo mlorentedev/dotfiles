@@ -276,6 +276,9 @@ if ($wingetCmd) {
 # OS, like uv), run in a child pwsh exactly as the uv/Bun installers are, and
 # skipped when the binary is already on PATH - the pattern-setup-script-
 # idempotence shape of the Linux blocks.
+# The tools step further down now renders the same `# mise: latest` pins on
+# Windows too; these installers stay until a clean Windows box shows that step
+# alone puts claude and agy on PATH (PLAT-001c AC4 follow-up).
 function Install-AgentBinary {
     param(
         [Parameter(Mandatory)][string]$Name,
