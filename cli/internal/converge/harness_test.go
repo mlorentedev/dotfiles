@@ -128,9 +128,9 @@ func TestRecordsHarness_AnApplyWithNoRunnerFailsLoudly(t *testing.T) {
 	}
 }
 
-// Skills are not planned yet, so an apply must run the deploy even when every
-// instruction file is current; skipping it would leave a changed skill record
-// undeployed behind a clean report.
+// Presence has no preview, so a plan with nothing to change is not yet proof
+// that nothing is stale: an apply still runs the deploy, which rewrites only
+// what differs, when every instruction file and skill record is current.
 func TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent(t *testing.T) {
 	env := harnessEnv(t)
 	if _, err := (recordsHarness{run: deployingRunner(t), has: noCommands}).Reconcile(env, false); err != nil {
@@ -254,7 +254,7 @@ func TestRecordsHarness_TheGoDeployConvergesTheRealCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := Env{RepoRoot: repo, Home: t.TempDir(), GOOS: "darwin"}
-	r := recordsHarness{run: HarnessDeploy, has: onPath}
+	r := recordsHarness{run: HarnessDeploy, preview: HarnessPreview, has: onPath}
 
 	if _, err := r.Reconcile(env, false); err != nil {
 		t.Fatal(err)
@@ -266,4 +266,94 @@ func TestRecordsHarness_TheGoDeployConvergesTheRealCheckout(t *testing.T) {
 	if err != nil || again.Changes != 0 {
 		t.Errorf("second plan: want 0 changes, got %d (%v): %s", again.Changes, err, again.Detail)
 	}
+}
+
+// skillsEnv adds a skills block to harnessEnv's manifest: one record, deployed
+// to claude's skill directory.
+func skillsEnv(t *testing.T) Env {
+	t.Helper()
+	env := harnessEnv(t)
+	writeFixture(t, env.RepoRoot, map[string]string{
+		"harness/manifest.json": `{"agents":{"vault_subpath":"00_meta/agents","record_dir":"harness/agents","deploy":[],"presence":[
+			{"agent":"claude","file":".claude/CLAUDE.md","source":"ai/claude/CLAUDE.md"}
+		]},"skills":{"vault_subpath":"00_meta/skills","record_dir":"harness/skills",
+			"deploy":[{"agent":"claude","render":"skill","dir":".claude/skills"}]}}`,
+		"harness/skills/demo/SKILL.md": "---\nname: demo\ndescription: a demo skill\n---\n\nversion one\n",
+		// A persona the roster needs, aimed away from claude so no presence
+		// region is rendered into its file.
+		"harness/agents/reviewer/AGENT.md": "---\nname: reviewer\nkind: invocable\ntargets: [copilot]\nskills: []\n---\n",
+	})
+	return env
+}
+
+// The plan judges skill records by their rendered form (#2013 AC2, PLAT-001b
+// L63): a record whose render differs from the deployed copy is a change the
+// plan counts and the probe fails on until an apply deploys it. Before this,
+// the plan read only the instruction files and a changed skill was invisible.
+func TestRecordsHarness_AChangedSkillRecordIsPlannedAndFailsTheProbe(t *testing.T) {
+	env := skillsEnv(t)
+	r := recordsHarness{run: HarnessDeploy, preview: HarnessPreview, has: noCommands}
+
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := r.Reconcile(env, true); err != nil || again.Changes != 0 {
+		t.Fatalf("after a deploy: want 0 changes, got %d (%v): %s", again.Changes, err, again.Detail)
+	}
+
+	writeFixture(t, env.RepoRoot, map[string]string{
+		"harness/skills/demo/SKILL.md": "---\nname: demo\ndescription: a demo skill\n---\n\nversion two\n",
+	})
+	plan, err := r.Reconcile(env, true)
+	if err != nil || plan.Changes != 1 || !strings.Contains(plan.Detail, "skill") {
+		t.Fatalf("a changed record: want 1 skill change, got %d (%v): %s", plan.Changes, err, plan.Detail)
+	}
+	if err := r.Probe(env); err == nil || !strings.Contains(err.Error(), "skill") {
+		t.Fatalf("want the probe to fail on the undeployed skill, got %v", err)
+	}
+
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Probe(env); err != nil {
+		t.Fatalf("probe after the apply: %v", err)
+	}
+	deployed, _ := os.ReadFile(filepath.Join(env.Home, ".claude", "skills", "demo", "SKILL.md"))
+	if !strings.Contains(string(deployed), "version two") {
+		t.Fatalf("the apply did not deploy the changed record:\n%s", deployed)
+	}
+}
+
+// A record that no longer exists leaves a generated output the deploy prunes:
+// that is a change too, and the probe holds until it is gone.
+func TestRecordsHarness_ARemovedSkillRecordIsPlannedAsAPrune(t *testing.T) {
+	env := skillsEnv(t)
+	r := recordsHarness{run: HarnessDeploy, preview: HarnessPreview, has: noCommands}
+	if _, err := r.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(env.RepoRoot, "harness", "skills", "demo")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(env.RepoRoot, "harness", "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := r.Reconcile(env, true)
+	if err != nil || plan.Changes != 1 {
+		t.Fatalf("a removed record: want 1 change (the prune), got %d (%v): %s", plan.Changes, err, plan.Detail)
+	}
+}
+
+// A nil preview plans no records, so the registry must wire one: without it the
+// plan would go back to reading the instruction files alone.
+func TestRegistry_RecordsHarnessPreviewsTheRecords(t *testing.T) {
+	for _, r := range Registry(Options{}) {
+		if h, ok := r.(recordsHarness); ok {
+			if h.preview == nil {
+				t.Fatal("records-harness has no preview: its plan would skip the skill records")
+			}
+			return
+		}
+	}
+	t.Fatal("the registry has no records-harness step")
 }

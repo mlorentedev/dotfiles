@@ -117,7 +117,7 @@ func Registry(o Options) []Reconciler {
 		checkout{run: o.GitRun, url: url, has: onPath, installer: o.ToolsCatalog, registered: o.RegisteredPath},
 		recordsMirror{},
 		envGenerate{},
-		recordsHarness{run: o.RunHarnessDeploy, has: onPath},
+		recordsHarness{run: o.RunHarnessDeploy, preview: HarnessPreview, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs, registered: o.RegisteredPath},
 		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},

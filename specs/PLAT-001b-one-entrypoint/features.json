@@ -71,8 +71,8 @@
   },
   {
     "id": "PLAT-001b-one-entrypoint-f11",
-    "behavior": "AC2: the records step runs the skill deploy (compile-harness.sh --deploy) on every apply, even when the instruction files are current",
-    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent$' -count=1 -v | grep -q -- '--- PASS: TestRecordsHarness_ApplyRunsTheDeployEvenWhenInstructionsAreCurrent'",
+    "behavior": "AC2: the records step plans the skill records from their rendered form: a changed record is a planned change, fails the probe until an apply deploys it, and a removed one is a planned prune",
+    "verification": "cd cli && go test ./internal/converge/ -run '^TestRecordsHarness_AChangedSkillRecordIsPlannedAndFailsTheProbe$' -count=1 -v | grep -q -- '--- PASS: TestRecordsHarness_AChangedSkillRecordIsPlannedAndFailsTheProbe'",
     "state": "pending",
     "evidence": ""
   },
