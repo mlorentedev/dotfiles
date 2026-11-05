@@ -82,20 +82,6 @@ refute_legacy_mise_sync() {
     refute_grep_fixed 'Installing aider-chat via uv' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 registers MCP servers" {
-    grep -q 'Registering Claude Code MCP servers' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 MCP loop is StrictMode-safe (probes PSObject.Properties)" {
-    # Under Set-StrictMode -Version Latest, $srv.prerequisite_binary throws when
-    # the field is absent. Only the hive MCP declares this property; the other
-    # servers (sequential-thinking, context7) don't. The loop must probe via
-    # PSObject.Properties to treat missing fields as $null, matching Linux which
-    # uses jq's `(.prerequisite_binary // "")` null-coalesce.
-    grep -qF "PSObject.Properties['prerequisite_binary']" "$PS1_SCRIPT"
-    grep -qF "PSObject.Properties['prerequisite_command']" "$PS1_SCRIPT"
-}
-
 @test "setup-windows.ps1 does NOT eager-source load-secrets, and fetches no deploy-time secret [#587, OPS-040]" {
     # Migrated off the load-secrets eager dot-source by #587 (ADR-028), then
     # OPS-040 removed the `dotf secrets show` fetch itself: the agy mcp_config
@@ -247,25 +233,28 @@ refute_legacy_mise_sync() {
     grep -Eq '\$existingTaskArgument\s+-eq\s+\$expectedTaskArgument' "$PS1_SCRIPT"
 }
 
-# --- MCP server registration (SSOT + idempotence) ---
+# --- MCP server registration ---
 
-# MCP server list must live in mcp-servers.json, not hardcoded in the setup script.
-@test "setup-windows.ps1 MCP registration reads from mcp-servers.json" {
-    refute_grep 'claude mcp add --transport (stdio|http) (drawio|socket|context7|sequential-thinking|hive)' "$PS1_SCRIPT"
+# The bare `dotf deploy` registers them (claude-mcp, with drift re-registration
+# and the .claude.json truncation guard). The loop that did it here, with its
+# HIVE-118 remove and Backup-AndRestoreClaudeJson wrapper, registered the same
+# servers a second time (#2000); none comes back. Same guard as setup-linux.bats.
+@test "setup-windows.ps1 registers no Claude MCP server itself: dotf deploy does" {
+    refute_grep '^[[:space:]]*([^#[:space:]].*)?claude mcp (add|get|remove)' "$PS1_SCRIPT"
 }
 
-# MCP registration must check existence before adding, not blindly retry.
 @test "setup-windows.ps1 installs Claude Code and agy via their official installers when absent (AI-041, #1325)" {
     # setup-linux.sh provisions both; on Windows every block gating on `claude`
     # and the agy config deploy were dead on a clean box. Child pwsh, skip when
-    # on PATH, before the MCP block that needs the binary.
+    # on PATH, before the bare `dotf deploy` that registers Claude's MCP servers.
     grep -qF 'function Install-AgentBinary' "$PS1_SCRIPT"
     grep -qF 'https://claude.ai/install.ps1' "$PS1_SCRIPT"
     grep -qF 'https://antigravity.google/cli/install.ps1' "$PS1_SCRIPT"
     grep -qF -- '-NoProfile -ExecutionPolicy Bypass -File $installer' "$PS1_SCRIPT"
     install_line=$(grep -n 'Install-AgentBinary -Name "Claude Code"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    mcp_line=$(grep -n 'claude mcp get' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ "$install_line" -lt "$mcp_line" ]
+    deploy_line=$(grep -nE '^[[:space:]]*& dotf deploy' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
+    [ -n "$deploy_line" ]
+    [ "$install_line" -lt "$deploy_line" ]
     # parity: Linux and macOS get the same two from mise, at their newest
     # release (#2013 D9); setup-linux.sh no longer runs a vendor installer
     grep -A1 -xF '# mise: latest' "$DOTFILES_DIR/versions.conf" | grep -qE '^CLAUDE_VERSION='
@@ -296,45 +285,6 @@ refute_legacy_mise_sync() {
     gen_line=$(grep -n 'dotf env generate | Out-Null' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     persist_line=$(grep -n 'dotf env persist | Out-Null' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
     [ "$gen_line" -lt "$persist_line" ]
-}
-
-@test "setup-windows.ps1 MCP registration checks existence with claude mcp get" {
-    grep -q 'claude mcp get' "$PS1_SCRIPT"
-}
-
-# --- BUG-004: defense-in-depth around claude plugin install (truncate guard) ---
-# Every `claude plugin install` call triggers upstream anthropics/claude-code#59870:
-# the CLI's deserialize-modify-serialize cycle drops fields outside its internal
-# struct (organizationType, organizationRateLimitTier, projects map, onboarding
-# flags), shrinking ~/.claude/.claude.json from ~75 KB to ~1.5 KB and forcing
-# re-authentication. The existing idempotence guard (`-match [regex]::Escape`
-# against `claude plugin list` output) can yield a false negative for a plugin
-# not in that listing -- so a run reinstalls it, triggering the truncation. The
-# fix is defense in depth:
-# snapshot .claude.json before the call, restore if it shrinks >50% from a
-# baseline of >=10 KB. Complementary to SDD-021's session-start canary at
-# claude-session-start.ps1 (same 10240 threshold, same upstream issue).
-# The plugin installs left the script for `dotf deploy` (#2336), which keeps
-# the same guard in cli/internal/claude; the helper stays for the MCP calls.
-
-@test "setup-windows.ps1 defines Backup-AndRestoreClaudeJson helper (BUG-004)" {
-    grep -q 'function Backup-AndRestoreClaudeJson' "$PS1_SCRIPT"
-}
-
-@test "setup-windows.ps1 uses 10240-byte sanity floor in the truncate guard (BUG-004)" {
-    grep -qF '10240' "$PS1_SCRIPT"
-}
-
-# --- BUG-011: extend the BUG-004 guard to every claude CLI call site ---
-# BUG-004 covered only `claude plugin install`. The same upstream truncation
-# (anthropics/claude-code#59870) fires on `claude mcp get`, `claude mcp add`, and
-# `claude plugin list` because they go through the same deserialize-modify-
-# serialize cycle. With ~9 MCP servers, each unwrapped setup run triggered
-# ~18 chances of truncation. These asserts lock in the wrap on every call site.
-
-@test "setup-windows.ps1 wraps claude mcp get with Backup-AndRestoreClaudeJson (BUG-011)" {
-    # Same scriptblock typically wraps both mcp get and mcp add inside one iteration.
-    grep -B15 'claude mcp get' "$PS1_SCRIPT" | grep -q 'Backup-AndRestoreClaudeJson'
 }
 
 # --- MEM-002: retire claude-mem — plugin no longer installed on Windows ---
@@ -458,19 +408,21 @@ refute_legacy_mise_sync() {
     jq -e '.tools[] | select(.name == "poetry" and .source.type == "uv-tool")' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
-# The uvx MCP servers are skipped while uv is absent, so the registration runs
-# after `dotf tools install`, which installs uv, and the session PATH is
-# refreshed between them (OPS-044, #2754).
+# The uvx MCP servers are skipped while uv is absent, so the bare `dotf deploy`
+# that registers them runs after `dotf tools install`, which installs uv, and the
+# session PATH is refreshed between them. A clean box's first run otherwise
+# registered neither uvx server and only the second converged (OPS-044, #1361,
+# #2754).
 @test "setup-windows.ps1 registers MCP servers after dotf tools install puts uv on PATH" {
-    local catalog_line sync_line mcp_line
+    local catalog_line sync_line deploy_line
     catalog_line="$(grep -nE '^[[:space:]]+dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
     sync_line="$(awk -v from="$catalog_line" 'NR > from && /^[[:space:]]+Sync-SessionPath[[:space:]]*$/ { print NR; exit }' "$PS1_SCRIPT")"
-    mcp_line="$(grep -n 'Registering Claude Code MCP servers' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
+    deploy_line="$(grep -nE '^[[:space:]]*& dotf deploy[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
     [ -n "$catalog_line" ]
     [ -n "$sync_line" ]
-    [ -n "$mcp_line" ]
+    [ -n "$deploy_line" ]
     [ "$catalog_line" -lt "$sync_line" ]
-    [ "$sync_line" -lt "$mcp_line" ]
+    [ "$sync_line" -lt "$deploy_line" ]
 }
 
 @test "Windows entrypoint owns tool convergence; legacy setup does not duplicate mise sync" {
@@ -900,25 +852,6 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     grep -qF -- '-File $installer' "$PS1_SCRIPT"
     run grep -F '& $installer' "$PS1_SCRIPT"
     [ "$status" -ne 0 ]
-}
-
-# OPS-044 (#1361): hive-vault and pdf-modifier are `uvx` MCP servers, and the
-# registration loop skips a server whose prerequisite binary is absent. With the
-# uv installer in section 4 a clean box's first run registered neither and only
-# the second run converged -- measured on the CI runner the first time Claude
-# Code installed there (#1360). Ordering is asserted by line number of the
-# invocation. Linux has no such loop: the bare `dotf deploy` registers the
-# servers after `dotf tools sync` has installed uv.
-# uv now arrives through `dotf tools install` (winget astral-sh.uv, #2754),
-# so that call is the line the registration must follow.
-@test "setup-windows.ps1 installs uv before registering the Claude MCP servers (OPS-044, #1361)" {
-    uv_line=$(grep -nE '^[[:space:]]+dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    # The executable invocation, never a comment naming it: the block's own
-    # comments mention `claude mcp add` 40 lines above the call.
-    mcp_line=$(grep -nE '^[[:space:]]*[^#[:space:]].*claude mcp add --transport' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$uv_line" ]
-    [ -n "$mcp_line" ]
-    [ "$uv_line" -lt "$mcp_line" ]
 }
 
 # CLI-062 (#1338): the DX-006 Orca hook repair is `dotf orca tune-hooks`, the
