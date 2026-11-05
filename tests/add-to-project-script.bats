@@ -50,6 +50,8 @@ STUB
 }
 
 @test "a project that resolves to null fails without sending the mutation" {
+    # Also the fallback for a gh that exited 0 on a body carrying `errors`:
+    # `--jq .data.user.projectV2.id` prints `null` for it, and this guard rejects it.
     STUB_PROJECT=null run bash "$FIX/script.sh"
     [ "$status" -eq 1 ]
     [[ "$output" == *"project id resolved empty"* ]] || false
@@ -77,9 +79,10 @@ STUB
     [ "$(cat "$FIX/sleep.log")" = 5 ]
 }
 
-@test "a GraphQL RATE_LIMITED error, sent with HTTP 200, takes the rate-limit path (item 12)" {
-    # gh api graphql exits 1 on a response carrying `errors`, and prints this
-    # line for RATE_LIMITED: the exact text it returned on 2026-11-05.
+@test "a GraphQL RATE_LIMITED error, which gh exits 1 on, takes the rate-limit path (item 12)" {
+    # GitHub sends RATE_LIMITED with HTTP 200. gh api graphql still exits 1 on a
+    # body carrying `errors` (checked live on 2026-11-05) and prints this line,
+    # so the stub exits 1 with it. A gh that exited 0 instead is test 2's case.
     STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 \
         STUB_FAIL_MSG='GraphQL: API rate limit already exceeded for user ID 13562150.' run bash "$FIX/script.sh"
     [ "$status" -eq 0 ]
@@ -88,7 +91,7 @@ STUB
     [ ! -e "$FIX/mutation.log" ]
 }
 
-@test "a GraphQL permission error, sent with HTTP 200, fails the job (item 12)" {
+@test "a GraphQL permission error, which gh exits 1 on, fails the job (item 12)" {
     STUB_PROJECT=PVT_abc STUB_FAIL_ONCE=1 \
         STUB_FAIL_MSG='GraphQL: Resource not accessible by personal access token (user.projectV2)' run bash "$FIX/script.sh"
     [ "$status" -eq 1 ]
