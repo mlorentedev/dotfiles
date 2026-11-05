@@ -224,7 +224,7 @@ Pass --force to regenerate the entry files (the memory symlink is left as-is).`,
 		},
 	}
 
-	cmd.Flags().StringVar(&stack, "stack", "none", "project stack token for the entry: go|python|node|none")
+	cmd.Flags().StringVar(&stack, "stack", "none", "project stack token for the entry: go|python|node|ts|workflows|none")
 	cmd.Flags().BoolVar(&force, "force", false, "regenerate entry files even if present")
 	return cmd
 }

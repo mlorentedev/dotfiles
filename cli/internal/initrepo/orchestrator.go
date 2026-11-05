@@ -15,7 +15,7 @@ import (
 // for --skip-vault or an absent vault).
 type InitOptions struct {
 	Root              string
-	Stack             string // go | python | node | ts | none
+	Stack             string // go | python | node | ts | workflows | none
 	Date              string // YYYY-MM-DD
 	DryRun            bool   // report what would change without modifying disk
 	SkipAgents        bool

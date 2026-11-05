@@ -36,6 +36,12 @@ Mutation check (2026-11-04). Each change was reverted on its own and the three n
 - ADR-022 line 76 lists `--stack {go,python,node,none}`. It is a dated decision record, so it is left as written; the flag help is the live list.
 - The PR box in tasks.md stays unticked. The PR is recorded here instead, so the reviewed tasks.md digest does not change (HARNESS-081).
 
+## Review dispositions (round 1: PASS, nan/glm5.3-flash, on ecf307de)
+
+- Minor, the `InitOptions.Stack` comment omits `workflows` (orchestrator.go:18) -> applied
+- Minor, the `dotf vault project --stack` help omits `ts` and `workflows` (vault.go:227; pre-existing for `ts`) -> applied
+- Minor, ADR-022:76 stack list is stale -> declined: a dated decision record stays as written (see Decisions above); the flag help is the live list
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: a missing table entry, no new failure mode
@@ -44,7 +50,7 @@ Mutation check (2026-11-04). Each change was reverted on its own and the three n
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CLI-135-init-stack-directories/` -> `specs/archive/CLI-135-init-stack-directories/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CLI-135-init-stack-directories/` -> `specs/archive/CLI-135-init-stack-directories/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
