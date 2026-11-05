@@ -218,3 +218,25 @@ func TestApplySquashMergeDefaultsAlreadySet(t *testing.T) {
 		t.Errorf("already-set must be a no-op (no PATCH); calls:\n%s", readFile(t, calls))
 	}
 }
+
+// A gh that cannot read the repo (unauthenticated, offline, missing repo) is a
+// skip, never an error and never a PATCH.
+func TestApplySquashMergeDefaultsSkipsWhenTheRepoIsUnreadable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("gh stub uses a POSIX shell script")
+	}
+	dir := t.TempDir()
+	calls := filepath.Join(dir, "calls.log")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + shq(calls) + "\nexit 1\n"
+	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	res, err := ApplySquashMergeDefaults("owner/repo", false)
+	if err != nil || res.Action != "skipped" || !strings.Contains(res.Reason, "could not query") {
+		t.Fatalf("want a skip naming the query, got %+v, %v", res, err)
+	}
+	if patched(t, calls) {
+		t.Errorf("an unreadable repo must not be PATCHed; calls:\n%s", readFile(t, calls))
+	}
+}
