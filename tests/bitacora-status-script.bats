@@ -59,56 +59,56 @@ PRIORITY_FIELD='{"id":"PVTSSF_priority"}'
 @test "an issue closed while the run was queued is left off the board" {
     go '{"state":"closed"}'
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"calls":["issues.get"]'* ]]
+    [[ "$output" == *'"calls":["issues.get"]'* ]] || false
 }
 
 @test "a Backlog issue moves to In Progress" {
     go "{\"values\":[{\"optionId\":\"f65b1174\",\"name\":\"Backlog\",\"field\":$STATUS_FIELD}]}"
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"update:6c133cc8"'* ]]
+    [[ "$output" == *'"update:6c133cc8"'* ]] || false
 }
 
 @test "a parked issue is left as is, whatever the field and option are named" {
     go "{\"values\":[{\"optionId\":\"7705a647\",\"name\":\"Bloqueado\",\"field\":$STATUS_FIELD}]}"
     [ "$status" -eq 0 ]
-    [[ "$output" != *'update:'* ]]
-    [[ "$output" == *'is \"Bloqueado\"; left as is'* ]]
+    [[ "$output" != *'update:'* ]] || false
+    [[ "$output" == *'is \"Bloqueado\"; left as is'* ]] || false
 }
 
 @test "another field's option is not read as the status" {
     go "{\"values\":[{\"optionId\":\"7705a647\",\"name\":\"P1\",\"field\":$PRIORITY_FIELD}]}"
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"update:6c133cc8"'* ]]
+    [[ "$output" == *'"update:6c133cc8"'* ]] || false
 }
 
 @test "a transient failure is retried and the move still lands" {
     go "{\"fail\":[null,{\"status\":502}],\"values\":[]}"
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"update:6c133cc8"'* ]]
-    [[ "$output" == *'"waits":[5]'* ]]
+    [[ "$output" == *'"update:6c133cc8"'* ]] || false
+    [[ "$output" == *'"waits":[5]'* ]] || false
 }
 
 @test "a secondary rate limit waits for retry-after, and at least a minute" {
     go '{"fail":[{"status":403,"message":"You have exceeded a secondary rate limit","headers":{"retry-after":"90"}},{"status":429}],"values":[]}'
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"waits":[90,60]'* ]]
+    [[ "$output" == *'"waits":[90,60]'* ]] || false
 }
 
 @test "a GraphQL RATE_LIMITED error is retried, though it arrives with HTTP 200" {
     go '{"fail":[null,{"errors":[{"type":"RATE_LIMITED"}]}],"values":[]}'
     [ "$status" -eq 0 ]
-    [[ "$output" == *'"waits":[60]'* ]]
+    [[ "$output" == *'"waits":[60]'* ]] || false
 }
 
 @test "a missing permission fails at once, with no retry" {
     go '{"fail":[{"status":403,"message":"Resource not accessible by personal access token"}]}'
     [ "$status" -eq 1 ]
-    [[ "$output" == *'"calls":["issues.get"]'* ]]
-    [[ "$output" == *'"waits":[]'* ]]
+    [[ "$output" == *'"calls":["issues.get"]'* ]] || false
+    [[ "$output" == *'"waits":[]'* ]] || false
 }
 
 @test "a GraphQL error that is not a rate limit fails at once" {
     go '{"fail":[null,{"errors":[{"type":"NOT_FOUND"}]}]}'
     [ "$status" -eq 1 ]
-    [[ "$output" == *'"waits":[]'* ]]
+    [[ "$output" == *'"waits":[]'* ]] || false
 }
