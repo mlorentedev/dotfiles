@@ -54,6 +54,12 @@ func (w *refreshWrites) records(repoRoot, vault string, k *recordKind, file stri
 		if _, err := os.Stat(filepath.Join(src, file)); err != nil {
 			continue
 		}
+		if skip, err := k.excluded(name); err != nil || skip {
+			if err != nil {
+				return err
+			}
+			continue
+		}
 		if msg := frontmatterError(filepath.Join(src, file), required); msg != "" {
 			return errors.New(msg)
 		}
@@ -71,7 +77,7 @@ func (w *refreshWrites) records(repoRoot, vault string, k *recordKind, file stri
 		return err
 	}
 	for _, name := range stale {
-		if !isDir(filepath.Join(vaultDir, name)) {
+		if _, excluded := k.Exclude[name]; excluded || !isDir(filepath.Join(vaultDir, name)) {
 			w.ops = append(w.ops, refreshOp{log: "dropped stale record: " + path.Join(k.RecordDir, name),
 				dst: filepath.Join(recDir, name), drop: true})
 		}

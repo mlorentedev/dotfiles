@@ -27,16 +27,21 @@ type VaultDrift struct {
 	Edited    []string // kind/name of a record that differs from the render of its unchanged source
 	Unstamped []string // records carrying no provenance, which cannot be compared
 	Unread    []string // records directories that could not be read
+	Missing   []string // kind/name of a vault record a refresh would write that the checkout lacks
 }
 
 // HasDrift reports whether any record failed to match or could not be compared.
 func (d VaultDrift) HasDrift() bool {
-	return len(d.Stale)+len(d.Edited)+len(d.Unstamped)+len(d.Unread) > 0
+	return len(d.Stale)+len(d.Edited)+len(d.Unstamped)+len(d.Unread)+len(d.Missing) > 0
 }
 
 // Lines renders the comparison as check lines, problems first.
 func (d VaultDrift) Lines() []CheckLine {
 	var out []CheckLine
+	for _, n := range d.Missing {
+		out = append(out, CheckLine{Problem: true, Text: "[MISSING] harness/" + n + " is a vault record no refresh has committed",
+			Detail: []string{"      -> run dotf harness refresh in a worktree and commit it, or exclude it in the manifest with the reason"}})
+	}
 	for _, n := range d.Stale {
 		out = append(out, CheckLine{Problem: true, Text: "[STALE] harness/" + n + " differs from its vault source",
 			Detail: []string{"      -> if the vault is the newer side, run dotf harness refresh in a worktree; if the record is, carry the edit to the vault"}})
@@ -88,10 +93,51 @@ func CompareWithVault(repoRoot, vault string) VaultDrift {
 		}
 	}
 	d.compareEnforced(repoRoot, vault)
+	d.compareCoverage(repoRoot, vault)
+	sort.Strings(d.Missing)
 	sort.Strings(d.Stale)
 	sort.Strings(d.Edited)
 	sort.Strings(d.Unstamped)
 	return d
+}
+
+// compareCoverage walks the vault side, which the stamps cannot see: a vault
+// record that a refresh would write and the checkout lacks is Missing (#3098),
+// and a committed record the manifest excludes is Stale, since a refresh drops
+// it. A checkout without a manifest has no record kinds to walk.
+func (d *VaultDrift) compareCoverage(repoRoot, vault string) {
+	m, err := loadCheckManifest(repoRoot)
+	if err != nil {
+		return // compareEnforced already reported an unreadable manifest
+	}
+	for _, kind := range []struct {
+		k         *recordKind
+		sub, file string
+	}{{m.Skills, "skills", "SKILL.md"}, {m.Agents, "agents", "AGENT.md"}} {
+		if kind.k == nil {
+			continue
+		}
+		vaultDir := filepath.Join(vault, filepath.FromSlash(kind.k.VaultSubpath))
+		recDir := filepath.Join(repoRoot, filepath.FromSlash(kind.k.RecordDir))
+		names, err := visibleDirs(vaultDir)
+		if err != nil {
+			d.Unread = append(d.Unread, fmt.Sprintf("vault %s (%v)", kind.k.VaultSubpath, err))
+			continue
+		}
+		for _, name := range names {
+			_, notRecord := os.Stat(filepath.Join(vaultDir, name, kind.file))
+			_, notCommitted := os.Stat(filepath.Join(recDir, name, kind.file))
+			excluded, err := kind.k.excluded(name)
+			switch {
+			case err != nil:
+				d.Unread = append(d.Unread, err.Error())
+			case excluded && notCommitted == nil:
+				d.Stale = append(d.Stale, kind.sub+"/"+name+" (excluded)")
+			case !excluded && notRecord == nil && notCommitted != nil:
+				d.Missing = append(d.Missing, kind.sub+"/"+name)
+			}
+		}
+	}
 }
 
 // recordFiles is filepath.Glob(dir/*/file) without its blind spot: Glob drops
