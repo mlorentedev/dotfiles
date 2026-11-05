@@ -1,5 +1,5 @@
 ---
-id: "lesson-549-a-hosted-runner-ships-the-runtime-a-clean-windows-lacks"
+id: "lesson-550-a-hosted-runner-ships-the-runtime-a-clean-windows-lacks"
 type: lesson
 status: active
 title: "A hosted runner ships the runtime a clean Windows lacks"
@@ -9,7 +9,7 @@ created: "2026-11-05"
 # A hosted runner ships the runtime a clean Windows lacks
 
 
-**Context:** #3174 added mise to the Windows tool catalog. Earlier measurements had mise 2026.9.13 installing every marked pin on Windows, and the PR's `test-windows` job installed mise and all 40 pins on windows-latest.
+**Context:** #3174 added mise to the Windows tool catalog. Earlier measurements had mise 2026.9.13 installing every marked pin on Windows, and the PR's `test-windows` job installed mise on windows-latest and ran its sync over all 40 marked pins.
 
 **Problem:** On a clean Windows 11 Arm64 guest, the same catalog entry failed with `mise-v2026.9.13-windows-arm64.exe does not run`. The binary was the right architecture (PE machine `0xAA64`) and passed its checksum. It exited `0xC0000135`, STATUS_DLL_NOT_FOUND, because it imports `vcruntime140.dll` and a clean Windows ships no Visual C++ redistributable. The GitHub-hosted Windows image installs that redistributable, so every runner measurement passed. After `winget install Microsoft.VCRedist.2015+.arm64`, `mise --version` printed `2026.9.13 windows-arm64`.
 
