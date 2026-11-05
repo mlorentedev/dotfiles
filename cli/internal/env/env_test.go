@@ -70,6 +70,150 @@ func TestResolveWindowsExpandsUserprofile(t *testing.T) {
 	}
 }
 
+func TestResolveDerivedPathUsesResolvedBase(t *testing.T) {
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "env-contract.json")
+	raw := `{"env_vars":[
+		{"name":"PROJECTS_PATH","default":{"linux":"$HOME/Projects","windows":"$env:USERPROFILE\\Projects"}},
+		{"name":"WORKTREE_ROOT","derived_from":{"key":"PROJECTS_PATH","path":"worktrees"},
+		 "default":{"linux":"$HOME/Projects/worktrees","windows":"$env:USERPROFILE\\Projects\\worktrees"}}
+	]}`
+	if err := os.WriteFile(contractPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := loadContract(contractPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name     string
+		goos     string
+		home     string
+		override map[string]string
+		want     string
+	}{
+		{
+			name:     "linux base override",
+			goos:     "linux",
+			home:     "/home/me",
+			override: map[string]string{"PROJECTS_PATH": "/workspace"},
+			want:     "/workspace/worktrees",
+		},
+		{
+			name:     "windows base override",
+			goos:     "windows",
+			home:     `C:\Users\me`,
+			override: map[string]string{"PROJECTS_PATH": `D:\Workspace`},
+			want:     `D:\Workspace\worktrees`,
+		},
+		{
+			name:     "dependent override wins",
+			goos:     "linux",
+			home:     "/home/me",
+			override: map[string]string{"PROJECTS_PATH": "/workspace", "WORKTREE_ROOT": "/short/wt"},
+			want:     "/short/wt",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolved(Resolve(c, &machine{Paths: tc.override}, tc.goos, tc.home))
+			if got["WORKTREE_ROOT"] != tc.want {
+				t.Errorf("WORKTREE_ROOT = %q, want %q", got["WORKTREE_ROOT"], tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadContractRejectsInvalidDerivedPaths(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "unknown base",
+			body: `{"env_vars":[
+				{"name":"WORKTREE_ROOT","derived_from":{"key":"MISSING","path":"worktrees"},
+				 "default":{"linux":"$HOME/Projects/worktrees"}}
+			]}`,
+			want: "unknown base",
+		},
+		{
+			name: "cycle",
+			body: `{"env_vars":[
+				{"name":"A","derived_from":{"key":"B","path":"a"},"default":{"linux":"$HOME/a"}},
+				{"name":"B","derived_from":{"key":"A","path":"b"},"default":{"linux":"$HOME/b"}}
+			]}`,
+			want: "cycle",
+		},
+		{
+			name: "absolute child",
+			body: `{"env_vars":[
+				{"name":"PROJECTS_PATH","default":{"linux":"$HOME/Projects"}},
+				{"name":"WORKTREE_ROOT","derived_from":{"key":"PROJECTS_PATH","path":"/worktrees"},
+				 "default":{"linux":"$HOME/Projects/worktrees"}}
+			]}`,
+			want: "relative",
+		},
+		{
+			name: "unresolved token",
+			body: `{"env_vars":[
+				{"name":"WORKTREE_ROOT","default":{"linux":"{PROJECTS_PATH}/worktrees"}}
+			]}`,
+			want: "unresolved token",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "env-contract.json")
+			if err := os.WriteFile(path, []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err := loadContract(path)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("loadContract() error = %v, want one containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestDerivedDefaultMatchesCompatibilityFallback(t *testing.T) {
+	dir := t.TempDir()
+	contractPath := filepath.Join(dir, "env-contract.json")
+	raw := `{"env_vars":[
+		{"name":"PROJECTS_PATH","default":{"linux":"$HOME/Projects","windows":"$env:USERPROFILE\\Projects"}},
+		{"name":"WORKTREE_ROOT","derived_from":{"key":"PROJECTS_PATH","path":"worktrees"},
+		 "default":{"linux":"$HOME/Projects/worktrees","windows":"$env:USERPROFILE\\Projects\\worktrees"}}
+	]}`
+	if err := os.WriteFile(contractPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := loadContract(contractPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		goos string
+		home string
+	}{
+		{goos: "linux", home: "/home/me"},
+		{goos: "darwin", home: "/Users/me"},
+		{goos: "windows", home: `C:\Users\me`},
+	} {
+		t.Run(tc.goos, func(t *testing.T) {
+			derived := resolved(Resolve(c, &machine{}, tc.goos, tc.home))["WORKTREE_ROOT"]
+			c.EnvVars[1].DerivedFrom = nil
+			fallback := resolved(Resolve(c, &machine{}, tc.goos, tc.home))["WORKTREE_ROOT"]
+			c.EnvVars[1].DerivedFrom = &derivedPath{Key: "PROJECTS_PATH", Path: "worktrees"}
+			if derived != fallback {
+				t.Errorf("derived WORKTREE_ROOT = %q, compatibility fallback = %q", derived, fallback)
+			}
+		})
+	}
+}
+
 // TestRealContractRendersAgeKeyDiscovery is the end-to-end regression guard for
 // #518: the actual repo env-contract.json must resolve AGE_KEY_PATH and
 // SOPS_AGE_KEY_FILE to the deployed age key on both OSes, and both must survive

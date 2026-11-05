@@ -20,15 +20,15 @@ owner: manu
 - [x] Branch created from `origin/main`: `feat/3191-workspace-root-contract`
 - [x] `proposal.md` is complete and acceptance criteria are testable
 - [x] No open questions left in `proposal.md` "Risks / open questions"
-- [ ] Run `/spec check PLAT-008-workspace-root-contract`; expected: `PASS`
-- [ ] Set `proposal.md` status to `implementing` only after the consistency check passes
+- [x] Run `/spec check PLAT-008-workspace-root-contract`; expected: `PASS`
+- [x] Set `proposal.md` status to `implementing` only after the consistency check passes
 
 ## Implementation
 
 ### PR 1 - project boundary, derived paths, persistence and trust
 
-- [ ] [AC1] Add table cases to `cli/internal/env/env_test.go` for `derived_from`: resolved base override, compatibility fallback, unknown base, cycle, absolute child, and default-equivalence. Run `cd cli; go test ./internal/env -run 'TestResolveDerived|TestDerivedDefaults'`; expected: FAIL because the schema and resolver do not exist.
-- [ ] [AC1] Add `DerivedFrom` to `cli/internal/env.contractVar` and implement dependency resolution in `cli/internal/env/resolve.go`; reject unknown bases, cycles, absolute children and unresolved tokens. Run the focused env tests; expected: PASS.
+- [x] [AC1] Add table cases to `cli/internal/env/env_test.go` for `derived_from`: resolved base override, compatibility fallback, unknown base, cycle, absolute child, and default-equivalence. Run `cd cli; go test ./internal/env -run 'TestResolveDerived|TestDerivedDefaults'`; expected: FAIL because the schema and resolver do not exist.
+- [x] [AC1] Add `DerivedFrom` to `cli/internal/env.contractVar` and implement dependency resolution in `cli/internal/env/resolve.go`; reject unknown bases, cycles, absolute child paths and unresolved tokens. Run the focused env tests; expected: PASS.
 - [ ] [AC1] Add real-contract tests proving `PROJECTS_PATH`, `DOTFILES_REPO_DIR`, `VAULT_PATH`, `HIVE_VAULT_PATH`, `WORKTREE_ROOT` and `COPILOT_WORKTREE_ROOT` resolve identically from default and machine-overridden boundaries. Run `cd cli; go test ./internal/env -run 'TestRealContract.*Projects|TestDefaultCheckoutDirMatchesTheContract'`; expected: FAIL before the contract changes.
 - [ ] [AC1] Update `env-contract.json` with `PROJECTS_PATH`, additive `derived_from` relationships and compatibility defaults. Keep explicit overrides higher precedence. Run the focused real-contract tests; expected: PASS.
 - [ ] [AC1] Add failing tests in `cli/internal/doctor/checks_env_persist_test.go` for persisted drift being `FAIL`, not `WARN`, and for a current process retaining a stale dotf-generated value after the resolved value changes. Run `cd cli; go test ./internal/doctor -run TestCheckPersistedEnv`; expected: FAIL on status/seam behavior.

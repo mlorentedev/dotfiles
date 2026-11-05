@@ -22,6 +22,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -34,8 +35,14 @@ type contract struct {
 }
 
 type contractVar struct {
-	Name    string            `json:"name"`
-	Default map[string]string `json:"default"`
+	Name        string            `json:"name"`
+	Default     map[string]string `json:"default"`
+	DerivedFrom *derivedPath      `json:"derived_from,omitempty"`
+}
+
+type derivedPath struct {
+	Key  string `json:"key"`
+	Path string `json:"path"`
 }
 
 // machine is the per-machine override file (~/.config/dotfiles/machine.json):
@@ -59,7 +66,76 @@ func loadContract(path string) (*contract, error) {
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return nil, fmt.Errorf("parse env-contract.json (%s): %w", path, err)
 	}
+	if err := validateContract(&c); err != nil {
+		return nil, fmt.Errorf("validate env-contract.json (%s): %w", path, err)
+	}
 	return &c, nil
+}
+
+func validateContract(c *contract) error {
+	byName := make(map[string]contractVar, len(c.EnvVars))
+	for _, v := range c.EnvVars {
+		byName[v.Name] = v
+		for goos, value := range v.Default {
+			if strings.ContainsAny(value, "{}") {
+				return fmt.Errorf("%s default for %s contains an unresolved token: %q", v.Name, goos, value)
+			}
+		}
+	}
+	for _, v := range c.EnvVars {
+		if err := validateDerivedPath(v, byName); err != nil {
+			return err
+		}
+	}
+	return validateDerivedCycles(byName)
+}
+
+func validateDerivedPath(v contractVar, byName map[string]contractVar) error {
+	if v.DerivedFrom == nil {
+		return nil
+	}
+	if _, ok := byName[v.DerivedFrom.Key]; !ok {
+		return fmt.Errorf("%s derived_from names unknown base %q", v.Name, v.DerivedFrom.Key)
+	}
+	if v.DerivedFrom.Path == "" || absoluteOnAnyOS(v.DerivedFrom.Path) {
+		return fmt.Errorf("%s derived_from path %q must be a non-empty relative path", v.Name, v.DerivedFrom.Path)
+	}
+	return nil
+}
+
+func absoluteOnAnyOS(value string) bool {
+	slash := strings.ReplaceAll(value, `\`, "/")
+	if strings.HasPrefix(slash, "/") {
+		return true
+	}
+	return len(slash) >= 3 && slash[1] == ':' && slash[2] == '/'
+}
+
+func validateDerivedCycles(byName map[string]contractVar) error {
+	state := make(map[string]uint8, len(byName))
+	var visit func(string) error
+	visit = func(name string) error {
+		if state[name] == 1 {
+			return fmt.Errorf("derived_from cycle includes %q", name)
+		}
+		if state[name] == 2 {
+			return nil
+		}
+		state[name] = 1
+		if d := byName[name].DerivedFrom; d != nil {
+			if err := visit(d.Key); err != nil {
+				return err
+			}
+		}
+		state[name] = 2
+		return nil
+	}
+	for name := range byName {
+		if err := visit(name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // loadMachine reads ~/.config/dotfiles/machine.json. A missing file yields an

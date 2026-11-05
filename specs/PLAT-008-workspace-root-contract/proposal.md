@@ -1,7 +1,7 @@
 ---
 id: "PLAT-008-workspace-root-contract"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-11-05"
 issue: "mlorentedev/dotfiles#3191"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
