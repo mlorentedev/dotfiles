@@ -83,6 +83,10 @@ jobs:
           # only that case.
           RATE_LIMITED=10
 
+          # fd 3 is the step's stdout. gh_graphql's notices go there, so a caller
+          # that captures the function's output gets the response alone (#3160).
+          exec 3>&1
+
           # gh_graphql <args...> — one GraphQL call with the three-way handling
           # described in the header. Prints the response on success.
           gh_graphql() {
@@ -100,11 +104,11 @@ jobs:
                 *"secondary rate limit"*|*"abuse detection"*|*"was submitted too quickly"*|\
                 *"HTTP 50"*|*"timeout"*|*"Connection reset"*|*"EOF"*)
                   if [ "$attempt" -ge "$max" ]; then
-                    printf '::error::transient failure persisted after %d attempts\n' "$max"
+                    printf '::error::transient failure persisted after %d attempts\n' "$max" >&3
                     printf '%s\n' "$out" >&2
                     return 1
                   fi
-                  printf '::warning::transient failure (attempt %d/%d), retrying\n' "$attempt" "$max"
+                  printf '::warning::transient failure (attempt %d/%d), retrying\n' "$attempt" "$max" >&3
                   sleep $(( attempt * 5 ))
                   attempt=$(( attempt + 1 ))
                   ;;
@@ -126,6 +130,8 @@ jobs:
             query { user(login: "mlorentedev") { projectV2(number: 1) { id } } }
           ' --jq '.data.user.projectV2.id') || rc=$?
 
+          # --jq prints `null` for a missing project: that is no id either.
+          [ "${PROJECT_ID}" = null ] && PROJECT_ID=
           if [ "$rc" -eq 0 ] && [ -n "${PROJECT_ID}" ]; then
             # $project and $contentId are GraphQL variables, not shell ones.
             # shellcheck disable=SC2016
