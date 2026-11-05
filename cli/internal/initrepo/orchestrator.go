@@ -186,6 +186,11 @@ func initGithubWithDryRun(root string, dryRun bool) (status, detail string) {
 		return "skipped", res.Reason
 	}
 	detail = "delete_branch_on_merge " + res.Action + " on " + repo
+	squash, err := ApplySquashMergeDefaults(repo, dryRun)
+	if err != nil {
+		return "warn", detail + "; " + err.Error()
+	}
+	detail += "; squash merge defaults " + squash.Action
 	labels, err := ApplyDependabotLabels(repo, dryRun)
 	if err != nil {
 		return "warn", detail + "; " + err.Error()

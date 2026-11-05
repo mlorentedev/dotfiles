@@ -195,11 +195,14 @@ func newInitGithubCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "github",
-		Short: "Apply GitHub repo defaults (delete_branch_on_merge, Dependabot labels)",
+		Short: "Apply GitHub repo defaults (delete_branch_on_merge, squash merge message, Dependabot labels)",
 		Long: `github applies opinionated GitHub repo-level defaults via the gh CLI:
 
   - delete_branch_on_merge=true, which auto-deletes a PR's head branch on merge
     (the orphan-branch hygiene fix);
+  - squash merges take the PR title and no body (squash_merge_commit_title=PR_TITLE,
+    squash_merge_commit_message=BLANK), so no commit carries the branch's Refs lines
+    into a changelog that renders them as closes;
   - every label the repo's own .github/dependabot.yml declares exists. Dependabot
     never creates a custom label and drops a missing one from its PRs.
 
@@ -246,6 +249,19 @@ unreadable repo is a [WARN] skip with exit 0, never fatal.`,
 				cmd.Printf("[DRY-RUN] would enable delete_branch_on_merge on %s\n", res.Repo)
 			case "enabled":
 				cmd.Printf("[OK] enabled delete_branch_on_merge on %s\n", res.Repo)
+			}
+
+			squash, err := initrepo.ApplySquashMergeDefaults(target, dryRun)
+			if err != nil {
+				return err
+			}
+			switch squash.Action {
+			case "skipped":
+				cmd.PrintErrf("[WARN] %s — skipping squash merge defaults for %s\n", squash.Reason, squash.Repo)
+			case "dry-run":
+				cmd.Printf("[DRY-RUN] would set squash merges to the PR title with no body on %s\n", squash.Repo)
+			default:
+				cmd.Printf("[OK] squash merge defaults %s on %s\n", squash.Action, squash.Repo)
 			}
 
 			labels, err := initrepo.ApplyDependabotLabels(target, dryRun)

@@ -164,3 +164,57 @@ func gitInit(t *testing.T, dir, originURL string) {
 func shq(s string) string {
 	return shellsafe.Bash(s)
 }
+
+func TestApplySquashMergeDefaultsSkipsWithoutGh(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	res, err := ApplySquashMergeDefaults("owner/repo", false)
+	if err != nil || res.Action != "skipped" {
+		t.Fatalf("want graceful skip, got %+v, %v", res, err)
+	}
+}
+
+func TestApplySquashMergeDefaultsDryRunDoesNotPatch(t *testing.T) {
+	calls := stubGh(t, "COMMIT_OR_PR_TITLE COMMIT_MESSAGES")
+	res, err := ApplySquashMergeDefaults("owner/repo", true)
+	if err != nil || res.Action != "dry-run" {
+		t.Fatalf("want dry-run, got %+v, %v", res, err)
+	}
+	if patched(t, calls) {
+		t.Errorf("--dry-run must not PATCH; calls:\n%s", readFile(t, calls))
+	}
+}
+
+func TestApplySquashMergeDefaultsSets(t *testing.T) {
+	calls := stubGh(t, "COMMIT_OR_PR_TITLE COMMIT_MESSAGES")
+	res, err := ApplySquashMergeDefaults("owner/repo", false)
+	if err != nil || res.Action != "set" {
+		t.Fatalf("want set, got %+v, %v", res, err)
+	}
+	log := readFile(t, calls)
+	for _, want := range []string{"-X PATCH", "squash_merge_commit_title=PR_TITLE", "squash_merge_commit_message=BLANK"} {
+		if !strings.Contains(log, want) {
+			t.Errorf("PATCH call lacks %q; calls:\n%s", want, log)
+		}
+	}
+}
+
+// One of the two differing is enough to PATCH: PR_TITLE with a PR_BODY body
+// still folds the PR description, references included, into the commit.
+func TestApplySquashMergeDefaultsSetsWhenOnlyTheBodyDiffers(t *testing.T) {
+	calls := stubGh(t, "PR_TITLE PR_BODY")
+	res, err := ApplySquashMergeDefaults("owner/repo", false)
+	if err != nil || res.Action != "set" || !patched(t, calls) {
+		t.Fatalf("want set with a PATCH, got %+v, %v", res, err)
+	}
+}
+
+func TestApplySquashMergeDefaultsAlreadySet(t *testing.T) {
+	calls := stubGh(t, "PR_TITLE BLANK")
+	res, err := ApplySquashMergeDefaults("owner/repo", false)
+	if err != nil || res.Action != "already-set" {
+		t.Fatalf("want already-set, got %+v, %v", res, err)
+	}
+	if patched(t, calls) {
+		t.Errorf("already-set must be a no-op (no PATCH); calls:\n%s", readFile(t, calls))
+	}
+}
