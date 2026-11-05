@@ -1,5 +1,5 @@
 ---
-id: "lesson-550-a-hosted-runner-ships-the-runtime-a-clean-windows-lacks"
+id: "lesson-552-a-hosted-runner-ships-the-runtime-a-clean-windows-lacks"
 type: lesson
 status: active
 title: "A hosted runner ships the runtime a clean Windows lacks"
