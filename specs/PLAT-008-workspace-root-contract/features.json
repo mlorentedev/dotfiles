@@ -1,0 +1,44 @@
+[
+  {
+    "id": "PLAT-008-workspace-root-contract-f1",
+    "behavior": "PROJECTS_PATH-derived defaults, generated path files, persistent environment, and trust projections converge while compatibility fallbacks and explicit overrides remain valid.",
+    "verification": "cd cli && go test ./internal/env ./internal/doctor ./internal/deploy -run 'Test(ResolveDerived|DerivedDefaults|RealContract.*Projects|CheckPersistedEnv|.*Trust.*Path)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-008-workspace-root-contract-f2",
+    "behavior": "A manually moved worktree is classified and repaired only from one unambiguous checkout-to-admin-record match, while unsafe and orphaned states fail safely.",
+    "verification": "cd cli && go test ./internal/worktree ./internal/cmd -run 'TestReconcile(Plan|Repair|Orphan|Refusals)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-008-workspace-root-contract-f3",
+    "behavior": "A sound clean idle worktree relocates through Git with branch, content, registration, and lease preserved, and a second plan is empty.",
+    "verification": "cd cli && go test ./internal/worktree ./internal/cmd -run 'TestReconcile(Move|Relocation|MoveIdempotence)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-008-workspace-root-contract-f4",
+    "behavior": "Hidden roots, boundary violations, stale generated values, ambiguous metadata, and projected Windows paths at or above 260 fail loudly; path headroom below 20 warns.",
+    "verification": "cd cli && go test ./internal/worktree ./internal/doctor -run 'Test(PathBudget|CheckWorktreeRoots|CheckPersistedEnv)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-008-workspace-root-contract-f5",
+    "behavior": "Every recovery and path-budget test is isolated from live user repositories, HOME, and dotf state.",
+    "verification": "cd cli && go test ./internal/worktree -run 'TestReconcileFixturesStayInTempRoot'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "PLAT-008-workspace-root-contract-f6",
+    "behavior": "Reconciliation plan mode is side-effect-free and emits stable machine-readable classifications with Windows and POSIX path parity.",
+    "verification": "cd cli && go test ./internal/worktree ./internal/cmd -run 'TestReconcilePlan.*(NoMutation|JSON|PathParity)'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
