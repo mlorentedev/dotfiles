@@ -48,11 +48,26 @@ sys.exit(1 if long else 0)' "$ROOT/.github/workflows/$wf"
 }
 
 @test "every canonical workflow passes actionlint with no ignores (ts-bridge hygiene)" {
-    # dotfiles' CI does not install actionlint, so this runs where it is on PATH
-    # (pre-commit on a workstation) and says so when it is not.
-    command -v actionlint >/dev/null || skip "actionlint not on PATH"
+    # The Linux test job installs actionlint and sets DOTFILES_CI_EXPECT_ACTIONLINT,
+    # so there a missing binary fails; elsewhere (the macOS job, a workstation
+    # without it) the test says it skipped (#3160 item 7).
+    if ! command -v actionlint >/dev/null; then
+        [ -z "${DOTFILES_CI_EXPECT_ACTIONLINT:-}" ] || { echo "DOTFILES_CI_EXPECT_ACTIONLINT is set, actionlint is not on PATH"; return 1; }
+        skip "actionlint not on PATH"
+    fi
     for wf in "${WORKFLOWS[@]}"; do
         run actionlint -config-file /dev/null "$ROOT/.github/workflows/$wf"
         [ "$status" -eq 0 ] || { echo "$wf: $output"; return 1; }
+    done
+}
+
+@test "CI installs the actionlint that dotf init's lint.yml pins" {
+    # Two copies of one pin; this keeps them one version and one checksum.
+    pin() { sed -n "s/^ *$1: *//p" "$2" | head -1; }
+    tmpl="$ROOT/cli/internal/initrepo/templates/lint.yml"
+    ci="$ROOT/.github/workflows/ci.yml"
+    for key in ACTIONLINT_VERSION ACTIONLINT_SHA256; do
+        [ -n "$(pin "$key" "$tmpl")" ]
+        [ "$(pin "$key" "$ci")" = "$(pin "$key" "$tmpl")" ] || { echo "$key differs between ci.yml and lint.yml"; return 1; }
     done
 }

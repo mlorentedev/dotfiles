@@ -264,3 +264,70 @@ STUB
     [ "$status" -eq 0 ]
     [ ! -e "$DOTF_LOG" ]
 }
+
+# ── a protected branch: the PR path (#3160 item 9) ────────────────────────────
+
+# gh stub for a protected default branch: a PUT without `branch=` is refused, as
+# GitHub answers 409, so every workflow takes the PR path. STUB_OPEN_PR is the
+# number an open PR on ci/bitacora-workflows answers with; STUB_BRANCH_COPY makes
+# the branch already carry the canonical copies.
+protected_stub() {
+    cat > "$FIX/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_LOG"
+all="$*"
+case "$all" in
+    *"projectV2(number: 1) { id }"*) printf 'PVT_test123\n'; exit 0 ;;
+    *"-X PUT"*contents/*branch=*) exit 0 ;;
+    *"-X PUT"*contents/*) exit 1 ;;
+    *"-X POST"*git/refs*) exit "${STUB_BRANCH_EXISTS:-0}" ;;
+    *"?ref=ci/bitacora-workflows -q .content"*)
+        wf="${all%%\?ref=*}"; wf="${wf##*/}"
+        [ -n "${STUB_BRANCH_COPY:-}" ] && base64 < "$CANON/$wf"
+        exit 0 ;;
+    *"pr list"*"--head ci/bitacora-workflows"*)
+        [ -n "${STUB_PR_LIST_FAILS:-}" ] && exit 1
+        [ -n "${STUB_OPEN_PR:-}" ] && printf '%s\n' "$STUB_OPEN_PR"
+        exit 0 ;;
+esac
+exit 0
+STUB
+    chmod +x "$FIX/bin/gh"
+    export CANON="$BATS_TEST_DIRNAME/../.github/workflows"
+}
+
+@test "a re-run with the rollout PR open adds commits to its branch, never resetting it" {
+    protected_stub
+    STUB_OPEN_PR=3097 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 0 ]
+    refute_grep 'force=true' "$GH_LOG"
+    refute_grep 'git/refs' "$GH_LOG"
+    refute_grep 'pr create' "$GH_LOG"
+    grep -q -- '-X PUT .*branch=ci/bitacora-workflows' "$GH_LOG"
+    [[ "$output" == *"open PR #3097 updated"* ]] || false
+}
+
+@test "a re-run whose open PR already carries the copies commits nothing" {
+    protected_stub
+    STUB_OPEN_PR=3097 STUB_BRANCH_COPY=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 0 ]
+    refute_grep 'branch=ci/bitacora-workflows' "$GH_LOG"
+}
+
+@test "with no open PR a leftover branch is reset to base and a PR is opened" {
+    protected_stub
+    STUB_BRANCH_EXISTS=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 0 ]
+    grep -q 'force=true' "$GH_LOG"
+    grep -q 'pr create' "$GH_LOG"
+    [[ "$output" == *"PR opened for review"* ]] || false
+}
+
+@test "a failed open-PR lookup fails the repo and never resets the branch" {
+    protected_stub
+    STUB_PR_LIST_FAILS=1 STUB_BRANCH_EXISTS=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"demo: cannot list open PRs on ci/bitacora-workflows"* ]] || false
+    refute_grep 'force=true' "$GH_LOG"
+    refute_grep 'pr create' "$GH_LOG"
+}
