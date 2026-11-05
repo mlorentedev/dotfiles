@@ -61,7 +61,7 @@ created: "2026-10-06"
   - `compile-harness.sh` delegates `deploy_instructions` to it when the installed dotf carries the subcommand (the `dotf_knows_subcommand` probe) and keeps the copy as the fallback, so no release is needed to land it
 - [x] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`.
   Done in #2914 (`c07b51ae`). The Claude bulk copy now passes `-Exclude 'settings.json', 'CLAUDE.md'`, `copilot-instructions.md` is no longer copied, and both files come from `dotf harness deploy`, whose first surface is `instructions`. The pinned 0.79.0 carries the command
-- [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
+- [x] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form. Done in `records-harness` itself, not a separate step (PR 16); f11 now runs `TestRecordsHarness_AChangedSkillRecordIsPlannedAndFailsTheProbe`
 - [x] `records-bind` (#2232): `harness.Bind` returns one outcome per target and `dotf harness bind` renders it, so converge and doctor count changes without parsing text
   - Every OS, after `configs-deploy` (which seeds the settings files the hooks merge into); the plan writes nothing, the probe re-plans and requires zero writes, and a second run reports 0 changes; with no dotf path resolver wired the step is skipped and says so, as the other steps report a runner they were not given
   - Hooks whose markers another writer stripped are converged (`TestRecordsBind_HooksWithStrippedMarkersAreConverged`), resting on #2276's identity by command signature
@@ -318,6 +318,19 @@ Orca regenerates `~/.copilot/hooks/orca.json` and `~/.orca/agent-hooks/copilot-h
 - [x] Tests: plan, apply, probe and a second plan with 0 changes; no Orca is a skip; tuned hooks are in sync; an unrecognised script is named and never planned or probed; the registry order names the step after `configs-deploy`. Mutations killed: counting an unrecognised script, a plan that applies, a probe that never fails
 - [x] On the Mac, `go run ./cmd/dotf converge --plan --only orca-hooks` reports `[SKIP] orca-hooks  Orca has generated no Copilot hooks for this user`. Orca is not installed there
 - [ ] Follow-up, once the release carrying this step is the `DOTF_VERSION` pin: decide whether the bare `dotf deploy` keeps its own Orca call. It is the path a plain `setup-*.sh` run takes without converge, so it stays until both setups converge first
+
+### PR 16 — records-harness plans the skill records (#2013 AC2, L63)
+
+`records-harness` judged only the instruction files. Its plan printed "skills and presence re-rendered on apply" and counted 0 whatever a skill record held, so a changed record was invisible to the plan and to the probe. The CLI-026 Windows guest showed it: a second converge reported `changed=0` while the skills had been deployed blind.
+
+- [x] The plan and the probe call a dry run of the same deploy (`HarnessPreview`, `harness.Deploy` with `dryRun`) and count every skill, agent-record and doctrine output it would write or prune. The instruction outcomes are left out, because `staleInstructions` already judges those files with the harness regions stripped
+- [x] The probe fails while any record is still to deploy, so a skill the deploy left out stops the run. That is the "fails if they are absent afterwards" half of AC2
+- [x] Planned in `records-harness`, not a new `records-skills` step: the skills are a surface of the same `harness.Deploy`, and a separate step would run that deploy twice
+- [x] The apply still runs the deploy on every run, a plan of 0 included. Presence has no preview, so 0 is not yet proof that nothing is stale; the deploy rewrites only what differs
+- [x] The preview is a seam beside `run`. A nil preview plans no records, and `TestRegistry_RecordsHarnessPreviewsTheRecords` fails if the registry ever drops it
+- [x] Tests: a changed record is 1 planned skill change, fails the probe, and is deployed by the apply; a removed record is a planned prune; the real-checkout test now covers the skills in its "second plan 0 changes". Mutations killed: a plan that ignores the preview, a probe that ignores stale records, a prune not counted
+- [x] On the Mac: `go run ./cmd/dotf converge --plan --only records-harness` prints `[ OK ] records-harness  instruction files current; skill, agent and doctrine records current`
+- [ ] Follow-up: once presence has a preview, the apply can skip the deploy when the plan is 0
 
 ## Closing
 
