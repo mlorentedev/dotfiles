@@ -166,8 +166,15 @@ or application root intentionally stored elsewhere.
 ### 3. Generated persistent environment is not an explicit user override
 
 The path cascade remains explicit process environment -> `machine.json` -> contract.
-However, a value in the Windows user environment that `DOTF_MANAGED_ENV` says dotf wrote
-is a generated artifact, not an operator override.
+However, a value that dotf wrote is a generated artifact, not an operator override. This
+includes Windows user-environment values named by `DOTF_MANAGED_ENV` and values loaded
+from generated `paths.sh` or `paths.ps1`. The generated files are the provenance record
+for the keys they export.
+
+Generation remains deterministic: it resolves only the contract and `machine.json`, never
+the current process environment. Runtime resolvers and persistence ignore stale
+dotf-generated values while computing desired state; an unmanaged environment value keeps
+normal precedence.
 
 `dotf env persist` computes the desired value while ignoring stale dotf-managed values,
 updates the persistent scope, and records the managed set atomically. An unmanaged value
@@ -275,11 +282,17 @@ long-path-aware.
 
 Doctor applies the same calculation to existing worktrees. This closes #2637.
 
-### 7. The managed root cannot be hidden from an agent
+### 7. A linked checkout cannot be hidden from an agent
 
 Doctor rejects a managed worktree root with a dot-prefixed path component or one matched
-by a deployed agent exclusion glob. This mechanically prevents the current
-`Workspace/.worktrees` regression from recurring.
+by a deployed agent exclusion glob.
+
+The reconciliation inventory also scans below `PROJECTS_PATH` for linked-checkout `.git`
+files under dot-prefixed components, then cross-checks them against each repository's Git
+administrative records. A checkout found under an excluded component is a hidden-root
+error even when the configured `WORKTREE_ROOT` itself is valid. The configured-root guard
+and the boundary inventory together prevent the current `Workspace/.worktrees` regression
+from recurring.
 
 ### 8. Rollout order
 
