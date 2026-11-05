@@ -115,13 +115,15 @@ Owner: "lo que recomiende el advisor", which was C on #2991. A box holding a `uv
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks pass (`pwsh` parse / shellcheck as applicable)
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+*Checked 2026-11-05.* Of the nine criteria, AC3 and AC7 are withdrawn. AC1 is superseded: its script and suite were deleted with the timer (AC9). AC5 and AC6 are documentation decisions, so they have no executable test. Their proof is the text they cite: `specs/archive/AI-022-hive-daemon-activation/tasks.md:55` carries the A3 supersession, `specs/archive/AI-023-hive-auto-upgrade-timer/proposal.md:19` the forward pointer, and `proposal.md:40-41` the Linux decision. The two lines below cover the criteria that make a behavioural claim: AC2, AC4, AC8 and AC9.
+
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test. AC2 and AC8 are covered by f8's suite, and AC2 also by the two-converge guest run. AC4 is covered by `tests/hive-daemon-gate.bats` (f4). AC9 is covered by f9, plus msi and the seeded Windows guest
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command (f4, f8, f9; AC2 shares f8, whose `SelfInstall` tests are the Windows bootstrap)
+- [x] Type checks pass (`pwsh` parse / shellcheck as applicable): `dotf lint powershell` analyzed 31 files, exit 0; no shell script changed in the last PRs
+- [x] Lint passes: CI green on every PR of the spec, the last ones being #3130 and #3183
+- [x] No unrelated changes in the diff (no scope creep): each PR was scoped to one task block (PR1 to PR8)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder (#796, #2876, #2901, #2922, #2994, #3013, #3130, #3183)
 
 ## Machine-readable features
 
