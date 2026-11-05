@@ -164,7 +164,7 @@ BLOCKED="{\"optionId\":\"7705a647\",\"name\":\"Blocked\",\"field\":$STATUS_FIELD
 }
 
 @test "a GraphQL error typed RATE_LIMIT is a rate limit too" {
-    go '{"fail":[null,{"errors":[{"type":"RATE_LIMIT"}]}],"values":[]}'
+    go '{"fail":[null,{"graphql":true,"errors":[{"type":"RATE_LIMIT"}]}],"values":[]}'
     [ "$status" -eq 0 ]
     [[ "$output" == *'"waits":[60]'* ]] || false
 }
