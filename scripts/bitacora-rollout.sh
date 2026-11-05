@@ -108,15 +108,21 @@ deploy_workflow() {  # $1 = repo, $2 = workflow filename
 }
 
 deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR for review (never auto-merge)
-    local repo="$1" branch="ci/bitacora-workflows" base base_sha wf wf_path src sha
+    local repo="$1" branch="ci/bitacora-workflows" base base_sha wf wf_path src sha open_pr
     base="$(gh api "repos/$OWNER/$repo" -q '.default_branch')"
     base_sha="$(gh api "repos/$OWNER/$repo/git/ref/heads/$base" -q '.object.sha')"
-    # Create the branch at base HEAD; if it already exists, FORCE-reset it to base.
-    # Blind reuse caused merge conflicts: after the previous PR was squash-merged the
-    # leftover branch held stale commits that textually conflicted with the new base
-    # (observed on pollex/yt-metrics-cli/pdf-modifier-mcp, 2026-06-10). Re-PUTting the
-    # canonical files on a base-fresh branch is the convergent form.
-    if ! gh api -X POST "repos/$OWNER/$repo/git/refs" \
+    open_pr="$(gh pr list --repo "$OWNER/$repo" --head "$branch" --state open --json number -q '.[].number')"
+    # An open PR keeps its branch: the files below land as new commits on it. A
+    # reset to base empties the PR's diff, GitHub closes it, and its reviews and
+    # triage stay behind on a closed PR (#3160 item 9: kubelab#3077 → #3097 → #3100).
+    #
+    # Without an open PR, create the branch at base HEAD, or FORCE-reset a leftover
+    # one to base. Blind reuse caused merge conflicts: after the previous PR was
+    # squash-merged the leftover branch held stale commits that textually conflicted
+    # with the new base (observed on pollex/yt-metrics-cli/pdf-modifier-mcp,
+    # 2026-06-10). Re-PUTting the canonical files on a base-fresh branch is the
+    # convergent form.
+    if [ -z "$open_pr" ] && ! gh api -X POST "repos/$OWNER/$repo/git/refs" \
         -f ref="refs/heads/$branch" -f sha="$base_sha" >/dev/null 2>&1; then
         gh api -X PATCH "repos/$OWNER/$repo/git/refs/heads/$branch" \
             -f sha="$base_sha" -F force=true >/dev/null \
@@ -125,6 +131,9 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
     for wf in "${PR_FILES[@]}"; do
         wf_path=".github/workflows/$wf"
         src="$REPO_ROOT/.github/workflows/$wf"
+        # A kept branch may already carry this copy: skip it rather than commit nothing.
+        [ "$(gh api "repos/$OWNER/$repo/contents/$wf_path?ref=$branch" -q '.content' 2>/dev/null \
+            | base64 -d 2>/dev/null || true)" = "$(cat "$src")" ] && continue
         sha="$(gh api "repos/$OWNER/$repo/contents/$wf_path?ref=$branch" -q '.sha' 2>/dev/null || true)"
         local -a put_args=(-X PUT "repos/$OWNER/$repo/contents/$wf_path"
             -f message="ci: deploy bitácora workflow $wf (OPS-002)"
@@ -132,7 +141,7 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
         [ -n "$sha" ] && put_args+=(-f sha="$sha")
         gh api "${put_args[@]}" >/dev/null || { err "$repo: PUT $wf to $branch failed"; return; }
     done
-    if ! gh pr list --repo "$OWNER/$repo" --head "$branch" --state open --json number -q '.[].number' | grep -q .; then
+    if [ -z "$open_pr" ]; then
         gh pr create --repo "$OWNER/$repo" --base "$base" --head "$branch" \
             --title "ci: deploy bitácora workflows (OPS-002)" \
             --body "Canonical \`add-to-project.yml\` + \`bitacora-status.yml\` from \`mlorentedev/dotfiles\` (runbook §7). Deployed via \`scripts/bitacora-rollout.sh\` — this repo's default branch is protected, so the rollout lands through a PR." >/dev/null \
@@ -141,7 +150,11 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
     # Merge is a supervised human action: auto-merge is forbidden repo-wide
     # (it lands a PR the instant CI is green, bypassing human review), so the
     # rollout only opens the PR and leaves the merge to a reviewer.
-    ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
+    if [ -n "$open_pr" ]; then
+        ok "$repo: protected branch — open PR #$open_pr updated (${PR_FILES[*]})"
+    else
+        ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
+    fi
 }
 
 # apply_github_defaults REPO — hand the repo-level defaults to `dotf init
