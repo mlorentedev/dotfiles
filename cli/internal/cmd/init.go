@@ -255,14 +255,7 @@ unreadable repo is a [WARN] skip with exit 0, never fatal.`,
 			if err != nil {
 				return err
 			}
-			switch squash.Action {
-			case "skipped":
-				cmd.PrintErrf("[WARN] %s — skipping squash merge defaults for %s\n", squash.Reason, squash.Repo)
-			case "dry-run":
-				cmd.Printf("[DRY-RUN] would set squash merges to the PR title with no body on %s\n", squash.Repo)
-			default:
-				cmd.Printf("[OK] squash merge defaults %s on %s\n", squash.Action, squash.Repo)
-			}
+			reportSquashMergeDefaults(cmd, squash)
 
 			labels, err := initrepo.ApplyDependabotLabels(target, dryRun)
 			if err != nil {
@@ -283,4 +276,16 @@ unreadable repo is a [WARN] skip with exit 0, never fatal.`,
 	cmd.Flags().StringVar(&repo, "repo", "", "target repo owner/name (default: derived from origin)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without applying")
 	return cmd
+}
+
+// reportSquashMergeDefaults prints the outcome of ApplySquashMergeDefaults.
+func reportSquashMergeDefaults(cmd *cobra.Command, res initrepo.GitHubResult) {
+	switch res.Action {
+	case "skipped":
+		cmd.PrintErrf("[WARN] %s — skipping squash merge defaults for %s\n", res.Reason, res.Repo)
+	case "dry-run":
+		cmd.Printf("[DRY-RUN] would set squash merges to the PR title with no body on %s\n", res.Repo)
+	default:
+		cmd.Printf("[OK] squash merge defaults %s on %s\n", res.Action, res.Repo)
+	}
 }
