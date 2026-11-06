@@ -144,6 +144,10 @@ type Installer struct {
 	// HasCommand reports whether a package manager is on PATH. Nil means
 	// exec.LookPath; tests inject the answer.
 	HasCommand func(name string) bool
+	// RegisteredPath reads the PATH installers registered for the next process
+	// (env.RegisteredPath: the registry on Windows). A system entry's command
+	// there counts as present. Nil means none.
+	RegisteredPath func() ([]string, error)
 	// Query runs a package manager's read-only presence query for a "system"
 	// entry (dpkg-query, brew list, winget list). Nil means ExecRunner; tests
 	// inject the machine's answer, so no real manager is ever asked.
