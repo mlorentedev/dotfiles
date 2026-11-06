@@ -14,11 +14,24 @@ import (
 // RepositoryRoot resolves the checkout containing dir without inheriting
 // per-command Git configuration overrides from the caller.
 func RepositoryRoot(dir string) (string, error) {
-	out, err := runGit(dir, "rev-parse", "--show-toplevel")
+	root, _, err := RepositoryLocation(dir)
+	return root, err
+}
+
+// RepositoryLocation resolves the checkout root and the slash-separated
+// working-directory prefix Git uses inside that checkout.
+func RepositoryLocation(dir string) (string, string, error) {
+	out, err := runGit(dir, "rev-parse", "--show-toplevel", "--show-prefix")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return strings.TrimSpace(string(out)), nil
+	lines := strings.Split(strings.TrimSuffix(string(out), "\n"), "\n")
+	if len(lines) != 2 {
+		return "", "", fmt.Errorf("git rev-parse returned %d lines, want root and prefix", len(lines))
+	}
+	root := strings.TrimSuffix(lines[0], "\r")
+	prefix := filepath.ToSlash(strings.TrimSuffix(lines[1], "\r"))
+	return root, prefix, nil
 }
 
 func Discover(repo string, policy Policy) ([]string, error) {

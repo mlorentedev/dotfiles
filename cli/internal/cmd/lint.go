@@ -46,18 +46,17 @@ func newLintDocPathsCmd() *cobra.Command {
 
 func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []string) error {
 	repoExplicit := repo != ""
-	var cwd string
+	var prefix string
 	if !repoExplicit {
-		var err error
-		cwd, err = os.Getwd()
+		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("resolve working directory: %w", err)
 		}
-		root, err := docpaths.RepositoryRoot(cwd)
+		root, rootPrefix, err := docpaths.RepositoryLocation(cwd)
 		if err != nil {
 			return err
 		}
-		repo = root
+		repo, prefix = root, rootPrefix
 	}
 	repo, err := filepath.Abs(repo)
 	if err != nil {
@@ -77,8 +76,8 @@ func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []
 		}
 	} else {
 		base := repo
-		if !repoExplicit {
-			base = cwd
+		if prefix != "" {
+			base = filepath.Join(repo, filepath.FromSlash(prefix))
 		}
 		files, err = repoRelativeDocPaths(repo, base, files)
 		if err != nil {

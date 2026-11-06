@@ -66,8 +66,23 @@ func TestRepositoryRootIgnoresGitStderrOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Clean(got) != filepath.Clean(repo) {
-		t.Fatalf("RepositoryRoot() = %q, want %q", got, repo)
+	assertSameFile(t, got, repo)
+}
+
+func TestRepositoryLocationReturnsWorkingDirectoryPrefix(t *testing.T) {
+	repo := gitRepo(t)
+	nested := filepath.Join(repo, "ai", "nan")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, prefix, err := RepositoryLocation(nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSameFile(t, root, repo)
+	if prefix != "ai/nan/" {
+		t.Fatalf("RepositoryLocation() prefix = %q, want %q", prefix, "ai/nan/")
 	}
 }
 
@@ -153,4 +168,19 @@ func setIncompleteGitConfig(t *testing.T) {
 		})
 	}
 	t.Setenv("GIT_CONFIG_COUNT", "1")
+}
+
+func assertSameFile(t *testing.T, left, right string) {
+	t.Helper()
+	leftInfo, err := os.Stat(left)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rightInfo, err := os.Stat(right)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(leftInfo, rightInfo) {
+		t.Fatalf("%q and %q are not the same directory", left, right)
+	}
 }

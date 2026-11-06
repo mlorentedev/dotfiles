@@ -32,7 +32,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Windows smoke with incomplete `GIT_CONFIG_COUNT=1`: install-style `version` probe -> 10.092 s; following full scans -> 485 ms / 473 ms, deterministic 14-line output, exit 0.
 - Fresh-build startup observation: endpoint security inspects each newly built unsigned EXE on first execution. `install.ps1` deliberately pays that one-time cost in its executable probe before placement, and its standalone path then runs the installed target through `converge`; hook use occurs after inspection rather than on the commit path.
 - Lesson hygiene: `go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons` -> `[OK] lessons are in their canonical form`.
-- CI on `3ce302cc`: Linux/Windows tests passed; `cli-lint` found `filepath.Glob` and a dead helper, and hygiene found duplicate lesson 553. Both causes are removed on the remediation worktree; CI for the new head is pending push.
+- CI on `3ce302cc`: Linux/Windows tests passed; `cli-lint` found `filepath.Glob` and a dead helper, and hygiene found duplicate lesson 553. All three causes were removed in `17d943af`.
+- Hosted CI on `17d943af`: Windows exposed an 8.3 working-directory alias (`RUNNER~1`) and macOS exposed `/var` versus `/private/var`; string-relative path resolution rejected files inside the checkout. `RepositoryLocation` now gets both Git's physical root and its working-directory prefix in one invocation, while tests compare checkout identity with `os.SameFile`. Focused Windows tests pass locally; replacement-head CI is pending push.
 - Commit hook: historical bypasses are not counted as evidence. #3199 now permits one final reviewer/CI-fix commit after the evidence above; PR 1 makes no permanent hook configuration change.
 
 ## Decisions made during implementation
