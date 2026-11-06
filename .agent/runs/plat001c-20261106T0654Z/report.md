@@ -53,5 +53,5 @@ Ended 2026-11-06 ~10:15Z with `reason: queue-empty`. The P1/P2 bugs readable on 
 
 Owner next, in order:
 1. Merge release-please. It now carries #3222 and #3226.
-2. Once that release is the `DOTF_VERSION` pin: add the `vcredist` entry ahead of `mise` (the exact JSON is in the spec row) and delete `setup-windows.ps1`'s `dotf env persist` block.
+2. Once that release is the `DOTF_VERSION` pin: add the `vcredist` entry ahead of `mise` (`winget_arch` with both VCRedist ids, `platforms: ["windows"]`; spec row "Blocker 1") and delete `setup-windows.ps1`'s `dotf env persist` block.
 3. Decide #2438. Option 2, mise's `npm:` backend, touches `versions.conf`.
