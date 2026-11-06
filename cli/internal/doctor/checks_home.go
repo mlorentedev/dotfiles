@@ -23,7 +23,7 @@ func checkForeignHome(sys *System, rep *Report) {
 		return
 	}
 	if !ok || home == "" {
-		rep.Pass("no user-scope HOME; every tool resolves USERPROFILE")
+		rep.Pass("no persisted user-scope HOME (a shell may still export its own)")
 		return
 	}
 	profile := sys.Getenv("USERPROFILE")

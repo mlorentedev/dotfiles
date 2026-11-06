@@ -17,7 +17,7 @@ func TestCheckForeignHome(t *testing.T) {
 		want   Status
 		needle string
 	}{
-		{"no user-scope HOME → PASS", nil, nil, StatusPass, "no user-scope HOME"},
+		{"no user-scope HOME → PASS", nil, nil, StatusPass, "no persisted user-scope HOME"},
 		{"HOME equal to USERPROFILE, spelled differently → PASS", map[string]string{"HOME": `c:/users/manu/`}, nil, StatusPass, "agrees with USERPROFILE"},
 		{"HOME through %USERPROFILE% → PASS", map[string]string{"HOME": `%USERPROFILE%`}, nil, StatusPass, "agrees with USERPROFILE"},
 		{"a foreign HOME → FAIL naming both", map[string]string{"HOME": `C:\SPB_Data`}, nil, StatusFail, `user-scope HOME is C:\SPB_Data but USERPROFILE is C:\Users\manu`},
