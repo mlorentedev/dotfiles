@@ -33,7 +33,15 @@
 # which is the right way round, because the gate is blocking and CI review is
 # advisory. Visibly weaker reviews here are the signal to revisit, NOT to move
 # back on top of the gate. Full measurement trail in #1149.
-model = "openai/mimo-v2.6-flash"
+#
+# 2026-11-05 (#2216): deepseek leads again. The chain is the pool's NaN members
+# in weight order (`dotf pr preflight --pool`), and the re-weight cut mimo to 12:
+# a quarter of its attempts ended empty at NaN's reasoning-only ceiling and it
+# held 77% of the pool's NaN slot time. The gate argument above has weakened:
+# `dotf spec review` draws its first signer at random since HARNESS-093, so
+# deepseek is one bucket among several there, and this order now decides only
+# where a failed Haiku review spills (about 1% of runs).
+model = "openai/deepseek-v4-flash"
 
 # ONE fallback, now deepseek-v4-flash — the reverse of the pre-2026-08-21
 # arrangement (#1149). It reintroduces contention with the gate on exactly the
@@ -95,7 +103,7 @@ model = "openai/mimo-v2.6-flash"
 # the smallest bucket (5) and quota (1B/month), from carrying every review.
 # glm reviews only at `reasoning_effort = "low"`, which the workflow sets: at
 # its default it thinks until NaN closes the stream and publishes nothing.
-fallback_models = ["openai/deepseek-v4-flash", "openai/glm5.3-flash"]
+fallback_models = ["openai/glm5.3-flash", "openai/mimo-v2.6-flash"]
 
 # Cheap passes only — descriptions and commit summaries, never the review.
 model_weak = "openai/qwen3.6"

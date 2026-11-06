@@ -40,10 +40,12 @@ reviews a month (10-15 PRs in parallel) and 4-5 adversarial reviews per hour of 
    archives. Sonnet is the only `signs: second` member.
 3. **PR-Agent draws by declared weight.** Each member's `pr_agent` block in the pool gives its model, its weight and
    its reasoning effort. A member that does not answer its probe gives up its weight to the rest for that run.
-   Weights at adoption: mimo 27, glm 19, deepseek 19, Haiku 35.
+   Weights at adoption: mimo 12, glm 13, deepseek 25, Haiku 50.
+   Amended 2026-11-05 (#2216) from the first estimate of mimo 27, glm 19, deepseek 19, Haiku 35; the month of
+   data that moved them is in Consequences.
 4. **A risky PR reviews first on Sonnet.** A PR is risky when it has at least 1,500 changed lines or carries the
    `deep-review` label. Sonnet is never drawn. When it does not answer, the PR goes to the draw with a note.
-5. **The allowlist of Anthropic models CI may spend on lives in `scripts/pr-agent-route.sh`, not in the pool.** A
+5. **The allowlist of Anthropic models CI may spend on lives in `dotf pr route` (`cli/internal/prreview/allowlist.go`, formerly `scripts/pr-agent-route.sh`), not in the pool.** A
    pool edit naming another model fails the draw. A test requires a price row and a worst-review ceiling for every
    allowed model.
 6. **One key, two names.** The local review reads the same Bitwarden item as PR-Agent, under
@@ -66,3 +68,11 @@ reviews a month (10-15 PRs in parallel) and 4-5 adversarial reviews per hour of 
   point of the total weight draws the member that owns it.
 - The weights are a first estimate. They change with data from #2215 and #2216, not by feel, as ADR-037 requires
   for its deadline.
+- **First re-weight, 2026-11-05 (#2216).** A month of data (2026-10-09 to 11-05, 1,133 published reviews in dotfiles,
+  kubelab and hive, a 42% sample of the run logs) showed NaN's pressure is mimo, not 429s: a quarter of its attempts
+  ended empty at NaN's reasoning-only ceiling, and at 27% of draws it held 77% of the pool's NaN slot time. Haiku
+  answers in a median 18 s but its findings are the least often addressed (about 0.31 a review against 0.46 for
+  deepseek and mimo), so the share Haiku gains comes from mimo and glm, and deepseek takes mimo's quality share. The
+  projection is about 39% less NaN slot time for about the same addressed findings per 100 reviews (1% fewer), and an Anthropic month
+  of about $40 against the $30 actually spent. The draw reaches only callers that run `dotf pr route` on this pool;
+  the repositories that review NaN-only never see a weight.
