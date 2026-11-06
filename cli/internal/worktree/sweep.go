@@ -12,6 +12,9 @@ import (
 type SweepRunner interface {
 	GitRunner
 	WorktreeRemove(repoRoot, worktreePath string) error
+	// WorktreeRemoveForce removes a worktree whose untracked content is known
+	// to be disposable: only a review worktree past its lease.
+	WorktreeRemoveForce(repoRoot, worktreePath string) error
 	BranchDelete(repoRoot, branch string) (string, error)
 	WorktreePrune(repoRoot string) error
 }
@@ -24,6 +27,14 @@ func (r *RealSweepRunner) WorktreeRemove(repoRoot, worktreePath string) error {
 	cmd := exec.Command("git", "-C", repoRoot, "worktree", "remove", worktreePath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree remove failed (%w): %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (r *RealSweepRunner) WorktreeRemoveForce(repoRoot, worktreePath string) error {
+	cmd := exec.Command("git", "-C", repoRoot, "worktree", "remove", "--force", worktreePath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git worktree remove --force failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -54,8 +65,16 @@ func (r *RealSweepRunner) WorktreePrune(repoRoot string) error {
 
 type MockSweepRunner struct {
 	MockGitRunner
-	OnWorktreeRemove func(repoRoot, worktreePath string) error
-	OnBranchDelete   func(repoRoot, branch string) (string, error)
+	OnWorktreeRemove      func(repoRoot, worktreePath string) error
+	OnWorktreeRemoveForce func(repoRoot, worktreePath string) error
+	OnBranchDelete        func(repoRoot, branch string) (string, error)
+}
+
+func (m *MockSweepRunner) WorktreeRemoveForce(repoRoot, worktreePath string) error {
+	if m.OnWorktreeRemoveForce != nil {
+		return m.OnWorktreeRemoveForce(repoRoot, worktreePath)
+	}
+	return nil
 }
 
 func (m *MockSweepRunner) WorktreeRemove(repoRoot, worktreePath string) error {
@@ -238,6 +257,11 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 	if err != nil || pathWithin(resolvedPath(absCwd), resolvedPath(absWT)) {
 		return false
 	}
+	// Re-read under the lock, like the lease below: the kind decides which
+	// gates apply, so it is not taken from the listing.
+	if meta, err := LoadMetadata(info.Path); err == nil && meta != nil && meta.Kind == KindReview {
+		return reapReviewWorktree(repoRoot, info, absWT, runner, now)
+	}
 	if isDirty(info.Path, runner) {
 		return false
 	}
@@ -252,6 +276,31 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 		return false
 	}
 	return executeWorktreeReap(repoRoot, info, runner)
+}
+
+// reapReviewWorktree removes a review worktree once its lease has passed
+// (HARNESS-142). It skips the clean and merged gates: the worktree has no
+// branch to merge, and what it holds uncommitted is reviewer output that
+// `spec deadline` failed to copy back, so it is discarded with --force and
+// said so. Gate f stays last: a reviewer still running past its lease is the
+// one case the lease cannot see.
+func reapReviewWorktree(repoRoot string, info Info, absWT string, runner SweepRunner, now time.Time) bool {
+	if !isLeaseExpired(info.Path, now) {
+		return false
+	}
+	dirt, dirtErr := runner.Dirt(info.Path)
+	if hostProcessInside(absWT).Inside {
+		return false
+	}
+	if dirtErr != nil || dirt.Any() {
+		_, _ = fmt.Fprintf(os.Stderr, "Discarding review worktree %s past its lease, with the uncommitted reviewer output it holds\n", info.Path)
+	}
+	if err := runner.WorktreeRemoveForce(repoRoot, info.Path); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: removing review worktree %s: %v\n", info.Path, err)
+		return false
+	}
+	_ = runner.WorktreePrune(repoRoot)
+	return true
 }
 
 func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*SweepReport, error) {

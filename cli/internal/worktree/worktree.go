@@ -170,6 +170,16 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 		return StateActive, "main repository"
 	}
 
+	// A review worktree has no branch to merge, and an interrupted review
+	// leaves its output untracked in it: its lease is its only gate.
+	if info.Metadata != nil && info.Metadata.Kind == KindReview {
+		until := info.Metadata.LeaseExpiresAt.Format(time.RFC3339)
+		if info.Metadata.LeaseExpiresAt.After(now) {
+			return StateActive, "review worktree, lease active until " + until
+		}
+		return StateReapable, "review worktree past its lease (" + until + "); sweep discards any reviewer output left in it"
+	}
+
 	if info.Dirty {
 		if len(info.IgnoredContent) > 0 {
 			return StateDirty, "ignored files that are not known build output: " + summarizePaths(info.IgnoredContent)

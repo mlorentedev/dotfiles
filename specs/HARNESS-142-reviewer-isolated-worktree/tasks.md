@@ -28,7 +28,7 @@ Worktree package (`cli/internal/worktree/`):
 - [x] [P] [AC3] Test: `AddDetached` creates a worktree detached at a given sha, with metadata `Issue: 0`, `ReapOK: true`, a lease of the given TTL and `Kind: "review"`; fails red because `AddRunner` has no detached path. `go test ./internal/worktree/ -run AddDetached`
 - [x] [AC3] Add `WorktreeAddDetached(repo, target, sha)` to `AddRunner` and `RealAddRunner`, a `Kind` field to `Metadata`, and `AddDetached`; test green.
 - [x] [AC3] Test then code: `dotf worktree list` labels a `Kind: "review"` worktree, and `refuseHeldIssue` never counts it (it holds no issue).
-- [ ] [AC3] Test then code (`TestReviewWorktreeSwept`): `sweep` removes an expired review worktree whose `ReapOK` is true.
+- [x] [AC3] Test then code (`TestReviewWorktreeSwept`): `sweep` removes an expired review worktree whose `ReapOK` is true.
 
 Launch (`cli/internal/cmd/spec.go`, `cli/internal/spec/`):
 
