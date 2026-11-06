@@ -209,6 +209,21 @@ func finishLeftoverReviewTree(errw io.Writer, review, tree, callerSpec string) {
 	}
 }
 
+// enterReviewTree makes the review worktree deadline's working directory, which
+// the reviewer inherits (#3220). The launch also starts tmux there with -c, but
+// a tmux server whose own working directory is unreadable hands every new
+// session an unreadable one, and nothing reported it: pi died on startup, and
+// agy ran elsewhere unnoticed. No worktree, no change.
+func enterReviewTree(tree string) error {
+	if tree == "" {
+		return nil
+	}
+	if err := os.Chdir(tree); err != nil {
+		return fmt.Errorf("entering the review worktree %s, so the reviewer was not started: %w", tree, err)
+	}
+	return nil
+}
+
 // isWithin reports whether p is dir or below it.
 func isWithin(p, dir string) bool {
 	rel, err := filepath.Rel(dir, p)

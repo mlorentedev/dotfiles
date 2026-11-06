@@ -616,8 +616,9 @@ folder is named on stderr, since a reviewer's only sanctioned output is
 review.md. A run that otherwise exited 0 then exits 4, so the leftovers are a
 failure someone reads rather than files a later "git add -A" commits.
 
-With --worktree and --copy-back, the run is in a review worktree: however it
-ends, the review file is copied back to the --copy-back folder, and the
+With --worktree and --copy-back, the run is in a review worktree: deadline
+starts the command there, and refuses to run it when it cannot enter it. However
+it ends, the review file is copied back to the --copy-back folder, and the
 worktree is then marked as saved and removed. A worktree whose review could
 not be copied back is kept.`,
 		Hidden:        true,
@@ -633,6 +634,10 @@ not be copied back is kept.`,
 				return fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", stall)
 			}
 			errw := cmd.ErrOrStderr()
+			if err := enterReviewTree(tree); err != nil {
+				finishLeftoverReviewTree(errw, review, tree, copyBack)
+				return err
+			}
 			var before spec.TreeSnapshot
 			var snapErr error
 			if review != "" {
