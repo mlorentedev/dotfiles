@@ -37,7 +37,7 @@
   {
     "id": "TOOL-034-manage-ts-bridge-client-routing-f6",
     "behavior": "A second install and converge report zero changes, and bridge-down behavior is explicit.",
-    "verification": "cd cli && go test ./internal/tools ./internal/converge -run 'Test.*TsBridge.*(Idempotent|Second|Down)'",
+    "verification": "cd cli && go test ./internal/tools ./internal/converge ./internal/doctor -run '^(TestInstallGitHubArchiveSecondRunSkipsWithoutFetch|TestTsBridgeClientRoleCreatesAndRetiresGitDropIn|TestCheckTsBridgeListenerDownIsExplicit)$'",
     "state": "pending",
     "evidence": ""
   },
