@@ -224,3 +224,31 @@ func snapshot(t *testing.T, dir string) string {
 	}
 	return b.String()
 }
+
+// kubelab writes its lesson ids unquoted and compares the raw text to the file
+// name, so a renumber that re-quotes it turns that repository red (#3124). A
+// lesson that already declares an id keeps every byte but the number.
+func TestRenumber_KeepsTheIdStyleAndChangesOnlyTheNumber(t *testing.T) {
+	for _, style := range []struct{ name, before, after string }{
+		{"bare", "id: lesson-497-mine", "id: lesson-499-mine"},
+		{"double-quoted", `id: "lesson-497-mine"`, `id: "lesson-499-mine"`},
+		{"single-quoted", "id: 'lesson-497-mine'", "id: 'lesson-499-mine'"},
+	} {
+		t.Run(style.name, func(t *testing.T) {
+			front := "---\n" + style.before + "\ntype: lesson\ntitle: Mine\ncreated: 2026-10-05\n---\n\n# Mine\n\nBody.\n"
+			dir := writeTree(t, map[string]string{
+				"lesson-497-mine.md":   front,
+				"lesson-497-theirs.md": lessonBody("Theirs", ""),
+				"lesson-498-other.md":  lessonBody("Other", ""),
+			})
+			got, err := Renumber(dir, filepath.Join(dir, "lesson-497-mine.md"), 0, os.Rename)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := strings.Replace(front, style.before, style.after, 1)
+			if moved := read(t, got.To); moved != want {
+				t.Errorf("renumbered file:\n%s\nwant only the number changed:\n%s", moved, want)
+			}
+		})
+	}
+}
