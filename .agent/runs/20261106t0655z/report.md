@@ -1,4 +1,4 @@
-# run 20261106t0655z — ended queue-empty after 3 iterations / ~25 min — 0 done, 3 released or parked, 0 merged, 0 unmerged
+# run 20261106t0655z — ended queue-empty after 3 iterations / about 5 min — 0 done, 3 released or parked, 0 merged, 0 unmerged
 
 **What is waiting on a human, and is anything in it irreversible?** Three questions, nothing irreversible: no PR was opened, nothing was landed, nothing was published. Only issue comments were added (#2250, #873, #690).
 
@@ -20,10 +20,10 @@ None.
 - Issue comments: #2250 (release), #873 (park), #690 (park).
 
 ## Budget spent
-3 of 6 iterations, about 25 minutes of 8h, 3 items of 4. No dollar figure exists: the provider exposes none.
+3 of 6 iterations, about 5 minutes of 8h, 3 items of 4. No dollar figure exists: the provider exposes none.
 
 ## Host-suspend line
-`caffeinate -i -t 28800` bound to the launching session ran from 06:58Z and was stopped at run end (about 07:20Z). The window after that was not held awake because the run had ended.
+`caffeinate -i -t 28800` bound to the launching session ran from 06:58Z and was stopped at run end (07:03Z). The window after that was not held awake because the run had ended.
 
 ## Why it ended early
 The queue was thin by construction: two sibling runs armed at 06:53Z hold the Windows bugs and the review/spec/worktree/autopilot code, `harness/**` and workflows are frozen, and every other unassigned bug I read turned out to need a decision or a person. A run that invents work to look busy would have produced the wrong thing; `queue-empty` is the honest ending.
