@@ -71,8 +71,8 @@ reviews a month (10-15 PRs in parallel) and 4-5 adversarial reviews per hour of 
 - **First re-weight, 2026-11-05 (#2216).** A month of data (2026-10-09 to 11-05, 1,133 published reviews in dotfiles,
   kubelab and hive, a 42% sample of the run logs) showed NaN's pressure is mimo, not 429s: a quarter of its attempts
   ended empty at NaN's reasoning-only ceiling, and at 27% of draws it held 77% of the pool's NaN slot time. Haiku
-  answers in a median 18 s but its findings are the least often addressed (about 0.29 a review against 0.45 for
+  answers in a median 18 s but its findings are the least often addressed (about 0.31 a review against 0.46 for
   deepseek and mimo), so the share Haiku gains comes from mimo and glm, and deepseek takes mimo's quality share. The
-  projection is about 39% less NaN slot time for about the same addressed findings per 100 reviews (3% fewer), and an Anthropic month
+  projection is about 39% less NaN slot time for about the same addressed findings per 100 reviews (1% fewer), and an Anthropic month
   of about $40 against the $30 actually spent. The draw reaches only callers that run `dotf pr route` on this pool;
   the repositories that review NaN-only never see a weight.

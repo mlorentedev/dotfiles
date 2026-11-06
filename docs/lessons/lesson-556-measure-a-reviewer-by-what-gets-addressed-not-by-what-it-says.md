@@ -37,8 +37,8 @@ last seen on: `git diff -U0 <last_seen_head_sha> refs/pull/<n>/head -- <path>`, 
 `[line_start, line_end]`. The state block on every review comment carries all four fields. Attribute each
 finding to the member whose run published at its `first_seen` time, from the run logs.
 
-Measured that way, Haiku's findings were the least often addressed (12% of line-anchored findings, about 0.29
-a review) and deepseek's and mimo's the most (about 0.45 a review): the reverse of what the self-reported
+Measured that way, Haiku's findings were the least often addressed (12% of line-anchored findings, about 0.31
+a review) and deepseek's and mimo's the most (about 0.46 a review): the reverse of what the self-reported
 signals said.
 
 ## Takeaway
