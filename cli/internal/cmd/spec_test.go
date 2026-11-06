@@ -31,11 +31,28 @@ func makeRepo(t *testing.T) string {
 	headSHAOf = func(string) string { return "headheadhead" }
 	requestIgnored = func(string, string, spec.ReviewSlot) bool { return false }
 	callerDirt = func(string) ([]string, error) { return nil, nil }
+	stubReviewTree(t)
 	t.Cleanup(func() {
 		resolveReviewBase, headSHAOf, requestIgnored, callerDirt = prevBase, prevHead, prevIgnored, prevDirt
 	})
 
 	return root
+}
+
+// stubReviewTree replaces the review worktree's planning, creation and
+// removal with a plain directory, since the fixture has no real repository.
+// It returns where the worktree would be.
+func stubReviewTree(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "review-tree")
+	prevPlan, prevCreate, prevRemove := planReviewTree, createReviewTree, removeReviewTree
+	planReviewTree = func(repoRoot, id string, slot spec.ReviewSlot) (reviewTree, error) {
+		return reviewTree{repoRoot: repoRoot, name: "review-tree", path: path}, nil
+	}
+	createReviewTree = func(tree reviewTree, _ string, _ time.Duration) error { return os.MkdirAll(tree.path, 0o755) }
+	removeReviewTree = os.RemoveAll
+	t.Cleanup(func() { planReviewTree, createReviewTree, removeReviewTree = prevPlan, prevCreate, prevRemove })
+	return path
 }
 
 // pinClock fixes the scaffold clock so created: is deterministic.
