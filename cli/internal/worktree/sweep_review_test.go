@@ -68,7 +68,7 @@ func (s *reviewSweep) sweep(t *testing.T, now time.Time) *SweepReport {
 	return report
 }
 
-func TestSweepReapsAnExpiredReviewWorktreeWithItsOutput(t *testing.T) {
+func TestReviewWorktreeSwept(t *testing.T) {
 	withHostProcessInside(t, false)
 	now := time.Now()
 	s := newReviewSweep(t, -time.Minute, now)

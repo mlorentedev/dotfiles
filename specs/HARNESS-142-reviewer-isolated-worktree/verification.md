@@ -15,7 +15,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [ ] Criterion 1 -> commit `<hash>` / test `<name>`
 - [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [ ] Criterion 3 -> (in progress) worktree package: `TestAddDetachedSavesALeaseFreeReapableLease`, `TestAddWithIssueIgnoresALiveReviewWorktree`, `TestWorktreeTableLabelsAReviewWorktree` (#3195); `TestClassifyAReviewWorktreeByItsLease`, `TestReviewWorktreeSwept`, `TestSweepKeepsAReviewWorktreeWhileItsLeaseLivesOrAReviewerRuns`, `TestRealRunnerForceRemovesAReviewWorktreeWithUntrackedOutput`; copy-back and removal on every exit path are still open
 
 ## Test status
 
@@ -27,8 +27,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
--
--
+- A review worktree is reaped on its lease alone. Under the ordinary gates sweep could never take one: it has no branch, so no pull request merges it, and an interrupted review leaves its output untracked, so it is never clean. AC3 was unreachable until `Classify` and `reapSingleWorktree` keyed `Kind: review` on the lease, skipping the clean and merged gates. The cwd check and Gate f still refuse, so a reviewer running past its lease is kept. Sweep removes it with `git worktree remove --force` (plain remove refuses untracked files) and says on stderr that it discarded reviewer output.
+- `DetachedOptions.Kind` is required: a detached worktree with no issue and no kind is one nothing labels and no reap rule recognises (PR-Agent on #3195).
 
 ## Promotion candidates
 
