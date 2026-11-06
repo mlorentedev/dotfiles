@@ -41,7 +41,7 @@ func managerBinary(manager string) string {
 // systemInstalled returns systemPresent when the package is on this machine and
 // "" when it is absent or the entry names no package for this OS.
 func (in *Installer) systemInstalled(t Tool) string {
-	manager, pkg := t.Source.SystemPackage(in.GOOS)
+	manager, pkg := t.Source.SystemPackage(in.GOOS, in.GOARCH)
 	if pkg == "" {
 		return ""
 	}
@@ -220,7 +220,7 @@ func aptInstallArgv(pkgs ...string) []string {
 // missingSystemTool names the first executable the install needs and PATH lacks
 // ("" when it can run): the manager, and sudo when apt must escalate.
 func (in *Installer) missingSystemTool(t Tool) string {
-	manager, pkg := t.Source.SystemPackage(in.GOOS)
+	manager, pkg := t.Source.SystemPackage(in.GOOS, in.GOARCH)
 	if pkg == "" {
 		return ""
 	}
@@ -243,7 +243,7 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 		p.Action, p.Note = PlanMissingManager, "waits on "+in.missingSystemTool(t)
 	default:
 		p.Action = PlanInstall
-		manager, pkg := t.Source.SystemPackage(in.GOOS)
+		manager, pkg := t.Source.SystemPackage(in.GOOS, in.GOARCH)
 		if in.waitsOnSudo(t, manager, pkg) {
 			// The classifier the apply uses, asked up front, so a plan never
 			// promises an install the apply skips.
@@ -256,7 +256,7 @@ func (in *Installer) planSystem(p Plan, t Tool) Plan {
 
 // installSystem converges a system package through the OS manager.
 func (in *Installer) installSystem(t Tool) (Result, error) {
-	manager, pkg := t.Source.SystemPackage(in.GOOS)
+	manager, pkg := t.Source.SystemPackage(in.GOOS, in.GOARCH)
 	if in.systemInstalled(t) != "" {
 		_, _ = fmt.Fprintf(in.Out, "%s already installed; skipping\n", t.Name)
 		return Skipped, nil

@@ -241,6 +241,10 @@ func TestLoad_RejectsMalformedSystemEntries(t *testing.T) {
 		{"a command with a pipe", `{"type":"system","apt":"gh","command":"gh|id"}`, "", "command"},
 		{"a formula and a cask for one OS", `{"type":"system","brew":"gh","cask":"gh"}`, "", "both a brew formula and a cask"},
 		{"needs_sudo on an entry with no cask", `{"type":"system","apt":"gh","brew":"gh","needs_sudo":true}`, "", "needs_sudo"},
+		{"a winget id and a per-arch map", `{"type":"system","winget":"x","winget_arch":{"amd64":"x.x64","arm64":"x.arm64"}}`, "", "both winget and winget_arch"},
+		{"a per-arch map missing an arch", `{"type":"system","winget_arch":{"arm64":"x.arm64"}}`, "", "amd64"},
+		{"a per-arch map with an arch Windows does not ship", `{"type":"system","winget_arch":{"amd64":"x.x64","arm64":"x.arm64","386":"x.x86"}}`, "", `"386"`},
+		{"a per-arch winget id that is a flag", `{"type":"system","winget_arch":{"amd64":"--force","arm64":"x.arm64"}}`, "", "winget_arch"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -271,7 +275,7 @@ func TestLoad_AcceptsACaskEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a cask-only system entry must load: %v", err)
 	}
-	if m, pkg := c.Tools[0].Source.SystemPackage("darwin"); m != "brew-cask" || pkg != "obsidian" {
+	if m, pkg := c.Tools[0].Source.SystemPackage("darwin", ""); m != "brew-cask" || pkg != "obsidian" {
 		t.Errorf("SystemPackage(darwin) = %s, %s; want brew-cask, obsidian", m, pkg)
 	}
 	if c.Tools[0].SupportsOS("linux") || c.Tools[0].SupportsOS("windows") || !c.Tools[0].SupportsOS("darwin") {
@@ -289,6 +293,30 @@ func TestLoad_AcceptsACaskEntry(t *testing.T) {
 	withPlatforms := `{"tools":[{"name":"obsidian","source":{"type":"system","cask":"obsidian","platforms":["darwin"]}}]}`
 	if _, err := Load(writeCatalog(t, withPlatforms)); err != nil {
 		t.Errorf("a cask entry with platforms [darwin] must load: %v", err)
+	}
+}
+
+// winget_arch names one winget id per Windows arch, for a package winget
+// publishes per arch (the VC++ runtime, PLAT-001c blocker 1): installing the
+// x64 id on Arm64 leaves the arm64 runtime absent, so no single id is right.
+func TestLoad_AcceptsAPerArchWingetEntry(t *testing.T) {
+	body := `{"tools":[{"name":"vcredist","source":{"type":"system","winget_arch":{"amd64":"Microsoft.VCRedist.2015+.x64","arm64":"Microsoft.VCRedist.2015+.arm64"},"platforms":["windows"]}}]}`
+	c, err := Load(writeCatalog(t, body))
+	if err != nil {
+		t.Fatalf("a per-arch winget entry must load: %v", err)
+	}
+	vc := c.Tools[0]
+	for goarch, want := range map[string]string{"amd64": "Microsoft.VCRedist.2015+.x64", "arm64": "Microsoft.VCRedist.2015+.arm64", "386": ""} {
+		if m, pkg := vc.Source.SystemPackage("windows", goarch); pkg != want || (want != "" && m != "winget") {
+			t.Errorf("SystemPackage(windows, %s) = %s, %s; want winget, %q", goarch, m, pkg, want)
+		}
+	}
+	if !vc.SupportsOS("windows") || vc.SupportsOS("linux") || vc.SupportsOS("darwin") {
+		t.Error("a per-arch winget entry installs on windows only")
+	}
+	gh := Source{Type: "system", Winget: "GitHub.cli"}
+	if _, pkg := gh.SystemPackage("windows", "arm64"); pkg != "GitHub.cli" {
+		t.Errorf("a single winget id serves every arch, got %q", pkg)
 	}
 }
 
