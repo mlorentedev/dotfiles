@@ -1,0 +1,27 @@
+version: 1
+run_id: "h142-20261106t0653z"
+armed_by: manu
+armed_at: 2026-11-06T06:53:32Z
+expires_at: 2026-11-06T14:53:32Z
+objective: "Close the HARNESS-142 arc (land #3221, archive the spec), then fix review-pipeline and autopilot bugs, one PR per item, landed under the standing grant or parked with a question."
+worktree: /Users/manu/Projects/worktrees/dotfiles/chore-autopilot-h142-20261106t0653z
+branch: chore/autopilot-h142-20261106t0653z
+scope:
+  write_paths: ["cli/internal/cmd/spec*", "cli/internal/cmd/worktree*", "cli/internal/cmd/autopilot*", "cli/internal/spec/**", "cli/internal/worktree/**", "cli/internal/autopilot/**", "specs/HARNESS-142-reviewer-isolated-worktree/**", "specs/archive/HARNESS-142-reviewer-isolated-worktree/**", "specs/HARNESS-158-*/**", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", "README.md", ".agent/runs/h142-20261106t0653z/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "secrets/**", "scripts/**", "setup-*.sh", "setup-*.ps1", "versions.conf", "release-please-config.json", ".release-please-manifest.json"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, jq, yq, caffeinate, tmux]
+queue:
+  source: bitacora
+  filter: "In order, first eligible survivor each time: (1) land #3221 (closes #3220, and #3204 and #3165 are the same bug); (2) archive HARNESS-142 (#1649): triage the PASS-WITH-GAPS archive review on chore/archive-harness-142, answer the promotion candidates, dotf spec archive, PR; (3) #3215; (4) #3177, parked with a question if it needs a design decision; (5) #1727 HARNESS-158; (6) #3086; (7) #2704. Each must pass the 3 a.m. test and hold a free lease. Launch every spec review with --foreground: the default tmux server (pid 12265) belongs to another session and hands sessions an unreadable working directory; never kill it. A PR that changes a deletion rule, the merge grant, .github or harness is left for the owner."
+  max_items: 7
+budget:
+  max_iterations: 10
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
