@@ -208,6 +208,11 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 	if pythonPackages != "" {
 		fmt.Fprintf(&b, "python.default_packages_file = %q\n", filepath.ToSlash(pythonPackages))
 	}
+	// The budget for one whole download; a stalled read still fails after
+	// http_timeout (30s). mise's default, 30m, failed a from-zero converge on
+	// argocd, the largest pinned asset (237 MB), at the 85 kB/s a slow link
+	// measured: 47 minutes (#3181). 2h holds that asset down to ~33 kB/s.
+	b.WriteString("http_download_timeout = \"2h\"\n")
 	var alias []string
 	for _, t := range tools {
 		if backend, ok := attestedBackend[t.Name]; ok && runtime.GOOS != "windows" {
