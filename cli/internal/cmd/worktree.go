@@ -164,6 +164,19 @@ func resolveCommandRepoRoot(repoDir string) (string, error) {
 	return root, nil
 }
 
+// branchCell is the BRANCH column. A review worktree has no branch, so it is
+// named by kind and commit rather than left blank (HARNESS-142).
+func branchCell(info worktree.Info) string {
+	if info.Metadata == nil || info.Metadata.Kind != worktree.KindReview {
+		return info.Branch
+	}
+	head := info.Head
+	if len(head) > 7 {
+		head = head[:7]
+	}
+	return "(review " + head + ")"
+}
+
 func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 	w := tabwriter.NewWriter(out, 0, 0, 3, ' ', 0)
 	if _, err := fmt.Fprintln(w, "PATH\tBRANCH\tSTATUS\tPR\tSTATE\tREASON"); err != nil {
@@ -192,7 +205,7 @@ func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			info.Path,
-			info.Branch,
+			branchCell(info),
 			status,
 			prStatus,
 			info.State,
