@@ -326,8 +326,8 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 		isMain := isMainWorktree(raw.Path, i)
 		isCurrent := (absPath == absRepoRoot)
 
-		dirt, err := runner.Dirt(raw.Path)
-		if err != nil {
+		dirt, dirtErr := runner.Dirt(raw.Path)
+		if dirtErr != nil {
 			// Fail-closed: treat error in status check as dirty so it is never reaped (F2)
 			dirt = Dirt{Tracked: true}
 		}
@@ -355,6 +355,9 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			IgnoredContent: dirt.Ignored,
 		}
 
+		if dirtErr != nil {
+			info.DirtUnknown = dirtErr.Error()
+		}
 		if mergeErr != nil {
 			info.PRMergedUnknown = mergeErr.Error()
 		}

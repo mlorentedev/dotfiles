@@ -89,6 +89,9 @@ type System struct {
 	// checks (skip POSIX-only tools / tmux / shell-rc symlinks on Windows) are
 	// table-testable; the zero value "" behaves like a POSIX host.
 	GOOS string
+	// GOARCH is the target arch (runtime.GOARCH in production), for a catalog
+	// entry that names a package per arch (winget_arch).
+	GOARCH string
 	// AgeRoundTrip proves the age key at keyPath actually decrypts: it derives
 	// the recipient, encrypts a sentinel, and decrypts it back, returning a
 	// non-nil error if any step fails or the bytes don't match. The real impl
@@ -289,7 +292,8 @@ func realSystem() *System {
 		},
 		HTTPGetBody:     httpGetBody,
 		Now:             time.Now,
-		GOOS:            runtime.GOOS, //nolint:forbidigo // the production wiring of the seam
+		GOOS:            runtime.GOOS,   //nolint:forbidigo // the production wiring of the seam
+		GOARCH:          runtime.GOARCH, //nolint:forbidigo // the production wiring of the seam
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
 		BWServeStatus: func() (string, error) {

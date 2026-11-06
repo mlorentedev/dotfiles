@@ -17,6 +17,13 @@ import (
 // worktree detached at its HEAD under a temporary worktree root.
 func reviewWorktree(t *testing.T) (repo, callerSpec, tree string) {
 	t.Helper()
+	// deadline enters the worktree and leaves it on removal, so a test using
+	// one must get its own working directory back.
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(wd)
 	repo, _ = strayRepo(t)
 	callerSpec = filepath.Join(repo, "specs", "AI-001-x")
 	if err := os.WriteFile(filepath.Join(repo, "main.go"), []byte("package main\n"), 0o644); err != nil {
@@ -159,5 +166,85 @@ func TestReviewInWorktreeStillReportsStrayWrites(t *testing.T) {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr does not name %s:\n%s", want, stderr)
 		}
+	}
+}
+
+// #3220: the reviewer starts in the review worktree whatever directory deadline
+// was started from. tmux's -c was the only thing putting it there, and a tmux
+// server with an unreadable working directory ignored it.
+func TestDeadlineRunsTheReviewerInTheReviewWorktree(t *testing.T) {
+	_, callerSpec, tree := reviewWorktree(t)
+	t.Chdir(t.TempDir())
+	review := filepath.Join(tree, "specs", "AI-001-x", "review.md")
+	want, err := filepath.EvalSymlinks(tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, stderr, err := execute(t, "spec", "deadline", "1m", "--review", review, "--worktree", tree, "--copy-back", callerSpec,
+		"--", "sh", "-c", `pwd -P > "$1"`, "sh", review)
+	if err != nil {
+		t.Fatalf("deadline failed: %v\n%s", err, stderr)
+	}
+	got, err := os.ReadFile(filepath.Join(callerSpec, "review.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(got)) != want {
+		t.Errorf("the reviewer ran in %q, want the review worktree %q", strings.TrimSpace(string(got)), want)
+	}
+}
+
+// A review worktree deadline cannot enter is refused before the reviewer runs,
+// naming the directory, rather than left to the reviewer to fail on.
+func TestDeadlineRefusesAReviewWorktreeItCannotEnter(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		unwalk func(t *testing.T, tree string) string
+	}{
+		{"missing", func(t *testing.T, _ string) string { return filepath.Join(t.TempDir(), "gone") }},
+		{"unreadable", func(t *testing.T, tree string) string {
+			if err := os.Chmod(tree, 0o000); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(tree, 0o755) })
+			return tree
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, callerSpec, tree := reviewWorktree(t)
+			target := c.unwalk(t, tree)
+			review := filepath.Join(target, "specs", "AI-001-x", "review.md")
+			ran := filepath.Join(t.TempDir(), "ran")
+
+			_, stderr, err := execute(t, "spec", "deadline", "1m", "--review", review, "--worktree", target, "--copy-back", callerSpec,
+				"--", "sh", "-c", `touch "$1"`, "sh", ran)
+			if err == nil {
+				t.Fatalf("deadline ran in a review worktree it cannot enter\n%s", stderr)
+			}
+			if want := "entering the review worktree " + target; !strings.Contains(err.Error(), want) {
+				t.Errorf("the error is not the worktree refusal %q: %v", want, err)
+			}
+			if _, statErr := os.Stat(ran); !os.IsNotExist(statErr) {
+				t.Errorf("the reviewer ran although deadline could not enter the worktree: %v", statErr)
+			}
+		})
+	}
+}
+
+// A relative --copy-back still names the caller's folder once deadline stands
+// in the worktree it removes at the end.
+func TestDeadlineCopiesBackToARelativeFolder(t *testing.T) {
+	repo, callerSpec, tree := reviewWorktree(t)
+	t.Chdir(repo)
+	review := filepath.Join(tree, "specs", "AI-001-x", "review.md")
+
+	_, stderr, err := execute(t, "spec", "deadline", "1m", "--review", review, "--worktree", tree,
+		"--copy-back", filepath.Join("specs", "AI-001-x"), "--", "sh", "-c", `echo verdict > "$1"`, "sh", review)
+	if err != nil {
+		t.Fatalf("deadline failed: %v\n%s", err, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(callerSpec, "review.md")); err != nil {
+		t.Errorf("the verdict did not reach the caller's spec folder through a relative --copy-back: %v\n%s", err, stderr)
 	}
 }

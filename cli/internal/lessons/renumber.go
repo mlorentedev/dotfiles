@@ -56,10 +56,19 @@ func Renumber(dir, file string, to int, move func(from, to string) error) (Renum
 	if err != nil {
 		return Renumbered{}, err
 	}
-	// Normalised before the move: a lesson Normalize cannot read (no H1, no
-	// date) is refused with the tree untouched, not moved with its old id.
-	if _, rewrites[file], err = Normalize(filepath.Base(dest), rewrites[file]); err != nil {
+	// Read through Normalize before the move: a lesson it cannot read (no H1,
+	// no date) is refused with the tree untouched, not moved with its old id.
+	_, normalized, err := Normalize(filepath.Base(dest), rewrites[file])
+	if err != nil {
 		return Renumbered{}, err
+	}
+	// A lesson that declares an id keeps its own front matter, number aside:
+	// a repository may compare the raw id to the file name, and re-quoting it
+	// turns that check red (#3124). One with no id gets the canonical form.
+	if kept, ok := withID(rewrites[file], strings.TrimSuffix(filepath.Base(dest), ".md")); ok {
+		rewrites[file] = kept
+	} else {
+		rewrites[file] = normalized
 	}
 	if err := move(file, dest); err != nil {
 		return Renumbered{}, err
@@ -193,4 +202,38 @@ func listAll(dir string) ([]entry, error) {
 		}
 	}
 	return all, nil
+}
+
+// withID returns raw with its front-matter id line set to id, in the quoting
+// the line already used, and whether raw declares an id at all. Nothing else
+// in the file changes.
+func withID(raw []byte, id string) ([]byte, bool) {
+	text := string(raw)
+	if !strings.HasPrefix(text, "---\n") && !strings.HasPrefix(text, "---\r\n") {
+		return raw, false
+	}
+	lines := strings.SplitAfter(text, "\n")
+	for i := 1; i < len(lines); i++ {
+		line := strings.TrimRight(lines[i], "\r\n")
+		if line == "---" {
+			break
+		}
+		value, isID := strings.CutPrefix(line, "id:")
+		if !isID {
+			continue
+		}
+		// The spacing after the colon is kept too: `id:lesson-1-x` is valid YAML.
+		gap := value[:len(value)-len(strings.TrimLeft(value, " \t"))]
+		switch value = strings.TrimSpace(value); {
+		case strings.HasPrefix(value, `"`):
+			value = `"` + id + `"`
+		case strings.HasPrefix(value, "'"):
+			value = "'" + id + "'"
+		default:
+			value = id
+		}
+		lines[i] = "id:" + gap + value + lines[i][len(line):]
+		return []byte(strings.Join(lines, "")), true
+	}
+	return raw, false
 }
