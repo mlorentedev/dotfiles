@@ -134,9 +134,6 @@ func TestMissingSiblingRequires(t *testing.T) {
 // "<command>" for every OS or "<command>/<goos>" for one.
 var requiredButNotCataloged = map[string]string{
 	"git":            "install.sh's prerequisite: the checkout step needs it before the catalog runs",
-	"claude/windows": "mise installs it on linux and darwin; on Windows setup-windows.ps1 does until mise joins the Windows catalog (#2013)",
-	"herdr/windows":  "mise installs it on linux and darwin; Windows waits for mise in the Windows catalog and H2 (conpty/, #2013)",
-	"pi":             "the setup twins install it until #2278 moves it to the catalog",
 	"zsh/darwin":     "macOS ships zsh as its login shell",
 	"zsh/windows":    "the zsh configs are for POSIX shells; Windows runs pwsh",
 	"tmux/windows":   "the tmux config is for POSIX terminals; Windows has no tmux",

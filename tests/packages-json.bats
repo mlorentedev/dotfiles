@@ -9,11 +9,6 @@ setup() {
     export CATALOG="$BATS_TEST_DIRNAME/../packages.json"
 }
 
-mise_catalog_excludes_windows() {
-    jq -e 'any(.tools[]; .name == "mise" and
-        ((.source.platforms // ["windows"]) | index("windows") == null))' "$1" >/dev/null
-}
-
 @test "packages.json is valid JSON with a tools array" {
     jq -e '.tools | type == "array"' "$CATALOG" >/dev/null
 }
@@ -40,8 +35,8 @@ mise_catalog_excludes_windows() {
 # installs mise is installed twice on a fresh box: setup's first
 # `dotf tools install` runs before `dotf tools sync`, so the catalog put an
 # unpinned OS copy of zoxide on PATH before mise placed the pinned one (#2195).
-# Where the catalog does not install mise (Windows), the catalog is the only
-# owner, which is how uv reaches Windows (winget astral-sh.uv, #2754).
+# The catalog installs mise on every OS (PLAT-001c), so a marked CLI has no
+# catalog entry anywhere: uv reaches Windows through mise too.
 @test "no packages.json tool is also a CLI versions.conf marks for mise, on an OS where mise runs" {
     local marked both
     marked="$(awk '
@@ -69,15 +64,17 @@ mise_catalog_excludes_windows() {
     [ -z "$both" ] || { echo "owned by both mise and packages.json: $both"; false; }
 }
 
-@test "mise stays disabled on Windows until the reader and full catalog are verified" {
-    mise_catalog_excludes_windows "$CATALOG"
-}
-
-@test "a release bump alone cannot enable Windows mise without the reader" {
-    local fixture="$BATS_TEST_TMPDIR/packages.json"
-    printf '%s\n' '{"tools":[{"name":"mise","source":{"platforms":["windows"]}}]}' > "$fixture"
-    DOTF_VERSION=0.69.0 run mise_catalog_excludes_windows "$fixture"
-    [ "$status" -eq 1 ] || { echo "release pin bypassed the Windows catalog guard"; false; }
+# Windows mise renders bats as npm:bats and direnv from its GitHub release;
+# a dotf older than that reader renders the aqua channels, which install
+# nothing usable there, so the catalog may not reach Windows behind it
+# (007c92fc, first released in 0.68.0).
+@test "mise is in the catalog on every OS, and the dotf pin carries the Windows reader" {
+    jq -e 'any(.tools[]; .name == "mise" and .source.platforms == null
+        and .source.asset["windows/amd64"] and .source.asset["windows/arm64"])' "$CATALOG" >/dev/null
+    local pin
+    pin="$(sed -n 's/^DOTF_VERSION=//p' "$BATS_TEST_DIRNAME/../versions.conf")"
+    [ -n "$pin" ]
+    awk -v v="$pin" 'BEGIN { split(v, p, "."); exit !(p[1] > 0 || p[2] >= 68) }'
 }
 
 # A self_install without {version} installs whatever is newest: an unattended
