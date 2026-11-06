@@ -81,6 +81,19 @@ test_windows_job() {
     [ "$status" -eq 1 ] || { echo "the doctor gate step carries GH_TOKEN again"; false; }
 }
 
+# mise verifies GitHub artifact attestations through the GitHub API. Without a
+# token, a shared runner IP exhausts the anonymous limit and a pinned CLI fails
+# to install (#3182). mise reads MISE_GITHUB_TOKEN and never GH_TOKEN, so the
+# token reaches mise and not the gh calls setup makes.
+@test "test-windows: setup hands mise the workflow token as MISE_GITHUB_TOKEN, not GH_TOKEN (#3182)" {
+    job="$(test_windows_job)"
+    step="$(printf '%s\n' "$job" | awk '/- name: Run setup-windows.ps1 end-to-end/{f=1} f && /^      - / && !/Run setup-windows.ps1 end-to-end/{exit} f')"
+    [ -n "$step" ] || false
+    printf '%s\n' "$step" | grep -qF 'MISE_GITHUB_TOKEN: ${{ github.token }}'
+    run grep -E '^[^#]*GH_TOKEN' <<<"$step"
+    [ "$status" -eq 1 ] || { echo "the setup step carries GH_TOKEN"; false; }
+}
+
 # The machine scope skips doctor's gh checks too, and spec-issue-state was the
 # one that verified something on the runner (CI-004 AC8): a spec whose issue
 # closed must still turn the job red. The audit is its own step with the token.
