@@ -61,7 +61,6 @@ setup() {
 #                             on 2026-08-23 (18 stray processes) and the reason the guard exists. The
 #                             stub there is not standing in for a real run — it proves the guard yields
 #                             to a test's own stub.
-#   hermes-setup              stubs remote installers — a real run provisions an agent host
 #   install                   stubs the release download — a real run fetches from GitHub releases
 #   model-canary              stubs `gh` and the canary: a real run opens, rewrites or closes a
 #                             live issue, and the real canary needs the NaN key. The Go probe is
@@ -93,7 +92,7 @@ setup() {
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
 EXEMPT_SUITES="add-to-project-script bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper gh-auth-helper guard-memory-sink guard-no-gui
-hermes-setup install model-canary release-pr-body-refs review-attestation-workflow setup-no-arch-downloads shell-profile skills-pipeline
+install model-canary release-pr-body-refs review-attestation-workflow setup-no-arch-downloads shell-profile skills-pipeline
 tmux vault-maintenance-weekly zshrc-guards"
 
 exempt() {
