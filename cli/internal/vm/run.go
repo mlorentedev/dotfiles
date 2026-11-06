@@ -258,9 +258,9 @@ func waitLogon(q *QGA, o RunOptions) error {
 
 // stillRunning is the PowerShell that reports a step that has not ended: its
 // log so far, read with a shared read, then every process under the step's
-// guestrun.ps1, oldest first, as `pid command line`. The script's own command
-// line carries the pattern it looks for, so it leaves itself out, and the walk
-// stops at 500 so a reused PID cannot make it a cycle.
+// guestrun.ps1, oldest first, as `pid command line`. Its own command line holds
+// the pattern it looks for, so the $PID filter leaves this process out, and the
+// walk stops at 500 so a reused PID cannot make it a cycle.
 func stillRunning(name string) string {
 	return `Get-Content -Raw -Encoding UTF8 -LiteralPath '` + guestWork + `\` + name + `.log' -ErrorAction SilentlyContinue
 $all = @(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID })
@@ -296,6 +296,8 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 		// running, before a run without --keep discards the guest (#3208).
 		if r, err := q.Run("powershell.exe", []string{"-NoProfile", "-Command", stillRunning(name)}); err == nil {
 			_, _ = o.Out.Write(bytes.TrimPrefix(r.Stdout, []byte(utf8BOM)))
+		} else {
+			_, _ = fmt.Fprintf(o.Out, "--- could not read what %s left running: %v\n", name, err)
 		}
 		return fmt.Errorf("%s did not finish in %s: %w", label, o.Step, werr)
 	}
