@@ -1,5 +1,5 @@
 ---
-id: "lesson-557-tmux-c-is-not-a-guarantee-of-the-working-directory"
+id: "lesson-562-tmux-c-is-not-a-guarantee-of-the-working-directory"
 type: lesson
 status: active
 title: "tmux -c is not a guarantee of the working directory"
