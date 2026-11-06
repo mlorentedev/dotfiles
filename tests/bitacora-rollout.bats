@@ -368,3 +368,59 @@ STUB
     refute_grep 'force=true' "$GH_LOG"
     refute_grep 'pr create' "$GH_LOG"
 }
+
+# ── pacing the PR pushes (#3188) ──────────────────────────────────────────────
+
+# Every push to a rollout PR starts a PR-Agent review, and NaN serves five at a
+# time: a rollout that pushed eight PRs at once left three unreviewed. The sleep
+# stub writes into the gh log, so a test can see where the pause falls.
+sleep_stub() {
+    cat > "$FIX/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+printf 'SLEEP %s\n' "$*" >> "$GH_LOG"
+STUB
+    chmod +x "$FIX/bin/sleep"
+}
+
+# The repository each PR push went to, in order, with the pauses between them.
+push_order() {
+    grep -E '^SLEEP|^api -X PUT repos/mlorentedev/[^/]+/contents/.*branch=' "$GH_LOG" \
+        | sed -E 's#^api -X PUT repos/mlorentedev/([^/]+)/contents/.*#\1#' | uniq
+}
+
+@test "the PR pushes go out in batches of four, with a pause between batches" {
+    protected_stub; sleep_stub
+    BITACORA_PAT=stub run "$SCRIPT" r1 r2 r3 r4 r5 r6 r7 r8 r9
+    [ "$status" -eq 0 ]
+    [ "$(push_order | tr '\n' ' ')" = "r1 r2 r3 r4 SLEEP 900 r5 r6 r7 r8 SLEEP 900 r9 " ]
+}
+
+@test "a repo whose PR already carries the copies is not counted against a batch" {
+    protected_stub; sleep_stub
+    STUB_OPEN_PR=7 STUB_BRANCH_COPY=1 BITACORA_PAT=stub run "$SCRIPT" r1 r2 r3 r4 r5 r6
+    [ "$status" -eq 0 ]
+    [ "$(count_calls '^SLEEP')" -eq 0 ]
+}
+
+@test "ROLLOUT_BATCH and ROLLOUT_PAUSE set the batch and the pause" {
+    protected_stub; sleep_stub
+    ROLLOUT_BATCH=2 ROLLOUT_PAUSE=30 BITACORA_PAT=stub run "$SCRIPT" r1 r2 r3
+    [ "$status" -eq 0 ]
+    [ "$(push_order | tr '\n' ' ')" = "r1 r2 SLEEP 30 r3 " ]
+}
+
+@test "--check pushes nothing, so it never pauses" {
+    protected_stub; sleep_stub
+    BITACORA_PAT=stub run "$SCRIPT" --check r1 r2 r3 r4 r5
+    [ "$status" -eq 0 ]
+    [ "$(count_calls '^SLEEP')" -eq 0 ]
+}
+
+@test "a ROLLOUT_BATCH that is not a positive integer stops the run before any repo" {
+    protected_stub; sleep_stub
+    ROLLOUT_BATCH=0 BITACORA_PAT=stub run "$SCRIPT" r1
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ROLLOUT_BATCH"* ]] || false
+    # Not a single gh call: the run stopped before discovery and every repo.
+    [ ! -e "$GH_LOG" ]
+}
