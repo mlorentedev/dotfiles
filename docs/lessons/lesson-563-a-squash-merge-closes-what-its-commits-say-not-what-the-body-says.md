@@ -28,8 +28,8 @@ with a comment naming what is still open. Better still, write `Refs` in the comm
 settled. A commit message cannot be edited without a force-push, while a body can be edited at any time.
 
 The keyword does not have to stand at the start of a line, or appear in a template field. The PR that added this
-lesson described the mistake in prose: its body said the earlier squash merge "closed" the issue, followed by the issue
-reference. When that PR merged, GitHub closed the same issue a second time. Any closing verb (close, fix, resolve, in
-any tense) followed by an issue reference counts, wherever it appears in a body or a commit message. To mention a
-closing without triggering one, keep the verb and the reference apart. "Shut issue 2445" reads the same and closes
+lesson described the mistake in prose, and its body put the word "closed" directly before the issue reference. When
+that PR merged, GitHub closed the same issue a second time. A closing keyword (close, fix or resolve, in any tense)
+placed immediately before an issue reference counts wherever it appears in a body or a commit message. To mention a
+closing without triggering one, keep the verb away from the reference. "Shut issue 2445" reads the same and closes
 nothing.
