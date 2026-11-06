@@ -32,8 +32,9 @@ func TestReviewLaunchUsesReviewWorktree(t *testing.T) {
 			t.Fatalf("%s: %v\n%s", reviewer, err, out+errOut)
 		}
 		// The tmux form quotes the whole pipeline once more, so compare with
-		// the quoting stripped.
-		plain := strings.NewReplacer("'", "", "\\", "").Replace(out)
+		// the quoting stripped. Only the quote escape goes: a Windows path keeps
+		// its backslashes.
+		plain := strings.NewReplacer(`'\''`, "", "'", "").Replace(out)
 		wants := []string{
 			"-c " + tree + " ",
 			"Repo: " + tree,
@@ -77,6 +78,9 @@ func TestReviewWorktreeCarriesEarlierRounds(t *testing.T) {
 			t.Errorf("the review worktree lacks %s: %v", f, err)
 		}
 	}
+	// seedSpec gave the caller a review.md, so this holds only if the copy-in
+	// runs after the rotation. A verdict committed at HEAD is the other route
+	// into the slot: TestReviewWorktreeDropsAVerdictTheCallerRotated.
 	if _, err := os.Stat(filepath.Join(treeSpec, "review.md")); !os.IsNotExist(err) {
 		t.Errorf("the rotated verdict is still in the review slot of the worktree: %v", err)
 	}
