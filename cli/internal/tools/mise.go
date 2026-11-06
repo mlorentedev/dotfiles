@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -620,7 +621,7 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 			if out, err := s.Run("mise", "install", "node"); err != nil {
 				return p, fmt.Errorf("mise install node (required by bats): %w\n%s", err, strings.TrimSpace(string(out)))
 			}
-			if out, err := s.Run("mise", "install", "--force", "npm:bats"); err != nil {
+			if out, err := s.Run("mise", batsInstallArgs...); err != nil {
 				return p, fmt.Errorf("mise install npm:bats: %w\n%s", err, strings.TrimSpace(string(out)))
 			}
 		}
@@ -892,8 +893,13 @@ func gitBashScope(name string, args ...string) bool {
 	return strings.EqualFold(base, "bats.cmd") || isBatsInstall(name, args...)
 }
 
+// batsInstallArgs is the one Windows bats install Apply runs. The runner keys
+// Git Bash and the npm installer on these exact arguments, so the call site and
+// the match share them rather than each spelling them out.
+var batsInstallArgs = []string{"install", "--force", "npm:bats"}
+
 func isBatsInstall(name string, args ...string) bool {
-	return name == "mise" && len(args) == 3 && args[0] == "install" && args[1] == "--force" && args[2] == "npm:bats"
+	return name == "mise" && slices.Equal(args, batsInstallArgs)
 }
 
 func miseInstallEnv(name string, args ...string) string {
