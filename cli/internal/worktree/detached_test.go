@@ -69,6 +69,7 @@ func TestAddDetachedRefusesAnExistingTargetAndMissingInputs(t *testing.T) {
 		"commit": func(o *DetachedOptions) { o.Commit = "" },
 		"name":   func(o *DetachedOptions) { o.Name = "" },
 		"root":   func(o *DetachedOptions) { o.WorktreeRoot = "" },
+		"kind":   func(o *DetachedOptions) { o.Kind = "" },
 	} {
 		opts := detachedOpts(t)
 		blank(&opts)

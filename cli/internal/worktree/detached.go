@@ -28,8 +28,10 @@ type DetachedOptions struct {
 // caller that dies before removing it leaves something `sweep` can reap. No
 // branch is made, fetched or checked: the caller names the commit.
 func AddDetachedWithRunner(opts DetachedOptions, runner AddRunner, now time.Time) (*Info, error) {
-	if opts.RepoRoot == "" || opts.Name == "" || opts.Commit == "" {
-		return nil, errors.New("a detached worktree needs a repository, a name and a commit")
+	// Kind is required: a detached, issue-less worktree with no kind is one
+	// nothing labels and no reap rule recognises.
+	if opts.RepoRoot == "" || opts.Name == "" || opts.Commit == "" || opts.Kind == "" {
+		return nil, errors.New("a detached worktree needs a repository, a name, a commit and a kind")
 	}
 	if opts.WorktreeRoot == "" {
 		return nil, errors.New("WORKTREE_ROOT could not be resolved: run `dotf doctor`")
