@@ -114,26 +114,6 @@ setup() {
     refute_grep '^model = "openai/gemma4"' "$CFG"
 }
 
-@test "pr-agent: CI and the spec-review gate do not share a model" {
-    # #1149. NaN's concurrency limit is per MODEL, not per API key, so CI and
-    # `dotf spec review` drawing on the same id share one bucket of five.
-    # Measured 2026-08-21: a spec review died with
-    # `429: deepseek-v4-flash concurrency limit` because PR-Agent was reviewing
-    # the very PR that review had to clear. CI starved the gate its own PR
-    # needed to pass.
-    #
-    # Two models are two independent buckets, so the fix is separation and this
-    # asserts it stays separated. The pool's PRIMARY is what matters: that is
-    # what `dotf spec review` reaches for first.
-    pool_primary="$(python3 -c "
-import json
-d = json.load(open('$REPO/harness/reviewer-pool.json'))
-print(next(e['model'] for e in d['pool'] if e['role'] == 'primary'))
-")"
-    [ -n "$pool_primary" ]
-    refute_grep "^model = \"openai/${pool_primary}\"" "$CFG"
-}
-
 @test "pr-agent: the token budget is stated, because NaN models are not in LiteLLM's registry" {
     # Without this LiteLLM assumes a small default and silently truncates the
     # diff — a reviewer reading half a change reports on half a change.

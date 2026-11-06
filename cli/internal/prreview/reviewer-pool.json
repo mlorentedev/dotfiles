@@ -70,7 +70,7 @@
       "vendor": "deepseek",
       "pr_agent": {
         "model": "openai/deepseek-v4-flash",
-        "weight": 19
+        "weight": 25
       },
       "why": "1M context and a mandatory reasoning chain — roughly 4x slower than qwen3.6 on trivial prompts, which is the correct trade for a gate that runs once per spec. Exercised: BUG-074 round 3 re-ran the mutation battery itself rather than trusting the spec's table."
     },
@@ -93,10 +93,10 @@
       "vendor": "xiaomi",
       "pr_agent": {
         "model": "openai/mimo-v2.6-flash",
-        "weight": 27
+        "weight": 12
       },
       "why": "Re-admitted 2026-09-30 on the bar this file requires, not renamed in. NaN retired its predecessor mimo-v2.5 that day: it hung, then answered 401 'This API key does not have access to the requested model' (AI-045, #1763). mimo-v2.5 had been admitted 2026-08-20 on a planted-defect test, and the successor was given the same one: the `((count++))` exit-status-1 case under `set -e` from this repo's prohibited-pattern table. mimo-v2.6-flash found it in 21 s and 772 completion tokens, named a failing input (count=0), and gave the fix (`count=$((count + 1))`). deepseek-v4-flash, run on the same prompt, found the same defect in 9 s. That is agreement on one planted defect, not a quality ranking, and it is stated as that. It stays a SECOND fallback, after the provider-diverse one, because provider diversity remains the stronger property. Profile: 1M context, reasoning chain, which is this pool's line against qwen3.6 and gemma4 at 262K.",
-      "operational_note": "Reasoning models here emit reasoning_content BEFORE content. Under-provisioning max_tokens returns an empty body with finish_reason=length and no error — the same shape as a review that silently did not happen (lesson 213). Provision generously and check finish_reason. NaN recommends max_tokens >= 300 for this model and publishes a per-model concurrency limit of 5."
+      "operational_note": "Reasoning models here emit reasoning_content BEFORE content. Under-provisioning max_tokens returns an empty body with finish_reason=length and no error — the same shape as a review that silently did not happen (lesson 213). Provision generously and check finish_reason. NaN recommends max_tokens >= 300 for this model and publishes a per-model concurrency limit of 5. Measured in PR-Agent 2026-10-09 to 11-05 (#2216): 25% of attempts ended empty at NaN's reasoning-only ceiling (60,000 characters or 420 s, ai/nan/README.md), which no cap of ours moves and which `reasoning_effort` does not shorten for this model; mean 379 s of a NaN slot per draw against 127 s for deepseek and 35 s for glm, so at weight 27 it held 77% of the pool's NaN slot time, and it was the only member NaN answered 429. Hence weight 12: its addressed findings per review (about 0.45) match deepseek's, which takes the share it gives up."
     },
     {
       "id": "nan/glm5.3-flash",
@@ -108,7 +108,7 @@
       "vendor": "zhipu",
       "pr_agent": {
         "model": "openai/glm5.3-flash",
-        "weight": 19,
+        "weight": 13,
         "reasoning_effort": "low"
       },
       "why": "Admitted 2026-08-29 by owner decision (HARNESS-093, #1370) to spread reviews across NaN's PER-MODEL concurrency buckets and exercise more than one model on the gate. What IS established: reasoning-class by profile — pi-nan-provider's snapshot marks glm5.3-flash reasoning: true with a 1M context, the line this pool draws (tests/pi-nan-package.bats holds it). What is NOT established: a calibration against a review of known outcome (e.g. CLI-050 round 1's real Major); recorded here so nobody reads this entry as measured equivalence to deepseek. Drawn at random like every member; --reviewer names it deliberately."
@@ -134,10 +134,10 @@
       "signs": "fallback",
       "pr_agent": {
         "model": "anthropic/claude-haiku-5-5",
-        "weight": 35,
+        "weight": 50,
         "reasoning_effort": "medium"
       },
-      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B). In the adversarial review it signs only as a FALLBACK, with a classified reason (rate limit, quota, provider error, timeout, content filter, empty answer) when the NaN first signers failed; it never signs first by draw. In PR-Agent it is drawn at weight 35, about a third of reviews, because NaN's shared per-model concurrency is the scarcer resource and the owner judged the spend acceptable (2026-10-14, #2215). Measured on four real reviews (25K-55K tokens in, 9K-32K out, all under the 100K price step): about $0.02-0.06 a review, 3 to 7 times the $0.008 this entry first estimated, because thinking tokens bill as output. Reasoning-class by profile (adaptive thinking). Effort is medium, not high: at high, thinking spent the 32,000-token output cap on large diffs and the answer came back empty in 5 of 11 runs (#2458). No calibration against a review of known outcome yet; #2215 and #2216 measure its addressed-comment rate."
+      "why": "Admitted 2026-10-09 by owner decision (#1923, amendment B). In the adversarial review it signs only as a FALLBACK, with a classified reason (rate limit, quota, provider error, timeout, content filter, empty answer) when the NaN first signers failed; it never signs first by draw. In PR-Agent it is drawn at weight 50, half of reviews, to offload NaN, whose shared concurrency is the scarcer resource (owner, 2026-11-05, #2216; 35 from 2026-10-09). Measured 2026-10-09 to 11-05 (#2216, 456 published reviews): mean 40.7K tokens in and 5.7K out, about $0.035 a review at the rates above the price step and less below it; median 18 s from request to publish; 1.0% of attempts empty at `length` since effort dropped to medium (#2459, against 5 of 11 at high). Its findings are the most numerous (3.6 a review) and the least often addressed: 12% of line-anchored findings had their lines changed before the next review that dropped them, against 27-34% for the NaN members, about 0.29 addressed a review against 0.45 for deepseek and mimo. Reasoning-class by profile (adaptive thinking). Effort is medium, not high: at high, thinking spent the 32,000-token output cap on large diffs and the answer came back empty in 5 of 11 runs (#2458)."
     },
     {
       "id": "anthropic-review/claude-sonnet-5-5",
@@ -159,6 +159,6 @@
   "pr_agent_risk": {
     "min_changed_lines": 1500,
     "label": "deep-review",
-    "$comment": "A PR reviews first on the `route: risk` member when its additions plus deletions reach min_changed_lines, or it carries the label. Set to 1500 by owner decision 2026-10-09: the first live Sonnet review cost $0.37, not $0.13, because a PR this large fills the prompt cap, and over the last 395 merged PRs 9.1% reach 900 lines, 4.8% reach 1200 and 3.0% reach 1500. At 1500 the route costs about $28 of the $60-65 month. A path-based predicate matched 14-35% and was rejected as too costly. Recalibrate at #2215 / #2216."
+    "$comment": "A PR reviews first on the `route: risk` member when its additions plus deletions reach min_changed_lines, or it carries the label. Set to 1500 by owner decision 2026-10-09: the first live Sonnet review cost $0.37, not $0.13, because a PR this large fills the prompt cap, and over the last 395 merged PRs 9.1% reach 900 lines, 4.8% reach 1200 and 3.0% reach 1500. At 1500 the route costs about $28 of the $60-65 month. A path-based predicate matched 14-35% and was rejected as too costly. Measured 2026-10-09 to 11-05 (#2216): the route took 1.9% of drawn reviews, not 3%, at a mean of $0.22 (60.9K tokens in), about $8 a month."
   }
 }
