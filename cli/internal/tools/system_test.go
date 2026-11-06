@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -261,6 +262,54 @@ func TestInstallSystem_ExitZeroWithoutThePackageIsAnError(t *testing.T) {
 	_, err := w.installer("darwin").Install(ghTool())
 	if err == nil || !strings.Contains(err.Error(), "gh") || !strings.Contains(err.Error(), "brew") {
 		t.Errorf("want an error naming gh and brew, got %v", err)
+	}
+}
+
+// winget's 0x8a15000f (APPINSTALLER_CLI_ERROR_SOURCE_DATA_MISSING) is an
+// incomplete source cache, and a plain retry reads the same cache: both CI
+// attempts failed alike (#2445). One `winget source update` per run, then one
+// retry of the install that hit it.
+func TestInstallSystem_WingetSourceDataMissingRefreshesTheSourceOnce(t *testing.T) {
+	w := newWorld("winget")
+	in := w.installer("windows")
+	stale := true // until a `source update` runs
+	run := in.Run
+	in.Run = func(name string, args ...string) error {
+		if strings.Join(args, " ") == "source update" {
+			stale = false
+		}
+		if args[0] == "install" && stale {
+			return errors.New("exit status 0x8a15000f")
+		}
+		return run(name, args...)
+	}
+	zoxide := Tool{Name: "zoxide", Source: Source{Type: "system", Winget: "ajeetdsouza.zoxide"}}
+	for _, tool := range []Tool{ghTool(), zoxide} {
+		if res, err := in.Install(tool); err != nil || res != Installed {
+			t.Fatalf("Install(%s) = %v, %v; want Installed, nil\n%s", tool.Name, res, err, w.out.String())
+		}
+	}
+	updates := 0
+	for _, argv := range w.ran {
+		if strings.Join(argv, " ") == "winget source update" {
+			updates++
+		}
+	}
+	if updates != 1 {
+		t.Errorf("ran `winget source update` %d times, want once per run: %v", updates, w.ran)
+	}
+}
+
+// Any other winget failure is not retried: it is reported with the command.
+func TestInstallSystem_OtherWingetFailuresAreNotRetried(t *testing.T) {
+	w := newWorld("winget")
+	w.failRun = errors.New("exit status 0x8a150014") // no package found
+	_, err := w.installer("windows").Install(ghTool())
+	if err == nil || !strings.Contains(err.Error(), "winget install --id GitHub.cli") {
+		t.Fatalf("want the failing command in the error, got %v", err)
+	}
+	if len(w.ran) != 1 {
+		t.Errorf("ran %v, want the one install", w.ran)
 	}
 }
 
