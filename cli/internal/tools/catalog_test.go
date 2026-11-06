@@ -217,6 +217,43 @@ func TestLoad_RejectsAReleaseToolWithNoAsset(t *testing.T) {
 	}
 }
 
+func TestLoad_AcceptsGitHubArchiveAndResolvesMember(t *testing.T) {
+	body := `{"tools":[{"name":"ts-bridge","version":"1.20.0","profile":"full","source":{
+		"type":"github-archive","repo":"mlorentedev/ts-bridge",
+		"asset":{"windows":"ts-bridge-v{version}-windows-{goarch}.zip"},
+		"checksums":"checksums.txt",
+		"member":{"windows":"ts-bridge.exe"}
+	}}]}`
+	c, err := Load(writeCatalog(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool := c.Tools[0]
+	if got := tool.MemberName("windows", "amd64"); got != "ts-bridge.exe" {
+		t.Fatalf("MemberName() = %q", got)
+	}
+}
+
+func TestLoad_RejectsMalformedGitHubArchive(t *testing.T) {
+	cases := []struct {
+		name, source, want string
+	}{
+		{"missing member", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s"}`, "member"},
+		{"unknown member key", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"macos":"tool"}}`, "macos"},
+		{"asset member mismatch", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"linux":"tool"}}`, "same platforms"},
+		{"parent escape", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"windows":"../tool.exe"}}`, "safe relative"},
+		{"absolute member", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"windows":"C:/tool.exe"}}`, "safe relative"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `{"tools":[{"name":"tool","version":"1.0.0","source":` + tc.source + `}]}`
+			if _, err := Load(writeCatalog(t, body)); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Load() error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 // A system entry names its package per OS manager. One that names none can never
 // install anywhere, one that names an unknown manager (pacman, dnf) is a typo the
 // decoder would drop in silence, and one that carries a version asks for a pin a

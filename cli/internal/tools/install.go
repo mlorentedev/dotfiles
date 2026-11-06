@@ -255,7 +255,7 @@ func (in *Installer) Install(t Tool) (Result, error) {
 		return Skipped, fmt.Errorf("%s: %s", t.Name, reason)
 	}
 	switch t.Source.Type {
-	case "github-release":
+	case "github-release", "github-archive":
 		return in.installRelease(t)
 	case "npm":
 		return in.installNpm(t)
@@ -319,9 +319,17 @@ func unknownTypeNote(t Tool) string {
 // refusal, so it is not asked about its checksums.
 func (in *Installer) refusal(t Tool) string {
 	switch t.Source.Type {
-	case "github-release":
+	case "github-release", "github-archive":
 		if t.AssetName(in.GOOS, in.GOARCH) != "" && t.ChecksumsName(in.GOARCH) == "" {
 			return "no checksums file declared — refusing to install unverified"
+		}
+		if asset := t.AssetName(in.GOOS, in.GOARCH); t.Source.Type == "github-archive" &&
+			asset != "" && !supportedArchive(asset) {
+			return "unsupported archive type"
+		}
+		if t.Source.Type == "github-archive" && t.AssetName(in.GOOS, in.GOARCH) != "" &&
+			t.MemberName(in.GOOS, in.GOARCH) == "" {
+			return "no archive member declared for this platform"
 		}
 	case "npm", "uv-tool":
 		if t.Source.Package == "" {
@@ -351,7 +359,7 @@ func (in *Installer) Plan(t Tool) Plan {
 		return p
 	}
 	switch t.Source.Type {
-	case "github-release":
+	case "github-release", "github-archive":
 		if t.AssetName(in.GOOS, in.GOARCH) == "" {
 			p.Action = PlanUnsupported
 			p.Note = "no release asset for " + in.GOOS + "/" + in.GOARCH
@@ -592,6 +600,13 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 	if err := verifyChecksum(assetPath, sumsPath, asset); err != nil {
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}
+	payloadPath := assetPath
+	if t.Source.Type == "github-archive" {
+		payloadPath, err = extractArchiveMember(assetPath, asset, t.MemberName(in.GOOS, in.GOARCH), tmp)
+		if err != nil {
+			return Skipped, fmt.Errorf("%s: %w", t.Name, err)
+		}
+	}
 
 	// Execute the staged copy before placing it (PLAT-001a W1). A checksum proves
 	// the bytes are the release's, not that they run here: a linux-amd64 asset on
@@ -610,7 +625,7 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 	}
 	defer func() { _ = os.RemoveAll(stageDir) }()
 	staged := filepath.Join(stageDir, binFilename(t.Name, in.GOOS))
-	if err := placeBinary(assetPath, staged); err != nil {
+	if err := placeBinary(payloadPath, staged); err != nil {
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	if err := checkProbed(t, ProbeVersion(staged, in.Probe), "the downloaded "+asset+" does not run on "+in.GOOS+"/"+in.GOARCH); err != nil {
@@ -703,11 +718,36 @@ func placeBinary(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	data, err := os.ReadFile(src)
+	input, err := os.Open(src) //nolint:gosec // checksum-verified staged payload
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0o755)
+	defer func() { _ = input.Close() }()
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".dotf-tool-*")
+	if err != nil {
+		return err
+	}
+	staged := tmp.Name()
+	defer func() { _ = os.Remove(staged) }() // no-op after rename
+	if _, err := io.Copy(tmp, input); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(staged, dst); err != nil {
+		return err
+	}
+	return os.Chmod(dst, 0o755)
 }
 
 // verifyChecksum confirms assetPath's sha256 matches the entry for assetName in
