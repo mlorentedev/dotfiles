@@ -1272,3 +1272,43 @@ func TestSync_RepairsADeployedConfigThatDoesNotParse(t *testing.T) {
 		t.Errorf("the next plan must have nothing to do, got %+v, %v", again, err)
 	}
 }
+
+// A Windows sync whose bats never reaches its pin because Git Bash is missing
+// said only "not running at their pin: bats" (#2346). The error names the
+// missing runtime and why it was not found.
+func TestBatsRuntimeNote_NamesAMissingGitBash(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	withBash := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(withBash, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(withBash, "bin", "bash.exe"), []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	found := func() ([]byte, error) {
+		return []byte(filepath.Join(withBash, "mingw64", "libexec", "git-core") + "\n"), nil
+	}
+	notUnder := func() ([]byte, error) { return []byte(execPath + "\n"), nil }
+	noGit := func() ([]byte, error) { return nil, errors.New(`exec: "git": executable file not found in %PATH%`) }
+	for _, tc := range []struct {
+		name     string
+		goos     string
+		missing  []string
+		execPath func() ([]byte, error)
+		want     string // substring; "" means no note at all
+	}{
+		{"git cannot be run", "windows", []string{"bats"}, noGit, "Git Bash not found: `git --exec-path` failed"},
+		{"no bash under Git's root", "windows", []string{"jq", "bats"}, notUnder, "Git Bash not found under " + root},
+		{"Git Bash is there", "windows", []string{"bats"}, found, ""},
+		{"bats is not the missing tool", "windows", []string{"jq"}, noGit, ""},
+		{"not Windows", "linux", []string{"bats"}, noGit, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := batsRuntimeNote(tc.goos, tc.missing, tc.execPath)
+			if tc.want == "" && got != "" || !strings.Contains(got, tc.want) {
+				t.Errorf("batsRuntimeNote = %q, want it to contain %q", got, tc.want)
+			}
+		})
+	}
+}

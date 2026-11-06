@@ -671,7 +671,8 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 		return p, fmt.Errorf("after mise prune, still installed: %s", strings.Join(after.Orphans, ", "))
 	}
 	if len(after.Missing) > 0 {
-		return p, fmt.Errorf("after mise install, not running at their pin: %s", strings.Join(after.Missing, ", "))
+		return p, fmt.Errorf("after mise install, not running at their pin: %s%s",
+			strings.Join(after.Missing, ", "), batsRuntimeNote(runtime.GOOS, after.Missing, gitExecPath))
 	}
 	if older := regressed(p.current, after.current, after.Outdated); len(older) > 0 {
 		return p, fmt.Errorf("after mise upgrade, older than before: %s", strings.Join(older, ", "))
@@ -856,10 +857,8 @@ func GitBash(execPath string) (string, bool) {
 func HomeRunners(home string) (run, stdout Runner) {
 	bashBin := ""
 	if runtime.GOOS == "windows" {
-		if out, err := exec.Command("git", "--exec-path").Output(); err == nil {
-			if bash, ok := GitBash(string(out)); ok {
-				bashBin = filepath.Dir(bash)
-			}
+		if bash, reason := findGitBash(gitExecPath); reason == "" {
+			bashBin = filepath.Dir(bash)
 		}
 	}
 	command := func(name string, args ...string) *exec.Cmd {
@@ -881,6 +880,37 @@ func HomeRunners(home string) (run, stdout Runner) {
 	run = func(name string, args ...string) ([]byte, error) { return command(name, args...).CombinedOutput() }
 	stdout = func(name string, args ...string) ([]byte, error) { return command(name, args...).Output() }
 	return run, stdout
+}
+
+// gitExecPath asks git where its helpers live; Git Bash is found from it.
+var gitExecPath = func() ([]byte, error) { return exec.Command("git", "--exec-path").Output() }
+
+// findGitBash locates Git for Windows' bash from `git --exec-path`. reason is
+// empty when bash was found, and otherwise says why not, in words an operator
+// can act on.
+func findGitBash(execPath func() ([]byte, error)) (bash, reason string) {
+	out, err := execPath()
+	if err != nil {
+		return "", fmt.Sprintf("Git Bash not found: `git --exec-path` failed (%v); install Git for Windows", err)
+	}
+	bash, ok := GitBash(string(out))
+	if !ok {
+		return bash, "Git Bash not found under " + filepath.Dir(filepath.Dir(bash)) + "; reinstall Git for Windows"
+	}
+	return bash, ""
+}
+
+// batsRuntimeNote names a missing Git Bash when bats is what failed its pin on
+// Windows: bats runs under Git Bash there, so without it the only symptom was
+// "not running at their pin: bats" (#2346).
+func batsRuntimeNote(goos string, missing []string, execPath func() ([]byte, error)) string {
+	if goos != "windows" || !contains(missing, "bats") {
+		return ""
+	}
+	if _, reason := findGitBash(execPath); reason != "" {
+		return "; bats runs under Git Bash, and " + reason
+	}
+	return ""
 }
 
 // gitBashScope reports whether a sync child needs Git Bash on its PATH: the
