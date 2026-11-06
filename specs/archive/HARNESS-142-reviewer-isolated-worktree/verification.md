@@ -29,6 +29,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - That run's verdict was FAIL, on a real defect: a verdict committed at HEAD was checked out into the worktree and survived the caller's rotation, so a run ending without a verdict would copy the old one back. Fixed by mirroring the caller's spec folder instead of copying over it (`TestReviewWorktreeDropsAVerdictTheCallerRotated`). Its minor finding, a foreground run that never starts leaving the worktree to its lease, is fixed too (`TestReviewForegroundRemovesTheWorktreeWhenTheRunNeverStarts`).
 - Launch and deadline batch (AC1, AC2, AC3, AC4, AC6): the full Go suite, both lints and `GOOS=windows go vet ./...` pass; the deadline tests run real git worktrees and are Unix-only, like the stray-write tests they extend.
 - Not yet exercised for real, left to the archive review: a pi reviewer in a review worktree, and the worktree's removal on a real Windows box (CI's Windows leg runs the unit tests only).
+- Archive review, 2026-11-06, pi reviewer `nan/glm5.3-flash` at c4d0e6c8, `--foreground`: PASS-WITH-GAPS. It ran inside a review worktree the launcher made for round 2, so the pi arm is now exercised for real: the caller's uncommitted round-1 files reached it and the verdict committed at HEAD was dropped from it. Its first, detached attempt died on startup: the long-lived tmux server handed the session an unreadable working directory despite `-c`. That is #3220, fixed in #3221 (`spec deadline` enters the worktree itself and refuses when it cannot). The Windows removal stays open for the first real Windows review.
+
+## Archive review dispositions
+
+- Promotion candidates unanswered: applied below.
+- `tasks.md` closing boxes unticked: declined. `tasks.md` is in the contract set the review signed, and the evidence the boxes name is recorded in this file and in #3213.
+- `launchDetached` keeps the worktree when `confirmLaunched` fails; `AddDetachedWithRunner` leaves an unlabelled worktree when the metadata save fails; the committed-verdict test stubs git rather than checking a verdict out; `SnapshotTree` ignores staged copies into the spec folder: ticketed as #3223.
+- Proposal wording on copying back the transcript: declined. The proposal is in the contract set, and the decision log above records the mechanism.
+- Removal on a real Windows box: open, recorded above; sweep is the backstop.
 - No regressions in the existing suite: yes, the full Go suite passes with the check in place.
 
 ## Decisions made during implementation
@@ -49,13 +58,13 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-562-tmux-c-is-not-a-guarantee-of-the-working-directory.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the decisions are local to the review launcher and are logged above; no cross-cutting contract changed
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the review worktree exists in this repository only
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-142-reviewer-isolated-worktree/` -> `specs/archive/HARNESS-142-reviewer-isolated-worktree/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-142-reviewer-isolated-worktree/` -> `specs/archive/HARNESS-142-reviewer-isolated-worktree/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
