@@ -22,9 +22,11 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
-- Test suite: `cd cli && go test ./internal/worktree/ ./internal/cmd/ -count=1` -> ok (worktree package batch; the full suite runs at the end per tasks.md)
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Worktree package batch (#3195, #3196): `cd cli && go test ./internal/worktree/ ./internal/cmd/ -count=1` -> ok.
+- Launch batch, AC5: `cd cli && go build ./... && go vet ./... && go test ./...` -> every package ok; `golangci-lint run ./...`, `GOOS=windows golangci-lint run ./...` -> 0 issues; `GOOS=windows go vet ./...` -> clean.
+- The command-level review fixtures use a fake `.git` directory, so they stub the dirt check through the `callerDirt` seam, as they already stub the review base. `TestReviewRefusesDirtyTreeWithoutAllowDirty` replaces the fake with a real repository and runs the real check, and `TestCallerDirtNamesWhatTheReviewerWouldNotSee` covers the helper in `internal/spec`.
+- Manual smoke test: pending, the one real `dotf spec review` on this spec at the end of tasks.md.
+- No regressions in the existing suite: yes, the full Go suite passes with the check in place.
 
 ## Decisions made during implementation
 
