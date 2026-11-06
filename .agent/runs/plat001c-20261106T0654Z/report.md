@@ -52,6 +52,11 @@ Ended 2026-11-06 ~10:15Z with `reason: queue-empty`. The P1/P2 bugs readable on 
 #3174 has main merged into it and a status line for each blocker, and it stays a draft. Worktrees for #3222 and #3226 are removed.
 
 Owner next, in order:
-1. Merge release-please. It now carries #3222 and #3226.
+1. Merge release-please, #3140 (`chore(main): release 0.80.0`). It now carries #3222 and #3226.
 2. Once that release is the `DOTF_VERSION` pin: add the `vcredist` entry ahead of `mise` (`winget_arch` with both VCRedist ids, `platforms: ["windows"]`; spec row "Blocker 1") and delete `setup-windows.ps1`'s `dotf env persist` block.
 3. Decide #2438. Option 2, mise's `npm:` backend, touches `versions.conf`.
+
+Also from this run:
+- I filed #3242: the tools step does not expose mise's 30-minute download timeout, so a slow link fails the large downloads. Measured on both guest runs.
+- #3227, #3228 and #3242 went in through REST because GraphQL was exhausted. They have no `AREA-NNN:` id and no board Type or Priority yet.
+- The repo-wide `dotf pr triage-queue` exits 1 because of #3236 and #3231. Both belong to other sessions; nothing from this run is waiting.
