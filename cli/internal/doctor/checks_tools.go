@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // coreTools is healthcheck.sh section 1's PATH expectation set.
@@ -38,12 +39,35 @@ func checkCoreTools(sys *System, c *Contract, rep *Report) {
 			rep.Skip(tool + " (POSIX-only; not expected on Windows)")
 			continue
 		}
+		if win && tool == "bash" {
+			checkGitBash(sys, rep)
+			continue
+		}
 		if sys.has(tool) {
 			rep.Pass(tool + " found")
 		} else {
 			rep.Fail(tool + " not in PATH" + coreToolRemedy(tool, sys.GOOS))
 		}
 	}
+}
+
+// checkGitBash is the Windows form of the bash check: the Git Bash dotf runs,
+// found from `git --exec-path` as tools.HomeRunners finds it. The PATH is not
+// consulted, so a WSL bash there neither passes nor fails it (#3214).
+func checkGitBash(sys *System, rep *Report) {
+	// Stdout alone: the answer is a path, and a stderr line merged into it
+	// would make the root it names garbage.
+	out, err := sys.CommandStdoutDir("", "git", "--exec-path")
+	if err != nil {
+		rep.Fail("Git Bash not found: `git --exec-path` failed (install Git for Windows)")
+		return
+	}
+	bash, ok := tools.GitBash(out)
+	if !ok {
+		rep.Fail("Git Bash not found under " + filepath.Dir(filepath.Dir(bash)) + " (reinstall Git for Windows)")
+		return
+	}
+	rep.Pass("bash found (Git Bash: " + bash + ")")
 }
 
 // coreToolRemedy names the command that provisions a missing core tool, only

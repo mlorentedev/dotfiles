@@ -836,6 +836,17 @@ func writeFileAtomic(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
+// GitBash returns Git for Windows' bash.exe under the install root that the
+// output of `git --exec-path` names (<root>\mingw64\libexec\git-core), and
+// whether it is there. dotf runs this bash, not whatever `bash` the PATH holds:
+// Git's installer adds only Git\cmd, and a bare `bash` may be WSL's (#3214).
+func GitBash(execPath string) (string, bool) {
+	root := filepath.Dir(filepath.Dir(filepath.Dir(strings.TrimSpace(execPath))))
+	bash := filepath.Join(root, "bin", "bash.exe")
+	info, err := os.Stat(bash)
+	return bash, err == nil && !info.IsDir()
+}
+
 // HomeRunners returns the runners a machine-level sync uses, both run from
 // home so a project mise.toml in the caller's directory is not installed as a
 // side effect: run merges stdout and stderr (`mise install`), stdout returns
@@ -844,12 +855,9 @@ func writeFileAtomic(path string, data []byte) error {
 func HomeRunners(home string) (run, stdout Runner) {
 	bashBin := ""
 	if runtime.GOOS == "windows" {
-		out, err := exec.Command("git", "--exec-path").Output()
-		if err == nil {
-			gitRoot := filepath.Dir(filepath.Dir(filepath.Dir(strings.TrimSpace(string(out)))))
-			candidate := filepath.Join(gitRoot, "bin", "bash.exe")
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-				bashBin = filepath.Dir(candidate)
+		if out, err := exec.Command("git", "--exec-path").Output(); err == nil {
+			if bash, ok := GitBash(string(out)); ok {
+				bashBin = filepath.Dir(bash)
 			}
 		}
 	}
