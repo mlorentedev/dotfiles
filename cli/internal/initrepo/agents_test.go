@@ -206,3 +206,21 @@ func TestBootstrapLane_ForceKeepsFencedQuote(t *testing.T) {
 		t.Errorf("the prior content, fence included, did not survive:\n%s", got)
 	}
 }
+
+func TestBootstrapLane_FencedQuoteIsNotTheSection(t *testing.T) {
+	root := t.TempDir()
+	prior := "# AGENTS.md\n\n```md\n## Lanes\nexample only\n```\n"
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte(prior), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := BootstrapLane(root, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Agents != "appended" {
+		t.Errorf("Agents = %q, want appended: a fenced quote is not the section", res.Agents)
+	}
+	if got := readLaneFile(t, root, "AGENTS.md"); !strings.HasPrefix(got, prior) || strings.Count(got, "\n## Lanes\n") != 2 {
+		t.Errorf("want the fence intact and a real section appended:\n%s", got)
+	}
+}
