@@ -838,6 +838,10 @@ jobs:
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
           DOTFILES_SKIP_PI_PACKAGES: ${{ (github.event_name == 'pull_request' && needs.changes.outputs.pi != 'true') && '1' || '' }}
+          # For mise alone: it verifies GitHub artifact attestations through
+          # the API, and a shared runner IP has used up the anonymous limit
+          # (#3182). mise never reads GH_TOKEN, so gh here stays unauthenticated.
+          MISE_GITHUB_TOKEN: ${{ github.token }}
         run: .\setup-windows.ps1
 
       # The gate. Setup itself stays non-fatal on doctor (degrade-not-break, C9,
