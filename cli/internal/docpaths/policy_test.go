@@ -3,6 +3,7 @@ package docpaths
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -55,6 +56,17 @@ func TestCurrentPolicyLoads(t *testing.T) {
 	policy, err := LoadPolicy(filepath.Join("..", "..", "..", "harness", "doc-paths.json"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	wantBasenames := []string{
+		"AGENTS.md",
+		"CLAUDE.md",
+		"AGY.md",
+		"GEMINI.md",
+		"copilot-instructions.md",
+		"README.md",
+	}
+	if !reflect.DeepEqual(policy.GovernedBasenames, wantBasenames) {
+		t.Fatalf("governed basenames = %v, want %v", policy.GovernedBasenames, wantBasenames)
 	}
 	if len(policy.RequiredMembers) < 5 || len(policy.KnownExtensions) < 10 {
 		t.Fatalf("current policy is incomplete: %+v", policy)

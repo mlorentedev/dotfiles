@@ -45,12 +45,23 @@ func newLintDocPathsCmd() *cobra.Command {
 }
 
 func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []string) error {
-	if repo == "" {
-		root, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	repoExplicit := repo != ""
+	var cwd string
+	if !repoExplicit {
+		var err error
+		cwd, err = os.Getwd()
 		if err != nil {
-			return errors.New("not inside a git checkout: run from the checkout or pass --repo")
+			return fmt.Errorf("resolve working directory: %w", err)
 		}
-		repo = strings.TrimSpace(string(root))
+		root, err := docpaths.RepositoryRoot(cwd)
+		if err != nil {
+			return err
+		}
+		repo = root
+	}
+	repo, err := filepath.Abs(repo)
+	if err != nil {
+		return fmt.Errorf("resolve repository root: %w", err)
 	}
 	if policyPath == "" {
 		policyPath = filepath.Join(repo, "harness", "doc-paths.json")
@@ -64,6 +75,15 @@ func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []
 		if err != nil {
 			return err
 		}
+	} else {
+		base := repo
+		if !repoExplicit {
+			base = cwd
+		}
+		files, err = repoRelativeDocPaths(repo, base, files)
+		if err != nil {
+			return err
+		}
 	}
 	report, err := docpaths.CheckFiles(docpaths.CheckOptions{
 		RepoRoot: repo, VaultRoot: envpkg.ResolvePath("VAULT_PATH"), Policy: policy,
@@ -72,6 +92,26 @@ func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []
 		return err
 	}
 	return printDocPathReport(stdout, stderr, report)
+}
+
+func repoRelativeDocPaths(repo, base string, files []string) ([]string, error) {
+	out := make([]string, 0, len(files))
+	for _, file := range files {
+		path := file
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(base, filepath.FromSlash(file))
+		}
+		rel, err := filepath.Rel(repo, path)
+		if err != nil {
+			return nil, fmt.Errorf("resolve explicit file %q: %w", file, err)
+		}
+		slash := filepath.ToSlash(filepath.Clean(rel))
+		if slash == ".." || strings.HasPrefix(slash, "../") || filepath.IsAbs(rel) {
+			return nil, fmt.Errorf("explicit file %q is outside repository root %s", file, repo)
+		}
+		out = append(out, slash)
+	}
+	return out, nil
 }
 
 func printDocPathReport(stdout, stderr io.Writer, report docpaths.Report) error {

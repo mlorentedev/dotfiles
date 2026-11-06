@@ -17,6 +17,8 @@ func TestCheckFilesPathOutcomes(t *testing.T) {
 	}
 	writeRepoFile(t, repo, "AGENTS.md", strings.Join([]string{
 		"Existing: `scripts/utils.sh`.",
+		"Existing glob: `harness/skills/*/SKILL.md`.",
+		"Existing glob with trailing slash: `scripts/*.sh/`.",
 		"Missing: `scripts/definitely-not-here.sh`.",
 		"Empty glob: `ai/skills/*/SKILL.md`.",
 		"Uppercase file: `harness/skills/missing/SKILL.md`.",
@@ -54,8 +56,72 @@ func TestCheckFilesPathOutcomes(t *testing.T) {
 			t.Errorf("missing finding %q: %+v", want, report.Findings)
 		}
 	}
+
 	if len(report.Findings) != 4 {
 		t.Errorf("findings = %+v, want exactly four", report.Findings)
+	}
+}
+
+func TestCheckFilesTreatsNotDirectoryGlobAsEmpty(t *testing.T) {
+	repo := t.TempDir()
+	writeRepoFile(t, repo, "scripts", "not a directory\n")
+	writeRepoFile(t, repo, "AGENTS.md", "Broken glob: `scripts/*.sh`.\n")
+	policy := Policy{
+		Version:           1,
+		GovernedBasenames: []string{"AGENTS.md"},
+		KnownExtensions:   []string{".sh"},
+	}
+
+	report, err := CheckFiles(CheckOptions{RepoRoot: repo, Policy: policy}, []string{"AGENTS.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := findingKeys(report.Findings); len(got) != 1 || !got["empty-glob:scripts/*.sh"] {
+		t.Fatalf("findings = %+v", report.Findings)
+	}
+}
+
+func TestCheckFilesTreatsMalformedGlobAsEmpty(t *testing.T) {
+	repo := t.TempDir()
+	writeRepoFile(t, repo, "scripts/exists.sh", "ok\n")
+	writeRepoFile(t, repo, "AGENTS.md", "Broken glob: `scripts/[.sh`.\n")
+	policy := Policy{
+		Version:           1,
+		GovernedBasenames: []string{"AGENTS.md"},
+		KnownExtensions:   []string{".sh"},
+	}
+
+	report, err := CheckFiles(CheckOptions{RepoRoot: repo, Policy: policy}, []string{"AGENTS.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := findingKeys(report.Findings); len(got) != 1 || !got["empty-glob:scripts/[.sh"] {
+		t.Fatalf("findings = %+v", report.Findings)
+	}
+}
+
+func TestCheckFilesGlobFollowsSymlinkedDirectories(t *testing.T) {
+	repo := t.TempDir()
+	writeRepoFile(t, repo, "fixtures/skill/SKILL.md", "ok\n")
+	if err := os.MkdirAll(filepath.Join(repo, "ai", "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(repo, "fixtures", "skill"), filepath.Join(repo, "ai", "skills", "linked")); err != nil {
+		t.Skipf("directory symlinks unavailable: %v", err)
+	}
+	writeRepoFile(t, repo, "AGENTS.md", "Existing glob: `ai/skills/*/SKILL.md`.\n")
+	policy := Policy{
+		Version:           1,
+		GovernedBasenames: []string{"AGENTS.md"},
+		KnownExtensions:   []string{".md"},
+	}
+
+	report, err := CheckFiles(CheckOptions{RepoRoot: repo, Policy: policy}, []string{"AGENTS.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Findings) != 0 {
+		t.Fatalf("findings = %+v", report.Findings)
 	}
 }
 
@@ -152,10 +218,19 @@ func findingKeys(findings []Finding) map[string]bool {
 func writeRepoFile(t *testing.T, root, rel, body string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))
+	assertInside(t, root, path)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func assertInside(t *testing.T, root, path string) {
+	t.Helper()
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == ".." || strings.HasPrefix(filepath.ToSlash(rel), "../") || filepath.IsAbs(rel) {
+		t.Fatalf("%s is outside %s", path, root)
 	}
 }

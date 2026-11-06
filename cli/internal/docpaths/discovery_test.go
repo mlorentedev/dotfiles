@@ -1,10 +1,12 @@
 package docpaths
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -30,8 +32,7 @@ func TestDiscoverGovernedFiles(t *testing.T) {
 		ExcludePrefixes:   []string{"harness/", "specs/", "docs/"},
 		RequiredMembers:   []string{"AGENTS.md", "cli/README.md"},
 	}
-	t.Setenv("GIT_CONFIG_COUNT", "1")
-	t.Setenv("GIT_CONFIG_KEY_0", "core.hooksPath")
+	setIncompleteGitConfig(t)
 
 	got, err := Discover(repo, policy)
 	if err != nil {
@@ -57,6 +58,57 @@ func TestDiscoverFailsWhenRequiredMemberIsMissing(t *testing.T) {
 	}
 }
 
+func TestRepositoryRootIgnoresGitStderrOnSuccess(t *testing.T) {
+	repo := gitRepo(t)
+	t.Setenv("GIT_TRACE", "1")
+
+	got, err := RepositoryRoot(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Clean(got) != filepath.Clean(repo) {
+		t.Fatalf("RepositoryRoot() = %q, want %q", got, repo)
+	}
+}
+
+func TestDiscoverIncludesGitFailure(t *testing.T) {
+	repo := t.TempDir()
+	want := gitFailureDetail(t, repo, "ls-files", "-z", "--", "*.md")
+
+	_, err := Discover(repo, Policy{Version: 1, GovernedBasenames: []string{"AGENTS.md"}})
+	if err == nil {
+		t.Fatal("Discover() succeeded outside a Git checkout")
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("Discover() error = %q, want Git stderr %q", err, want)
+	}
+}
+
+func TestDiscoverFromLinkedWorktree(t *testing.T) {
+	repo := gitRepo(t)
+	writeRepoFile(t, repo, "AGENTS.md", "# fixture\n")
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+		"commit", "-qm", "fixture")
+	worktree := filepath.Join(t.TempDir(), "linked worktree")
+	gitRun(t, repo, "worktree", "add", "-q", "-b", "fixture-linked", worktree)
+	setIncompleteGitConfig(t)
+
+	policy := Policy{
+		Version:           1,
+		GovernedBasenames: []string{"AGENTS.md"},
+		RequiredMembers:   []string{"AGENTS.md"},
+	}
+	got, err := Discover(worktree, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"AGENTS.md"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Discover() = %v, want %v", got, want)
+	}
+}
+
 func gitRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
@@ -73,10 +125,32 @@ func gitRun(t *testing.T, repo string, args ...string) {
 	}
 }
 
-func assertInside(t *testing.T, root, path string) {
+func gitFailureDetail(t *testing.T, repo string, args ...string) string {
 	t.Helper()
-	rel, err := filepath.Rel(root, path)
-	if err != nil || rel == ".." || filepath.IsAbs(rel) {
-		t.Fatalf("%s is outside %s", path, root)
+	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+	cmd.Env = cleanGitConfigEnv(os.Environ())
+	_, err := cmd.Output()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		t.Fatalf("git %v error = %v, want exit error", args, err)
 	}
+	return strings.TrimSpace(string(exit.Stderr))
+}
+
+func setIncompleteGitConfig(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"} {
+		value, ok := os.LookupEnv(name)
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if ok {
+				_ = os.Setenv(name, value)
+			} else {
+				_ = os.Unsetenv(name)
+			}
+		})
+	}
+	t.Setenv("GIT_CONFIG_COUNT", "1")
 }

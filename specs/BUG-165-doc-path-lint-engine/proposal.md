@@ -43,14 +43,14 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 
 Observable outcomes. Each must be testable.
 
-- [ ] `dotf lint doc-paths` reproduces every accepted/rejected token, discovery, glob, escape, Windows-worktree, vault, governed-pattern-floor, and zsh bare-source outcome currently covered by BATS.
-- [ ] The full current repository check completes in <=2 seconds on the affected Windows workstation and produces deterministic sorted output on Windows and POSIX.
-- [ ] PR 1 ships the Go engine, checkout-owned `harness/doc-paths.json`, command tests, and current-repository CI coverage while the shell hook remains operational.
+- [x] `dotf lint doc-paths` reproduces every accepted/rejected token, discovery, glob, escape, Windows-worktree, vault, governed-pattern-floor, and zsh bare-source outcome currently covered by BATS.
+- [x] The full current repository check completes in <=2 seconds on the affected Windows workstation and produces deterministic sorted output on Windows and POSIX.
+- [x] PR 1 ships the Go engine, checkout-owned `harness/doc-paths.json`, command tests, and current-repository CI coverage while the shell hook remains operational.
 - [ ] After a release/pin containing the command, PR 2 switches pre-commit to `dotf lint doc-paths`, removes the old CI step, and deletes the shell script plus both BATS files with no dangling references.
-- [ ] A change to any governed instruction file or `harness/doc-paths.json` triggers the Go guard before merge, including docs-only changes.
-- [ ] Malformed policy, unreadable Git state, missing explicit files, missing paths, empty globs, and repo escapes exit non-zero; no timeout or inability-to-run path reports success.
-- [ ] `harness/doc-paths.json` is versioned, decoded with unknown fields rejected, and an unreadable or unsupported version fails before scanning.
-- [ ] Behavioral tests use synthetic temporary repositories/vaults; the only real-repository test is read-only and records the <=2 second performance measurement.
+- [x] A change to any governed instruction file or `harness/doc-paths.json` triggers the Go guard before merge, including docs-only changes.
+- [x] Malformed policy, unreadable Git state, missing explicit files, missing paths, empty globs, and repo escapes exit non-zero; no timeout or inability-to-run path reports success.
+- [x] `harness/doc-paths.json` is versioned, decoded with unknown fields rejected, and an unreadable or unsupported version fails before scanning.
+- [x] Behavioral tests use synthetic temporary repositories/vaults; the only real-repository test is read-only and records the <=2 second performance measurement.
 
 ## References
 

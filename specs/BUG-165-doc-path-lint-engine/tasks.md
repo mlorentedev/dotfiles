@@ -40,7 +40,9 @@ owner: manu
 - [x] [AC5] Confirm `.github/workflows/cli.yml` has no PR/push path filter, so the current-repository Go test already runs when governed docs or policy change; no workflow edit is needed in PR 1.
 - [x] [AC3] Verify PR 1 does not modify `.pre-commit-config.yaml`, `scripts/check-doc-paths.sh`, or either BATS file.
 - [x] [AC1] [AC2] [AC3] [AC6] [AC7] [AC8] Run `cd cli; go test ./internal/docpaths ./internal/cmd`, `go vet ./internal/docpaths ./internal/cmd`, and the exact `features.json` commands.
-- [ ] Commit and open PR 1; CI and the existing shell hook must both pass.
+- [x] [AC1] [AC6] Add review regressions for working-directory-relative explicit files, sanitized Git root discovery, surfaced glob traversal errors, linked worktrees, and the exact governed basename set.
+- [x] Commit and open PR 1 as #3201.
+- [ ] Verify CI and the existing shell hook pass on the remediation head.
 
 ### Release gate
 
@@ -61,12 +63,12 @@ owner: manu
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
 - [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 

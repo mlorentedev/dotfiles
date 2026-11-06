@@ -2,6 +2,7 @@ package docpaths
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,10 +11,18 @@ import (
 	"strings"
 )
 
+// RepositoryRoot resolves the checkout containing dir without inheriting
+// per-command Git configuration overrides from the caller.
+func RepositoryRoot(dir string) (string, error) {
+	out, err := runGit(dir, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 func Discover(repo string, policy Policy) ([]string, error) {
-	cmd := exec.Command("git", "-C", repo, "ls-files", "-z", "--", "*.md")
-	cmd.Env = cleanGitConfigEnv(os.Environ())
-	out, err := cmd.Output()
+	out, err := runGit(repo, "ls-files", "-z", "--", "*.md")
 	if err != nil {
 		return nil, fmt.Errorf("list tracked markdown files: %w", err)
 	}
@@ -65,6 +74,23 @@ func requireMembers(files, required []string) error {
 		return fmt.Errorf("required governed member(s) missing: %s", strings.Join(missing, ", "))
 	}
 	return nil
+}
+
+func runGit(dir string, args ...string) ([]byte, error) {
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = cleanGitConfigEnv(os.Environ())
+	out, err := cmd.Output()
+	if err == nil {
+		return out, nil
+	}
+	message := fmt.Sprintf("git %s from %s", strings.Join(args, " "), dir)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		if detail := strings.TrimSpace(string(exit.Stderr)); detail != "" {
+			return nil, fmt.Errorf("%s: %w; git said: %s", message, err, detail)
+		}
+	}
+	return nil, fmt.Errorf("%s: %w", message, err)
 }
 
 func cleanGitConfigEnv(environment []string) []string {

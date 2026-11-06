@@ -1,8 +1,10 @@
 package docpaths
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -78,7 +80,11 @@ func checkFile(opts CheckOptions, top map[string]bool, rel string) ([]Finding, e
 	}
 	var findings []Finding
 	for _, token := range uniqueTokens(string(raw)) {
-		if finding, ok := checkToken(opts, top, rel, token); ok {
+		finding, ok, err := checkToken(opts, top, rel, token)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
 			findings = append(findings, finding)
 		}
 	}
@@ -101,31 +107,99 @@ func uniqueTokens(text string) []string {
 	return out
 }
 
-func checkToken(opts CheckOptions, top map[string]bool, file, token string) (Finding, bool) {
+func checkToken(opts CheckOptions, top map[string]bool, file, token string) (Finding, bool, error) {
 	if finding, handled := checkVaultToken(opts, file, token); handled {
-		return finding, finding.Kind != ""
+		return finding, finding.Kind != "", nil
 	}
 	if ignoreToken(token, opts.Policy) {
-		return Finding{}, false
+		return Finding{}, false, nil
 	}
 	token = strings.TrimPrefix(token, "./")
 	if !strings.Contains(token, "/") || !top[firstSegment(token)] {
-		return Finding{}, false
+		return Finding{}, false, nil
 	}
 	if hasParentSegment(token) {
-		return newFinding(file, token, "escape", "path escapes the repository root"), true
+		return newFinding(file, token, "escape", "path escapes the repository root"), true, nil
 	}
 	if strings.ContainsAny(token, "*?[") {
-		matches, _ := filepath.Glob(filepath.Join(opts.RepoRoot, filepath.FromSlash(token)))
-		if len(matches) == 0 {
-			return newFinding(file, token, "empty-glob", "glob matches nothing"), true
+		matched, err := globExists(opts.RepoRoot, token)
+		if err != nil {
+			return Finding{}, false, fmt.Errorf("expand glob %q: %w", token, err)
 		}
-		return Finding{}, false
+		if !matched {
+			return newFinding(file, token, "empty-glob", "glob matches nothing"), true, nil
+		}
+		return Finding{}, false, nil
 	}
 	if _, err := os.Stat(filepath.Join(opts.RepoRoot, filepath.FromSlash(token))); err != nil {
-		return newFinding(file, token, "missing", "referenced path does not exist"), true
+		return newFinding(file, token, "missing", "referenced path does not exist"), true, nil
 	}
-	return Finding{}, false
+	return Finding{}, false, nil
+}
+
+func globExists(root, pattern string) (bool, error) {
+	parts := strings.Split(path.Clean(filepath.ToSlash(pattern)), "/")
+	return matchGlob(root, parts)
+}
+
+func matchGlob(path string, parts []string) (bool, error) {
+	if len(parts) == 0 {
+		return true, nil
+	}
+	part := parts[0]
+	if !strings.ContainsAny(part, "*?[") {
+		next := filepath.Join(path, filepath.FromSlash(part))
+		info, err := os.Stat(next)
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if len(parts) > 1 && !info.IsDir() {
+			return false, nil
+		}
+		return matchGlob(next, parts[1:])
+	}
+	entries, err := os.ReadDir(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	found := false
+	for _, entry := range entries {
+		matched, matchErr := filepath.Match(part, entry.Name())
+		if errors.Is(matchErr, filepath.ErrBadPattern) {
+			return false, nil
+		}
+		if matchErr != nil {
+			return false, matchErr
+		}
+		if !matched {
+			continue
+		}
+		child := filepath.Join(path, entry.Name())
+		if len(parts) > 1 {
+			info, statErr := os.Stat(child)
+			if errors.Is(statErr, os.ErrNotExist) {
+				continue
+			}
+			if statErr != nil {
+				return false, statErr
+			}
+			if !info.IsDir() {
+				continue
+			}
+		}
+		childFound, childErr := matchGlob(child, parts[1:])
+		if childErr != nil {
+			return false, childErr
+		}
+		found = found || childFound
+	}
+	return found, nil
 }
 
 func checkVaultToken(opts CheckOptions, file, token string) (Finding, bool) {
