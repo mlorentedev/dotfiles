@@ -18,6 +18,11 @@ func TestClassifyAReviewWorktreeByItsLeaseAndSavedOutput(t *testing.T) {
 		return Info{Path: "/wt/r", IsDetached: true, Dirty: dirty,
 			Metadata: &Metadata{Kind: KindReview, ReapOK: true, OutputSaved: saved, CreatedAt: now.Add(-time.Minute), LeaseExpiresAt: now.Add(lease)}}
 	}
+	held := review(-time.Minute, false, false)
+	held.Metadata.ReapOK = false
+	if state, reason := Classify(held, now); state != StateActive || !strings.Contains(reason, "reap hold") {
+		t.Errorf("held: %s (%s), want ACTIVE naming the reap hold, as sweep refuses it", state, reason)
+	}
 	for _, c := range []struct {
 		name         string
 		lease        time.Duration

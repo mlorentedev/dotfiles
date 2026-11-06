@@ -182,6 +182,9 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 		if info.Metadata.LeaseExpiresAt.After(now) {
 			return StateActive, "review worktree, lease active until " + until
 		}
+		if !info.Metadata.ReapOK {
+			return StateActive, "review worktree past its lease (" + until + "), reap hold (reap_ok=false)"
+		}
 		if info.Dirty && !info.Metadata.OutputSaved {
 			return StateDirty, "review worktree past its lease (" + until + ") whose output was never copied back: copy its specs/<id>/ review files out, then `dotf worktree done <path> --force`"
 		}
