@@ -19,7 +19,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
+- Test suite: `cd cli && go test ./internal/worktree/ ./internal/cmd/ -count=1` -> ok (worktree package batch; the full suite runs at the end per tasks.md)
 - Manual smoke test: what was exercised, what was observed
 - No regressions in existing test suite: yes / no (if no, document)
 

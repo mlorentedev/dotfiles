@@ -40,6 +40,7 @@ Resolved before tasks:
 
 - Where the worktree lives: under the worktree root through the `worktree` package, not `os.MkdirTemp`. A temp directory stays registered in `.git/worktrees`, nothing lists it, `git worktree prune` skips it while the directory exists, and macOS `/var/folders` outlives reboots, so a crashed cleanup accumulates silently. Under the root, `list` shows it and `sweep` reaps it.
 - Repositories that need an init step: the prompt route here, the declared step in #3177.
+- Sweep's ordinary gates (merged pull request, clean tree) can never pass for a branchless review worktree that an interrupted review left untracked output in: a review worktree is reaped on its lease alone, with `--force`, and Gate f still refuses one a reviewer is running in (found while implementing; see `verification.md`).
 
 Still open, each covered by a task:
 
