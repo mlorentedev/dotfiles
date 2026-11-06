@@ -164,6 +164,9 @@ type Installer struct {
 	// aptIndexAsked records that this Installer has run `apt-get update`, which
 	// it does once, before its first apt install (refreshAptIndex).
 	aptIndexAsked bool
+	// wingetSourceAsked records that this Installer has run `winget source
+	// update`, which it does once, after an install hits 0x8a15000f.
+	wingetSourceAsked bool
 	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
