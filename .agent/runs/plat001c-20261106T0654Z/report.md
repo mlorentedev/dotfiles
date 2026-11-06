@@ -6,8 +6,8 @@ Armed 2026-11-06T06:54Z, expires 14:54Z. Envelope: `.agent/unattended.yml` on th
 
 | Item | State | Record |
 |---|---|---|
-| #3222 user Path from `env-persist` | ready, CI settling | the PR |
-| Blocker 1 reader, `winget_arch` | #3226 draft, CI queued | the PR, spec row "Blocker 1" |
+| #3222 user Path from `env-persist` | **merged** (`ff653a0`); PR-Agent's three findings declined with evidence | the PR, its triage comment |
+| Blocker 1 reader, `winget_arch` | **merged** (`506ba8f`), under the owner's explicit grant for this contract change; PR-Agent's finding (`windows/386` would run `winget install --id ""`) reproduced, fixed and tested | the PR, its triage comment, spec row "Blocker 1" |
 | AC4 re-measure on a clean Arm64 guest | measured, AC4 **not met** | below |
 | Owner item 8: MEMORY.md | six finished threads archived to `archive/superseded-handoffs-2026-11-05.md`; still 209 lines | #3227 |
 | Owner item 8: tickets | #3227 (handoff-write line cap + auto-archive), #3228 (PR polling over REST) | the issues |
@@ -44,3 +44,14 @@ node/uv/gh/jq/python/claude/pi  C:\Users\dotf\AppData\Local\mise\shims\<name>.cm
 - The `vcredist` catalog entry. Every released dotf rejects the new key, so it waits for a release that carries #3226. I did not open a draft for it, because the from-zero job would go red. The entry is in the spec row.
 - Deleting `setup-windows.ps1`'s `dotf env persist` block, and the AC4 follow-up. Both wait for that same release.
 - MEMORY.md is still over the 200-line load cap (#3227). Read this report before the handoff block.
+
+## End
+
+Ended 2026-11-06 ~10:15Z with `reason: queue-empty`. The P1/P2 bugs readable on the board were #690 (another run parked it tonight as a policy fork) and #700 (a large contract change). The PLAT-001c-adjacent bugs are out of reach: #2438 needs `versions.conf` (frozen), #2346 and #3214 are another session's, and #3142 did not reproduce, so I only commented it. A full board read failed on GraphQL budget, so bugs past the first 1,500 items were not seen.
+
+#3174 has main merged into it and a status line for each blocker, and it stays a draft. Worktrees for #3222 and #3226 are removed.
+
+Owner next, in order:
+1. Merge release-please. It now carries #3222 and #3226.
+2. Once that release is the `DOTF_VERSION` pin: add the `vcredist` entry ahead of `mise` (the exact JSON is in the spec row) and delete `setup-windows.ps1`'s `dotf env persist` block.
+3. Decide #2438. Option 2, mise's `npm:` backend, touches `versions.conf`.
