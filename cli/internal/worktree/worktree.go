@@ -34,7 +34,14 @@ type Metadata struct {
 	CreatedAt      time.Time `json:"created_at"`
 	LeaseExpiresAt time.Time `json:"lease_expires_at"`
 	ReapOK         bool      `json:"reap_ok"`
+	// Kind is empty for a worktree someone works in, and names what made one
+	// that nobody does, such as KindReview.
+	Kind string `json:"kind,omitempty"`
 }
+
+// KindReview marks the disposable worktree `dotf spec review` runs a reviewer
+// in (HARNESS-142): detached at the reviewed commit, holding no issue.
+const KindReview = "review"
 
 // RawWorktree represents a parsed block from `git worktree list --porcelain`.
 type RawWorktree struct {

@@ -45,6 +45,8 @@ type AddRunner interface {
 	// WorktreeAttach checks out an existing branch at target. With remote set,
 	// it creates the local branch of the same name tracking remote's.
 	WorktreeAttach(repo, target, branch, remote string) error
+	// WorktreeAddDetached checks commit out at target with no branch.
+	WorktreeAddDetached(repo, target, commit string) error
 	WorktreeListPorcelain(repo string) (string, error)
 	// Dirt reports what a worktree holds that git would not recreate.
 	Dirt(path string) (Dirt, error)
@@ -129,6 +131,13 @@ func (r *RealAddRunner) WorktreeAttach(repo, target, branch, remote string) erro
 	}
 	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree add failed (%w): %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (r *RealAddRunner) WorktreeAddDetached(repo, target, commit string) error {
+	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "--detach", target, commit).CombinedOutput(); err != nil {
+		return fmt.Errorf("git worktree add --detach failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

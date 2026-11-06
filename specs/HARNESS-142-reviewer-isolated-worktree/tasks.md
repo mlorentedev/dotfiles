@@ -18,16 +18,16 @@ owner: manu
 ## Setup
 
 - [x] Branch created from main: `spec/reviewer-isolated-worktree`
-- [ ] `proposal.md` is complete and acceptance criteria are testable
+- [x] `proposal.md` is complete and acceptance criteria are testable
 - [ ] No open questions left in `proposal.md` "Risks / open questions"
 
 ## Implementation
 
 Worktree package (`cli/internal/worktree/`):
 
-- [ ] [P] [AC3] Test: `AddDetached` creates a worktree detached at a given sha, with metadata `Issue: 0`, `ReapOK: true`, a lease of the given TTL and `Kind: "review"`; fails red because `AddRunner` has no detached path. `go test ./internal/worktree/ -run AddDetached`
-- [ ] [AC3] Add `WorktreeAddDetached(repo, target, sha)` to `AddRunner` and `RealAddRunner`, a `Kind` field to `Metadata`, and `AddDetached`; test green.
-- [ ] [AC3] Test then code: `dotf worktree list` labels a `Kind: "review"` worktree, and `refuseHeldIssue` never counts it (it holds no issue).
+- [x] [P] [AC3] Test: `AddDetached` creates a worktree detached at a given sha, with metadata `Issue: 0`, `ReapOK: true`, a lease of the given TTL and `Kind: "review"`; fails red because `AddRunner` has no detached path. `go test ./internal/worktree/ -run AddDetached`
+- [x] [AC3] Add `WorktreeAddDetached(repo, target, sha)` to `AddRunner` and `RealAddRunner`, a `Kind` field to `Metadata`, and `AddDetached`; test green.
+- [x] [AC3] Test then code: `dotf worktree list` labels a `Kind: "review"` worktree, and `refuseHeldIssue` never counts it (it holds no issue).
 - [ ] [AC3] Test then code (`TestReviewWorktreeSwept`): `sweep` removes an expired review worktree whose `ReapOK` is true.
 
 Launch (`cli/internal/cmd/spec.go`, `cli/internal/spec/`):
