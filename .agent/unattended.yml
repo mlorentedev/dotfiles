@@ -1,0 +1,25 @@
+version: 1
+run_id: ""
+armed_by: manu
+armed_at: 2026-11-06T06:58:00Z
+expires_at: 2026-11-06T14:58:00Z
+objective: "Fix small, unassigned dotfiles bugs and mechanical chores doable on macOS, each as its own reviewed and tested PR."
+scope:
+  write_paths: ["cli/**", "tests/**", "docs/lessons/**", "docs/runbooks/**", "specs/**", "scripts/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "versions.conf", ".agent/unattended.yml", "secrets/**"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, make, go, golangci-lint, bats, shellcheck]
+queue:
+  source: bitacora
+  filter: 'unassigned issues of mlorentedev/dotfiles labelled bug, plus small mechanical chores with a written plan; fixable and testable on macOS; not Windows-only; no open PR or live branch of another session; never a harness/** or workflow change'
+  max_items: 4
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 45
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
