@@ -14,7 +14,7 @@ owner: manu
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
 - [x] Criteria 1-3 -> PR 1 generic archive source and rollout-safety tests
-- [ ] Criteria 4-6 -> PR 2 role/catalog/drop-in tests
+- [x] Criteria 4-6 -> PR 2 role/catalog/drop-in tests
 - [ ] Criteria 7-8 -> PR 3 doctor and live consequence evidence
 
 ## Test status
@@ -24,7 +24,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - Final placement now writes/syncs/chmods a sibling temp file and renames it over the destination.
   - Unsupported archive extensions are refused by both Plan and Install before download/extraction.
   - Catalog load requires asset/member resolution parity for every supported GOOS/GOARCH pair.
-- PR 2 tests: pending
+- PR 2: full `go test ./internal/env ./internal/tools ./internal/converge` -> PASS; command tool selectors -> PASS; f3/f4 exact feature commands -> PASS; focused vet -> PASS.
 - PR 3 tests/live smoke: pending
 
 ## Decisions made during implementation
@@ -35,6 +35,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Tool role filtering is rollout-safe for ts-bridge because the same entry uses a source type older dotf binaries explicitly skip.
 - Git routing uses an entirely dotf-owned include file, not writes into the user/gh-owned `~/.gitconfig`.
 - PR 1 streams only the exact member into a temp file after the release checksum passes; no archive path is expanded onto disk.
+- PR 2 filters role-bound tools for no-argument install/converge while an explicit named install remains an operator override.
+- The proxy is a complete dotf-owned drop-in. A foreign file at that path is refused, not overwritten or removed.
 
 ## Promotion candidates
 

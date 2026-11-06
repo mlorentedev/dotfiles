@@ -4,13 +4,47 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
+
+func TestLoadCatalogFiltersToolsByMachineRole(t *testing.T) {
+	repo, home := t.TempDir(), t.TempDir()
+	writeFixture(t, repo, map[string]string{
+		"packages.json": `{"tools":[
+			{"name":"common","source":{"type":"system","apt":"common"}},
+			{"name":"ts-bridge","version":"1.20.0","roles":["ts-bridge-client"],"source":{
+				"type":"github-archive","repo":"o/r","asset":{"windows":"tool.zip"},
+				"checksums":"checksums.txt","member":{"windows":"tool.exe"},"platforms":["windows"]
+			}}
+		]}`,
+	})
+	without, err := loadCatalog(Env{RepoRoot: repo, Home: home, GOOS: "windows"})
+	if err != nil || !reflect.DeepEqual(toolNames(without), []string{"common"}) {
+		t.Fatalf("without role = %v, %v", toolNames(without), err)
+	}
+	if _, err := envpkg.SetMachineRole(envpkg.MachinePath(home), envpkg.RoleTSBridgeClient, true); err != nil {
+		t.Fatal(err)
+	}
+	with, err := loadCatalog(Env{RepoRoot: repo, Home: home, GOOS: "windows"})
+	if err != nil || !reflect.DeepEqual(toolNames(with), []string{"common", "ts-bridge"}) {
+		t.Fatalf("with role = %v, %v", toolNames(with), err)
+	}
+}
+
+func toolNames(list []tools.Tool) []string {
+	out := make([]string, 0, len(list))
+	for _, tool := range list {
+		out = append(out, tool.Name)
+	}
+	return out
+}
 
 // catalogFixture is a packages.json with one entry of each kind the step must
 // tell apart: mise (a release binary), hive (waits on uv, which the mise sync

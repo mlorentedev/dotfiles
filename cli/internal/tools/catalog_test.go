@@ -138,6 +138,43 @@ func TestLoad_Platforms(t *testing.T) {
 	}
 }
 
+func TestToolAppliesToRoles(t *testing.T) {
+	common := Tool{Name: "common"}
+	bridge := Tool{Name: "ts-bridge", Roles: []string{"ts-bridge-client"}}
+	if !common.AppliesToRoles(nil) || !common.AppliesToRoles([]string{"other"}) {
+		t.Fatal("a tool with no roles must apply everywhere")
+	}
+	if bridge.AppliesToRoles(nil) || bridge.AppliesToRoles([]string{"other"}) ||
+		!bridge.AppliesToRoles([]string{"ts-bridge-client"}) {
+		t.Fatal("a role-bound tool did not require a matching role")
+	}
+}
+
+func TestLoad_RejectsUnknownToolRole(t *testing.T) {
+	body := `{"tools":[{"name":"tool","roles":["ts-bridge-clinet"],"source":{"type":"system","apt":"tool"}}]}`
+	if _, err := Load(writeCatalog(t, body)); err == nil || !strings.Contains(err.Error(), "ts-bridge-clinet") {
+		t.Fatalf("Load() error = %v", err)
+	}
+}
+
+func TestTheRepoCatalogDeclaresTsBridgeForTheClientRole(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range c.Tools {
+		if tool.Name != "ts-bridge" {
+			continue
+		}
+		if tool.Version != "1.20.0" || tool.Source.Type != "github-archive" ||
+			!slices.Equal(tool.Roles, []string{"ts-bridge-client"}) {
+			t.Fatalf("ts-bridge tool = %+v", tool)
+		}
+		return
+	}
+	t.Fatal("packages.json declares no ts-bridge")
+}
+
 // The shipped catalog declares hive as a uv tool on every OS, which hive
 // installs itself on Windows: there hive owns its install layout (hive
 // ADR-019), so the catalog must never put a uv copy there. A misspelt

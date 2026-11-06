@@ -18,11 +18,15 @@ const RoleSSHTarget = "ssh-target"
 // trigger only on a machine that declares it.
 const RoleSelfDeploy = "self-deploy"
 
+// RoleTSBridgeClient makes a machine install the userspace bridge client and
+// route only the declared private forge through its loopback SOCKS listener.
+const RoleTSBridgeClient = "ts-bridge-client"
+
 // knownRoles are the roles a machine may declare. A role changes what a machine
 // does unattended or how it faces the network, so none is taken by default and
 // none is taken by a typo: a name not listed here is an error, never a role
 // nobody reads.
-var knownRoles = []string{RoleSelfDeploy, RoleSSHTarget}
+var knownRoles = []string{RoleSelfDeploy, RoleSSHTarget, RoleTSBridgeClient}
 
 // KnownRoles returns the roles a machine may declare.
 func KnownRoles() []string { return slices.Clone(knownRoles) }

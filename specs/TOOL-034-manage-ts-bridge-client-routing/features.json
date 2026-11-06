@@ -16,16 +16,16 @@
   {
     "id": "TOOL-034-manage-ts-bridge-client-routing-f3",
     "behavior": "A ts-bridge-client role selects the pinned ts-bridge tool while non-role machines plan no bridge install.",
-    "verification": "cd cli && go test ./internal/env ./internal/tools ./internal/cmd ./internal/converge -run 'Test.*TsBridge.*Role'",
-    "state": "pending",
-    "evidence": "Planned for PR 2 under ADR-058."
+    "verification": "cd cli && go test ./internal/env ./internal/tools ./internal/cmd ./internal/converge -run 'Test(KnownRolesIncludesTsBridgeClient|ToolAppliesToRoles|TheRepoCatalogDeclaresTsBridgeForTheClientRole|SelectToolsForRoles|LoadCatalogFiltersToolsByMachineRole)'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-06: f3 exact selector passes across env/tools/cmd/converge. Tests cover known role, catalog selection, no-role filtering and named-install override."
   },
   {
     "id": "TOOL-034-manage-ts-bridge-client-routing-f4",
     "behavior": "The role owns a Gitea-only Git proxy drop-in and removes it when the role is removed; GitHub remains direct.",
     "verification": "cd cli && go test ./internal/gitconfig ./internal/converge -run 'Test.*TsBridge.*(Proxy|DropIn|Role)'",
-    "state": "pending",
-    "evidence": "Planned for PR 2 under ADR-058."
+    "state": "verified",
+    "evidence": "Windows 2026-11-06: role-gated drop-in tests pass. Apply/create/update/second-run/retire and foreign-file refusal are covered; missing optional include is exercised through real Git."
   },
   {
     "id": "TOOL-034-manage-ts-bridge-client-routing-f5",

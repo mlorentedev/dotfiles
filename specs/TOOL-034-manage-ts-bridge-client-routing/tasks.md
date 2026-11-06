@@ -33,15 +33,15 @@ owner: manu
 - [x] [AC3] Preserve old-reader safety: unknown source types remain explicit skips and do not block other tools.
 - [x] [AC1] [AC2] Run focused tools tests, full `internal/tools`, vet and formatting.
 - [x] [AC1] [AC2] Apply independent review findings: atomic mode-correct placement, plan/refusal archive parity and asset/member platform parity.
-- [ ] Open PR 1 referencing ADR-058 and this spec.
+- [x] Open PR 1 referencing ADR-058 and this spec: #3231.
 
 ### PR 2 - Role selection and Git drop-in
 
-- [ ] [AC4] Add `ts-bridge-client` to known machine roles with add/remove/idempotence tests.
-- [ ] [AC4] Add optional role selection to catalog tools; no-arg install and converge filter, named install remains an explicit override.
-- [ ] [AC1] [AC4] Add the v1.20.0 ts-bridge `github-archive` entry with Windows/POSIX assets, checksums and member paths.
-- [ ] [AC5] [AC6] Add the always-included optional Git drop-in path and a role-gated reconciler that creates/removes only `ts-bridge.gitconfig`.
-- [ ] [AC4] [AC5] [AC6] Prove non-role machines and GitHub remotes remain direct; second converge changes nothing.
+- [x] [AC4] Add `ts-bridge-client` to known machine roles with add/remove/idempotence tests.
+- [x] [AC4] Add optional role selection to catalog tools; no-arg install and converge filter, named install remains an explicit override.
+- [x] [AC1] [AC4] Add the v1.20.0 ts-bridge `github-archive` entry with Windows/POSIX assets, checksums and member paths.
+- [x] [AC5] [AC6] Add the always-included optional Git drop-in path and a role-gated reconciler that creates/removes only `ts-bridge.gitconfig`.
+- [x] [AC4] [AC5] [AC6] Prove non-role machines and GitHub remotes remain direct; second converge changes nothing.
 
 ### PR 3 - Doctor and end-to-end evidence
 

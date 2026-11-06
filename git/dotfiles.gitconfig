@@ -10,3 +10,6 @@
 [user]
 	email = mlorentedev@gmail.com
 	name = Manu
+
+[include]
+	path = ~/.config/git/ts-bridge.gitconfig
