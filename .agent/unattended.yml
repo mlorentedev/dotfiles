@@ -7,7 +7,7 @@ armed_at: 2026-11-06T06:53:09Z
 expires_at: 2026-11-06T14:53:09Z
 objective: "Land #3216 and #3217, then fix Windows from-zero convergence bugs in the dotf CLI, one PR each."
 scope:
-  write_paths: ["cli/**", "docs/lessons/**", "docs/runbooks/**", "scripts/install.ps1", "tests/**", "specs/**"]
+  write_paths: ["cli/**", "docs/lessons/**", "docs/runbooks/**", "install.ps1", "tests/**", "specs/**"]
   frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "**/CLAUDE.md", "setup-linux.sh", "setup-windows.ps1", "versions.conf", ".agent/**"]
   max_files: 8
   max_loc: 300
@@ -18,7 +18,7 @@ queue:
   # labelled security, anything assigned to another session, anything needing
   # a setup-script change (never grow setup scripts).
   filter: "repo:mlorentedev/dotfiles is:open label:bug windows in:title -label:security no:assignee"
-  seed: [3172, 3142, 2445, 2438, 1874]   # #3172 = option C only (install.ps1 names a Defender quarantine)
+  seed: [3172, 3142, 2445, 1874]   # #2438 dropped: inside #3174, owned by another session   # #3172 = option C only (install.ps1 names a Defender quarantine)
   max_items: 5
 budget:
   max_iterations: 8
@@ -29,7 +29,11 @@ authority:
   push: true
   open_pr: true
   advisor_tier: top
-  windows_vm: if-free            # `dotf vm windows` only when no guest is running; one run at a time
+  # `dotf vm windows` only when free = no qemu-system process AND no
+  # ~/.local/state/dotfiles/vm/windows/run/ directory. A free slot may still be a
+  # peer's queued turn (ts-bridge, then feat-vm-linux-exec-16, then ts-bridge);
+  # the owner accepted that risk, and the report says whether a run fired.
+  windows_vm: if-free
 notes:
   - "GraphQL is shared and often exhausted: use gh api REST for issues, PRs and comments."
   - "Never: secrets show, GH_TOKEN probes, force-push, go build over ~/.local/bin/dotf, release or dependabot PRs."
