@@ -1,6 +1,7 @@
 package copilotsettings
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -68,6 +69,25 @@ func TestLoadPolicyCurrentRepository(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.RetiredPaths, []string{"telemetry.disabled"}) {
 		t.Fatalf("current retired paths = %v", got.RetiredPaths)
+	}
+}
+
+func TestCurrentSourceDeclaresNoRetiredPath(t *testing.T) {
+	repo := filepath.Join("..", "..", "..")
+	policy, err := LoadPolicy(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(repo, "ai", "copilot", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source map[string]any
+	if err := json.Unmarshal(raw, &source); err != nil {
+		t.Fatal(err)
+	}
+	if found := findPaths(source, policy.RetiredPaths); len(found) > 0 {
+		t.Fatalf("ai/copilot/settings.json reintroduces retired path(s): %v", found)
 	}
 }
 

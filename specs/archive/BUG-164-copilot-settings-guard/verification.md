@@ -33,6 +33,30 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Manual smoke: a built development binary repaired a synthetic Copilot home, created `settings.json.pre-dotf`, preserved unrelated keys, and reported the second named deploy in sync.
 - Independent code review: one Medium finding applied — doctor now fails on a missing policy; only the deploy callback ignores it to keep old checkouts compatible.
 
+## Review disposition
+
+- **Applied:** added `TestCurrentSourceDeclaresNoRetiredPath`, so the tracked
+  `ai/copilot/settings.json` cannot reintroduce a path declared retired.
+- **Recorded, no contract edit:** `tasks.md` still shows the lint/PR closing
+  boxes unchecked because changing a contract file after the passing review
+  would stale it. PR #3218 is open; final CI state is recorded on the PR.
+- **Declined for this PR:** the theoretical rendered-config ordering gap.
+  `RepairConfig` returns false for every entry except `copilot-settings`, whose
+  manifest entry is `render: false`. Any future rendered repair must add an
+  `ErrRenderIncomplete` regression before wiring that entry.
+- **Accepted as verification-only gap:** f6 uses `! rg`; this session ran it
+  with ripgrep present and captured exit 1/no matches. The runtime guard is
+  independently covered by `TestCheckCopilotSettingsReportsFileAndKeyWithoutValue`.
+
+## Adjacent issue disposition
+
+- #3208 is separate: it concerns `cli/internal/vm/run.go` timeout log capture,
+  not `cli/internal/deploy/run.go`.
+- #2455 is separate: it changes identity semantics for merged list elements;
+  BUG-164 adds an optional pre-deploy repair and does not alter merge behavior.
+- #1948 is separate: it proposes new seed/replace-key manifest strategies and
+  a deployment-order rollout; BUG-164 deliberately leaves manifest version 6.
+
 ## Decisions made during implementation
 
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
@@ -52,7 +76,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-164-copilot-settings-guard/` -> `specs/archive/BUG-164-copilot-settings-guard/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-164-copilot-settings-guard/` -> `specs/archive/BUG-164-copilot-settings-guard/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
