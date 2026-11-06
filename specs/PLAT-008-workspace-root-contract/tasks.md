@@ -36,7 +36,7 @@ owner: manu
 - [x] [AC1] Add deploy-path tests proving Copilot and agy trust templates render `{PROJECTS_PATH}`, `{WORKTREE_ROOT}` and `{COPILOT_WORKTREE_ROOT}` without literal `Projects/Workspace`. Run `cd cli; go test ./internal/deploy -run 'Test.*(Copilot|Agy).*Path'`; expected: FAIL before template changes.
 - [x] [AC1] Update `ai/copilot/config.json` and `ai/agy/settings.json`; run `dotf deploy --dry-run` against redirected HOME fixtures or the existing deploy tests. Expected: managed trust entries change, unrelated user entries survive.
 - [ ] [AC1] Run `gofmt -w cli/internal/env cli/internal/doctor`; then `cd cli; go test ./internal/env ./internal/doctor ./internal/deploy` and `go vet ./internal/env ./internal/doctor ./internal/deploy`; expected: PASS.
-- [ ] [AC1] Commit PR-1 slice with only contract/persistence/trust behavior and update `features.json` evidence command for AC1.
+- [x] [AC1] Commit PR-1 slice with only contract/persistence/trust behavior and update `features.json` evidence command for AC1.
 
 ### PR 2 - side-effect-free reconciliation inventory
 
