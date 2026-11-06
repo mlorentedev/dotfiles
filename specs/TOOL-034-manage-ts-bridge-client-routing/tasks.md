@@ -19,7 +19,7 @@ owner: manu
 
 - [x] Branch created from `origin/main`: `feat/3219-ts-bridge-client-routing`
 - [x] Work-gate verified: #3219 is open, assigned and In Progress
-- [x] ADR-058 and Regla-del-3 audit are complete
+- [x] ADR-058 and the rule-of-three audit are complete
 - [x] `proposal.md` is complete and acceptance criteria are testable
 - [x] No open questions left in `proposal.md` "Risks / open questions"
 
@@ -31,14 +31,15 @@ owner: manu
 - [x] [AC1] [AC2] Add failing installer tests for zip/tar.gz success, checksum-before-extract, missing/duplicate/directory/symlink member, unsupported archive and unchanged destination on failure.
 - [x] [AC1] [AC2] Implement streaming exact-member extraction and atomic placement by reusing the existing release fetch/checksum/version-floor flow.
 - [x] [AC3] Preserve old-reader safety: unknown source types remain explicit skips and do not block other tools.
+- [x] [AC4] Land the generic catalog `roles` field, known `ts-bridge-client` role and no-argument install/converge filtering before any role-bound archive entry is published; named install remains an explicit override.
+- [x] [AC3] [AC4] Add a mixed-version regression proving a PR 1 binary excludes a future role-bound `github-archive` entry on a no-role machine.
 - [x] [AC1] [AC2] Run focused tools tests, full `internal/tools`, vet and formatting.
 - [x] [AC1] [AC2] Apply independent review findings: atomic mode-correct placement, plan/refusal archive parity and asset/member platform parity.
 - [x] Open PR 1 referencing ADR-058 and this spec: #3231.
 
 ### PR 2 - Role selection and Git drop-in
 
-- [x] [AC4] Add `ts-bridge-client` to known machine roles with add/remove/idempotence tests.
-- [x] [AC4] Add optional role selection to catalog tools; no-arg install and converge filter, named install remains an explicit override.
+- [x] [AC4] Consume the role/filtering precondition landed in PR 1.
 - [x] [AC1] [AC4] Add the v1.20.0 ts-bridge `github-archive` entry with Windows/POSIX assets, checksums and member paths.
 - [x] [AC5] [AC6] Add the always-included optional Git drop-in path and a role-gated reconciler that creates/removes only `ts-bridge.gitconfig`.
 - [x] [AC4] [AC5] [AC6] Prove non-role machines and GitHub remotes remain direct; second converge changes nothing.

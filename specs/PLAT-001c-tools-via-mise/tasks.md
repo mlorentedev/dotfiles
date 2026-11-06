@@ -197,9 +197,19 @@ lazygit replaces Orca's diff viewer. Its install was done with the mise pins abo
 - [x] The shims directory for non-interactive callers that read a startup file: `.zsh/path.sh` puts mise's shims, then `~/.local/bin`, at the head of PATH, sourced from `.zshenv` (`zsh -c`), the end of `.profile` (`bash -lc`) and the top of `.bashrc`, before its interactive check (bash run by sshd for a command); `zshenv` and `shell-path` are deploy entries on linux and darwin (`tests/shell-path-head.bats`)
   - `bash -c` and `sh -c` read no file and inherit their parent's PATH: covered when the parent is one of the shells above, by construction never by a file of ours (lesson 410)
   - cron is S1's: its jobs run `/bin/sh -c` with cron's own PATH, so the PATH belongs in the job definition S1 renders, not in a startup file
-- [ ] PR 2: the PATH a process gets without any shell, persisted by `dotf env persist` with a managed record of the entries it adds: the user environment (HKCU) on Windows, `launchctl` for GUI apps on the Mac
+- [ ] PR 2: the PATH a process gets without any shell, persisted with a managed record of the entries it adds: the user environment (HKCU) on Windows, `launchctl` for GUI apps on the Mac. The Windows half is below; the Mac half stays open
+- [x] PR 2, Windows (PLAT-001c blocker 2 on #3174): converge's `env-persist` step runs on Windows too and writes `HKCU\Environment`, which every new process reads, profile or not. Measured first on a clean Arm64 guest (2026-11-05): with only the registered PATH neither `dotf` nor `mise` resolved, and the profile could not activate mise because it looks mise up on PATH
+  - The contract variables go through `env.Persist`, what `dotf env persist` already did on Windows; doctor's 13-variable WARN on that guest is this half
+  - The user `Path` is the user's value, so dotf owns entries in it, not the value: `env.MergePath` puts mise's shims, then `~/.local/bin` (`Options.ToolsBinDirs`, the order `.zsh/path.sh` uses), at the head, keeps every other entry in place and as spelled, and removes a retired entry only when `DOTF_MANAGED_PATH` says dotf added it
+  - Entries compare as Windows compares directories: case-insensitive, trailing separator ignored, after expanding `%VAR%`. Empty segments alone are no change, so a second run writes nothing
+  - The write keeps `Path` REG_EXPAND_SZ (`SetExpandStringValue`): the existing `Set` writes REG_SZ, which would turn every `%VAR%` entry into a literal
+  - The probe reads the registry, not this process's environment: a write changes the next process, never the running one
+  - Tests: `TestMergePath` (13 cases, each also asserted a no-op on a second merge), `TestPersistPath_*`, `TestEnvPersist_WindowsPutsTheToolDirsOnTheUserPath` (plan writes nothing, apply passes the probe, second run 0 changes and 0 writes). Mutations on the retire filter, the separator normalisation, the first-spelling rule, the Path write and the Windows probe each turn a test red
+  - Measured on a clean Arm64 guest (`dotf vm windows`, 2026-11-05) with this branch built for windows/arm64, from a user Path of `%USERPROFILE%\go\bin;%USERPROFILE%\AppData\Local\Microsoft\WindowsApps;` (REG_EXPAND_SZ): the plan wrote nothing; the apply set 13 variables, both markers, and a Path of the shims, `~/.local/bin`, then the two `%USERPROFILE%` entries as written, still REG_EXPAND_SZ; the second apply reported `0 changed`. A `powershell -NoProfile` with the registered PATH resolved `dotf` to `~/.local/bin\dotf.exe`. `dotf doctor --verbose` passed both rows, and WARNed naming the step once the Path was reset by hand
+- [x] The doctor's Windows half of the probe below: the "Persisted environment (user scope)" section WARNs when the user Path does not start with the two directories, naming `dotf converge --only env-persist` (`checkUserPathHead`, `TestCheckPersistedEnv_UserPathHead`). The section's remedy on Windows is now that step too, since `dotf env persist` writes no Path
+- [ ] Follow-up: `setup-windows.ps1`'s `dotf env persist` block duplicates the step, which runs before `legacy-setup` in every converge. Delete it once a release carries the step
 - [x] The doctor's pin half: the pinned CLIs resolve through `mise which`, T3 below. That answers from the mise config whatever the caller's PATH, so it does NOT show the shims directory reaches PATH
-- [x] The doctor probe that the shims directory is on PATH for a non-interactive caller: `zsh -c` and `bash -lc`, each started from HOME and a bare system PATH, must list the shims ahead of `~/.local/bin`, else a WARN naming `dotf deploy` (`checkNonInteractivePath`, linux and darwin; Windows waits for PR 2)
+- [x] The doctor probe that the shims directory is on PATH for a non-interactive caller: `zsh -c` and `bash -lc`, each started from HOME and a bare system PATH, must list the shims ahead of `~/.local/bin`, else a WARN naming `dotf deploy` (`checkNonInteractivePath`, linux and darwin; Windows reads the user Path instead, PR 2 above)
 
 ### T3 — doctor reads a darwin machine as darwin, and checks the mise CLIs (stacked on #2043)
 
@@ -352,6 +362,20 @@ apt row installed Ubuntu's 2.46.0, which lacks `gh pr checks --json`. W2's
 - [x] `GH_NO_UPDATE_NOTIFIER` in mise's `[env]`: gh's notice names the channel that installed it first (`brew upgrade gh`), a second gh outside the pin (`TestRenderMiseConfig_SilencesGhsUpdateNotice`, red before the map entry)
 - [x] `setup-windows.bats` gh parity reads the marker and the winget id, the jq and zoxide shape
 - [ ] Windows: the winget row stays in `setup-windows.ps1` until mise runs there; the P5b row above already tracks its removal
+
+### Blocker 1 — the VC++ runtime, a winget id per arch (reader, then the entry)
+
+The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows lacks (measured on #3174, 2026-11-05). winget publishes that runtime once per arch, `Microsoft.VCRedist.2015+.x64` and `.arm64`, and a `system` entry names one winget id.
+
+- [x] Reader: `source.winget_arch`, a map from Windows GOARCH to a winget id. It mirrors `asset`'s `goos/goarch` keys and leaves `Source` decoding as it is
+  - `Load` requires both `amd64` and `arm64`, rejects any other key, and refuses an entry that names both `winget` and `winget_arch`. Each id passes the same package-name check as the other managers
+  - `SystemPackage` takes the arch; `SupportsOS` still answers by OS, since a map names every arch dotf ships for. Install and Plan also skip an arch the map does not name (`windows/386`), as an unsupported platform, never with an empty winget id (review of #3226). Installer, `dotf tools list` and doctor's system-package checks pass the arch (`System.GOARCH` is a new seam)
+  - Rejected: a `{arch}` token in `winget`. winget's arch tokens (`x64`, `arm64`) are not GOARCH, so it would need its own spelling table, and an id without the token would read the same as one with it
+  - A non-elevated `winget install --id Microsoft.VCRedist.2015+.arm64 -e …`, the catalog's argv, exited 0 on the Arm64 guest. That guest auto-elevates admins (UAC ConsentPromptBehaviorAdmin 0); on a box with the default prompt the runtime's installer asks through UAC, as every machine-scope winget entry already does
+- [ ] Entry (after a release carrying the reader is the `DOTF_VERSION` pin): `vcredist` with `winget_arch` and `platforms: ["windows"]`, ahead of `mise` in `packages.json`, since the tools step walks the catalog in file order. An older dotf rejects the unknown key and fails the whole catalog, which is why the entry waits
+- [ ] Re-measure AC4 on a clean Arm64 guest once the entry ships: the tools step alone places the runtime, then mise runs
+  - Measured ahead of the release on 2026-11-06. The guest was a clean Arm64 with no runtime. The dev dotf merged #3174, #3222 and this reader, plus a local `vcredist` entry ahead of `mise`, and ran with `MISE_HTTP_DOWNLOAD_TIMEOUT=3h`. The tools step installed `vcredist`, then mise and every mise pin, in 1h07m. The blocker is closed, but the row stays open until the entry ships
+  - AC4 is still not met. The same run exits 1 on the four npm CLIs (#2438: under a mise Node, npm's global prefix is the Node install directory, which no PATH holds) and on bats not running at its pin (#2346)
 
 ## Closing
 

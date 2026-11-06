@@ -11,6 +11,7 @@ import (
 )
 
 func TestTsBridgeClientRoleCreatesAndRetiresGitDropIn(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	home := t.TempDir()
 	e := Env{Home: home}
 	r := tsBridgeClient{}
@@ -64,6 +65,7 @@ func TestTsBridgeClientRoleCreatesAndRetiresGitDropIn(t *testing.T) {
 }
 
 func TestTsBridgeClientRefusesToOverwriteForeignDropIn(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	home := t.TempDir()
 	if _, err := envpkg.SetMachineRole(envpkg.MachinePath(home), envpkg.RoleTSBridgeClient, true); err != nil {
 		t.Fatal(err)
@@ -82,6 +84,27 @@ func TestTsBridgeClientRefusesToOverwriteForeignDropIn(t *testing.T) {
 	}
 	if raw, _ := os.ReadFile(path); string(raw) != foreign {
 		t.Fatal("foreign drop-in was overwritten")
+	}
+}
+
+func TestTsBridgeClientWithoutRoleRefusesForeignIncludedDropIn(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	home := t.TempDir()
+	path := tsBridgeGitConfig(home)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const foreign = "[http]\n\tproxy = http://foreign\n"
+	if err := os.WriteFile(path, []byte(foreign), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := (tsBridgeClient{}).Reconcile(Env{Home: home}, false)
+	if err == nil || !strings.Contains(err.Error(), "Git includes this path regardless of role state") {
+		t.Fatalf("role-absent foreign drop-in error = %v", err)
+	}
+	if raw, _ := os.ReadFile(path); string(raw) != foreign {
+		t.Fatal("foreign drop-in was changed")
 	}
 }
 

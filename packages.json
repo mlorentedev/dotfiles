@@ -75,9 +75,12 @@
         },
         "checksums": "checksums.txt",
         "member": {
-          "linux": "ts-bridge",
-          "darwin": "ts-bridge",
-          "windows": "ts-bridge.exe"
+          "linux/amd64": "ts-bridge-linux-amd64/ts-bridge",
+          "linux/arm64": "ts-bridge-linux-arm64/ts-bridge",
+          "darwin/amd64": "ts-bridge-darwin-amd64/ts-bridge",
+          "darwin/arm64": "ts-bridge-darwin-arm64/ts-bridge",
+          "windows/amd64": "ts-bridge-windows-amd64/ts-bridge.exe",
+          "windows/arm64": "ts-bridge-windows-arm64/ts-bridge.exe"
         }
       }
     },

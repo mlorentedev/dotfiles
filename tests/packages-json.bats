@@ -31,7 +31,7 @@ mise_catalog_excludes_windows() {
     jq -e 'all(.tools[]; (.name | type == "string") and (.profile | type == "string") and
         (if .source.type == "system"
          then (has("version") | not) and ([.source.apt, .source.brew, .source.cask, .source.winget] | any(type == "string"))
-         else (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")) and (.source.type | IN("npm", "github-release", "uv-tool"))
+         else (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")) and (.source.type | IN("npm", "github-release", "github-archive", "uv-tool"))
          end))' "$CATALOG" >/dev/null
 }
 

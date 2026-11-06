@@ -85,7 +85,7 @@ func extractTarGzMember(archivePath, member, dst string) error {
 		if found > 1 {
 			return fmt.Errorf("archive member %q appears more than once", member)
 		}
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {
+		if header.Typeflag != tar.TypeReg {
 			return fmt.Errorf("archive member %q is not a regular file", member)
 		}
 		if err := writeMember(dst, tr); err != nil {

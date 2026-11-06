@@ -95,6 +95,8 @@ func Run(opts Options) (int, error) {
 		checkContractPath(sys, contract, rep)
 		checkRequiredBinaries(sys, contract, rep)
 	}
+	// A registry read, no fork: cheap enough for --quick, and it needs no contract.
+	checkForeignHome(sys, rep)
 
 	if !opts.Quick {
 		for _, c := range sweep(sys, cfg, contract, rep, opts, start) {

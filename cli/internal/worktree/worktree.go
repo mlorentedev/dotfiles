@@ -73,6 +73,9 @@ type Info struct {
 	IsCurrent  bool   `json:"is_current,omitempty"`
 	IsOrphan   bool   `json:"is_orphan,omitempty"`
 	Dirty      bool   `json:"dirty"`
+	// DirtUnknown is why git could not report the worktree's state. Dirty is
+	// then true: the safe verdict, never "clean".
+	DirtUnknown string `json:"dirt_unknown,omitempty"`
 	// IgnoredContent names what made a worktree with no tracked changes
 	// Dirty: ignored paths that are not known build output (#1607).
 	IgnoredContent []string `json:"ignored_content,omitempty"`
@@ -184,6 +187,11 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 		}
 		if !info.Metadata.ReapOK {
 			return StateActive, "review worktree past its lease (" + until + "), reap hold (reap_ok=false)"
+		}
+		// Before the saved output: sweep keeps a review worktree whose state it
+		// cannot read, saved or not, and list says the same (#3215).
+		if info.DirtUnknown != "" {
+			return StateDirty, "review worktree past its lease (" + until + ") whose state cannot be read, so sweep keeps it: " + info.DirtUnknown
 		}
 		if info.Dirty && !info.Metadata.OutputSaved {
 			return StateDirty, "review worktree past its lease (" + until + ") whose output was never copied back: copy its specs/<id>/ review files out, then `dotf worktree done <path> --force`"
