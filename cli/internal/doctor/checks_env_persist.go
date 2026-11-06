@@ -14,7 +14,8 @@ import (
 // the Windows work box, DOTFILES_REPO_DIR, DOTFILES_DIR, VAULT_PATH and
 // COPILOT_HOME were all empty at User scope while every shell had them, and
 // `dotf harness mirror` inside a Copilot tool call could not find the
-// checkout. WARN, not FAIL: shells keep working; the remedy is one command.
+// checkout. Drift is a FAIL: profile-less agents can act on a different path
+// than interactive shells, and the remedy is one command.
 // Skipped where the OS has no such scope (sys.UserEnv is nil).
 //
 // The contract is located through the seam (checkout via DOTFILES_REPO_DIR,
@@ -74,14 +75,14 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 		for _, v := range drift {
 			names = append(names, v.Name)
 		}
-		rep.Warn(fmt.Sprintf("%d contract variable(s) missing or stale at user scope (%s) — %s see none of them; run %s",
+		rep.Fail(fmt.Sprintf("%d contract variable(s) missing or stale at user scope (%s) — %s see none of them; run %s",
 			len(drift), strings.Join(names, ", "), who, fix))
 	}
 	if len(retired) > 0 {
 		// CLI-065 (#1363): a name the contract retired but the ownership marker
 		// still lists — profile-less processes keep inheriting a value nothing
 		// declares. The same command sweeps it; nothing else is touched.
-		rep.Warn(fmt.Sprintf("%d retired name(s) still persisted at user scope (%s) — run %s to sweep them",
+		rep.Fail(fmt.Sprintf("%d retired name(s) still persisted at user scope (%s) — run %s to sweep them",
 			len(retired), strings.Join(retired, ", "), fix))
 	}
 }

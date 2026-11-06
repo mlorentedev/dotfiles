@@ -12,9 +12,22 @@
       "validation": "path_exists"
     },
     {
+      "name": "PROJECTS_PATH",
+      "required": false,
+      "description": "Per-machine boundary containing project repositories and declared worktree roots (ADR-057). Repository and worktree defaults derive from it, while explicit per-path machine overrides remain valid. No path_exists validation: a from-zero machine may not have cloned its first project yet.",
+      "default": {
+        "linux": "$HOME/Projects",
+        "windows": "$env:USERPROFILE\\Projects"
+      }
+    },
+    {
       "name": "DOTFILES_REPO_DIR",
       "required": false,
       "description": "Repo source-of-truth for dotfiles (BUG-020). Distinct from DOTFILES_DIR which is the deployed copy. Used by dotf doctor (CLI-019 repo/deploy drift check) to locate the git repo; without it the drift check cannot resolve the repo root and SKIPs.",
+      "derived_from": {
+        "key": "PROJECTS_PATH",
+        "path": "dotfiles"
+      },
       "default": {
         "linux": "$HOME/Projects/dotfiles",
         "windows": "$env:USERPROFILE\\Projects\\dotfiles"
@@ -84,16 +97,37 @@
     {
       "name": "WORKTREE_ROOT",
       "required": false,
-      "description": "The one root every git worktree lives under, as <WORKTREE_ROOT>/<repo>/<branch-slug> (#2503). herdr fixes that shape and only lets its root be configured, so `dotf worktree add` follows it, and `dotf deploy` renders the same value into herdr's worktrees.directory and the agy and Copilot trust lists. Visible on purpose: agy excludes **/.worktrees/**. No path_exists validation: the first `dotf worktree add` creates it.",
+      "description": "Exact root for managed git worktree creators, as <WORKTREE_ROOT>/<repo>/<branch-slug> (#2503, ADR-057). herdr fixes that shape and only lets its root be configured, so `dotf worktree add` follows it. Third-party roots remain explicit children of PROJECTS_PATH. Visible on purpose: agy excludes **/.worktrees/**. No path_exists validation: the first `dotf worktree add` creates it.",
+      "derived_from": {
+        "key": "PROJECTS_PATH",
+        "path": "worktrees"
+      },
       "default": {
         "linux": "$HOME/Projects/worktrees",
         "windows": "$env:USERPROFILE\\Projects\\worktrees"
       }
     },
     {
+      "name": "COPILOT_WORKTREE_ROOT",
+      "required": false,
+      "description": "Declared GitHub Copilot Desktop worktree root used by trust projections and reconciliation inventory (ADR-057). The application owns the copilot-worktrees child name; dotfiles never writes its internal database.",
+      "derived_from": {
+        "key": "PROJECTS_PATH",
+        "path": "copilot-worktrees"
+      },
+      "default": {
+        "linux": "$HOME/Projects/copilot-worktrees",
+        "windows": "$env:USERPROFILE\\Projects\\copilot-worktrees"
+      }
+    },
+    {
       "name": "VAULT_PATH",
       "required": false,
       "description": "Obsidian knowledge vault root — the cross-machine path seam (ADR-025). Honored by `dotf vault`/`dotf init`, the session-start hooks, and the Go vault resolver. Per-machine overrides live in ~/.config/dotfiles/machine.json; `dotf env generate` renders it into paths.{sh,ps1}.",
+      "derived_from": {
+        "key": "PROJECTS_PATH",
+        "path": "knowledge"
+      },
       "default": {
         "linux": "$HOME/Projects/knowledge",
         "windows": "$env:USERPROFILE\\Projects\\knowledge"
@@ -103,6 +137,10 @@
       "name": "HIVE_VAULT_PATH",
       "required": false,
       "description": "Vault path the Hive MCP daemon (`hive serve`) reads at start. Mirrors VAULT_PATH by default (same vault); declared separately because the daemon reads its own env (ADR-025).",
+      "derived_from": {
+        "key": "PROJECTS_PATH",
+        "path": "knowledge"
+      },
       "default": {
         "linux": "$HOME/Projects/knowledge",
         "windows": "$env:USERPROFILE\\Projects\\knowledge"

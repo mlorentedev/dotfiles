@@ -15,9 +15,9 @@
     ]
   },
   "trustedWorkspaces": [
-    "{HOME}/Projects/*",
-    "{HOME}/Projects/Workspace/*",
-    "{WORKTREE_ROOT}"
+    "{PROJECTS_PATH}/*",
+    "{WORKTREE_ROOT}",
+    "{COPILOT_WORKTREE_ROOT}"
   ],
   "workspace": {
     "autoSave": true,

@@ -2,7 +2,7 @@
   {
     "id": "PLAT-008-workspace-root-contract-f1",
     "behavior": "PROJECTS_PATH-derived defaults, generated path files, persistent environment, and trust projections converge while compatibility fallbacks and explicit overrides remain valid.",
-    "verification": "cd cli && go test ./internal/env ./internal/doctor ./internal/deploy -run 'Test(ResolveDerived|DerivedDefaults|RealContract.*Projects|CheckPersistedEnv|.*Trust.*Path)'",
+    "verification": "cd cli && go test ./internal/env -run 'Test(ResolveDerived|LoadContractRejectsInvalidDerived|DerivedDefaultMatches|RealContractDerivesProject|GeneratedDrift)' && go test ./internal/deploy -run 'Test(AgentTrust|Deploy_AgySettings|AgyTemplate)' && go test ./internal/doctor -run 'Test(CheckPersistedEnv|CheckPathFilesFailsOnStaleGenerated)'",
     "state": "pending",
     "evidence": ""
   },

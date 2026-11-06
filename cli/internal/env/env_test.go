@@ -253,17 +253,148 @@ func TestRealContractRendersAgeKeyDiscovery(t *testing.T) {
 	}
 }
 
+func TestRealContractDerivesProjectWorkspacePaths(t *testing.T) {
+	c, err := loadContract(filepath.Join("..", "..", "..", "env-contract.json"))
+	if err != nil {
+		t.Fatalf("load real env-contract.json: %v", err)
+	}
+
+	cases := []struct {
+		name     string
+		goos     string
+		home     string
+		override map[string]string
+		want     map[string]string
+	}{
+		{
+			name: "linux defaults",
+			goos: "linux",
+			home: "/home/me",
+			want: map[string]string{
+				"PROJECTS_PATH":         "/home/me/Projects",
+				"DOTFILES_REPO_DIR":     "/home/me/Projects/dotfiles",
+				"VAULT_PATH":            "/home/me/Projects/knowledge",
+				"HIVE_VAULT_PATH":       "/home/me/Projects/knowledge",
+				"WORKTREE_ROOT":         "/home/me/Projects/worktrees",
+				"COPILOT_WORKTREE_ROOT": "/home/me/Projects/copilot-worktrees",
+			},
+		},
+		{
+			name:     "linux workspace override and vault exception",
+			goos:     "linux",
+			home:     "/home/me",
+			override: map[string]string{"PROJECTS_PATH": "/workspace", "VAULT_PATH": "/data/vault"},
+			want: map[string]string{
+				"PROJECTS_PATH":         "/workspace",
+				"DOTFILES_REPO_DIR":     "/workspace/dotfiles",
+				"VAULT_PATH":            "/data/vault",
+				"HIVE_VAULT_PATH":       "/workspace/knowledge",
+				"WORKTREE_ROOT":         "/workspace/worktrees",
+				"COPILOT_WORKTREE_ROOT": "/workspace/copilot-worktrees",
+			},
+		},
+		{
+			name:     "windows workspace override",
+			goos:     "windows",
+			home:     `C:\Users\me`,
+			override: map[string]string{"PROJECTS_PATH": `D:\Workspace`},
+			want: map[string]string{
+				"PROJECTS_PATH":         `D:\Workspace`,
+				"DOTFILES_REPO_DIR":     `D:\Workspace\dotfiles`,
+				"VAULT_PATH":            `D:\Workspace\knowledge`,
+				"HIVE_VAULT_PATH":       `D:\Workspace\knowledge`,
+				"WORKTREE_ROOT":         `D:\Workspace\worktrees`,
+				"COPILOT_WORKTREE_ROOT": `D:\Workspace\copilot-worktrees`,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolved(Resolve(c, &machine{Paths: tc.override}, tc.goos, tc.home))
+			for name, want := range tc.want {
+				if got[name] != want {
+					t.Errorf("%s = %q, want %q", name, got[name], want)
+				}
+			}
+		})
+	}
+}
+
 func TestRenderShKeepsAlreadySetValue(t *testing.T) {
 	out := Render(FormatSh, []ResolvedVar{{Name: "VAULT_PATH", Value: "/data/vault"}})
-	if !strings.Contains(out, `export VAULT_PATH="${VAULT_PATH:-/data/vault}"`) {
+	if !strings.Contains(out, `if [ -z "${VAULT_PATH+x}" ]; then`) {
 		t.Errorf("sh render missing guarded export:\n%s", out)
+	}
+}
+
+func TestRenderShRecordsGeneratedValue(t *testing.T) {
+	out := Render(FormatSh, []ResolvedVar{{Name: "VAULT_PATH", Value: "/data/vault"}})
+	for _, want := range []string{
+		`if [ -z "${VAULT_PATH+x}" ]; then`,
+		`export VAULT_PATH="/data/vault"`,
+		`export DOTF_GENERATED_PATHS="${DOTF_GENERATED_PATHS:+${DOTF_GENERATED_PATHS};}VAULT_PATH"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("paths.sh missing %q:\n%s", want, out)
+		}
 	}
 }
 
 func TestRenderPs1OnlyAssignsWhenUnset(t *testing.T) {
 	out := Render(FormatPs1, []ResolvedVar{{Name: "VAULT_PATH", Value: `C:\data\vault`}})
-	if !strings.Contains(out, `if (-not $env:VAULT_PATH) { $env:VAULT_PATH = 'C:\data\vault' }`) {
+	if !strings.Contains(out, `if (-not $env:VAULT_PATH) {`) ||
+		!strings.Contains(out, `$env:VAULT_PATH = 'C:\data\vault'`) {
 		t.Errorf("ps1 render wrong:\n%s", out)
+	}
+}
+
+func TestRenderPs1RecordsGeneratedValue(t *testing.T) {
+	out := Render(FormatPs1, []ResolvedVar{{Name: "VAULT_PATH", Value: `C:\data\vault`}})
+	for _, want := range []string{
+		`if (-not $env:VAULT_PATH) {`,
+		`$env:VAULT_PATH = 'C:\data\vault'`,
+		`$env:DOTF_GENERATED_PATHS = if ($env:DOTF_GENERATED_PATHS) { "$env:DOTF_GENERATED_PATHS;VAULT_PATH" } else { "VAULT_PATH" }`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("paths.ps1 missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestGeneratedDriftChecksOnlyMarkedValues(t *testing.T) {
+	vars := []ResolvedVar{{Name: "VAULT_PATH", Value: "/new/vault"}}
+	cases := []struct {
+		name   string
+		values map[string]string
+		want   int
+	}{
+		{
+			name:   "unmarked operator override",
+			values: map[string]string{"VAULT_PATH": "/operator/vault"},
+		},
+		{
+			name: "marked current value",
+			values: map[string]string{
+				GeneratedMarker: "VAULT_PATH",
+				"VAULT_PATH":    "/new/vault",
+			},
+		},
+		{
+			name: "marked stale value",
+			values: map[string]string{
+				GeneratedMarker: "VAULT_PATH",
+				"VAULT_PATH":    "/old/vault",
+			},
+			want: 1,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := GeneratedDrift(vars, func(name string) string { return tc.values[name] })
+			if len(got) != tc.want {
+				t.Fatalf("GeneratedDrift() = %+v, want %d item(s)", got, tc.want)
+			}
+		})
 	}
 }
 

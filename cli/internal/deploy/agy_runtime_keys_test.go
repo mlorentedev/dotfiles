@@ -69,8 +69,13 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 
 	// The dst is spelled {AGY_HOME} (#2402); resolve it to the contract default.
 	resolve := func(name string) string {
-		if name == "AGY_HOME" {
+		switch name {
+		case "AGY_HOME":
 			return filepath.Dir(dst)
+		case "PROJECTS_PATH":
+			return filepath.ToSlash(home) + "/Projects"
+		case "COPILOT_WORKTREE_ROOT":
+			return "/r/copilot-worktrees"
 		}
 		return worktreeRoot(name)
 	}
@@ -87,7 +92,7 @@ func TestDeploy_AgySettingsPreservesRuntimeKeys(t *testing.T) {
 	if !containsAll(ws, "/home/u/Projects/ts-bridge") {
 		t.Errorf("a trust path the machine added was lost: %v", got["trustedWorkspaces"])
 	}
-	if !containsAll(ws, filepath.ToSlash(home)+"/Projects/*", "/r/worktrees") {
+	if !containsAll(ws, filepath.ToSlash(home)+"/Projects/*", "/r/worktrees", "/r/copilot-worktrees") {
 		t.Errorf("the baseline trust path or the rendered worktree root is missing: %v", got["trustedWorkspaces"])
 	}
 
@@ -135,7 +140,7 @@ func TestAgyTemplateShipsTheBaselineGrants(t *testing.T) {
 		t.Fatal(err)
 	}
 	ws, _ := tmpl["trustedWorkspaces"].([]any)
-	if !containsAll(ws, "{HOME}/Projects/*", "{HOME}/Projects/Workspace/*") {
+	if !containsAll(ws, "{PROJECTS_PATH}/*", "{WORKTREE_ROOT}", "{COPILOT_WORKTREE_ROOT}") {
 		t.Errorf("ai/agy/settings.json must ship the baseline trust paths: %v", tmpl["trustedWorkspaces"])
 	}
 	perms, _ := tmpl["permissions"].(map[string]any)

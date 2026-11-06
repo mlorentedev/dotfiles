@@ -122,3 +122,71 @@ func TestParseManifest_ValidatesPathsByName(t *testing.T) {
 		t.Errorf("slash must parse: %v", err)
 	}
 }
+
+func TestAgentTrustTemplatesUseProjectBoundaryTokens(t *testing.T) {
+	repo := filepath.Join("..", "..", "..")
+	copilotSource, err := os.ReadFile(filepath.Join(repo, "ai", "copilot", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	agySource, err := os.ReadFile(filepath.Join(repo, "ai", "agy", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, source := range map[string][]byte{"copilot": copilotSource, "agy": agySource} {
+		if strings.Contains(string(source), "{HOME}/Projects") || strings.Contains(string(source), "Projects/Workspace") {
+			t.Errorf("%s trust template still hardcodes the projects layout:\n%s", name, source)
+		}
+	}
+
+	resolve := func(name string) string {
+		return map[string]string{
+			"PROJECTS_PATH":         "/workspace",
+			"WORKTREE_ROOT":         "/workspace/worktrees",
+			"COPILOT_WORKTREE_ROOT": "/workspace/copilot-worktrees",
+		}[name]
+	}
+	copilotRendered, err := expandPaths(copilotSource, PathsSlash, "/home/me", resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agyRendered, err := expandPaths(agySource, PathsSlash, "/home/me", resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var copilot, agy map[string]any
+	if err := json.Unmarshal(copilotRendered, &copilot); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(agyRendered, &agy); err != nil {
+		t.Fatal(err)
+	}
+	assertStringList(t, copilot["trustedFolders"], []string{
+		"/workspace",
+		"/workspace/*",
+		"/workspace/worktrees/*/*",
+		"/workspace/copilot-worktrees/*/*",
+	})
+	assertStringList(t, agy["trustedWorkspaces"], []string{
+		"/workspace/*",
+		"/workspace/worktrees",
+		"/workspace/copilot-worktrees",
+	})
+}
+
+func assertStringList(t *testing.T, got any, want []string) {
+	t.Helper()
+	items, ok := got.([]any)
+	if !ok {
+		t.Fatalf("got %T, want a JSON list", got)
+	}
+	if len(items) != len(want) {
+		t.Fatalf("got %v, want %v", items, want)
+	}
+	for i, item := range items {
+		if item != want[i] {
+			t.Errorf("item %d = %v, want %q", i, item, want[i])
+		}
+	}
+}

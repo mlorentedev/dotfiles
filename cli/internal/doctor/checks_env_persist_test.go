@@ -16,7 +16,7 @@ const persistContract = `{"env_vars":[
 
 // The persisted-scope check (CLI-058, #1324) compares the resolved contract
 // against the per-user persistent environment through the seam: all present
-// and equal → PASS; missing or different → WARN naming them and the remedy;
+// and equal → PASS; missing, different or retired → FAIL naming them and the remedy;
 // unreadable → WARN; no seam (an OS without the scope) → no section at all.
 func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 	cases := []struct {
@@ -30,14 +30,14 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 		// CLI-065: every variable in place but no ownership record yet (a box
 		// that persisted before the record existed) — one run writes it.
 		{"all persisted, no record yet → WARN naming the record", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*"}, nil, StatusWarn, envpkg.ManagedMarker},
-		{"one missing → WARN naming it", map[string]string{"DOTFILES_REPO_DIR": "*"}, nil, StatusWarn, "VAULT_PATH"},
-		{"one different → WARN naming it", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": `C:\elsewhere`}, nil, StatusWarn, "VAULT_PATH"},
+		{"one missing → FAIL naming it", map[string]string{"DOTFILES_REPO_DIR": "*"}, nil, StatusFail, "VAULT_PATH"},
+		{"one different → FAIL naming it", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": `C:\elsewhere`}, nil, StatusFail, "VAULT_PATH"},
 		{"registry unreadable → WARN", nil, errors.New("access denied"), StatusWarn, "unreadable"},
 		// CLI-065 (#1363): the marker still lists a name the contract retired.
-		{"retired name still persisted → WARN naming it", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusWarn, "OLD_NAME"},
+		{"retired name still persisted → FAIL naming it", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusFail, "OLD_NAME"},
 		// Review finding: drift and a retired name at once — both are named.
-		{"drift and retired together → WARN naming the drift", map[string]string{"DOTFILES_REPO_DIR": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusWarn, "VAULT_PATH"},
-		{"drift and retired together → WARN naming the retired", map[string]string{"DOTFILES_REPO_DIR": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusWarn, "OLD_NAME"},
+		{"drift and retired together → FAIL naming the drift", map[string]string{"DOTFILES_REPO_DIR": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusFail, "VAULT_PATH"},
+		{"drift and retired together → FAIL naming the retired", map[string]string{"DOTFILES_REPO_DIR": "*", "OLD_NAME": "x", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;OLD_NAME;VAULT_PATH"}, nil, StatusFail, "OLD_NAME"},
 		{"marker in sync → PASS", map[string]string{"DOTFILES_REPO_DIR": "*", "VAULT_PATH": "*", envpkg.ManagedMarker: "DOTFILES_REPO_DIR;VAULT_PATH"}, nil, StatusPass, "persisted at user scope"},
 	}
 	for _, tc := range cases {
@@ -100,7 +100,7 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 	// #2013 S3: on macOS the scope is the launchd session, which logout clears.
 	// `dotf env persist` alone would restore it until the next logout; the
 	// converge step also loads the login agent, so that is the remedy named.
-	t.Run("darwin drift → WARN naming the converge step and the GUI apps", func(t *testing.T) {
+	t.Run("darwin drift → FAIL naming the converge step and the GUI apps", func(t *testing.T) {
 		home := t.TempDir()
 		mirror := filepath.Join(home, ".dotfiles")
 		writeFile(t, filepath.Join(mirror, "env-contract.json"), persistContract)
@@ -110,11 +110,11 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 		var buf bytes.Buffer
 		checkPersistedEnv(sys, &Config{DotfilesDir: mirror}, capture(&buf))
 		out := buf.String()
-		if got := statusOfLine(out, "dotf converge --only env-persist"); got != StatusWarn {
-			t.Fatalf("want a WARN naming the converge step, got %q\n%s", tagOf(got), out)
+		if got := statusOfLine(out, "dotf converge --only env-persist"); got != StatusFail {
+			t.Fatalf("want a FAIL naming the converge step, got %q\n%s", tagOf(got), out)
 		}
-		if statusOfLine(out, "launched from the Dock") != StatusWarn {
-			t.Errorf("the WARN must say who reads the scope on macOS\n%s", out)
+		if statusOfLine(out, "launched from the Dock") != StatusFail {
+			t.Errorf("the FAIL must say who reads the scope on macOS\n%s", out)
 		}
 	})
 

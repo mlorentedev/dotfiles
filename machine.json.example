@@ -1,9 +1,7 @@
 {
-  "_comment": "EXAMPLE per-machine path overrides (ADR-025). Copy to ~/.config/dotfiles/machine.json (Windows: %USERPROFILE%\\.config\\dotfiles\\machine.json) and edit. List ONLY the keys this machine relocates vs env-contract.json defaults; omit the rest. The `machine` and `pools` blocks below are separate from `paths` and are read by `dotf agent run`. After editing, run `dotf env generate`. The real machine.json lives OUTSIDE any repo and is never committed — this example is the only path file that belongs in git.",
+  "_comment": "EXAMPLE per-machine path overrides (ADR-025, ADR-057). Copy to ~/.config/dotfiles/machine.json (Windows: %USERPROFILE%\\.config\\dotfiles\\machine.json) and edit. PROJECTS_PATH is the normal single override; repository and worktree defaults derive from it. Add another path only for a deliberate exception, such as a vault on a separate disk. The `machine` and `pools` blocks below are separate from `paths` and are read by `dotf agent run`. After editing, run `dotf env generate` and `dotf env persist`. The real machine.json lives OUTSIDE any repo and is never committed — this example is the only path file that belongs in git.",
   "paths": {
-    "DOTFILES_REPO_DIR": "/home/you/Projects/dotfiles",
-    "VAULT_PATH": "/home/you/Projects/knowledge",
-    "HIVE_VAULT_PATH": "/home/you/Projects/knowledge"
+    "PROJECTS_PATH": "/home/you/Projects/Workspace"
   },
   "machine": {
     "id": "give-this-machine-a-name"
