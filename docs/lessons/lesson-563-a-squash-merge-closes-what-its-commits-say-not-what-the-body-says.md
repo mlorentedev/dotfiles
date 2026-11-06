@@ -30,6 +30,7 @@ settled. A commit message cannot be edited without a force-push, while a body ca
 The keyword does not have to stand at the start of a line, or appear in a template field. The PR that added this
 lesson described the mistake in prose, and its body put the word "closed" directly before the issue reference. When
 that PR merged, GitHub closed the same issue a second time. A closing keyword (close, fix or resolve, in any tense)
-placed immediately before an issue reference counts wherever it appears in a body or a commit message. To mention a
+placed immediately before an issue reference, or separated from it only by a colon, counts wherever it appears in a
+body or a commit message. To mention a
 closing without triggering one, keep the verb away from the reference. "Shut issue 2445" reads the same and closes
-nothing.
+nothing. For a link that must not close anything, write `Refs` before the reference.
