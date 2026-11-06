@@ -198,19 +198,53 @@ func TestDeadlineRunsTheReviewerInTheReviewWorktree(t *testing.T) {
 // A review worktree deadline cannot enter is refused before the reviewer runs,
 // naming the directory, rather than left to the reviewer to fail on.
 func TestDeadlineRefusesAReviewWorktreeItCannotEnter(t *testing.T) {
-	_, callerSpec, _ := reviewWorktree(t)
-	missing := filepath.Join(t.TempDir(), "gone")
-	ran := filepath.Join(t.TempDir(), "ran")
+	for _, c := range []struct {
+		name   string
+		unwalk func(t *testing.T, tree string) string
+	}{
+		{"missing", func(t *testing.T, _ string) string { return filepath.Join(t.TempDir(), "gone") }},
+		{"unreadable", func(t *testing.T, tree string) string {
+			if err := os.Chmod(tree, 0o000); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(tree, 0o755) })
+			return tree
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, callerSpec, tree := reviewWorktree(t)
+			target := c.unwalk(t, tree)
+			review := filepath.Join(target, "specs", "AI-001-x", "review.md")
+			ran := filepath.Join(t.TempDir(), "ran")
 
-	_, stderr, err := execute(t, "spec", "deadline", "1m", "--worktree", missing, "--copy-back", callerSpec,
-		"--", "sh", "-c", `touch "$1"`, "sh", ran)
-	if err == nil {
-		t.Fatalf("deadline ran in a review worktree that does not exist\n%s", stderr)
+			_, stderr, err := execute(t, "spec", "deadline", "1m", "--review", review, "--worktree", target, "--copy-back", callerSpec,
+				"--", "sh", "-c", `touch "$1"`, "sh", ran)
+			if err == nil {
+				t.Fatalf("deadline ran in a review worktree it cannot enter\n%s", stderr)
+			}
+			if want := "entering the review worktree " + target; !strings.Contains(err.Error(), want) {
+				t.Errorf("the error is not the worktree refusal %q: %v", want, err)
+			}
+			if _, statErr := os.Stat(ran); !os.IsNotExist(statErr) {
+				t.Errorf("the reviewer ran although deadline could not enter the worktree: %v", statErr)
+			}
+		})
 	}
-	if !strings.Contains(err.Error(), missing) {
-		t.Errorf("the error does not name the review worktree: %v", err)
+}
+
+// A relative --copy-back still names the caller's folder once deadline stands
+// in the worktree it removes at the end.
+func TestDeadlineCopiesBackToARelativeFolder(t *testing.T) {
+	repo, callerSpec, tree := reviewWorktree(t)
+	t.Chdir(repo)
+	review := filepath.Join(tree, "specs", "AI-001-x", "review.md")
+
+	_, stderr, err := execute(t, "spec", "deadline", "1m", "--review", review, "--worktree", tree,
+		"--copy-back", filepath.Join("specs", "AI-001-x"), "--", "sh", "-c", `echo verdict > "$1"`, "sh", review)
+	if err != nil {
+		t.Fatalf("deadline failed: %v\n%s", err, stderr)
 	}
-	if _, statErr := os.Stat(ran); !os.IsNotExist(statErr) {
-		t.Errorf("the reviewer ran although deadline could not enter the worktree: %v", statErr)
+	if _, err := os.Stat(filepath.Join(callerSpec, "review.md")); err != nil {
+		t.Errorf("the verdict did not reach the caller's spec folder through a relative --copy-back: %v\n%s", err, stderr)
 	}
 }

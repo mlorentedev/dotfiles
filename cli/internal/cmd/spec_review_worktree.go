@@ -214,12 +214,26 @@ func finishLeftoverReviewTree(errw io.Writer, review, tree, callerSpec string) {
 // a tmux server whose own working directory is unreadable hands every new
 // session an unreadable one, and nothing reported it: pi died on startup, and
 // agy ran elsewhere unnoticed. No worktree, no change.
-func enterReviewTree(tree string) error {
-	if tree == "" {
+//
+// The worktree and the paths given alongside it are made absolute first: once
+// deadline stands in the worktree, a relative --copy-back would resolve inside
+// the directory that is removed when the run ends.
+func enterReviewTree(tree *string, alongside ...*string) error {
+	if *tree == "" {
 		return nil
 	}
-	if err := os.Chdir(tree); err != nil {
-		return fmt.Errorf("entering the review worktree %s, so the reviewer was not started: %w", tree, err)
+	for _, p := range append([]*string{tree}, alongside...) {
+		if *p == "" {
+			continue
+		}
+		abs, err := filepath.Abs(*p)
+		if err != nil {
+			return fmt.Errorf("resolving %s before entering the review worktree, so the reviewer was not started: %w", *p, err)
+		}
+		*p = abs
+	}
+	if err := os.Chdir(*tree); err != nil {
+		return fmt.Errorf("entering the review worktree %s, so the reviewer was not started: %w", *tree, err)
 	}
 	return nil
 }

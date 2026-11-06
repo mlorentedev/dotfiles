@@ -634,7 +634,7 @@ not be copied back is kept.`,
 				return fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", stall)
 			}
 			errw := cmd.ErrOrStderr()
-			if err := enterReviewTree(tree); err != nil {
+			if err := enterReviewTree(&tree, &review, &copyBack, &transcript); err != nil {
 				finishLeftoverReviewTree(errw, review, tree, copyBack)
 				return err
 			}
