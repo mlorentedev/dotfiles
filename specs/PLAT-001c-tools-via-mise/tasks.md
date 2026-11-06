@@ -364,6 +364,8 @@ The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows
   - A non-elevated `winget install --id Microsoft.VCRedist.2015+.arm64 -e …`, the catalog's argv, exited 0 on the Arm64 guest. That guest auto-elevates admins (UAC ConsentPromptBehaviorAdmin 0); on a box with the default prompt the runtime's installer asks through UAC, as every machine-scope winget entry already does
 - [ ] Entry (after a release carrying the reader is the `DOTF_VERSION` pin): `vcredist` with `winget_arch` and `platforms: ["windows"]`, ahead of `mise` in `packages.json`, since the tools step walks the catalog in file order. An older dotf rejects the unknown key and fails the whole catalog, which is why the entry waits
 - [ ] Re-measure AC4 on a clean Arm64 guest once the entry ships: the tools step alone places the runtime, then mise runs
+  - Measured ahead of the release on 2026-11-06. The guest was a clean Arm64 with no runtime. The dev dotf merged #3174, #3222 and this reader, plus a local `vcredist` entry ahead of `mise`, and ran with `MISE_HTTP_DOWNLOAD_TIMEOUT=3h`. The tools step installed `vcredist`, then mise and every mise pin, in 1h07m. The blocker is closed, but the row stays open until the entry ships
+  - AC4 is still not met. The same run exits 1 on the four npm CLIs (#2438: under a mise Node, npm's global prefix is the Node install directory, which no PATH holds) and on bats not running at its pin (#2346)
 
 ## Closing
 
