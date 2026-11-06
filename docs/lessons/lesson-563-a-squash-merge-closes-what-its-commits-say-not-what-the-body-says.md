@@ -26,3 +26,10 @@ with a linked merge, the normal outcome for a fixed bug.
 When a PR is narrowed from `Closes` to `Refs`, check its commit messages too. Then reopen whatever the merge closed,
 with a comment naming what is still open. Better still, write `Refs` in the commit message until the PR's scope is
 settled. A commit message cannot be edited without a force-push, while a body can be edited at any time.
+
+The keyword does not have to stand at the start of a line, or appear in a template field. The PR that added this
+lesson described the mistake in prose: its body said the earlier squash merge "closed" the issue, followed by the issue
+reference. When that PR merged, GitHub closed the same issue a second time. Any closing verb (close, fix, resolve, in
+any tense) followed by an issue reference counts, wherever it appears in a body or a commit message. To mention a
+closing without triggering one, keep the verb and the reference apart. "Shut issue 2445" reads the same and closes
+nothing.
