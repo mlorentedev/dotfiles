@@ -37,6 +37,11 @@ type Metadata struct {
 	// Kind is empty for a worktree someone works in, and names what made one
 	// that nobody does, such as KindReview.
 	Kind string `json:"kind,omitempty"`
+	// OutputSaved is set by `spec deadline` once it has copied a review
+	// worktree's output back to the caller, and before it removes the
+	// worktree. Until then, uncommitted content in a review worktree may be
+	// the only copy of a verdict, and sweep keeps it.
+	OutputSaved bool `json:"output_saved,omitempty"`
 }
 
 // KindReview marks the disposable worktree `dotf spec review` runs a reviewer
@@ -177,7 +182,10 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 		if info.Metadata.LeaseExpiresAt.After(now) {
 			return StateActive, "review worktree, lease active until " + until
 		}
-		return StateReapable, "review worktree past its lease (" + until + "); sweep discards any reviewer output left in it"
+		if info.Dirty && !info.Metadata.OutputSaved {
+			return StateDirty, "review worktree past its lease (" + until + ") whose output was never copied back: copy its specs/<id>/ review files out, then `dotf worktree done <path> --force`"
+		}
+		return StateReapable, "review worktree past its lease (" + until + ")"
 	}
 
 	if info.Dirty {

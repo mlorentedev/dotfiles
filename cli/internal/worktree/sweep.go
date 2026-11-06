@@ -260,7 +260,7 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 	// Re-read under the lock, like the lease below: the kind decides which
 	// gates apply, so it is not taken from the listing.
 	if meta, err := LoadMetadata(info.Path); err == nil && meta != nil && meta.Kind == KindReview {
-		return reapReviewWorktree(repoRoot, info, absWT, runner, now)
+		return reapReviewWorktree(repoRoot, info, meta, absWT, runner, now)
 	}
 	if isDirty(info.Path, runner) {
 		return false
@@ -279,21 +279,30 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 }
 
 // reapReviewWorktree removes a review worktree once its lease has passed
-// (HARNESS-142). It skips the clean and merged gates: the worktree has no
-// branch to merge, and what it holds uncommitted is reviewer output that
-// `spec deadline` failed to copy back, so it is discarded with --force and
-// said so. Gate f stays last: a reviewer still running past its lease is the
-// one case the lease cannot see.
-func reapReviewWorktree(repoRoot string, info Info, absWT string, runner SweepRunner, now time.Time) bool {
+// (HARNESS-142). It skips the merged gate, since the worktree has no branch,
+// but not the clean gate's purpose: uncommitted content is removed only when
+// `spec deadline` recorded that it copied the review's output back
+// (OutputSaved), so what --force discards is what else the reviewer left. A
+// review whose output was never copied back is kept, and so is a tree whose
+// state cannot be read. Gate f stays last: a reviewer still running past its
+// lease is the one case the lease cannot see.
+func reapReviewWorktree(repoRoot string, info Info, meta *Metadata, absWT string, runner SweepRunner, now time.Time) bool {
 	if !isLeaseExpired(info.Path, now) {
 		return false
 	}
-	dirt, dirtErr := runner.Dirt(info.Path)
+	dirt, err := runner.Dirt(info.Path)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: keeping review worktree %s: its state cannot be read: %v\n", info.Path, err)
+		return false
+	}
+	if dirt.Any() && !meta.OutputSaved {
+		return false
+	}
 	if hostProcessInside(absWT).Inside {
 		return false
 	}
-	if dirtErr != nil || dirt.Any() {
-		_, _ = fmt.Fprintf(os.Stderr, "Discarding review worktree %s past its lease, with the uncommitted reviewer output it holds\n", info.Path)
+	if dirt.Any() {
+		_, _ = fmt.Fprintf(os.Stderr, "Removing review worktree %s: its output was copied back, and what else the reviewer left in it is discarded\n", info.Path)
 	}
 	if err := runner.WorktreeRemoveForce(repoRoot, info.Path); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "warning: removing review worktree %s: %v\n", info.Path, err)
