@@ -213,12 +213,43 @@ var forgeWriteBranch = func() (string, error) {
 // from it is always a mistake (#2784).
 const runEnvelopePath = ".agent/unattended.yml"
 
+// forgeEnvelopeBlob is the object id of the run envelope on ref, or "" when
+// the ref or the file is missing.
+func forgeEnvelopeBlob(ref string) string {
+	out, err := exec.Command("git", "rev-parse", "--verify", "-q", ref+":"+runEnvelopePath).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // forgeHeadCarriesEnvelope reports whether the head branch, local or as
-// origin last showed it, holds the run envelope. A branch git does not know
-// answers false: the forge then judges the head itself. A seam for tests.
-var forgeHeadCarriesEnvelope = func(head string) bool {
+// origin last showed it, holds a run envelope it added or changed since it
+// left the base. A repository may keep the envelope on its default branch, so
+// that its merge guard reads it from the base (#3125); every branch then holds
+// that file, and only a head that differs from its merge base is a run
+// branch. The base is origin's when origin has it, else the local branch.
+// With no base or merge base git knows, any envelope on the head refuses. A
+// branch git does not know answers false: the forge then judges the head
+// itself. A seam for tests.
+var forgeHeadCarriesEnvelope = func(head, base string) bool {
+	baseRef := ""
+	for _, ref := range []string{"refs/remotes/origin/" + base, "refs/heads/" + base} {
+		if exec.Command("git", "rev-parse", "--verify", "-q", ref+"^{commit}").Run() == nil {
+			baseRef = ref
+			break
+		}
+	}
 	for _, ref := range []string{"refs/heads/" + head, "refs/remotes/origin/" + head} {
-		if exec.Command("git", "cat-file", "-e", ref+":"+runEnvelopePath).Run() == nil {
+		blob := forgeEnvelopeBlob(ref)
+		if blob == "" {
+			continue
+		}
+		if baseRef == "" {
+			return true
+		}
+		out, err := exec.Command("git", "merge-base", ref, baseRef).Output()
+		if err != nil || blob != forgeEnvelopeBlob(strings.TrimSpace(string(out))) {
 			return true
 		}
 	}
@@ -259,14 +290,13 @@ func newForgePRCreateCmd() *cobra.Command {
 			}
 			// An agent shell reset to its launch worktree reads that
 			// worktree's branch as the default head: kubelab#2524 opened a
-			// pull request from a run branch that way. There is no override:
-			// the envelope never belongs on a base branch.
-			if forgeHeadCarriesEnvelope(head) {
+			// pull request from a run branch that way. There is no override.
+			if forgeHeadCarriesEnvelope(head, base) {
 				fix := "pass --head <the branch that holds the change>; this one was read from the current branch"
 				if !defaulted {
 					fix = "open the pull request from a branch that does not commit the envelope"
 				}
-				return fmt.Errorf("ERROR: head %q carries %s. WHY: that is an unattended run's branch, which holds its ledger and is never merged. FIX: %s", head, runEnvelopePath, fix)
+				return fmt.Errorf("ERROR: head %q carries a %s that %s does not. WHY: that is an unattended run's branch, which holds its ledger and is never merged. FIX: %s", head, runEnvelopePath, base, fix)
 			}
 			repo, backend, err := forgeTarget()
 			if err != nil {

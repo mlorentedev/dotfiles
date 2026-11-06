@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CLI-135-init-stack-directories-f1",
+    "behavior": "Each stack's code directories are pinned by a test, one row per stack, workflows included; none, every existing stack and an unknown stack keep src/, tests/ and scripts/",
+    "verification": "cd cli && go test ./internal/initrepo/ -run 'TestScaffoldCodeDirectoriesByStack$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-135-init-stack-directories-f2",
+    "behavior": "dotf init --stack workflows creates tests/, specs/, docs/ and lint.yml, and no src/, scripts/ or ci.yml",
+    "verification": "cd cli && go test ./internal/initrepo/ -run 'TestInitWorkflowsStackScaffoldsNoCodeAndNoCI$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-135-init-stack-directories-f3",
+    "behavior": "StackInit(root, \"workflows\") performs nothing and reports no unknown-stack skip",
+    "verification": "cd cli && go test ./internal/initrepo/ -run 'TestStackInitWorkflowsIsANoOp$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

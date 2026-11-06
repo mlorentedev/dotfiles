@@ -44,10 +44,27 @@ type checkManifest struct {
 
 // recordKind is a manifest's skills or agents block: where the vault keeps the
 // sources, where the checkout keeps the records, and the schema they meet.
+// Exclude names vault dirs that are not shipped as records, each with its
+// reason: refresh skips them, and drops a committed record of one.
 type recordKind struct {
-	VaultSubpath string `json:"vault_subpath"`
-	RecordDir    string `json:"record_dir"`
-	Schema       string `json:"schema"`
+	VaultSubpath string            `json:"vault_subpath"`
+	RecordDir    string            `json:"record_dir"`
+	Schema       string            `json:"schema"`
+	Exclude      map[string]string `json:"exclude"`
+}
+
+// schema is the kind's frontmatter schema, defaulting by the record file name.
+func (k *recordKind) schema(file string) string {
+	return orDefault(k.Schema, "harness/"+strings.ToLower(strings.TrimSuffix(file, ".md"))+"-frontmatter.schema.json")
+}
+
+// excluded reports whether name is excluded, refusing an exclusion with no reason.
+func (k *recordKind) excluded(name string) (bool, error) {
+	reason, ok := k.Exclude[name]
+	if ok && strings.TrimSpace(reason) == "" {
+		return false, fmt.Errorf("%s exclusion of %q needs a reason", k.RecordDir, name)
+	}
+	return ok, nil
 }
 
 func loadCheckManifest(repoRoot string) (*checkManifest, error) {

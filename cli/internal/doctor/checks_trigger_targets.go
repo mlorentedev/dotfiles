@@ -11,7 +11,7 @@ import (
 
 // triggerPatternsSubdir is where the vault keeps the patterns harness/triggers.json
 // names. It is the `vault_subpath` harness/manifest.json declares for the
-// enforced records, which compile-harness.sh reads from the same place.
+// enforced records, which `dotf harness refresh` reads from the same place.
 const triggerPatternsSubdir = "00_meta/patterns"
 
 // checkTriggerTargets asserts that every pattern a trigger names exists in the
@@ -23,7 +23,7 @@ const triggerPatternsSubdir = "00_meta/patterns"
 // never written or had been renamed, and nothing said so, because the file is only
 // read by code that treats the name as an opaque string.
 //
-// compile-harness.sh --refresh refuses the same thing, but only when someone runs
+// `dotf harness refresh` refuses the same thing, but only when someone runs
 // it. This is the check that still fires after a pattern is renamed in the vault
 // on a machine that already deployed the triggers.
 //

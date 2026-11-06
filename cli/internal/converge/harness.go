@@ -19,11 +19,14 @@ import (
 //
 // The plan and the probe read the instruction files: one that is missing, or
 // whose content outside the harness regions differs from its source, is a
-// change. It runs on every OS: setup-windows.ps1 and setup-linux.sh deploy
+// change. They also judge the skill records, agent records and doctrine by
+// their rendered form, through a dry run of the same deploy: an output to
+// write or prune is a change (#2013 AC2). It runs on every OS: setup-windows.ps1 and setup-linux.sh deploy
 // through the same harness.Deploy, as `dotf harness deploy`.
 type recordsHarness struct {
-	run func(Env) error   // the deploy; HarnessDeploy in production
-	has func(string) bool // is a command on PATH
+	run     func(Env) error                       // the deploy; HarnessDeploy in production
+	preview func(Env) (harness.Deployment, error) // its dry run; HarnessPreview in production, nil previews nothing
+	has     func(string) bool                     // is a command on PATH
 }
 
 func (recordsHarness) Name() string { return "records-harness" }
@@ -38,13 +41,18 @@ func (r recordsHarness) Reconcile(env Env, dryRun bool) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Changes: len(stale), Detail: instructionsDetail(stale, dryRun)}
+	records, err := r.staleRecords(env)
+	if err != nil {
+		return Result{}, err
+	}
+	res := Result{Changes: len(stale) + records.total(), Detail: instructionsDetail(stale, records, dryRun)}
 	if dryRun {
 		return res, nil
 	}
-	// Skills are not planned yet, so the deploy runs on every apply: it is
-	// idempotent in content, and skipping it on a converged instruction set
-	// would leave a changed skill record undeployed.
+	// The deploy still runs on every apply, a plan of 0 changes included:
+	// presence has no preview, so 0 is not yet proof that nothing is stale.
+	// The deploy rewrites only what differs, so a converged machine is left
+	// as it is.
 	if r.run == nil {
 		return res, errors.New("no harness deploy runner is wired into this registry")
 	}
@@ -64,6 +72,13 @@ func (r recordsHarness) Probe(env Env) error {
 	}
 	if len(stale) > 0 {
 		return fmt.Errorf("instruction files still missing or stale after the deploy: %s", strings.Join(stale, ", "))
+	}
+	records, err := r.staleRecords(env)
+	if err != nil {
+		return err
+	}
+	if records.total() > 0 {
+		return fmt.Errorf("records still to deploy after the deploy: %s", records)
 	}
 	return presenceCurrent(env, r.has)
 }
@@ -96,15 +111,63 @@ func (r recordsHarness) staleInstructions(env Env) ([]string, error) {
 	return stale, nil
 }
 
-func instructionsDetail(stale []string, dryRun bool) string {
-	if len(stale) == 0 {
-		return "instruction files current; skills and presence re-rendered on apply"
+// recordChanges counts the outputs a dry run of the deploy would write or
+// prune, per surface.
+type recordChanges struct{ skills, agents, doctrine int }
+
+func (c recordChanges) total() int { return c.skills + c.agents + c.doctrine }
+
+func (c recordChanges) String() string {
+	return fmt.Sprintf("%d skill, %d agent and %d doctrine output(s)", c.skills, c.agents, c.doctrine)
+}
+
+// staleRecords previews the deploy and counts what it would change. The
+// instruction outcomes are left out: staleInstructions judges those files
+// with the harness regions stripped, which the deploy's own outcome does not.
+func (r recordsHarness) staleRecords(env Env) (recordChanges, error) {
+	if r.preview == nil {
+		return recordChanges{}, nil
 	}
+	d, err := r.preview(env)
+	if err != nil {
+		return recordChanges{}, fmt.Errorf("preview the harness records: %w", err)
+	}
+	var c recordChanges
+	for _, o := range d.Skills {
+		if o.Status == harness.SkillDeployed || o.Status == harness.SkillPruned {
+			c.skills++
+		}
+	}
+	for _, o := range d.Agents {
+		if o.Status == harness.SkillDeployed || o.Status == harness.SkillPruned {
+			c.agents++
+		}
+	}
+	for _, o := range d.Doctrine {
+		if o.Status == harness.SkillDeployed {
+			c.doctrine++
+		}
+	}
+	return c, nil
+}
+
+func instructionsDetail(stale []string, records recordChanges, dryRun bool) string {
 	verb := "deployed"
 	if dryRun {
 		verb = "to deploy"
 	}
-	return fmt.Sprintf("%d instruction file(s) %s: %s", len(stale), verb, strings.Join(stale, ", "))
+	var parts []string
+	if len(stale) == 0 {
+		parts = append(parts, "instruction files current")
+	} else {
+		parts = append(parts, fmt.Sprintf("%d instruction file(s) %s: %s", len(stale), verb, strings.Join(stale, ", ")))
+	}
+	if records.total() == 0 {
+		parts = append(parts, "skill, agent and doctrine records current")
+	} else {
+		parts = append(parts, records.String()+" "+verb)
+	}
+	return strings.Join(parts, "; ")
 }
 
 // presenceCurrent checks each presence region the records render against the
@@ -143,6 +206,12 @@ func presenceCurrent(env Env, has func(string) bool) error {
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// HarnessPreview is HarnessDeploy's dry run: what each surface would write or
+// prune, with nothing written. Presence has no preview, so it reports none.
+func HarnessPreview(env Env) (harness.Deployment, error) {
+	return harness.Deploy(env.RepoRoot, env.Home, onPath, true)
 }
 
 // HarnessDeploy deploys every harness surface from the checkout into the home.

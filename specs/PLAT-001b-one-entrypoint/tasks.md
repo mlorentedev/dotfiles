@@ -59,8 +59,9 @@ created: "2026-10-06"
 - [x] PR 2c-2: `harness.DeployInstructions` and `dotf harness instructions [--dry-run]` write each source verbatim with the deployed file's deploy-only regions, so a refreshed source region replaces the stale one and the presence roster and skill catalog survive
   - The catalog fills the source's empty slot in place, the position `compile-harness.sh` `replace_region` writes it to, so the two writers agree byte for byte and neither duplicates it; the presence roster is appended, as `dotf harness presence` does
   - `compile-harness.sh` delegates `deploy_instructions` to it when the installed dotf carries the subcommand (the `dotf_knows_subcommand` probe) and keeps the copy as the fallback, so no release is needed to land it
-- [ ] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`
-- [ ] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form
+- [x] Gated on the release that ships `harness instructions` and the `DOTF_VERSION` bump (#1814 class): `setup-windows.ps1` drops its CLAUDE.md and copilot-instructions copies for `dotf harness instructions`.
+  Done in #2914 (`c07b51ae`). The Claude bulk copy now passes `-Exclude 'settings.json', 'CLAUDE.md'`, `copilot-instructions.md` is no longer copied, and both files come from `dotf harness deploy`, whose first surface is `instructions`. The pinned 0.79.0 carries the command
+- [x] [AC2] `records-skills` (feature f11 moves here once skills are planned in Go): the skill records planned from their rendered form. Done in `records-harness` itself, not a separate step (PR 16); f11 now runs `TestRecordsHarness_AChangedSkillRecordIsPlannedAndFailsTheProbe`
 - [x] `records-bind` (#2232): `harness.Bind` returns one outcome per target and `dotf harness bind` renders it, so converge and doctor count changes without parsing text
   - Every OS, after `configs-deploy` (which seeds the settings files the hooks merge into); the plan writes nothing, the probe re-plans and requires zero writes, and a second run reports 0 changes; with no dotf path resolver wired the step is skipped and says so, as the other steps report a runner they were not given
   - Hooks whose markers another writer stripped are converged (`TestRecordsBind_HooksWithStrippedMarkersAreConverged`), resting on #2276's identity by command signature
@@ -88,7 +89,9 @@ created: "2026-10-06"
 - [x] [AC10] Failing test, then `deploy.ErrRenderIncomplete`: a strict renderer turns a placeholder the store could not resolve into a skip that keeps the installed file (lesson 378)
 - [x] [AC10] [AC3] `configs-deploy` between `tools` and `git-config` (git-config's probe needs the include target a config entry deploys); plan, apply, probe and a second plan with 0 changes; a template change fails the probe until applied; no renderer wired fails loudly
 - [x] On the Mac: `go run ./cmd/dotf converge --plan --only configs-deploy` reports 20 configs in sync, `agy-settings` to deploy, 1 not for this machine
-- [ ] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+- [x] Orca's hooks and Claude Code's MCP servers and plugins stay with a bare `dotf deploy`; their reconciler is #1843 B10
+  - MCP servers and plugins: `agent-extensions` (PR 8, PR 10)
+  - Orca's hooks: `orca-hooks` (PR 15)
 
 ### PR 2e — the macOS environment step: `env-persist` (#2013 S3)
 
@@ -106,7 +109,8 @@ created: "2026-10-06"
 
 - [x] [AC3] Failing test: a second run on a converged temp HOME reports zero changes and writes the report under the user state directory
 - [x] [AC3] Implement the report (JSON, one entry per reconciler, the run's result and error), written atomically under `env.StateDir()`, which the skill gate's ledger now shares; a plan writes none. `cli/README.md` documents `converge`, which shipped in PR 2a without a section
-- [ ] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file
+- [x] [AC2] On the Mac: `dotf converge` deploys `~/.claude/CLAUDE.md` and the skills; `dotf doctor` no longer fails on the Claude instruction file.
+  Measured 2026-11-03 with the installed 0.79.0: `dotf converge --plan --repo <checkout> --only records-harness` reports `[ OK ] instruction files current`, 0 to change, so `~/.claude/CLAUDE.md` matches its source. The plan does not judge skills, because every apply re-renders them. For skills the evidence is a content comparison: `dotf harness deploy --dry-run` from the checkout reports `skills: 0 would be deployed, 204 current, 0 would be pruned`. That covers every agent's skill directory, and `~/.claude/skills` holds 35 of them. `dotf doctor` reports no instruction-file finding: `Repo↔deploy-dir drift` and `Agent presence` are all ok. Its one FAIL is the OpenRouter model limit flap recorded on #902
 
 ### PR 4a — the checkout step, so converge can run from zero
 
@@ -255,9 +259,9 @@ Only the setup twins wrote `~/.gemini/config/mcp_config.json` and the hive-vault
 - [x] The bare `dotf deploy` prints `migrated`/`would migrate` rows with `was -> now`, an `untouched` row with the reason, and a failed row that says when the old registration was restored; converge's detail names each re-registration in the tense of the run (`to re-register` in a plan)
 - [x] Tests: renamed package, hive HIVE-118, moved URL, changed transport, a command without args, an unreadable answer, a missing scope, a local and a project scope, dry run, a failed remove, a failed re-add and its restore; converge plans, applies and is in sync on the second run. Mutations caught: the drift comparison, the scope guard, the restore, the scope requirement, the nested-settings guard, `Lost`, the restored-row branch in `dotf deploy`
 - [x] Evidence on the Mac, plan only: `go run ./cmd/dotf converge --plan --only agent-extensions` prints `pdf-modifier to re-register (stdio uvx pdf-modifier-mcp -> stdio uvx pdf-modifier)`
-- [ ] Follow-up: the Claude MCP registration loop still lives in both setup twins (with their own HIVE-118 remove); the pinned 0.68.0 already registers from `dotf deploy`, so the twin is deletable in its own PR
+- [x] Follow-up: the Claude MCP registration loop still lives in both setup twins (with their own HIVE-118 remove); the pinned 0.68.0 already registers from `dotf deploy`, so the twin is deletable in its own PR
   - [x] Linux: `setup-linux.sh` loses the loop, its HIVE-118 remove and the `snapshot_claude_json`/`restore_claude_json_if_truncated` helpers it alone used. Verified before deleting: the bare `dotf deploy` sits above the loop, so on 0.70.0 the loop only ever found the servers `claude-mcp` had registered; `dotf converge --plan` on the Mac prints `agent-extensions … claude: 0 MCP server(s) to add, 4 present`; from-zero 38671157122 (ubuntu) has converge's `agent-extensions` add 4 and `legacy-setup`'s `claude-mcp` report `0 added, 4 already present`. The same log then shows the loop `4 added, 0 already present`: with `CLAUDE_CONFIG_DIR` unset in setup's environment, claude kept a second `.claude.json` and the loop filled it. The loop's `uv tool install --upgrade hive-vault` also moved hive past its packages.json pin on every run; the pin now holds. Guard: `tests/setup-linux.bats` fails on any executable `claude mcp add|get|remove` in `setup-linux.sh` (two mutations caught)
-  - [ ] Windows: the loop stays. Its `prerequisite_command` is how a Windows box gets hive at all (`packages.json` lists hive for linux and darwin only, #2001), so it leaves with hive's Windows install: OPS-051 (#1993) for the install, CLI-096 (#2000) for the twin, in #2013's Windows batch
+  - [x] Windows (CLI-096, #2000): `setup-windows.ps1` loses the loop, its HIVE-118 remove and `Backup-AndRestoreClaudeJson`, which only the loop still called (1277 to 1156 lines). Its blocker went first: OPS-051 (#1993) dropped `prerequisite_command`, and packages.json installs hive on Windows through `self_install`, so the loop only registered what the bare `dotf deploy` further down registers. Guard: `tests/setup-windows.bats` fails on any executable `claude mcp add|get|remove` (mutation caught: one `& claude mcp get hive` line). The uv-before-registration ordering test now follows `& dotf deploy`. The BUG-005 re-exec stays, for the reason its comment gives
 
 ### PR 11 — doctor: Claude extensions (CLI-106 #2393)
 
@@ -303,6 +307,30 @@ Measured on from-zero run 38516177380 (#2452, pi under mise): `tools` installed 
 - [x] Second half (#1948): delete the shell seed and the jq/PowerShell model sync from both setup scripts, once the release carrying this step is the `DOTF_VERSION` pin. An older dotf has no step, and on the plain `setup-linux.sh` path the shell seed is still what runs before `dotf deploy`
   - Not a pure deletion: a plain `./setup-linux.sh` (the `integration` job runs one) has no converge run before its bare `dotf deploy`, so each twin's seed and sync become one `dotf converge --only pi-settings` call placed before that deploy, the shape the `git-config` and `git-hooks` calls in the same block already use. Under converge's `legacy-setup` the call finds the step already in sync. Verified before deleting: the pin is 0.70.0, which carries the step (#2457); `dotf converge --plan --only pi-settings` on the Mac prints `[ OK ] pi-settings settings.json present, enabledModels in sync`
   - Guards in `tests/pi-config.bats`: both twins call the step before the bare deploy, and neither has an executable line naming the settings paths or `enabledModels` (three mutations caught). The seed-only-when-absent and model-sync behaviour they replaced is held by the Go tests of PR 14
+
+### PR 15 — the orca-hooks step (#1843 B10, the Orca half)
+
+Orca regenerates `~/.copilot/hooks/orca.json` and `~/.orca/agent-hooks/copilot-hook.ps1` on every install, with the 5 s timeouts and the Invoke-WebRequest POST that DX-006 repairs (lesson 111). Only a bare `dotf deploy` re-applied the repair (CLI-093, #1953), so a machine that `dotf converge` brought up kept every Copilot tool call failing with "hook errored" on Windows until someone ran the deploy.
+
+- [x] `orca.HookPaths` moves from `cmd` into the orca package, so `dotf orca tune-hooks`, the bare deploy and the step resolve the two files the same way
+- [x] Converge step `orca-hooks`, inserted right after `configs-deploy`, the position the bare deploy tunes them in (an insertion; no step moved). It calls `orca.TuneHooks`: the plan counts the files the repair would change and writes nothing, and the apply tunes them and backs each one up beside itself. Every OS: the timeout floor waives itself where Orca registers bash hooks (#2252)
+- [x] A script whose POST line the swap does not know is named ("review it by hand") and left alone. It is not counted as a change, so the step cannot plan it on every run and then fail its own probe. Without Orca's files the step is skipped
+- [x] Tests: plan, apply, probe and a second plan with 0 changes; no Orca is a skip; tuned hooks are in sync; an unrecognised script is named and never planned or probed; the registry order names the step after `configs-deploy`. Mutations killed: counting an unrecognised script, a plan that applies, a probe that never fails
+- [x] On the Mac, `go run ./cmd/dotf converge --plan --only orca-hooks` reports `[SKIP] orca-hooks  Orca has generated no Copilot hooks for this user`. Orca is not installed there
+- [ ] Follow-up, once the release carrying this step is the `DOTF_VERSION` pin: decide whether the bare `dotf deploy` keeps its own Orca call. It is the path a plain `setup-*.sh` run takes without converge, so it stays until both setups converge first
+
+### PR 16 — records-harness plans the skill records (#2013 AC2, L63)
+
+`records-harness` judged only the instruction files. Its plan printed "skills and presence re-rendered on apply" and counted 0 whatever a skill record held, so a changed record was invisible to the plan and to the probe. The CLI-026 Windows guest showed it: a second converge reported `changed=0` while the skills had been deployed blind.
+
+- [x] The plan and the probe call a dry run of the same deploy (`HarnessPreview`, `harness.Deploy` with `dryRun`) and count every skill, agent-record and doctrine output it would write or prune. The instruction outcomes are left out, because `staleInstructions` already judges those files with the harness regions stripped
+- [x] The probe fails while any record is still to deploy, so a skill the deploy left out stops the run. That is the "fails if they are absent afterwards" half of AC2
+- [x] Planned in `records-harness`, not a new `records-skills` step: the skills are a surface of the same `harness.Deploy`, and a separate step would run that deploy twice
+- [x] The apply still runs the deploy on every run, a plan of 0 included. Presence has no preview, so 0 is not yet proof that nothing is stale; the deploy rewrites only what differs
+- [x] The preview is a seam beside `run`. A nil preview plans no records, and `TestRegistry_RecordsHarnessPreviewsTheRecords` fails if the registry ever drops it
+- [x] Tests: a changed record is 1 planned skill change, fails the probe, and is deployed by the apply; a removed record is a planned prune; the real-checkout test now covers the skills in its "second plan 0 changes". Mutations killed: a plan that ignores the preview, a probe that ignores stale records, a prune not counted
+- [x] On the Mac: `go run ./cmd/dotf converge --plan --only records-harness` prints `[ OK ] records-harness  instruction files current; skill, agent and doctrine records current`
+- [ ] Follow-up: once presence has a preview, the apply can skip the deploy when the plan is 0
 
 ## Closing
 

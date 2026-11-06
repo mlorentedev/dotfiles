@@ -166,6 +166,9 @@
     "vault_subpath": "00_meta/agents/definitions",
     "record_dir": "harness/agents",
     "schema": "harness/agent-frontmatter.schema.json",
+    "exclude": {
+      "hermes-kubelab": "Not shipped as a harness agent until kubelab#1933 decides where the hermes-nan successor runs and whether these harnesses invoke it (#3098)."
+    },
     "deploy": [
       {
         "agent": "claude",

@@ -1,7 +1,7 @@
 ---
 id: "AI-028-hive-install-model-migration"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-08-07"
 issue: "dotfiles#791"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -73,7 +73,7 @@ The install model stops being "a uv tool that dotfiles upgrades in place" and be
 - [x] **AC8** — *Added 2026-10-03 (#1993).* On Linux and macOS, `dotf tools install` installs `hive-vault` at the version pinned in `packages.json`. It upgrades a lower version and never downgrades a higher one. On Windows the tool is reported as unsupported, never installed and never failed.
 - ~~**AC7** — On the maintainer's currently-broken Windows box, all four before-state symptoms flip (see `verification.md`), and Claude Code's `hive` MCP entry resolves to a working binary.~~
   *Withdrawn 2026-10-21:* that box no longer holds the before-state (by 2026-08-27 it answered `hive --version` 3.0.0, #1311), so B1–B9 cannot flip. The guest baseline V1–V5 in `verification.md` is the reproducible before-state that AC2 and AC4 flip.
-- [ ] **AC9** — *Added 2026-10-21 (#2857).* No timer, task or hook in this repo upgrades hive unattended. A machine that had `hive-upgrade.timer` or `DotfilesHiveUpgrade` has neither after one converge, and a second converge changes nothing.
+- [x] **AC9** — *Added 2026-10-21 (#2857).* No timer, task or hook in this repo upgrades hive unattended. A machine that had `hive-upgrade.timer` or `DotfilesHiveUpgrade` has neither after one converge, and a second converge changes nothing.
 
 ## References
 

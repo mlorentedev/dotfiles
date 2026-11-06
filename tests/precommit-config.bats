@@ -17,7 +17,7 @@ setup() {
 }
 
 @test ".pre-commit-config.yaml declares check-bats-names at pre-commit stage [#925]" {
-    # scripts/test.sh (the dotfiles-test hook) never ran bats or this script —
+    # the retired dotfiles-test hook (scripts/test.sh, #1327) never ran bats or this script —
     # a non-ASCII @test name shipped past local pre-commit and was only
     # caught by a full adversarial-review round. This hook is the guard.
     grep -q 'check-bats-names' "$DOTFILES_DIR/.pre-commit-config.yaml"

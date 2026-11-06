@@ -11,9 +11,8 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
 
-// newHarnessInstructionsCmd deploys the agents' instruction files: the Go form
-// of compile-harness.sh's deploy_instructions, which delegates here when the
-// installed dotf carries this subcommand (PLAT-001b PR 2c).
+// newHarnessInstructionsCmd deploys the agents' instruction files. It replaced
+// compile-harness.sh's deploy_instructions (PLAT-001b PR 2c, CLI-026).
 func newHarnessInstructionsCmd() *cobra.Command {
 	var (
 		repoRoot, home string

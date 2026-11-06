@@ -24,9 +24,8 @@ type InstructionOutcome struct {
 // that already holds exactly that is left alone, so a converged machine is not
 // rewritten. A target whose requires_command is not on PATH is skipped; a
 // symlink at the destination is replaced by a copy (BUG-100). A missing source
-// is an error, reported after every other target has been deployed. This is
-// the Go form of compile-harness.sh's deploy_instructions, which delegates to
-// it when the installed dotf carries it.
+// is an error, reported after every other target has been deployed. It
+// replaced compile-harness.sh's deploy_instructions (CLI-026).
 func DeployInstructions(repoRoot, home string, has func(string) bool, dryRun bool) ([]InstructionOutcome, error) {
 	_, targets, err := LoadPresence(filepath.Join(repoRoot, filepath.FromSlash(ManifestFile)))
 	if err != nil {

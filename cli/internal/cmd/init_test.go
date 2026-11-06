@@ -120,3 +120,62 @@ func TestInitAgentsDryRunCmd(t *testing.T) {
 		t.Errorf("dry-run wrote AGENTS.md to %s", dir)
 	}
 }
+
+// TestInitLane_DryRun asserts `dotf init lane --dry-run` reports intent and writes nothing, and a real run writes the contract.
+func TestInitLane_DryRun(t *testing.T) {
+	dir := t.TempDir()
+	stdout, stderr, err := execute(t, "init", "lane", "--repo", dir, "--dry-run")
+	if err != nil {
+		t.Fatalf("`dotf init lane --dry-run` errored: %v\n%s", err, stdout+stderr)
+	}
+	if !strings.Contains(stdout+stderr, "[DRY-RUN]") {
+		t.Errorf("expected [DRY-RUN] in output, got:\n%s", stdout+stderr)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("dry-run wrote %d entries to %s", len(entries), dir)
+	}
+
+	stdout, stderr, err = execute(t, "init", "lane", "--repo", dir)
+	if err != nil {
+		t.Fatalf("`dotf init lane` errored: %v\n%s", err, stdout+stderr)
+	}
+	for _, f := range []string{".dotf/lane.json", ".dotf/lane-prompt.md", "AGENTS.md"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			t.Errorf("expected %s after `dotf init lane`: %v", f, err)
+		}
+	}
+}
+
+// TestInit_SkipFlagsReachTheLaneStep drives the real command so the flag-to-option
+// wiring is covered, not only InitOptions: a mis-mapped --skip-lane or
+// --skip-agents must change what lands on disk.
+func TestInit_SkipFlagsReachTheLaneStep(t *testing.T) {
+	cases := []struct {
+		name       string
+		flag       string
+		wantLane   bool
+		wantAgents bool
+	}{
+		{"no skip flag scaffolds both", "", true, true},
+		{"--skip-lane keeps AGENTS.md", "--skip-lane", false, true},
+		{"--skip-agents also skips the lane step", "--skip-agents", false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			args := []string{"init", dir, "--skip-github", "--skip-vault"}
+			if tc.flag != "" {
+				args = append(args, tc.flag)
+			}
+			if stdout, stderr, err := execute(t, args...); err != nil {
+				t.Fatalf("`dotf %s` errored: %v\n%s", strings.Join(args, " "), err, stdout+stderr)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".dotf", "lane.json")); (err == nil) != tc.wantLane {
+				t.Errorf(".dotf/lane.json present=%v, want %v", err == nil, tc.wantLane)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); (err == nil) != tc.wantAgents {
+				t.Errorf("AGENTS.md present=%v, want %v", err == nil, tc.wantAgents)
+			}
+		})
+	}
+}

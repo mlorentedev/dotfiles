@@ -125,8 +125,16 @@ type MockAddRunner struct {
 	OnExistingBranch func(repo, branch string) (remote string, exists bool)
 	OnWorktreeAttach func(repo, target, branch, remote string) error
 	OnWorktreeList   func(repo string) (string, error)
+	OnDirt           func(path string) (Dirt, error)
 	DefaultBaseRan   bool
 	WorktreeListRan  bool
+}
+
+func (m *MockAddRunner) Dirt(path string) (Dirt, error) {
+	if m.OnDirt != nil {
+		return m.OnDirt(path)
+	}
+	return Dirt{}, nil
 }
 
 func (m *MockAddRunner) WorktreeListPorcelain(repo string) (string, error) {

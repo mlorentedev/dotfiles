@@ -102,7 +102,7 @@ if [ "$#" -eq 0 ]; then
     # Auto-discover instruction files when invoked without arguments (BUG-088, #1021).
     # Governed files: all active agent instructions and READMEs.
     # Exclusions for stated reasons:
-    #   harness/ — rendered from the vault; compile-harness.sh --check covers it,
+    #   harness/ — rendered from the vault; `dotf harness check` covers it,
     #              but ONLY for enforced-region drift and clean rendering. It does
     #              not resolve paths named in skill prose, and #1486's session found
     #              harness/skills/crystallize/SKILL.md telling agents to run

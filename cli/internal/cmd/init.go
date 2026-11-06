@@ -27,6 +27,7 @@ func newInitCmd() *cobra.Command {
 		skipVault  bool
 		skipGithub bool
 		skipAgents bool
+		skipLane   bool
 		dryRun     bool
 	)
 
@@ -80,6 +81,7 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 				Date:              now().Format("2006-01-02"),
 				DryRun:            dryRun,
 				SkipAgents:        skipAgents,
+				SkipLane:          skipLane,
 				SkipGithub:        skipGithub,
 				VaultPath:         vaultPath,
 				ClaudeProjectsDir: claudeDir,
@@ -100,14 +102,16 @@ Use the subcommands to run one piece on an existing repo: 'dotf init agents'
 		},
 	}
 
-	cmd.Flags().StringVar(&stack, "stack", "none", "project stack to initialize: go|python|node|none")
+	cmd.Flags().StringVar(&stack, "stack", "none", "project stack to initialize: go|python|node|ts|workflows|none")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without modifying disk")
 	cmd.Flags().BoolVar(&skipVault, "skip-vault", false, "skip the vault project entry")
 	cmd.Flags().BoolVar(&skipGithub, "skip-github", false, "skip applying GitHub repo defaults")
-	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "skip writing AGENTS.md + the SDD section")
+	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "skip writing AGENTS.md + the SDD section (also skips the lane contract, which extends it)")
+	cmd.Flags().BoolVar(&skipLane, "skip-lane", false, "skip scaffolding the lane contract (.dotf/lane.json, prompt, AGENTS.md ## Lanes)")
 
 	cmd.AddCommand(newInitAgentsCmd())
 	cmd.AddCommand(newInitGithubCmd())
+	cmd.AddCommand(newInitLaneCmd())
 	return cmd
 }
 
@@ -136,17 +140,9 @@ the current git repo.`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			root := repo
-			if root == "" {
-				cwd, err := os.Getwd()
-				if err != nil {
-					return err
-				}
-				if root, err = spec.RepoRoot(cwd); err != nil {
-					return err
-				}
-			} else if info, err := os.Stat(root); err != nil || !info.IsDir() {
-				return fmt.Errorf("--repo is not a directory: %s", root)
+			root, err := resolveInitRepo(repo)
+			if err != nil {
+				return err
 			}
 
 			res, err := initrepo.BootstrapAgentsOpts(root, force, dryRun)
@@ -199,11 +195,14 @@ func newInitGithubCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "github",
-		Short: "Apply GitHub repo defaults (delete_branch_on_merge, Dependabot labels)",
+		Short: "Apply GitHub repo defaults (delete_branch_on_merge, squash merge message, Dependabot labels)",
 		Long: `github applies opinionated GitHub repo-level defaults via the gh CLI:
 
   - delete_branch_on_merge=true, which auto-deletes a PR's head branch on merge
     (the orphan-branch hygiene fix);
+  - squash merges take the PR title and no body (squash_merge_commit_title=PR_TITLE,
+    squash_merge_commit_message=BLANK), so no commit carries the branch's Refs lines
+    into a changelog that renders them as closes;
   - every label the repo's own .github/dependabot.yml declares exists. Dependabot
     never creates a custom label and drops a missing one from its PRs.
 
@@ -252,6 +251,12 @@ unreadable repo is a [WARN] skip with exit 0, never fatal.`,
 				cmd.Printf("[OK] enabled delete_branch_on_merge on %s\n", res.Repo)
 			}
 
+			squash, err := initrepo.ApplySquashMergeDefaults(target, dryRun)
+			if err != nil {
+				return err
+			}
+			reportSquashMergeDefaults(cmd, squash)
+
 			labels, err := initrepo.ApplyDependabotLabels(target, dryRun)
 			if err != nil {
 				return err
@@ -271,4 +276,16 @@ unreadable repo is a [WARN] skip with exit 0, never fatal.`,
 	cmd.Flags().StringVar(&repo, "repo", "", "target repo owner/name (default: derived from origin)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would change without applying")
 	return cmd
+}
+
+// reportSquashMergeDefaults prints the outcome of ApplySquashMergeDefaults.
+func reportSquashMergeDefaults(cmd *cobra.Command, res initrepo.GitHubResult) {
+	switch res.Action {
+	case "skipped":
+		cmd.PrintErrf("[WARN] %s — skipping squash merge defaults for %s\n", res.Reason, res.Repo)
+	case "dry-run":
+		cmd.Printf("[DRY-RUN] would set squash merges to the PR title with no body on %s\n", res.Repo)
+	default:
+		cmd.Printf("[OK] squash merge defaults %s on %s\n", res.Action, res.Repo)
+	}
 }

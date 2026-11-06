@@ -584,6 +584,8 @@ failure someone reads rather than files a later "git add -A" commits.`,
 				if res.LastCall != "" {
 					_, _ = fmt.Fprintf(errw, "[review] last tool call recorded: %s\n", res.LastCall)
 				}
+				// A slow command that prints nothing reads as a wedge (#2979).
+				_, _ = fmt.Fprintf(errw, "[review] if that call was slow rather than wedged, rerun with a longer --stall-timeout\n")
 			}
 			if res.Stop != spec.StopNone && review != "" {
 				_, _ = fmt.Fprintf(errw, "[review] %s\n", spec.StoppedRunRecord(review))

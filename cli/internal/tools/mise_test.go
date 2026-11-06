@@ -138,6 +138,23 @@ func TestRenderMiseConfig_TurnsOffMiseOwnUpdateNotice(t *testing.T) {
 	}
 }
 
+// mise's default 30m budget for one download failed a from-zero converge on
+// argocd, the largest pinned asset, over a slow link (#3181).
+func TestRenderMiseConfig_SizesTheDownloadBudgetToTheLargestAsset(t *testing.T) {
+	for _, py := range []string{"", "/cfg/py.txt"} {
+		out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, py))
+		var settings struct {
+			Settings map[string]any `toml:"settings"`
+		}
+		if err := toml.Unmarshal([]byte(out), &settings); err != nil {
+			t.Fatalf("rendered config does not parse: %v\n%s", err, out)
+		}
+		if got := settings.Settings["http_download_timeout"]; got != "2h" {
+			t.Errorf("http_download_timeout = %v, want \"2h\":\n%s", got, out)
+		}
+	}
+}
+
 // A tool mise keeps current must not also update itself: Claude Code's own
 // updater would replace the binary mise installed, outside the pin's floor and
 // outside converge's report (#2013 D9). The env lives in the config mise owns,

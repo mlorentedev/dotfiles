@@ -265,7 +265,7 @@ else
     log_warning "dotf not found (PATH or ~/.local/bin) -- harness records not refreshed from the vault; deploying the committed ones"
 fi
 
-# Mirror the harness inputs into the deploy dir so `compile-harness.sh --check`
+# Mirror the harness inputs into the deploy dir so `dotf harness check`
 # (healthcheck section 12) and `dotf doctor` read a complete snapshot from
 # ~/.dotfiles: harness/ plus every file harness/manifest.json declares as an
 # injection target. `dotf harness mirror` is the one implementation for both

@@ -15,10 +15,11 @@ import (
 // for --skip-vault or an absent vault).
 type InitOptions struct {
 	Root              string
-	Stack             string // go | python | node | ts | none
+	Stack             string // go | python | node | ts | workflows | none
 	Date              string // YYYY-MM-DD
 	DryRun            bool   // report what would change without modifying disk
 	SkipAgents        bool
+	SkipLane          bool // skip the lane contract (.dotf/lane.json, prompt, AGENTS.md ## Lanes)
 	SkipGithub        bool
 	VaultPath         string // resolved vault root, or "" to skip
 	ClaudeProjectsDir string // ~/.claude/projects, for the memory symlink
@@ -50,7 +51,7 @@ func Init(opts InitOptions) (InitReport, error) {
 	report := InitReport{Root: opts.Root}
 
 	// 1. Structure + static files (core — fatal).
-	sc, err := ScaffoldOpts(opts.Root, opts.DryRun)
+	sc, err := ScaffoldOpts(opts.Root, opts.Stack, opts.DryRun)
 	if err != nil {
 		return report, fmt.Errorf("scaffold structure: %w", err)
 	}
@@ -65,6 +66,15 @@ func Init(opts InitOptions) (InitReport, error) {
 			return report, fmt.Errorf("bootstrap AGENTS.md: %w", err)
 		}
 		report.add("agents", "ok", "AGENTS.md "+res.Action)
+	}
+
+	// 2b. The lane contract (ADR-050 §6) — after AGENTS.md, which it extends.
+	if opts.SkipLane || opts.SkipAgents {
+		report.add("lane", "skipped", "--skip-lane or --skip-agents")
+	} else if res, err := BootstrapLane(opts.Root, false, opts.DryRun); err != nil {
+		report.add("lane", "warn", err.Error())
+	} else {
+		report.add("lane", okOrSkip(res == LaneResult{Config: "unchanged", Prompt: "unchanged", Agents: "unchanged"}), res.String())
 	}
 
 	// 3. CI by stack.
@@ -176,6 +186,11 @@ func initGithubWithDryRun(root string, dryRun bool) (status, detail string) {
 		return "skipped", res.Reason
 	}
 	detail = "delete_branch_on_merge " + res.Action + " on " + repo
+	squash, err := ApplySquashMergeDefaults(repo, dryRun)
+	if err != nil {
+		return "warn", detail + "; " + err.Error()
+	}
+	detail += "; squash merge defaults " + squash.Action
 	labels, err := ApplyDependabotLabels(repo, dryRun)
 	if err != nil {
 		return "warn", detail + "; " + err.Error()

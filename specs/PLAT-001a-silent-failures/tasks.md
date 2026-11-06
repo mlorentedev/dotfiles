@@ -101,9 +101,12 @@ Tracked in #2013 track W. Each PR adds its block here when it starts.
 - [x] Review triage: uncommitted work in the refreshed paths stops the refresh. It would have been
   overwritten, and then announced as the vault's change with a commit line that folds it in.
   The ordering guard anchors on the mirror invocation, not on the comment that names it
-- [ ] The installed release lacks the command until the next `DOTF_VERSION` pin. Until then setup
+- [x] The installed release lacks the command until the next `DOTF_VERSION` pin. Until then setup
   warns that the refresh failed and deploys the committed records, the safe side of #2162.
-  #1814 owns this class (setup calling what the pinned `dotf` does not have)
+  #1814 owns this class (setup calling what the pinned `dotf` does not have).
+  Closed by the pin: `versions.conf` holds `DOTF_VERSION=0.79.0`, and the installed `dotf version 0.79.0`
+  answers `dotf harness refresh --help` with exit 0 and lists the `--repo` flag `setup-linux.sh`
+  passes (measured on macOS, 2026-11-03)
 
 ## `dotf vault health` — every obsidian call was an error read as a result
 
