@@ -1,0 +1,32 @@
+version: 1
+run_id: "plat001c-20261106T0654Z"
+armed_by: manu
+armed_at: 2026-11-06T06:54:00Z
+expires_at: 2026-11-06T14:54:00Z
+objective: "Close what PLAT-001c's Windows rows can close without a release: land #3222 (user Path), build and land the per-arch winget reader (blocker 1), and re-measure AC4 on the Windows guest with a dev build carrying both; then work dotfiles bugs from the board."
+worktree: /Users/manu/Projects/worktrees/dotfiles/chore-autopilot-plat001c-20261106t0654z
+branch: chore/autopilot-plat001c-20261106t0654z
+scope:
+  write_paths: ["cli/**", "tests/**", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", "specs/PLAT-001c-tools-via-mise/**", "packages.json"]
+  vault_paths: ["10_projects/dotfiles/memory/MEMORY.md", "10_projects/dotfiles/memory/archive/superseded-handoffs-2026-11-05.md", "10_projects/dotfiles/memory/threads/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "scripts/**", "setup-*.sh", "setup-*.ps1", "versions.conf", "specs/**/review.md"]
+  max_files: 15
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, caffeinate]
+queue:
+  source: bitacora
+  filter: "first, in order: #3222 (land), the per-arch winget reader PR (blocker 1), an AC4 re-measure on the Windows guest with a dev build; the owner's item 8 (archive finished MEMORY.md threads, file two tickets: handoff-write auto-prune, PR polling over REST with a cache). Then dotfiles board items with type bug, priority P1 or P2, status Backlog, that need no new spec (WIP is over ADR-043's limit)."
+  max_items: 8
+  explicit_grants:
+    - "The per-arch winget reader PR changes the packages.json contract; the owner granted landing it under the standing grant (2026-11-06, before arming)."
+  held_for_owner:
+    - "The packages.json VCRedist entry, the setup-windows.ps1 env-persist deletion and the AC4 follow-up: each needs a release that carries the reader, and release-please is the owner's. Open as drafts at most."
+budget:
+  max_iterations: 10
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
