@@ -1,7 +1,7 @@
 {
-  "reviewed_sha": "df6959540ea1ff9b9cab679e0686361aae2824a0",
-  "reviewer": "agy/gemini-3.8-flash-high",
-  "requested_at": "2026-11-06T03:51:41Z",
+  "reviewed_sha": "c4d0e6c8b891159a2fb7267140d76a7fa9421689",
+  "reviewer": "nan/glm5.3-flash",
+  "requested_at": "2026-11-06T06:30:03Z",
   "review_digest_before": "",
   "base_sha": "adf49c93bb006b6322bb9bc6b20f1a44303e16e9",
   "contract_digests": {
