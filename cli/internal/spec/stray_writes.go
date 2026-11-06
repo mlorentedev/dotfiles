@@ -49,6 +49,23 @@ func SnapshotTree(review string) (TreeSnapshot, error) {
 	return snap, nil
 }
 
+// CallerDirt lists, sorted, the tracked changes and untracked files outside
+// specDir in the repository holding it (HARNESS-142 AC5). A reviewer reads a
+// fresh worktree at the reviewed commit, so these are what it will not see;
+// the spec folder's own content is carried into that worktree and is left out.
+func CallerDirt(specDir string) ([]string, error) {
+	snap, err := SnapshotTree(filepath.Join(specDir, "review.md"))
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(snap.entries))
+	for path := range snap.entries {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths, nil
+}
+
 // StrayWrites lists the paths whose state after differs from before, sorted.
 // A file that was already dirty and is changed again keeps its status and is
 // not seen: the snapshot compares states, not contents. A path only the before

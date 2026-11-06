@@ -81,6 +81,9 @@ var emptyTreeOf = spec.EmptyTree
 // requestIgnored is a seam over spec.RequestIgnored, for the same reason.
 var requestIgnored = spec.RequestIgnoredIn
 
+// callerDirt is a seam over spec.CallerDirt, for the same reason.
+var callerDirt = spec.CallerDirt
+
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
 //
@@ -134,6 +137,7 @@ func newSpecReviewCmd() *cobra.Command {
 		fallbackReason string
 		timeout        time.Duration
 		stallTimeout   time.Duration
+		allowDirty     bool
 	)
 
 	cmd := &cobra.Command{
@@ -159,6 +163,11 @@ launch. Without tmux (Windows, or a machine that lacks it) the run goes to the
 foreground and says so. A machine-readable transcript is written beside the
 review, because the verdict records what a reviewer concluded and the transcript
 is the only record of how.
+
+The reviewer reads the reviewed commit, not the working tree, so the launch is
+refused while the tree has tracked changes or untracked files outside
+specs/<feature-id>/, naming them. Commit them first, or pass --allow-dirty to
+launch without them; the spec folder's own uncommitted content does not refuse.
 
 A spec whose proposal.md declares ` + "`risk: high`" + ` also needs a second signature, from
 a pool member of another vendor that declares ` + "`signs: second`" + `: --second launches it,
@@ -196,6 +205,9 @@ commit and the tree. --initial is refused for any other spec.`,
 			skill := spec.ReviewerSkillPath(chosen.Runner)
 			scope, headSHA, err := reviewRange(repoRoot, specDir, id, initial)
 			if err != nil {
+				return err
+			}
+			if err := checkCallerDirt(cmd, specDir, id, allowDirty); err != nil {
 				return err
 			}
 
@@ -271,11 +283,36 @@ commit and the tree. --initial is refused for any other spec.`,
 		"review a spec first added in the repository's root commit from git's empty tree; refused for any other spec")
 	cmd.Flags().StringVar(&fallbackReason, "fallback-reason", "",
 		"launch a `signs: fallback` member as the first signer, naming how the first signers failed: "+strings.Join(spec.FallbackReasons, ", "))
+	cmd.Flags().BoolVar(&allowDirty, "allow-dirty", false,
+		"launch although the tree has changes outside specs/<feature-id>/, which the reviewer will not see")
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it and everything it started are stopped, on every runner; the reviewer is told to aim for two thirds of it")
 	cmd.Flags().DurationVar(&stallTimeout, "stall-timeout", spec.DefaultStallTimeout,
 		"stop the reviewer when its transcript has not changed for this long, instead of waiting for --timeout; 0 turns it off")
 	return cmd
+}
+
+// checkCallerDirt refuses a launch whose tree has tracked changes or untracked
+// files outside specs/<id>/ (HARNESS-142 AC5). The reviewer reads a fresh
+// worktree at the reviewed commit, so that work would be reviewed as if it did
+// not exist. --allow-dirty launches anyway and says what is left out. A tree
+// whose state cannot be read is refused too: it cannot be shown to be clean.
+func checkCallerDirt(cmd *cobra.Command, specDir, id string, allowDirty bool) error {
+	dirt, err := callerDirt(specDir)
+	if err != nil && !allowDirty {
+		return fmt.Errorf("cannot read the working tree's state, so it cannot be shown that the reviewer sees all the work: %w\n"+
+			"Fix the repository, or pass --allow-dirty to launch anyway", err)
+	}
+	if len(dirt) == 0 {
+		return nil
+	}
+	list := "  " + strings.Join(dirt, "\n  ")
+	if !allowDirty {
+		return fmt.Errorf("the tree has changes outside specs/%s/, and the reviewer, which runs in a fresh worktree at the reviewed commit, would not see them:\n%s\n"+
+			"Commit them, or pass --allow-dirty to launch without them", id, list)
+	}
+	cmd.PrintErrf("warning: the reviewer runs in a fresh worktree at the reviewed commit and will not see these changes outside specs/%s/:\n%s\n", id, list)
+	return nil
 }
 
 // specRepoRoot validates a spec id and returns the root of the repository
