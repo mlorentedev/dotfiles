@@ -35,6 +35,11 @@ func TestLoadPolicy(t *testing.T) {
 		{"unsupported version", `{"version":2,"governed_basenames":["AGENTS.md"]}`, "unsupported version"},
 		{"missing governed names", `{"version":1}`, "governed_basenames"},
 		{"escaping exclude", `{"version":1,"governed_basenames":["AGENTS.md"],"exclude_prefixes":["../docs/"]}`, "exclude_prefix"},
+		{"empty exclude", `{"version":1,"governed_basenames":["AGENTS.md"],"exclude_prefixes":[""]}`, "exclude_prefix"},
+		{"governed path instead of basename", `{"version":1,"governed_basenames":["ai/AGENTS.md"]}`, "governed_basename"},
+		{"invalid known extension", `{"version":1,"governed_basenames":["AGENTS.md"],"known_extensions":["md"]}`, "known_extension"},
+		{"escaping required member", `{"version":1,"governed_basenames":["AGENTS.md"],"required_members":["../AGENTS.md"]}`, "required_member"},
+		{"invalid source extension", `{"version":1,"governed_basenames":["AGENTS.md"],"source_extensions":["sh"]}`, "source_extension"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -60,11 +60,47 @@ func validatePolicy(policy Policy) error {
 	if len(policy.GovernedBasenames) == 0 {
 		return fmt.Errorf("governed_basenames must not be empty")
 	}
+	for _, name := range policy.GovernedBasenames {
+		if name == "" || filepath.Base(name) != name {
+			return fmt.Errorf("governed_basename %q must be one file name", name)
+		}
+	}
 	for _, prefix := range policy.ExcludePrefixes {
-		clean := filepath.ToSlash(filepath.Clean(prefix))
-		if filepath.IsAbs(prefix) || clean == ".." || strings.HasPrefix(clean, "../") {
+		if !repoRelative(prefix) {
 			return fmt.Errorf("exclude_prefix %q must stay inside the repository", prefix)
 		}
 	}
+	if err := validateExtensions("known_extension", policy.KnownExtensions); err != nil {
+		return err
+	}
+	if err := validateExtensions("source_extension", policy.SourceExtensions); err != nil {
+		return err
+	}
+	for _, member := range policy.RequiredMembers {
+		if !repoRelative(member) {
+			return fmt.Errorf("required_member %q must stay inside the repository", member)
+		}
+	}
 	return nil
+}
+
+func validateExtensions(label string, extensions []string) error {
+	for _, ext := range extensions {
+		if len(ext) < 2 || ext[0] != '.' || strings.ContainsAny(ext, `/\`) {
+			return fmt.Errorf("%s %q must start with a dot and contain no path separator", label, ext)
+		}
+	}
+	return nil
+}
+
+func repoRelative(value string) bool {
+	if value == "" {
+		return false
+	}
+	slash := filepath.ToSlash(filepath.Clean(value))
+	if filepath.IsAbs(value) || strings.HasPrefix(slash, "/") ||
+		(len(slash) >= 2 && slash[1] == ':') {
+		return false
+	}
+	return slash != ".." && !strings.HasPrefix(slash, "../")
 }
