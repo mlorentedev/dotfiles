@@ -155,5 +155,6 @@ the next release without blocking unrelated tools.
 - ADR-012, ADR-020, ADR-025, ADR-036, ADR-041, ADR-044, ADR-045
 - `pattern-setup-script-idempotence`
 - `pattern-contract-defaults-per-machine-override`
-- `10_projects/dotfiles/prestudy/tool034-reference-audit-matrix.md`
+- Repository precedents: `cli/internal/tools/install.go`, `cli/internal/env/roles.go`
+  and `git/dotfiles.gitconfig`
 - ts-bridge#444

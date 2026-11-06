@@ -87,6 +87,27 @@ func TestTsBridgeClientRefusesToOverwriteForeignDropIn(t *testing.T) {
 	}
 }
 
+func TestTsBridgeClientWithoutRoleRefusesForeignIncludedDropIn(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	home := t.TempDir()
+	path := tsBridgeGitConfig(home)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const foreign = "[http]\n\tproxy = http://foreign\n"
+	if err := os.WriteFile(path, []byte(foreign), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := (tsBridgeClient{}).Reconcile(Env{Home: home}, false)
+	if err == nil || !strings.Contains(err.Error(), "Git includes this path regardless of role state") {
+		t.Fatalf("role-absent foreign drop-in error = %v", err)
+	}
+	if raw, _ := os.ReadFile(path); string(raw) != foreign {
+		t.Fatal("foreign drop-in was changed")
+	}
+}
+
 func TestDotfilesGitConfigIncludesOptionalTsBridgeDropIn(t *testing.T) {
 	repo := filepath.Join("..", "..", "..")
 	raw, err := os.ReadFile(filepath.Join(repo, "git", "dotfiles.gitconfig"))

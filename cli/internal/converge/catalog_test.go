@@ -437,6 +437,7 @@ func TestRun_ACaskThatNeedsSudoDoesNotStopTheStepsAfterTools(t *testing.T) {
 // so its uv came from legacy-setup, the last step, and `tools` never
 // converged in one run (#2754).
 func TestShippedCatalog_EveryOSProvidesTheUVItsUVToolsNeed(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	repo := filepath.Join("..", "..", "..")
 	entries, err := loadCatalog(Env{RepoRoot: repo})
 	if err != nil {

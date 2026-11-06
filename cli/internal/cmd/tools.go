@@ -44,8 +44,8 @@ func newToolsInstallCmd() *cobra.Command {
 		Long: "install downloads each catalog tool's pinned release binary, verifies its\n" +
 			"sha256 against the release checksums, and places it in ~/.local/bin. It is\n" +
 			"idempotent: a tool already at or above its pin is skipped, a below-pin one is\n" +
-			"upgraded (never downgraded). With no [name] it installs every catalog tool;\n" +
-			"with a name it installs just that one.\n\n" +
+			"upgraded (never downgraded). With no [name] it installs common tools and\n" +
+			"tools for this machine's roles; with a name it installs just that one.\n\n" +
 			"--dry-run prints the action install would take for each tool and changes\n" +
 			"nothing. It exits non-zero when install would refuse a tool (a release\n" +
 			"with no checksums file, a package source naming no package), as install\n" +
@@ -88,7 +88,7 @@ func newToolsInstallCmd() *cobra.Command {
 // share, so a tool installed by hand runs on the same Python as one converge
 // installed.
 func toolsInstaller(dest string, out io.Writer) *tools.Installer {
-	return &tools.Installer{Dest: dest, Out: out, Python: func() string {
+	return &tools.Installer{Dest: dest, Out: out, RegisteredPath: env.RegisteredPath, Python: func() string {
 		return pinnedPython(env.ResolveVersionsPath(), out)
 	}}
 }
@@ -251,7 +251,7 @@ func listAsset(t tools.Tool, goos, goarch string) string {
 	case t.Source.Type == "uv-tool":
 		return "uv:" + t.Source.Package
 	case t.Source.Type == "system":
-		manager, pkg := t.Source.SystemPackage(goos)
+		manager, pkg := t.Source.SystemPackage(goos, goarch)
 		return manager + ":" + pkg
 	}
 	if asset := t.AssetName(goos, goarch); asset != "" {

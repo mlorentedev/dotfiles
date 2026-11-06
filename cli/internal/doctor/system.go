@@ -89,6 +89,9 @@ type System struct {
 	// checks (skip POSIX-only tools / tmux / shell-rc symlinks on Windows) are
 	// table-testable; the zero value "" behaves like a POSIX host.
 	GOOS string
+	// GOARCH is the target arch (runtime.GOARCH in production), for a catalog
+	// entry that names a package per arch (winget_arch).
+	GOARCH string
 	// AgeRoundTrip proves the age key at keyPath actually decrypts: it derives
 	// the recipient, encrypts a sentinel, and decrypts it back, returning a
 	// non-nil error if any step fails or the bytes don't match. The real impl
@@ -151,6 +154,9 @@ type System struct {
 	// HKCU\Environment), the scope a profile-less process inherits; nil where
 	// the OS has no such scope, which skips checkPersistedEnv (CLI-058, #1324).
 	UserEnv func(name string) (string, bool, error)
+	// UserPath reads the user scope's stored Path (Windows: HKCU\Environment),
+	// unexpanded; nil where the OS keeps no such value.
+	UserPath func() (string, error)
 
 	// SSHTargetPaths and MeshAddrs point checkWorkstationTarget at a test tree
 	// and a test address list; nil means /etc/ssh and the real interfaces.
@@ -286,7 +292,8 @@ func realSystem() *System {
 		},
 		HTTPGetBody:     httpGetBody,
 		Now:             time.Now,
-		GOOS:            runtime.GOOS, //nolint:forbidigo // the production wiring of the seam
+		GOOS:            runtime.GOOS,   //nolint:forbidigo // the production wiring of the seam
+		GOARCH:          runtime.GOARCH, //nolint:forbidigo // the production wiring of the seam
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
 		BWServeStatus: func() (string, error) {
@@ -294,6 +301,7 @@ func realSystem() *System {
 		},
 		BWServeReadable: secrets.BWServeClient{}.Readable,
 		UserEnv:         userEnvReader(),
+		UserPath:        userPathReader(),
 		Scheduler: func(goos, home string) (schedule.Backend, error) {
 			return update.NativeBackend(goos, home, os.Getenv, os.Getuid(), schedule.Elevated)
 		},
@@ -427,6 +435,16 @@ func userEnvReader() func(name string) (string, bool, error) {
 		return nil
 	}
 	return store.Get
+}
+
+// userPathReader adapts env.NewUserPathStore to the seam: nil where the OS
+// keeps no user Path value.
+func userPathReader() func() (string, error) {
+	store, err := env.NewUserPathStore()
+	if err != nil {
+		return nil
+	}
+	return store.ReadPath
 }
 
 // httpGetBody is the production HTTPGetBody. 15s covers /v1/usage, which

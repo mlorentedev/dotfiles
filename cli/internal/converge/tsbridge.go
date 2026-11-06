@@ -80,7 +80,10 @@ func inspectTsBridgeClient(home string) (tsBridgeView, error) {
 		return tsBridgeView{}, readErr
 	}
 	if !missing && !bytes.HasPrefix(raw, []byte(tsBridgeManagedHeader)) {
-		return tsBridgeView{}, fmt.Errorf("%s exists but is not managed by dotf; left unchanged", path)
+		return tsBridgeView{}, fmt.Errorf(
+			"%s exists but is not managed by dotf; refusing to reconcile because Git includes this path regardless of role state",
+			path,
+		)
 	}
 	return tsBridgeView{
 		enabled: enabled,

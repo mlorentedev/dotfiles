@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -620,7 +621,7 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 			if out, err := s.Run("mise", "install", "node"); err != nil {
 				return p, fmt.Errorf("mise install node (required by bats): %w\n%s", err, strings.TrimSpace(string(out)))
 			}
-			if out, err := s.Run("mise", "install", "--force", "npm:bats"); err != nil {
+			if out, err := s.Run("mise", batsInstallArgs...); err != nil {
 				return p, fmt.Errorf("mise install npm:bats: %w\n%s", err, strings.TrimSpace(string(out)))
 			}
 		}
@@ -670,7 +671,8 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 		return p, fmt.Errorf("after mise prune, still installed: %s", strings.Join(after.Orphans, ", "))
 	}
 	if len(after.Missing) > 0 {
-		return p, fmt.Errorf("after mise install, not running at their pin: %s", strings.Join(after.Missing, ", "))
+		return p, fmt.Errorf("after mise install, not running at their pin: %s%s",
+			strings.Join(after.Missing, ", "), batsRuntimeNote(runtime.GOOS, after.Missing, gitExecPath))
 	}
 	if older := regressed(p.current, after.current, after.Outdated); len(older) > 0 {
 		return p, fmt.Errorf("after mise upgrade, older than before: %s", strings.Join(older, ", "))
@@ -836,6 +838,17 @@ func writeFileAtomic(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
+// GitBash returns Git for Windows' bash.exe under the install root that the
+// output of `git --exec-path` names (<root>\mingw64\libexec\git-core), and
+// whether it is there. dotf runs this bash, not whatever `bash` the PATH holds:
+// Git's installer adds only Git\cmd, and a bare `bash` may be WSL's (#3214).
+func GitBash(execPath string) (string, bool) {
+	root := filepath.Dir(filepath.Dir(filepath.Dir(strings.TrimSpace(execPath))))
+	bash := filepath.Join(root, "bin", "bash.exe")
+	info, err := os.Stat(bash)
+	return bash, err == nil && !info.IsDir()
+}
+
 // HomeRunners returns the runners a machine-level sync uses, both run from
 // home so a project mise.toml in the caller's directory is not installed as a
 // side effect: run merges stdout and stderr (`mise install`), stdout returns
@@ -844,23 +857,19 @@ func writeFileAtomic(path string, data []byte) error {
 func HomeRunners(home string) (run, stdout Runner) {
 	bashBin := ""
 	if runtime.GOOS == "windows" {
-		out, err := exec.Command("git", "--exec-path").Output()
-		if err == nil {
-			gitRoot := filepath.Dir(filepath.Dir(filepath.Dir(strings.TrimSpace(string(out)))))
-			candidate := filepath.Join(gitRoot, "bin", "bash.exe")
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-				bashBin = filepath.Dir(candidate)
-			}
+		if bash, reason := findGitBash(gitExecPath); reason == "" {
+			bashBin = filepath.Dir(bash)
 		}
 	}
 	command := func(name string, args ...string) *exec.Cmd {
 		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
 		c.Dir = home
 		installerEnv := miseInstallEnv(name, args...)
-		if bashBin != "" || installerEnv != "" {
+		withBash := bashBin != "" && gitBashScope(name, args...)
+		if withBash || installerEnv != "" {
 			c.Env = os.Environ()
 		}
-		if bashBin != "" {
+		if withBash {
 			c.Env = append(c.Env, "PATH="+bashBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 		}
 		if installerEnv != "" {
@@ -873,9 +882,58 @@ func HomeRunners(home string) (run, stdout Runner) {
 	return run, stdout
 }
 
+// gitExecPath asks git where its helpers live; Git Bash is found from it.
+var gitExecPath = func() ([]byte, error) { return exec.Command("git", "--exec-path").Output() }
+
+// findGitBash locates Git for Windows' bash from `git --exec-path`. reason is
+// empty when bash was found, and otherwise says why not, in words an operator
+// can act on.
+func findGitBash(execPath func() ([]byte, error)) (bash, reason string) {
+	out, err := execPath()
+	if err != nil {
+		return "", fmt.Sprintf("Git Bash not found: `git --exec-path` failed (%v); install Git for Windows", err)
+	}
+	bash, ok := GitBash(string(out))
+	if !ok {
+		return bash, "Git Bash not found under " + filepath.Dir(filepath.Dir(bash)) + "; reinstall Git for Windows"
+	}
+	return bash, ""
+}
+
+// batsRuntimeNote names a missing Git Bash when bats is what failed its pin on
+// Windows: bats runs under Git Bash there, so without it the only symptom was
+// "not running at their pin: bats" (#2346).
+func batsRuntimeNote(goos string, missing []string, execPath func() ([]byte, error)) string {
+	if goos != "windows" || !contains(missing, "bats") {
+		return ""
+	}
+	if _, reason := findGitBash(execPath); reason != "" {
+		return "; bats runs under Git Bash, and " + reason
+	}
+	return ""
+}
+
+// gitBashScope reports whether a sync child needs Git Bash on its PATH: the
+// bats launcher, and the npm:bats install, which is not shown to run without
+// it. Every other child (mise itself, every other tool's probe) keeps the
+// caller's PATH, so Git's bin cannot shadow what they resolve (#2346). name
+// may be a full Windows path, so both separators end its base.
+func gitBashScope(name string, args ...string) bool {
+	base := name[strings.LastIndexAny(name, `/\`)+1:]
+	return strings.EqualFold(base, "bats.cmd") || isBatsInstall(name, args...)
+}
+
+// batsInstallArgs is the one Windows bats install Apply runs. The runner keys
+// Git Bash and the npm installer on these exact arguments, so the call site and
+// the match share them rather than each spelling them out.
+var batsInstallArgs = []string{"install", "--force", "npm:bats"}
+
+func isBatsInstall(name string, args ...string) bool {
+	return name == "mise" && slices.Equal(args, batsInstallArgs)
+}
+
 func miseInstallEnv(name string, args ...string) string {
-	if runtime.GOOS == "windows" && name == "mise" && len(args) == 3 &&
-		args[0] == "install" && args[1] == "--force" && args[2] == "npm:bats" {
+	if runtime.GOOS == "windows" && isBatsInstall(name, args...) {
 		return "MISE_NPM_PACKAGE_MANAGER=npm"
 	}
 	return ""

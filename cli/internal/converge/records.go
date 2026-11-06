@@ -62,6 +62,10 @@ type Options struct {
 	// env-persist step is skipped.
 	Launchctl env.LaunchctlRunner
 	UID       int
+	// UserEnv and UserPath are HKCU\Environment on Windows (env.NewUserEnvStore,
+	// env.NewUserPathStore); unset, env-persist skips there.
+	UserEnv  func() (env.UserEnvStore, error)
+	UserPath func() (env.UserPathStore, error)
 	// DotfPath is the dotf binary the bound hooks name;
 	// harness.ResolveDotfPath in production. Unset, the records-bind step
 	// is skipped with the reason rather than guess.
@@ -129,7 +133,7 @@ func Registry(o Options) []Reconciler {
 		tsBridgeClient{},
 		gitLFS{run: o.GitRun, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
-		envPersist{launchctl: o.Launchctl, uid: o.UID},
+		envPersist{launchctl: o.Launchctl, uid: o.UID, userEnv: o.UserEnv, userPath: o.UserPath, expand: env.ExpandUserPath, bins: o.ToolsBinDirs},
 		selfDeploy{scheduler: o.Scheduler},
 		hiveUpgradeRetire{scheduler: o.Scheduler},
 		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.PathsFor, user: sshtarget.CurrentUser},
