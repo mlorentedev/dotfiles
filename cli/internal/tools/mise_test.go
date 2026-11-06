@@ -794,7 +794,30 @@ func TestSync_FailsWhenThePackageStillDoesNotImport(t *testing.T) {
 	}
 }
 
-func TestHomeRunners_WindowsFindsGitBashForBatsWithoutShellPathWiring(t *testing.T) {
+// Only bats needs Git Bash, so only bats gets it: a sync that prepended Git's
+// bin to every child changed what mise and every other probe resolved (#2346).
+func TestGitBashScope_OnlyTheBatsInstallAndProbe(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"mise", []string{"install", "--force", "npm:bats"}, true},
+		{`C:\Users\m\AppData\Local\mise\installs\npm-bats\1.13.0\bats.cmd`, []string{"--version"}, true},
+		{"BATS.CMD", []string{"--version"}, true},
+		{"mise", []string{"install"}, false},
+		{"mise", []string{"install", "node"}, false},
+		{"mise", []string{"which", "bats.cmd"}, false},
+		{"mise", []string{"install", "--force", "npm:prettier"}, false},
+		{`C:\tools\jq.exe`, []string{"--version"}, false},
+	} {
+		if got := gitBashScope(tc.name, tc.args...); got != tc.want {
+			t.Errorf("gitBashScope(%q, %q) = %v, want %v", tc.name, tc.args, got, tc.want)
+		}
+	}
+}
+
+func TestHomeRunners_WindowsGivesGitBashToBatsAlone(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Git Bash is the Windows bats runtime")
 	}
@@ -813,23 +836,30 @@ func TestHomeRunners_WindowsFindsGitBashForBatsWithoutShellPathWiring(t *testing
 	if err := os.WriteFile(bash, []byte("test fixture"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// A stand-in for mise's bats.cmd: it reports the first bash it can see.
+	batsCmd := filepath.Join(t.TempDir(), "bats.cmd")
+	if err := os.WriteFile(batsCmd, []byte("@where bash\r\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("PATH", filepath.Dir(gitCmd)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	run, _ := HomeRunners(t.TempDir())
-	out, err := run("where", "bash")
-	if err != nil {
-		t.Fatal(err)
+	firstBash := func(name string) string {
+		out, _ := run(name, "bash")
+		return strings.Split(strings.TrimSpace(string(out)), "\r\n")[0]
 	}
-	got := strings.Split(strings.TrimSpace(string(out)), "\r\n")[0]
-	found, err := os.Stat(got)
-	if err != nil {
-		t.Fatal(err)
+	isFixture := func(p string) bool {
+		found, err := os.Stat(p)
+		if err != nil {
+			return false
+		}
+		want, err := os.Stat(bash)
+		return err == nil && os.SameFile(found, want)
 	}
-	want, err := os.Stat(bash)
-	if err != nil {
-		t.Fatal(err)
+	if got := firstBash(batsCmd); !isFixture(got) {
+		t.Errorf("first bash bats sees = %q, want %q", got, bash)
 	}
-	if !os.SameFile(found, want) {
-		t.Errorf("first bash on the sync runner's PATH = %q, want %q", got, bash)
+	if got := firstBash("where"); isFixture(got) {
+		t.Errorf("a non-bats child sees Git Bash first (%q): the PATH prepend leaked", got)
 	}
 }
 

@@ -857,10 +857,11 @@ func HomeRunners(home string) (run, stdout Runner) {
 		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
 		c.Dir = home
 		installerEnv := miseInstallEnv(name, args...)
-		if bashBin != "" || installerEnv != "" {
+		withBash := bashBin != "" && gitBashScope(name, args...)
+		if withBash || installerEnv != "" {
 			c.Env = os.Environ()
 		}
-		if bashBin != "" {
+		if withBash {
 			c.Env = append(c.Env, "PATH="+bashBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 		}
 		if installerEnv != "" {
@@ -873,9 +874,22 @@ func HomeRunners(home string) (run, stdout Runner) {
 	return run, stdout
 }
 
+// gitBashScope reports whether a sync child needs Git Bash on its PATH: the
+// bats launcher, and the npm:bats install, which is not shown to run without
+// it. Every other child (mise itself, every other tool's probe) keeps the
+// caller's PATH, so Git's bin cannot shadow what they resolve (#2346). name
+// may be a full Windows path, so both separators end its base.
+func gitBashScope(name string, args ...string) bool {
+	base := name[strings.LastIndexAny(name, `/\`)+1:]
+	return strings.EqualFold(base, "bats.cmd") || isBatsInstall(name, args...)
+}
+
+func isBatsInstall(name string, args ...string) bool {
+	return name == "mise" && len(args) == 3 && args[0] == "install" && args[1] == "--force" && args[2] == "npm:bats"
+}
+
 func miseInstallEnv(name string, args ...string) string {
-	if runtime.GOOS == "windows" && name == "mise" && len(args) == 3 &&
-		args[0] == "install" && args[1] == "--force" && args[2] == "npm:bats" {
+	if runtime.GOOS == "windows" && isBatsInstall(name, args...) {
 		return "MISE_NPM_PACKAGE_MANAGER=npm"
 	}
 	return ""
