@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/copilotsettings"
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -144,6 +145,7 @@ func newDeployCmd() *cobra.Command {
 				Available: deployCommandAvailable,
 				DryRun:    dryRun,
 				Records:   records,
+				Repair:    copilotsettings.RepairConfig,
 			})
 			printDeploySteps(w, res, dryRun)
 			if err != nil {

@@ -2,6 +2,8 @@ package tools
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -261,6 +263,51 @@ func TestInstallSystem_ExitZeroWithoutThePackageIsAnError(t *testing.T) {
 	_, err := w.installer("darwin").Install(ghTool())
 	if err == nil || !strings.Contains(err.Error(), "gh") || !strings.Contains(err.Error(), "brew") {
 		t.Errorf("want an error naming gh and brew, got %v", err)
+	}
+}
+
+// The AWS CLI's MSI names its directory for the next process only, and winget's
+// listing can miss a package it just installed: a from-zero Arm64 converge
+// failed there with "winget exited 0 but does not list Amazon.AWSCLI" (#3142).
+// The command in a directory an installer registered is the package there.
+func TestInstallSystem_ACommandInARegisteredDirectoryIsInstalled(t *testing.T) {
+	aws := Tool{Name: "aws", Source: Source{Type: "system", Winget: "Amazon.AWSCLI", Command: "aws"}}
+	registered := t.TempDir()
+	for _, tc := range []struct {
+		name    string
+		place   bool
+		wantErr bool
+	}{
+		{"the command is in the registered directory", true, false},
+		{"nothing there either", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			exe := filepath.Join(registered, "aws.exe")
+			_ = os.Remove(exe)
+			w := newWorld("winget")
+			w.noEffect = true // winget exits 0 and its listing never names the id
+			in := w.installer("windows")
+			in.RegisteredPath = func() ([]string, error) { return []string{registered}, nil }
+			run := in.Run
+			in.Run = func(name string, args ...string) error {
+				if tc.place { // the MSI places aws.exe and registers its directory
+					if err := os.WriteFile(exe, []byte("fixture"), 0o755); err != nil {
+						return err
+					}
+				}
+				return run(name, args...)
+			}
+			res, err := in.Install(aws)
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "does not list Amazon.AWSCLI") {
+					t.Fatalf("Install = %v, %v; want the not-listed error", res, err)
+				}
+				return
+			}
+			if err != nil || res != Installed {
+				t.Fatalf("Install = %v, %v; want Installed, nil\n%s", res, err, w.out.String())
+			}
+		})
 	}
 }
 

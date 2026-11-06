@@ -81,6 +81,9 @@ var emptyTreeOf = spec.EmptyTree
 // requestIgnored is a seam over spec.RequestIgnored, for the same reason.
 var requestIgnored = spec.RequestIgnoredIn
 
+// callerDirt is a seam over spec.CallerDirt, for the same reason.
+var callerDirt = spec.CallerDirt
+
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
 //
@@ -134,6 +137,7 @@ func newSpecReviewCmd() *cobra.Command {
 		fallbackReason string
 		timeout        time.Duration
 		stallTimeout   time.Duration
+		allowDirty     bool
 	)
 
 	cmd := &cobra.Command{
@@ -159,6 +163,11 @@ launch. Without tmux (Windows, or a machine that lacks it) the run goes to the
 foreground and says so. A machine-readable transcript is written beside the
 review, because the verdict records what a reviewer concluded and the transcript
 is the only record of how.
+
+The reviewer reads the reviewed commit, not the working tree, so the launch is
+refused while the tree has tracked changes or untracked files outside
+specs/<feature-id>/, naming them. Commit them first, or pass --allow-dirty to
+launch without them; the spec folder's own uncommitted content does not refuse.
 
 A spec whose proposal.md declares ` + "`risk: high`" + ` also needs a second signature, from
 a pool member of another vendor that declares ` + "`signs: second`" + `: --second launches it,
@@ -198,10 +207,23 @@ commit and the tree. --initial is refused for any other spec.`,
 			if err != nil {
 				return err
 			}
+			if err := checkCallerDirt(cmd, specDir, id, allowDirty); err != nil {
+				return err
+			}
 
+			// The reviewer runs in a fresh worktree detached at HEAD (HARNESS-142),
+			// so nothing it writes reaches this tree. The transcript and its
+			// .stderr stay in the caller's spec folder: the transcript sink runs
+			// outside the deadline process and is still writing when the
+			// worktree is removed.
+			tree, err := planReviewTree(repoRoot, id, slot)
+			if err != nil {
+				return err
+			}
+			treeSpec := filepath.Join(tree.path, "specs", id)
 			transcript := spec.TranscriptPathIn(repoRoot, id, slot)
 			limits := spec.Limits{Deadline: timeout, StallTimeout: stallTimeout, Transcript: transcript}
-			argv, err := reviewerArgv(slot, chosen, id, repoRoot, skill, scope, limits, filepath.Join(specDir, slot.Review))
+			argv, err := reviewerArgv(slot, chosen, id, tree.path, skill, scope, limits, filepath.Join(treeSpec, slot.Review), headSHA, specDir)
 			if err != nil {
 				return err
 			}
@@ -212,10 +234,11 @@ commit and the tree. --initial is refused for any other spec.`,
 			cmd.Printf("Spec:       specs/%s\n", id)
 			cmd.Printf("Scope:      %s\n", describeScope(scope))
 			cmd.Printf("Transcript: %s\n", transcript)
+			cmd.Printf("Worktree:   %s (detached at %s)\n", tree.path, headSHA)
 
 			launch := argv
 			if useTmux {
-				launch = spec.TmuxWrap(session, repoRoot, argv, transcript, transcriptSink(transcript))
+				launch = spec.TmuxWrap(session, tree.path, argv, transcript, transcriptSink(transcript))
 			}
 
 			if dryRun {
@@ -245,12 +268,20 @@ commit and the tree. --initial is refused for any other spec.`,
 			// launched without one spends a review that can never archive.
 			// Refusing here costs nothing yet. So does an ignored request: it is
 			// written, and lost on every checkout but this one.
-			if err := recordReviewRequest(cmd, repoRoot, specDir, id, slot, headSHA, chosen.ID, scope, fallbackReason); err != nil {
+			if err := createReviewTree(tree, headSHA, reviewTTL(timeout)); err != nil {
 				return err
+			}
+			if err := recordReviewRequest(cmd, repoRoot, specDir, id, slot, headSHA, chosen.ID, scope, fallbackReason); err != nil {
+				return errors.Join(err, removeReviewTree(tree.path))
+			}
+			// The caller's spec folder, uncommitted rounds and the request just
+			// written included, is what the reviewer reads (AC6).
+			if err := mirrorSpecFolder(specDir, treeSpec); err != nil {
+				return errors.Join(fmt.Errorf("copying specs/%s/ into the review worktree: %w", id, err), removeReviewTree(tree.path))
 			}
 
 			if useTmux {
-				return launchDetached(cmd, repoRoot, launch, slot, session, transcript, id, chosen, entries)
+				return launchDetached(cmd, tree.path, launch, slot, session, transcript, id, chosen, entries)
 			}
 
 			cmd.Printf("\n")
@@ -258,7 +289,8 @@ commit and the tree. --initial is refused for any other spec.`,
 			// ENDED rather than only that it started, so the no-verdict case is
 			// reported here, with the transcript still in hand, instead of being left
 			// for whoever next tries to archive.
-			runErr := runForeground(repoRoot, launch, transcript)
+			runErr := runForeground(tree.path, launch, transcript)
+			finishLeftoverReviewTree(cmd.ErrOrStderr(), filepath.Join(treeSpec, slot.Review), tree.path, specDir)
 			return foregroundOutcome(slot, specDir, transcript, chosen.Runner, runErr)
 		},
 	}
@@ -271,11 +303,40 @@ commit and the tree. --initial is refused for any other spec.`,
 		"review a spec first added in the repository's root commit from git's empty tree; refused for any other spec")
 	cmd.Flags().StringVar(&fallbackReason, "fallback-reason", "",
 		"launch a `signs: fallback` member as the first signer, naming how the first signers failed: "+strings.Join(spec.FallbackReasons, ", "))
+	cmd.Flags().BoolVar(&allowDirty, "allow-dirty", false,
+		"launch although the tree has changes outside specs/<feature-id>/, which the reviewer will not see")
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it and everything it started are stopped, on every runner; the reviewer is told to aim for two thirds of it")
 	cmd.Flags().DurationVar(&stallTimeout, "stall-timeout", spec.DefaultStallTimeout,
 		"stop the reviewer when its transcript has not changed for this long, instead of waiting for --timeout; 0 turns it off")
 	return cmd
+}
+
+// checkCallerDirt refuses a launch whose tree has tracked changes or untracked
+// files outside specs/<id>/ (HARNESS-142 AC5). The reviewer reads a fresh
+// worktree at the reviewed commit, so that work would be reviewed as if it did
+// not exist. --allow-dirty launches anyway and says what is left out. A tree
+// whose state cannot be read is refused too: it cannot be shown to be clean.
+func checkCallerDirt(cmd *cobra.Command, specDir, id string, allowDirty bool) error {
+	dirt, err := callerDirt(specDir)
+	if err != nil && !allowDirty {
+		return fmt.Errorf("cannot read the working tree's state, so it cannot be shown that the reviewer sees all the work: %w\n"+
+			"Fix the repository, or pass --allow-dirty to launch anyway", err)
+	}
+	if err != nil {
+		cmd.PrintErrf("warning: cannot read the working tree's state, so the reviewer may not see all the work: %v\n", err)
+		return nil
+	}
+	if len(dirt) == 0 {
+		return nil
+	}
+	list := "  " + strings.Join(dirt, "\n  ")
+	if !allowDirty {
+		return fmt.Errorf("the tree has changes outside specs/%s/, and the reviewer, which runs in a fresh worktree at the reviewed commit, would not see them:\n%s\n"+
+			"Commit them, or pass --allow-dirty to launch without them", id, list)
+	}
+	cmd.PrintErrf("warning: the reviewer runs in a fresh worktree at the reviewed commit and will not see these changes outside specs/%s/:\n%s\n", id, list)
+	return nil
 }
 
 // specRepoRoot validates a spec id and returns the root of the repository
@@ -426,11 +487,11 @@ func recordReviewRequest(cmd *cobra.Command, repoRoot, specDir, id string, slot 
 // launchDetached starts the review in its tmux session and confirms the
 // runner came up. A detached launch can only report that the runner STARTED;
 // how it ends is read later, from the slot's verdict.
-func launchDetached(cmd *cobra.Command, repoRoot string, launch []string, slot spec.ReviewSlot, session, transcript, id string,
+func launchDetached(cmd *cobra.Command, treeRoot string, launch []string, slot spec.ReviewSlot, session, transcript, id string,
 	chosen spec.ReviewerEntry, entries []spec.ReviewerEntry) error {
 	cmd.Printf("Session:    %s\n\n", session)
-	if err := runCommand(repoRoot, launch); err != nil {
-		return fmt.Errorf("starting the tmux session: %w", err)
+	if err := runCommand(treeRoot, launch); err != nil {
+		return errors.Join(fmt.Errorf("starting the tmux session: %w", err), removeReviewTree(treeRoot))
 	}
 	if err := confirmLaunched(slot, session, transcript, id, chosen, entries); err != nil {
 		return err
@@ -511,8 +572,9 @@ growing length.`,
 
 // reviewerArgv is the pooled runner's command with its prompt, the time budget
 // included, under the deadline every runner gets in both modes (HARNESS-152).
-// Only agy used to be bounded, through its own --print-timeout.
-func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot, skill string, scope spec.ReviewScope, limits spec.Limits, review string) ([]string, error) {
+// Only agy used to be bounded, through its own --print-timeout. treeRoot is the
+// review worktree, at headSHA; callerSpec is where its verdict is copied back.
+func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, treeRoot, skill string, scope spec.ReviewScope, limits spec.Limits, review, headSHA, callerSpec string) ([]string, error) {
 	if limits.StallTimeout < 0 {
 		return nil, fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", limits.StallTimeout)
 	}
@@ -521,13 +583,14 @@ func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot,
 		timeout = spec.DefaultReviewerTimeout
 	}
 	limits.Deadline = timeout
-	prompt := spec.ReviewPromptForScope(slot, id, repoRoot, chosen.ID, chosen.Runner, skill, scope) +
+	prompt := spec.ReviewPromptForScope(slot, id, treeRoot, chosen.ID, chosen.Runner, skill, scope) +
+		"\n" + spec.FreshWorktreeNote(headSHA) +
 		"\n" + spec.TimeBudget(time.Now(), timeout)
-	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
+	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, treeRoot)
 	if err != nil {
 		return nil, err
 	}
-	return deadlineWrap(limits, review, argv), nil
+	return deadlineWrap(limits, review, treeRoot, callerSpec, argv), nil
 }
 
 // newSpecDeadlineCmd is plumbing, like transcript-sink: `spec review` runs every
@@ -535,7 +598,7 @@ func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot,
 // pool drew (HARNESS-152), and so does the stall detector (CLI-094).
 func newSpecDeadlineCmd() *cobra.Command {
 	var stall time.Duration
-	var transcript, review string
+	var transcript, review, tree, copyBack string
 	cmd := &cobra.Command{
 		Use:   "deadline <duration> [flags] -- <command> [args...]",
 		Short: "Internal: run a reviewer and stop it, with every process it started, at a deadline or when its transcript stalls",
@@ -551,7 +614,12 @@ says whether review.md holds a provisional record or was not rewritten.
 With --review, every path the run left changed outside the review's own spec
 folder is named on stderr, since a reviewer's only sanctioned output is
 review.md. A run that otherwise exited 0 then exits 4, so the leftovers are a
-failure someone reads rather than files a later "git add -A" commits.`,
+failure someone reads rather than files a later "git add -A" commits.
+
+With --worktree and --copy-back, the run is in a review worktree: however it
+ends, the review file is copied back to the --copy-back folder, and the
+worktree is then marked as saved and removed. A worktree whose review could
+not be copied back is kept.`,
 		Hidden:        true,
 		Args:          cobra.MinimumNArgs(2),
 		SilenceUsage:  true,
@@ -573,9 +641,11 @@ failure someone reads rather than files a later "git add -A" commits.`,
 			res, err := spec.RunWithLimits(spec.Limits{Deadline: limit, StallTimeout: stall, Transcript: transcript},
 				args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), errw)
 			if err != nil {
+				finishReviewTree(errw, review, tree, copyBack)
 				return err
 			}
 			stray := reportStrayWrites(errw, review, before, snapErr)
+			defer finishReviewTree(errw, review, tree, copyBack)
 			switch res.Stop {
 			case spec.StopDeadline:
 				_, _ = fmt.Fprintf(errw, "[review] stopped at the %s deadline: the time limit ended this run, not a verdict\n", limit)
@@ -602,6 +672,8 @@ failure someone reads rather than files a later "git add -A" commits.`,
 	cmd.Flags().DurationVar(&stall, "stall-timeout", 0, "stop the run when --transcript has not changed for this long (0: off)")
 	cmd.Flags().StringVar(&transcript, "transcript", "", "the transcript file the stall detector watches")
 	cmd.Flags().StringVar(&review, "review", "", "the review file a stopped run reports on")
+	cmd.Flags().StringVar(&tree, "worktree", "", "the review worktree the run is in, removed when it ends")
+	cmd.Flags().StringVar(&copyBack, "copy-back", "", "the caller's spec folder the review file is copied back to")
 	return cmd
 }
 
@@ -634,7 +706,7 @@ func reportStrayWrites(errw io.Writer, review string, before spec.TreeSnapshot, 
 // deadlineWrap runs argv under this binary's `spec deadline`, resolved by
 // absolute path for the reason transcriptSink gives: the command runs detached,
 // and a `dotf` found on PATH may be a build without the subcommand.
-var deadlineWrap = func(limits spec.Limits, review string, argv []string) []string {
+var deadlineWrap = func(limits spec.Limits, review, tree, callerSpec string, argv []string) []string {
 	self, err := os.Executable()
 	if err != nil {
 		self = "dotf"
@@ -645,6 +717,9 @@ var deadlineWrap = func(limits spec.Limits, review string, argv []string) []stri
 	}
 	if review != "" {
 		wrap = append(wrap, "--review", review)
+	}
+	if tree != "" && callerSpec != "" {
+		wrap = append(wrap, "--worktree", tree, "--copy-back", callerSpec)
 	}
 	return append(append(wrap, "--"), argv...)
 }

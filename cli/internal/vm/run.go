@@ -256,6 +256,20 @@ func waitLogon(q *QGA, o RunOptions) error {
 	}
 }
 
+// stillRunning is the PowerShell that reports a step that has not ended: its
+// log so far, read with a shared read, then every process under the step's
+// guestrun.ps1, oldest first, as `pid command line`. Its own command line holds
+// the pattern it looks for, so the $PID filter leaves this process out, and the
+// walk stops at 500 so a reused PID cannot make it a cycle.
+func stillRunning(name string) string {
+	return `Get-Content -Raw -Encoding UTF8 -LiteralPath '` + guestWork + `\` + name + `.log' -ErrorAction SilentlyContinue
+$all = @(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID })
+$tree = @($all | Where-Object { $_.CommandLine -like '*guestrun.ps1 -Step ` + name + `*' })
+for ($i = 0; $i -lt $tree.Count -and $i -lt 500; $i++) { $tree += @($all | Where-Object { $_.ParentProcessId -eq $tree[$i].ProcessId }) }
+'--- still running:'
+$tree | Sort-Object CreationDate | ForEach-Object { '{0} {1}' -f $_.ProcessId, $_.CommandLine }`
+}
+
 // runStep runs guestrun.ps1 -Step name as the test user, through a scheduled
 // task: the agent runs commands as LocalSystem, whose profile is not the one
 // a person converges. It relays the step's output, then judges the step on
@@ -276,11 +290,19 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 	limit, cancel := context.WithTimeout(context.Background(), o.Step)
 	defer cancel()
 	code, werr := pollExit(limit, q, o.Poll, guestWork+`\`+name+".exit")
+	if werr != nil {
+		// The step still holds its log open, which the agent's own open
+		// cannot share: read it through PowerShell, and name what is left
+		// running, before a run without --keep discards the guest (#3208).
+		if r, err := q.Run("powershell.exe", []string{"-NoProfile", "-Command", stillRunning(name)}); err == nil {
+			_, _ = o.Out.Write(bytes.TrimPrefix(r.Stdout, []byte(utf8BOM)))
+		} else {
+			_, _ = fmt.Fprintf(o.Out, "--- could not read what %s left running: %v\n", name, err)
+		}
+		return fmt.Errorf("%s did not finish in %s: %w", label, o.Step, werr)
+	}
 	if out, err := q.ReadFile(guestWork + `\` + name + ".log"); err == nil {
 		_, _ = o.Out.Write(bytes.TrimPrefix(out, []byte(utf8BOM)))
-	}
-	if werr != nil {
-		return fmt.Errorf("%s did not finish in %s: %w", label, o.Step, werr)
 	}
 	var runErr error
 	if code != "0" {

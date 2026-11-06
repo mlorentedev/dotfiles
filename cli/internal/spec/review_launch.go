@@ -229,6 +229,13 @@ func agyReviewerCommand(model, prompt string, timeout time.Duration, repoRoot, g
 	return append(args, "--print", prompt)
 }
 
+// FreshWorktreeNote tells the reviewer what its working tree is: a checkout of
+// the reviewed commit made for this run, with nothing built in it yet.
+func FreshWorktreeNote(sha string) string {
+	return fmt.Sprintf("You are in a fresh worktree checked out at %s for this review. It holds no build\n"+
+		"artifacts, dependencies or caches: install what the test suite needs before running it.\n", sha)
+}
+
 // TranscriptPath is where the launched reviewer's event stream lands for a spec.
 func TranscriptPath(repoRoot, specID string) string {
 	return TranscriptPathIn(repoRoot, specID, FirstSigner)

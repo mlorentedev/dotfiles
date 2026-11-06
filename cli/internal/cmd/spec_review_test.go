@@ -59,7 +59,10 @@ func TestSpecReviewForegroundRejectsMalformedReview(t *testing.T) {
 	withReviewBase(t, spec.ReviewBase{SHA: "basebasebase"}, "headheadhead")
 
 	prev := runForeground
-	runForeground = func(dir string, _ []string, _ string) error {
+	// The stub stands for the whole run, deadline's copy-back included, so the
+	// verdict lands in the caller's spec folder (the working directory), not
+	// in the review worktree it ran in.
+	runForeground = func(_ string, _ []string, _ string) error {
 		review := `---
 reviewer: nan/deepseek-v4-flash
 reviewed_sha: headheadhead
@@ -67,7 +70,7 @@ reviewed_sha: headheadhead
 
 FAIL
 `
-		return os.WriteFile(filepath.Join(dir, "specs", "AI-001-x", "review.md"), []byte(review), 0o600)
+		return os.WriteFile(filepath.Join("specs", "AI-001-x", "review.md"), []byte(review), 0o600)
 	}
 	t.Cleanup(func() { runForeground = prev })
 

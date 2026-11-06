@@ -327,8 +327,8 @@ jobs:
         continue-on-error: true
         env:
           NAN_API_KEY: ${{ secrets.NAN_API_KEY }}
-          DECLARED_MODEL: openai/mimo-v2.6-flash
-          DECLARED_FALLBACK_MODELS: '["openai/deepseek-v4-flash", "openai/glm5.3-flash"]'
+          DECLARED_MODEL: openai/deepseek-v4-flash
+          DECLARED_FALLBACK_MODELS: '["openai/glm5.3-flash", "openai/mimo-v2.6-flash"]'
         # The exit code travels to the draw: 1 (no NaN model answered) is an
         # outage the pool absorbs, 2 (a broken setup) must stop it.
         # continue-on-error leaves only `outcome`, which is `failure` for both.
