@@ -293,6 +293,7 @@ func (e sweepEnv) agents() []check {
 		{kind: kindMachine, run: func() { checkClaudeExtensions(e.sys, e.cfg, e.rep, e.opts.Claude) }},
 		{kind: kindMachine, run: func() { checkCopilotSettings(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkCopilot(e.sys, e.cfg, e.rep) }},
+		{kind: kindMachine, run: func() { checkTsBridge(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkGolangciLint(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkModelMap(e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkModelPins(e.sys, e.cfg, e.rep) }},
