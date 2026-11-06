@@ -28,7 +28,7 @@ Worktree package (`cli/internal/worktree/`):
 - [x] [P] [AC3] Test: `AddDetached` creates a worktree detached at a given sha, with metadata `Issue: 0`, `ReapOK: true`, a lease of the given TTL and `Kind: "review"`; fails red because `AddRunner` has no detached path. `go test ./internal/worktree/ -run AddDetached`
 - [x] [AC3] Add `WorktreeAddDetached(repo, target, sha)` to `AddRunner` and `RealAddRunner`, a `Kind` field to `Metadata`, and `AddDetached`; test green.
 - [x] [AC3] Test then code: `dotf worktree list` labels a `Kind: "review"` worktree, and `refuseHeldIssue` never counts it (it holds no issue).
-- [ ] [AC3] Test then code (`TestReviewWorktreeSwept`): `sweep` removes an expired review worktree whose `ReapOK` is true.
+- [x] [AC3] Test then code (`TestReviewWorktreeSwept`): `sweep` removes an expired review worktree that is clean or whose output was copied back (`OutputSaved`), and keeps one whose output was not, or whose state cannot be read.
 
 Launch (`cli/internal/cmd/spec.go`, `cli/internal/spec/`):
 
@@ -42,6 +42,7 @@ Deadline (`spec deadline`):
 
 - [ ] [AC1] [AC3] Test: with a fake reviewer, the slot's outputs (`slot.Review`, `slot.Transcript`, `.stderr`) are copied back and the worktree removed on exit 0, 4, 124 and 125, for the first slot and for `--second` (`review-second.md`); red first.
 - [ ] [AC1] [AC3] Implement copy-back and removal on every exit path; a failed removal is reported on stderr and left for `sweep`.
+- [ ] [AC3] After copy-back succeeds and before removal, set `OutputSaved` in the worktree's metadata, so a removal that fails leaves a worktree `sweep` may take.
 - [ ] [AC1] [AC2] Integration test: a fake reviewer creates `tests/probe_test.go` and edits a tracked file; the caller's `git status --porcelain` outside `specs/<id>/` is unchanged, inside it only the slot's outputs changed, the review file and transcript arrive, both paths are named and the run exits 4.
 
 Verification of the whole:
