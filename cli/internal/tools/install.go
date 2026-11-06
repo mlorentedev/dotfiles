@@ -249,13 +249,28 @@ func (in *Installer) current(t Tool) string {
 	return in.installedVersion(t.Name)
 }
 
+// unsupportedOn names the platform the catalog does not install t on, "" when
+// it does. SupportsOS answers by OS; a winget_arch entry also needs an id for
+// this arch, which Load guarantees only for the arches dotf ships.
+func (in *Installer) unsupportedOn(t Tool) string {
+	if !t.SupportsOS(in.GOOS) {
+		return in.GOOS
+	}
+	if t.Source.Type == "system" {
+		if _, pkg := t.Source.SystemPackage(in.GOOS, in.GOARCH); pkg == "" {
+			return in.GOOS + "/" + in.GOARCH
+		}
+	}
+	return ""
+}
+
 // Install converges the tool to its pinned version, dispatching on source type.
 // The pinned backends share the reconcile policy (decideAction): a no-op when already
 // at or above the pin, never a downgrade.
 func (in *Installer) Install(t Tool) (Result, error) {
 	in.defaults()
-	if !t.SupportsOS(in.GOOS) {
-		_, _ = fmt.Fprintf(in.Out, "%s is not installed on %s by this catalog; skipping\n", t.Name, in.GOOS)
+	if where := in.unsupportedOn(t); where != "" {
+		_, _ = fmt.Fprintf(in.Out, "%s is not installed on %s by this catalog; skipping\n", t.Name, where)
 		return Skipped, nil
 	}
 	if reason := in.refusal(t); reason != "" {
@@ -348,9 +363,9 @@ func (in *Installer) Plan(t Tool) Plan {
 	// reads as absent: no build for this platform is unsupported, an entry
 	// Install refuses is refused with Install's own reason, and an unknown
 	// source type is the skip Install makes.
-	if !t.SupportsOS(in.GOOS) {
+	if where := in.unsupportedOn(t); where != "" {
 		p.Action = PlanUnsupported
-		p.Note = "not installed on " + in.GOOS + " by this catalog"
+		p.Note = "not installed on " + where + " by this catalog"
 		return p
 	}
 	if reason := in.refusal(t); reason != "" {

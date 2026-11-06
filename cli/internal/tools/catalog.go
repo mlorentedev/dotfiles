@@ -62,6 +62,13 @@ type Source struct {
 	Apt    string `json:"apt,omitempty"`
 	Brew   string `json:"brew,omitempty"`
 	Winget string `json:"winget,omitempty"`
+	// WingetArch maps a Windows GOARCH (amd64, arm64) to a winget id, for a
+	// package winget publishes once per arch: the VC++ runtime is
+	// Microsoft.VCRedist.2015+.x64 and .arm64, and the x64 id on an Arm64 box
+	// leaves the native runtime absent. It names both arches, the way an
+	// Asset key names the platforms it serves, and replaces Winget: an entry
+	// carries one or the other.
+	WingetArch map[string]string `json:"winget_arch,omitempty"`
 	// Cask is a Homebrew cask token, the darwin package of a GUI app or font.
 	// It is its own key, not a Brew value, because brew lists and installs
 	// casks in a separate namespace (`--cask`): queried as a formula, an
@@ -248,7 +255,7 @@ var KnownSourceTypes = []string{"github-release", "npm", "uv-tool", "system"}
 // systemKeys are the source keys a "system" entry may carry. The typed decoder
 // drops any other key without a word, so a misspelt or unsupported manager
 // (pacman, dnf) would read as "no name for this OS" and skip in silence.
-var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "cask": true, "needs_sudo": true, "winget": true, "command": true, "platforms": true}
+var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "cask": true, "needs_sudo": true, "winget": true, "winget_arch": true, "command": true, "platforms": true}
 
 // sourceKeys lists, per tool, the keys its source object carries, for the checks
 // the typed decode cannot make.
@@ -280,11 +287,14 @@ var packageName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+@/:-]*$`)
 func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	for key := range keys {
 		if !systemKeys[key] {
-			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, cask, needs_sudo, winget, command or platforms)", t.Name, key)
+			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, cask, needs_sudo, winget, winget_arch, command or platforms)", t.Name, key)
 		}
 	}
-	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Cask == "" && t.Source.Winget == "" {
-		return fmt.Errorf("tool %q: system source names no package manager (want apt, brew, cask or winget)", t.Name)
+	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Cask == "" && t.Source.Winget == "" && len(t.Source.WingetArch) == 0 {
+		return fmt.Errorf("tool %q: system source names no package manager (want apt, brew, cask, winget or winget_arch)", t.Name)
+	}
+	if err := validateWingetArch(t); err != nil {
+		return err
 	}
 	if t.Source.Brew != "" && t.Source.Cask != "" {
 		return fmt.Errorf("tool %q: system source names both a brew formula and a cask; darwin installs one package per entry", t.Name)
@@ -294,7 +304,7 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	if len(t.Source.Platforms) > 0 {
 		reachable := false
 		for _, goos := range t.Source.Platforms {
-			if _, pkg := t.Source.SystemPackage(goos); pkg != "" {
+			if t.Source.namesPackage(goos) {
 				reachable = true
 			}
 		}
@@ -312,9 +322,45 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 		// The name becomes one argument of the manager's command line, and the
 		// one-line remedy dotf prints for a person to paste: a flag, a second
 		// word or a shell metacharacter would change what either does.
-		if pkg != "" && !packageName.MatchString(pkg) {
-			return fmt.Errorf("tool %q: %s name %q is not a package name (start with a letter or digit; then letters, digits and . _ + @ / : -)", t.Name, manager, pkg)
+		if err := checkPackageName(t, manager, pkg); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+// wingetArches are the Windows arches dotf ships for, the keys a winget_arch
+// map must name, each of them: a missing one would skip the package there in
+// silence, on the box that needs it.
+var wingetArches = []string{"amd64", "arm64"}
+
+func validateWingetArch(t Tool) error {
+	m := t.Source.WingetArch
+	if len(m) == 0 {
+		return nil
+	}
+	if t.Source.Winget != "" {
+		return fmt.Errorf("tool %q: system source names both winget and winget_arch; name one id for every arch or one per arch", t.Name)
+	}
+	for goarch := range m {
+		if !slices.Contains(wingetArches, goarch) {
+			return fmt.Errorf("tool %q: winget_arch has key %q (want %s)", t.Name, goarch, strings.Join(wingetArches, " and "))
+		}
+	}
+	for _, goarch := range wingetArches {
+		if m[goarch] == "" {
+			return fmt.Errorf("tool %q: winget_arch names no id for %s (want %s)", t.Name, goarch, strings.Join(wingetArches, " and "))
+		}
+		if err := checkPackageName(t, "winget_arch", m[goarch]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkPackageName(t Tool, manager, pkg string) error {
+	if pkg != "" && !packageName.MatchString(pkg) {
+		return fmt.Errorf("tool %q: %s name %q is not a package name (start with a letter or digit; then letters, digits and . _ + @ / : -)", t.Name, manager, pkg)
 	}
 	return nil
 }
@@ -325,17 +371,29 @@ func (t Tool) SupportsOS(goos string) bool {
 	if t.Source.Type == "system" {
 		// No name for this OS's manager is the same answer as a platforms miss,
 		// so Install, Plan and `tools list` skip it without a branch each.
-		if _, pkg := t.Source.SystemPackage(goos); pkg == "" {
+		if !t.Source.namesPackage(goos) {
 			return false
 		}
 	}
 	return platform.Supports(t.Source.Platforms, goos)
 }
 
-// SystemPackage is the manager and package name a "system" entry gives goos:
-// apt on linux, brew on darwin (brew-cask for a cask), winget on windows. The package is "" when the
-// entry names none there, or goos has no manager.
-func (s Source) SystemPackage(goos string) (manager, pkg string) {
+// namesPackage reports whether the entry names a package for goos on some
+// arch. Load holds a winget_arch map to every arch dotf ships for Windows, so
+// the OS alone answers where it installs.
+func (s Source) namesPackage(goos string) bool {
+	if goos == "windows" && len(s.WingetArch) > 0 {
+		return true
+	}
+	_, pkg := s.SystemPackage(goos, "")
+	return pkg != ""
+}
+
+// SystemPackage is the manager and package name a "system" entry gives
+// goos/goarch: apt on linux, brew on darwin (brew-cask for a cask), winget on
+// windows, where a winget_arch entry answers per goarch. The package is ""
+// when the entry names none there, or goos has no manager.
+func (s Source) SystemPackage(goos, goarch string) (manager, pkg string) {
 	switch goos {
 	case "linux":
 		return "apt", s.Apt
@@ -345,6 +403,9 @@ func (s Source) SystemPackage(goos string) (manager, pkg string) {
 		}
 		return "brew", s.Brew
 	case "windows":
+		if len(s.WingetArch) > 0 {
+			return "winget", s.WingetArch[goarch]
+		}
 		return "winget", s.Winget
 	}
 	return "", ""

@@ -363,6 +363,20 @@ apt row installed Ubuntu's 2.46.0, which lacks `gh pr checks --json`. W2's
 - [x] `setup-windows.bats` gh parity reads the marker and the winget id, the jq and zoxide shape
 - [ ] Windows: the winget row stays in `setup-windows.ps1` until mise runs there; the P5b row above already tracks its removal
 
+### Blocker 1 — the VC++ runtime, a winget id per arch (reader, then the entry)
+
+The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows lacks (measured on #3174, 2026-11-05). winget publishes that runtime once per arch, `Microsoft.VCRedist.2015+.x64` and `.arm64`, and a `system` entry names one winget id.
+
+- [x] Reader: `source.winget_arch`, a map from Windows GOARCH to a winget id. It mirrors `asset`'s `goos/goarch` keys and leaves `Source` decoding as it is
+  - `Load` requires both `amd64` and `arm64`, rejects any other key, and refuses an entry that names both `winget` and `winget_arch`. Each id passes the same package-name check as the other managers
+  - `SystemPackage` takes the arch; `SupportsOS` still answers by OS, since a map names every arch dotf ships for. Install and Plan also skip an arch the map does not name (`windows/386`), as an unsupported platform, never with an empty winget id (review of #3226). Installer, `dotf tools list` and doctor's system-package checks pass the arch (`System.GOARCH` is a new seam)
+  - Rejected: a `{arch}` token in `winget`. winget's arch tokens (`x64`, `arm64`) are not GOARCH, so it would need its own spelling table, and an id without the token would read the same as one with it
+  - A non-elevated `winget install --id Microsoft.VCRedist.2015+.arm64 -e …`, the catalog's argv, exited 0 on the Arm64 guest. That guest auto-elevates admins (UAC ConsentPromptBehaviorAdmin 0); on a box with the default prompt the runtime's installer asks through UAC, as every machine-scope winget entry already does
+- [ ] Entry (after a release carrying the reader is the `DOTF_VERSION` pin): `vcredist` with `winget_arch` and `platforms: ["windows"]`, ahead of `mise` in `packages.json`, since the tools step walks the catalog in file order. An older dotf rejects the unknown key and fails the whole catalog, which is why the entry waits
+- [ ] Re-measure AC4 on a clean Arm64 guest once the entry ships: the tools step alone places the runtime, then mise runs
+  - Measured ahead of the release on 2026-11-06. The guest was a clean Arm64 with no runtime. The dev dotf merged #3174, #3222 and this reader, plus a local `vcredist` entry ahead of `mise`, and ran with `MISE_HTTP_DOWNLOAD_TIMEOUT=3h`. The tools step installed `vcredist`, then mise and every mise pin, in 1h07m. The blocker is closed, but the row stays open until the entry ships
+  - AC4 is still not met. The same run exits 1 on the four npm CLIs (#2438: under a mise Node, npm's global prefix is the Node install directory, which no PATH holds) and on bats not running at its pin (#2346)
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

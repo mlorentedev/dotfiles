@@ -256,6 +256,30 @@ func TestInstallSystem_NoNameForThisOSIsSkipped(t *testing.T) {
 	}
 }
 
+// A winget_arch entry names amd64 and arm64 only; on any other Windows arch it
+// is the same skip as an OS with no name, never `winget install --id ""`.
+func TestInstallSystem_NoIdForThisArchIsSkipped(t *testing.T) {
+	vc := Tool{Name: "vcredist", Source: Source{Type: "system", WingetArch: map[string]string{
+		"amd64": "Microsoft.VCRedist.2015+.x64", "arm64": "Microsoft.VCRedist.2015+.arm64"}}}
+	w := newWorld("winget")
+	in := w.installer("windows")
+	in.GOARCH = "386"
+	res, err := in.Install(vc)
+	if err != nil || res != Skipped || !strings.Contains(w.out.String(), "windows/386") {
+		t.Errorf("Install = %v, %v, out %q; want a skip naming windows/386", res, err, w.out.String())
+	}
+	if p := in.Plan(vc); p.Action != PlanUnsupported || !strings.Contains(p.Note, "windows/386") {
+		t.Errorf("Plan = %q %q, want %q naming windows/386", p.Action, p.Note, PlanUnsupported)
+	}
+	if len(w.ran) != 0 || len(w.queries) != 0 {
+		t.Errorf("a skipped entry reached a manager: ran %v, queried %v", w.ran, w.queries)
+	}
+	in.GOARCH = "arm64"
+	if p := in.Plan(vc); p.Action == PlanUnsupported {
+		t.Errorf("windows/arm64 has an id, Plan = %q", p.Action)
+	}
+}
+
 // The package manager exiting 0 is not the package being there (the W1 lesson,
 // applied to class 3): the manager's own record is the post-condition.
 func TestInstallSystem_ExitZeroWithoutThePackageIsAnError(t *testing.T) {

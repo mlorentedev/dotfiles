@@ -232,7 +232,7 @@ func listAsset(t tools.Tool, goos, goarch string) string {
 	case t.Source.Type == "uv-tool":
 		return "uv:" + t.Source.Package
 	case t.Source.Type == "system":
-		manager, pkg := t.Source.SystemPackage(goos)
+		manager, pkg := t.Source.SystemPackage(goos, goarch)
 		return manager + ":" + pkg
 	}
 	if asset := t.AssetName(goos, goarch); asset != "" {
