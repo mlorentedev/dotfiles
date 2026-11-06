@@ -45,13 +45,29 @@ func (in *Installer) systemInstalled(t Tool) string {
 	if pkg == "" {
 		return ""
 	}
-	if cmd := t.Source.Command; cmd != "" && in.HasCommand(cmd) {
+	if cmd := t.Source.Command; cmd != "" && (in.HasCommand(cmd) || in.inRegisteredPath(cmd)) {
 		return systemPresent
 	}
 	if in.managerLists(manager, pkg) {
 		return systemPresent
 	}
 	return ""
+}
+
+// inRegisteredPath reports whether cmd runs from a directory an installer
+// registered for the next process. An MSI writes its directory there and not
+// into this process's PATH, and winget's listing can miss a package it has just
+// installed, so after a winget install exits 0 this is where the command is
+// (#3142). A failed read is absent: the listing still decides.
+func (in *Installer) inRegisteredPath(cmd string) bool {
+	if in.RegisteredPath == nil {
+		return false
+	}
+	dirs, err := in.RegisteredPath()
+	if err != nil || len(dirs) == 0 {
+		return false
+	}
+	return len(copiesOnPath(cmd, in.GOOS, strings.Join(dirs, string(os.PathListSeparator)), os.Getenv("PATHEXT"))) > 0
 }
 
 // managerLists asks the manager whether pkg is installed. A missing manager
