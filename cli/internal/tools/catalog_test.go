@@ -170,6 +170,18 @@ func TestTheRepoCatalogDeclaresTsBridgeForTheClientRole(t *testing.T) {
 			!slices.Equal(tool.Roles, []string{"ts-bridge-client"}) {
 			t.Fatalf("ts-bridge tool = %+v", tool)
 		}
+		for platform, want := range map[[2]string]string{
+			{"linux", "amd64"}:   "ts-bridge-linux-amd64/ts-bridge",
+			{"linux", "arm64"}:   "ts-bridge-linux-arm64/ts-bridge",
+			{"darwin", "amd64"}:  "ts-bridge-darwin-amd64/ts-bridge",
+			{"darwin", "arm64"}:  "ts-bridge-darwin-arm64/ts-bridge",
+			{"windows", "amd64"}: "ts-bridge-windows-amd64/ts-bridge.exe",
+			{"windows", "arm64"}: "ts-bridge-windows-arm64/ts-bridge.exe",
+		} {
+			if got := tool.MemberName(platform[0], platform[1]); got != want {
+				t.Errorf("ts-bridge member for %s/%s = %q, want %q", platform[0], platform[1], got, want)
+			}
+		}
 		return
 	}
 	t.Fatal("packages.json declares no ts-bridge")

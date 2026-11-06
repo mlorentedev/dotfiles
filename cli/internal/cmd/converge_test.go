@@ -51,6 +51,7 @@ func convergeFixture(t *testing.T) (repo, home string) {
 	stubIdentity(t, identity.Facts{}, nil)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("DOTFILES_DIR", "")
 	// converge puts its own directory on PATH for its children (#2688);
 	// registering PATH here restores it after every fixture test.

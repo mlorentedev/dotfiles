@@ -15,6 +15,7 @@ import (
 )
 
 func TestLoadCatalogFiltersToolsByMachineRole(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	repo, home := t.TempDir(), t.TempDir()
 	writeFixture(t, repo, map[string]string{
 		"packages.json": `{"tools":[

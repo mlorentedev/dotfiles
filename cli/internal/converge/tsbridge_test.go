@@ -11,6 +11,7 @@ import (
 )
 
 func TestTsBridgeClientRoleCreatesAndRetiresGitDropIn(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	home := t.TempDir()
 	e := Env{Home: home}
 	r := tsBridgeClient{}
@@ -64,6 +65,7 @@ func TestTsBridgeClientRoleCreatesAndRetiresGitDropIn(t *testing.T) {
 }
 
 func TestTsBridgeClientRefusesToOverwriteForeignDropIn(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	home := t.TempDir()
 	if _, err := envpkg.SetMachineRole(envpkg.MachinePath(home), envpkg.RoleTSBridgeClient, true); err != nil {
 		t.Fatal(err)
