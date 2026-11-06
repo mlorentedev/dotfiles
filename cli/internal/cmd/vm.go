@@ -79,12 +79,14 @@ func newVMWindowsCmd() *cobra.Command {
 			}
 			defer func() { _ = os.Remove(src) }()
 			return vm.Run(host, vm.RunOptions{
-				Machine:  vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
-				Source:   src,
-				Dotf:     dotf,
-				Keep:     keep,
-				Agent:    10 * time.Minute,
-				Step:     time.Hour,
+				Machine: vm.Machine{Layout: layout, Firmware: firmware, CPUs: cpus, MemoryMB: memory},
+				Source:  src,
+				Dotf:    dotf,
+				Keep:    keep,
+				Agent:   10 * time.Minute,
+				// A from-zero first converge took 1h23m on a slow link:
+				// the tools step 50m, then the Claude installer (#3208).
+				Step:     2 * time.Hour,
 				Poll:     5 * time.Second,
 				Out:      cmd.OutOrStdout(),
 				Progress: cmd.ErrOrStderr(),

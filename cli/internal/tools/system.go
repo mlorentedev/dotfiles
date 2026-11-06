@@ -45,13 +45,29 @@ func (in *Installer) systemInstalled(t Tool) string {
 	if pkg == "" {
 		return ""
 	}
-	if cmd := t.Source.Command; cmd != "" && in.HasCommand(cmd) {
+	if cmd := t.Source.Command; cmd != "" && (in.HasCommand(cmd) || in.inRegisteredPath(cmd)) {
 		return systemPresent
 	}
 	if in.managerLists(manager, pkg) {
 		return systemPresent
 	}
 	return ""
+}
+
+// inRegisteredPath reports whether cmd runs from a directory an installer
+// registered for the next process. An MSI writes its directory there and not
+// into this process's PATH, and winget's listing can miss a package it has just
+// installed, so after a winget install exits 0 this is where the command is
+// (#3142). A failed read is absent: the listing still decides.
+func (in *Installer) inRegisteredPath(cmd string) bool {
+	if in.RegisteredPath == nil {
+		return false
+	}
+	dirs, err := in.RegisteredPath()
+	if err != nil || len(dirs) == 0 {
+		return false
+	}
+	return len(copiesOnPath(cmd, in.GOOS, strings.Join(dirs, string(os.PathListSeparator)), os.Getenv("PATHEXT"))) > 0
 }
 
 // managerLists asks the manager whether pkg is installed. A missing manager
@@ -212,6 +228,30 @@ func (in *Installer) refreshAptIndex() {
 	}
 }
 
+// wingetSourceDataMissing reports whether a winget run failed with 0x8a15000f,
+// APPINSTALLER_CLI_ERROR_SOURCE_DATA_MISSING: its local source cache is
+// incomplete, and a retry without a refresh reads the same cache (#2445). Go
+// spells a Windows exit code that large in hex.
+func wingetSourceDataMissing(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "0x8a15000f")
+}
+
+// refreshWingetSource runs `winget source update` once per Installer and
+// reports whether it ran now, so the install that hit the stale cache is
+// retried once and a later one is not refreshed again. A failed refresh is a
+// warning: the retry then reports the install's own error.
+func (in *Installer) refreshWingetSource() bool {
+	if in.wingetSourceAsked {
+		return false
+	}
+	in.wingetSourceAsked = true
+	_, _ = fmt.Fprintln(in.Out, "winget's source data is missing (0x8a15000f); refreshing it and retrying")
+	if err := in.Run("winget", "source", "update"); err != nil {
+		_, _ = fmt.Fprintf(in.Out, "winget source update failed (%v); retrying with the source as it is\n", err)
+	}
+	return true
+}
+
 // aptInstallArgv installs pkgs through apt-get, without sudo.
 func aptInstallArgv(pkgs ...string) []string {
 	return append([]string{"apt-get", "install", "-y", "--no-remove"}, pkgs...)
@@ -276,7 +316,11 @@ func (in *Installer) installSystem(t Tool) (Result, error) {
 		in.refreshAptIndex()
 	}
 	argv := in.systemInstallArgv(manager, pkg)
-	if err := in.Run(argv[0], argv[1:]...); err != nil {
+	err := in.Run(argv[0], argv[1:]...)
+	if manager == "winget" && wingetSourceDataMissing(err) && in.refreshWingetSource() {
+		err = in.Run(argv[0], argv[1:]...)
+	}
+	if err != nil {
 		if in.needsSudoPassword(argv) || in.markedCaskLostSudo(t, manager) {
 			return in.deferForSudo(t, wait), nil
 		}

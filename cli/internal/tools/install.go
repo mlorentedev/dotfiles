@@ -144,6 +144,10 @@ type Installer struct {
 	// HasCommand reports whether a package manager is on PATH. Nil means
 	// exec.LookPath; tests inject the answer.
 	HasCommand func(name string) bool
+	// RegisteredPath reads the PATH installers registered for the next process
+	// (env.RegisteredPath: the registry on Windows). A system entry's command
+	// there counts as present. Nil means none.
+	RegisteredPath func() ([]string, error)
 	// Query runs a package manager's read-only presence query for a "system"
 	// entry (dpkg-query, brew list, winget list). Nil means ExecRunner; tests
 	// inject the machine's answer, so no real manager is ever asked.
@@ -160,6 +164,9 @@ type Installer struct {
 	// aptIndexAsked records that this Installer has run `apt-get update`, which
 	// it does once, before its first apt install (refreshAptIndex).
 	aptIndexAsked bool
+	// wingetSourceAsked records that this Installer has run `winget source
+	// update`, which it does once, after an install hits 0x8a15000f.
+	wingetSourceAsked bool
 	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.

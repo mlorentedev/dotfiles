@@ -164,6 +164,70 @@ Describe 'Set-DotfBinary' {
     }
 }
 
+Describe 'Get-DotfQuarantine' {
+    BeforeAll {
+        # Stand-ins so Mock has commands to replace where Defender is absent.
+        function Get-MpThreatDetection { }
+        function Get-MpThreat { param($ThreatID) $null = $ThreatID }
+        $script:Work = 'C:\Users\dotf\AppData\Local\Temp\dotf-xovaqzhd.1dl'
+    }
+
+    It 'names the threat Defender found under the work directory' {
+        Mock Get-MpThreatDetection {
+            [pscustomobject]@{ ThreatID = 1; Resources = @('file:_C:\Users\Public\other.exe') }
+            [pscustomobject]@{ ThreatID = 2; Resources = @('file:_C:\Users\dotf\AppData\Local\Temp\dotf-xovaqzhd.1dl\dotf.exe') }
+        }
+        Mock Get-MpThreat { [pscustomobject]@{ ThreatName = 'Trojan:Win32/Bearfoos.A!ml' } } -ParameterFilter { $ThreatID -eq 2 }
+        Get-DotfQuarantine -Dir $script:Work | Should -BeExactly 'Trojan:Win32/Bearfoos.A!ml'
+    }
+
+    It 'is null when nothing under the work directory was detected' {
+        Mock Get-MpThreatDetection { [pscustomobject]@{ ThreatID = 1; Resources = @('file:_C:\Users\Public\dotf.exe') } }
+        Get-DotfQuarantine -Dir $script:Work | Should -BeNullOrEmpty
+    }
+
+    It 'is null when the Defender query fails' {
+        Mock Get-MpThreatDetection { throw 'simulated: Defender service stopped' }
+        Get-DotfQuarantine -Dir $script:Work | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Install-Dotf when Defender removes dotf.exe' {
+    # The download is mocked: a release zip that verifies but holds no dotf.exe
+    # is what the installer sees after Defender removed the extracted binary.
+    BeforeAll {
+        $script:Zip = Join-Path $TestDrive 'release.zip'
+        $readme = Join-Path $TestDrive 'README.txt'
+        Set-Content -LiteralPath $readme -Value 'no binary'
+        Compress-Archive -Path $readme -DestinationPath $script:Zip -Force
+        $script:Hash = (Get-FileHash -Path $script:Zip -Algorithm SHA256).Hash.ToLower()
+    }
+
+    BeforeEach {
+        Mock Get-DotfArch { 'arm64' }
+        Mock Get-Command { $null } -ParameterFilter { $Name -eq 'dotf' }
+        Mock Invoke-WebRequest {
+            if ($Uri -like '*checksums.txt') {
+                Set-Content -LiteralPath $OutFile -Value "$($script:Hash)  dotf_9.9.9_windows_arm64.zip"
+            } else {
+                Copy-Item -LiteralPath $script:Zip -Destination $OutFile
+            }
+        }
+    }
+
+    It 'says Defender quarantined it, by threat name' {
+        Mock Get-DotfQuarantine { 'Trojan:Win32/Bearfoos.A!ml' }
+        Install-Dotf -Version '9.9.9' -Dest (Join-Path $TestDrive 'bin') -WarningVariable warned 3>$null | Should -BeFalse
+        "$warned" | Should -BeLike '*Defender quarantined the downloaded dotf 9.9.9 as Trojan:Win32/Bearfoos.A!ml*'
+    }
+
+    It 'reports the plain failure when Defender found nothing' {
+        Mock Get-DotfQuarantine { $null }
+        Install-Dotf -Version '9.9.9' -Dest (Join-Path $TestDrive 'bin') -WarningVariable warned 3>$null | Should -BeFalse
+        "$warned" | Should -BeExactly 'install: dotf.exe not found in dotf_9.9.9_windows_arm64.zip'
+    }
+}
+
 Describe 'install.ps1 executed' {
     # Invoke-WebRequest has no file:// support, so the download path cannot run
     # here; the hand-off is driven through the "pinned version already on PATH"

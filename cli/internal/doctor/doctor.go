@@ -95,6 +95,8 @@ func Run(opts Options) (int, error) {
 		checkContractPath(sys, contract, rep)
 		checkRequiredBinaries(sys, contract, rep)
 	}
+	// A registry read, no fork: cheap enough for --quick, and it needs no contract.
+	checkForeignHome(sys, rep)
 
 	if !opts.Quick {
 		for _, c := range sweep(sys, cfg, contract, rep, opts, start) {
@@ -291,6 +293,7 @@ func (e sweepEnv) agents() []check {
 		{kind: kindMachine, run: func() { checkOpenCode(e.sys, e.cfg, e.rep) }},
 		{kind: kindIdentity, section: "Agent configs from secrets", restore: restoreBW, run: func() { checkAgentSecretConfigs(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkClaudeExtensions(e.sys, e.cfg, e.rep, e.opts.Claude) }},
+		{kind: kindMachine, run: func() { checkCopilotSettings(e.sys, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkCopilot(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkGolangciLint(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkModelMap(e.cfg, e.rep) }},
