@@ -53,6 +53,49 @@ func TestCheckCoreTools_HintsTheProvisioningCommand(t *testing.T) {
 	}
 }
 
+// Git for Windows puts only Git\cmd on the PATH, and a bare `bash` there may be
+// WSL's System32\bash.exe. So on Windows doctor looks for bash where dotf runs
+// it, under the root `git --exec-path` names, and ignores the PATH (#3214).
+func TestCheckCoreTools_WindowsFindsGitBashFromGitNotPath(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	bash := filepath.Join(root, "bin", "bash.exe")
+	cases := []struct {
+		name    string
+		install bool
+		onPath  []string
+		want    string
+		fails   bool
+	}{
+		{"installed, off the PATH", true, nil, "bash found (Git Bash: " + bash + ")", false},
+		{"missing, WSL bash on the PATH", false, []string{"bash"}, "Git Bash not found under " + root, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = os.RemoveAll(filepath.Dir(bash))
+			if tc.install {
+				if err := os.MkdirAll(filepath.Dir(bash), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(bash, []byte("fixture"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			sys := newSys(nil, tc.onPath, map[string]string{"git --exec-path": execPath + "\n"})
+			sys.GOOS = "windows"
+			var buf bytes.Buffer
+			checkCoreTools(sys, &Contract{}, capture(&buf))
+			out := buf.String()
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("want %q in\n%s", tc.want, out)
+			}
+			if failed := strings.Contains(out, "[FAIL] Git Bash"); failed != tc.fails {
+				t.Errorf("bash FAIL = %v, want %v\n%s", failed, tc.fails, out)
+			}
+		})
+	}
+}
+
 func TestCheckCoreTools_SkipsContractCovered(t *testing.T) {
 	// git+jq are contract-covered → core-tools must not re-report them. With
 	// neither on PATH, the only failures should be the OTHER core tools.
