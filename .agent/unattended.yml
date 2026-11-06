@@ -1,0 +1,35 @@
+# .agent/unattended.yml: the arming envelope for this run. The run reads it from
+# the committed copy only, and a PR that changes it is never merged.
+version: 1
+run_id: "autopilot-20261106t0653z"
+armed_by: manu
+armed_at: 2026-11-06T06:53:09Z
+expires_at: 2026-11-06T14:53:09Z
+objective: "Land #3216 and #3217, then fix Windows from-zero convergence bugs in the dotf CLI, one PR each."
+scope:
+  write_paths: ["cli/**", "docs/lessons/**", "docs/runbooks/**", "scripts/install.ps1", "tests/**", "specs/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "**/CLAUDE.md", "setup-linux.sh", "setup-windows.ps1", "versions.conf", ".agent/**"]
+  max_files: 8
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, pwsh, jq, python3]
+queue:
+  source: bitacora
+  # Windows from-zero convergence bugs fixable in the CLI. Excluded: anything
+  # labelled security, anything assigned to another session, anything needing
+  # a setup-script change (never grow setup scripts).
+  filter: "repo:mlorentedev/dotfiles is:open label:bug windows in:title -label:security no:assignee"
+  seed: [3172, 3142, 2445, 2438, 1874]   # #3172 = option C only (install.ps1 names a Defender quarantine)
+  max_items: 5
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant          # .github/merge-grant.yml on main; own PRs only
+  push: true
+  open_pr: true
+  advisor_tier: top
+  windows_vm: if-free            # `dotf vm windows` only when no guest is running; one run at a time
+notes:
+  - "GraphQL is shared and often exhausted: use gh api REST for issues, PRs and comments."
+  - "Never: secrets show, GH_TOKEN probes, force-push, go build over ~/.local/bin/dotf, release or dependabot PRs."
