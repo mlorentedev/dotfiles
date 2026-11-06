@@ -1,8 +1,8 @@
 name: PAT expiry preflight
 
 # Weekly liveness + expiry preflight for the PAT-backed Actions secrets that drive
-# automation: RELEASE_TOKEN (release-please tag push → goreleaser) and BITACORA_PAT
-# (Projects v2 board moves). A classic PAT expired silently and broke release-please's
+# automation: RELEASE_TOKEN (release-please tag push → goreleaser), BITACORA_PAT
+# (Projects v2 board moves) and RENOVATE_TOKEN (the Renovate run in ci-workflows). A classic PAT expired silently and broke release-please's
 # first run with "Bad credentials" (CLI-011/#369) — nothing warned beforehand.
 #
 # This job probes GET /user with each secret, reads the
@@ -58,6 +58,7 @@ jobs:
       WARN_DAYS: ${{ github.event.inputs.warn_days || '14' }}
       RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       BITACORA_PAT: ${{ secrets.BITACORA_PAT }}
+      RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
     steps:
       - name: Probe PAT-backed secrets and alert on expiry
         run: |
@@ -194,6 +195,8 @@ jobs:
           INVALID=0
           check_token "RELEASE_TOKEN" "${RELEASE_TOKEN}"
           check_token "BITACORA_PAT" "${BITACORA_PAT}"
+          # RENOVATE_TOKEN drives the weekly Renovate run in ci-workflows (#30 there).
+          check_token "RENOVATE_TOKEN" "${RENOVATE_TOKEN}"
           # RELEASE_TOKEN's job is to open release-please's PR — assert that capability,
           # not just that it authenticates (the gap that broke releases). BITACORA_PAT
           # drives a Projects v2 board, a different capability not probed here.
