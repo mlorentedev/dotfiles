@@ -233,6 +233,7 @@ func TestRenumber_KeepsTheIdStyleAndChangesOnlyTheNumber(t *testing.T) {
 		{"bare", "id: lesson-497-mine", "id: lesson-499-mine"},
 		{"double-quoted", `id: "lesson-497-mine"`, `id: "lesson-499-mine"`},
 		{"single-quoted", "id: 'lesson-497-mine'", "id: 'lesson-499-mine'"},
+		{"unspaced", "id:lesson-497-mine", "id:lesson-499-mine"},
 	} {
 		t.Run(style.name, func(t *testing.T) {
 			front := "---\n" + style.before + "\ntype: lesson\ntitle: Mine\ncreated: 2026-10-05\n---\n\n# Mine\n\nBody.\n"

@@ -222,6 +222,8 @@ func withID(raw []byte, id string) ([]byte, bool) {
 		if !isID {
 			continue
 		}
+		// The spacing after the colon is kept too: `id:lesson-1-x` is valid YAML.
+		gap := value[:len(value)-len(strings.TrimLeft(value, " \t"))]
 		switch value = strings.TrimSpace(value); {
 		case strings.HasPrefix(value, `"`):
 			value = `"` + id + `"`
@@ -230,7 +232,7 @@ func withID(raw []byte, id string) ([]byte, bool) {
 		default:
 			value = id
 		}
-		lines[i] = "id: " + value + lines[i][len(line):]
+		lines[i] = "id:" + gap + value + lines[i][len(line):]
 		return []byte(strings.Join(lines, "")), true
 	}
 	return raw, false
