@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,5 +56,27 @@ func TestReviewRefusesDirtyTreeWithoutAllowDirty(t *testing.T) {
 	}
 	if !strings.Contains(errOut, "probe.go") || !strings.Contains(errOut, "will not see") {
 		t.Errorf("--allow-dirty launched without saying what the reviewer will not see:\n%s", errOut)
+	}
+}
+
+// An unreadable tree refuses, and --allow-dirty launches it with a warning,
+// never silently (PR-Agent on #3205).
+func TestReviewWarnsWhenAllowDirtyLaunchesAnUnreadableTree(t *testing.T) {
+	root := makeRepo(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	prev := callerDirt
+	callerDirt = func(string) ([]string, error) { return nil, errors.New("index.lock exists") }
+	t.Cleanup(func() { callerDirt = prev })
+
+	if _, _, err := execute(t, "spec", "review", "AI-001-x", "--dry-run"); err == nil || !strings.Contains(err.Error(), "--allow-dirty") {
+		t.Errorf("an unreadable tree did not refuse naming --allow-dirty: %v", err)
+	}
+	_, errOut, err := execute(t, "spec", "review", "AI-001-x", "--dry-run", "--allow-dirty")
+	if err != nil {
+		t.Fatalf("--allow-dirty still refused: %v", err)
+	}
+	if !strings.Contains(errOut, "cannot read") || !strings.Contains(errOut, "index.lock") {
+		t.Errorf("--allow-dirty launched an unreadable tree silently:\n%s", errOut)
 	}
 }

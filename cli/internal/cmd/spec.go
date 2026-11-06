@@ -303,6 +303,10 @@ func checkCallerDirt(cmd *cobra.Command, specDir, id string, allowDirty bool) er
 		return fmt.Errorf("cannot read the working tree's state, so it cannot be shown that the reviewer sees all the work: %w\n"+
 			"Fix the repository, or pass --allow-dirty to launch anyway", err)
 	}
+	if err != nil {
+		cmd.PrintErrf("warning: cannot read the working tree's state, so the reviewer may not see all the work: %v\n", err)
+		return nil
+	}
 	if len(dirt) == 0 {
 		return nil
 	}
