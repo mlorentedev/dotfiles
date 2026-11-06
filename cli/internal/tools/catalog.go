@@ -9,10 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
 
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
 
@@ -21,12 +23,34 @@ type Catalog struct {
 	Tools []Tool `json:"tools"`
 }
 
+// AppliesToRoles reports whether a no-argument install includes the tool.
+func (t Tool) AppliesToRoles(roles []string) bool {
+	if len(t.Roles) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(t.Roles, func(role string) bool {
+		return slices.Contains(roles, role)
+	})
+}
+
+// ForRoles keeps common tools plus those selected by a machine role.
+func ForRoles(list []Tool, roles []string) []Tool {
+	out := make([]Tool, 0, len(list))
+	for _, tool := range list {
+		if tool.AppliesToRoles(roles) {
+			out = append(out, tool)
+		}
+	}
+	return out
+}
+
 // Tool is one catalog entry: a pinned, cross-OS-installable package.
 type Tool struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Profile string `json:"profile"`
-	Source  Source `json:"source"`
+	Name    string   `json:"name"`
+	Version string   `json:"version"`
+	Profile string   `json:"profile"`
+	Roles   []string `json:"roles,omitempty"`
+	Source  Source   `json:"source"`
 }
 
 // Source declares how to fetch a tool. Four kinds:
@@ -112,6 +136,9 @@ type Source struct {
 	// expand {version}. The installer (CLI-029 PR-B) downloads it and verifies the
 	// fetched asset against its entry.
 	Checksums string `json:"checksums"`
+	// Member names the exact regular-file path to extract from a github-archive
+	// asset. It uses the same GOOS or GOOS/GOARCH keys as Asset.
+	Member map[string]string `json:"member,omitempty"`
 }
 
 // SelfInstall is a source's self_install: the OSes it applies to and the
@@ -215,19 +242,45 @@ func Load(path string) (Catalog, error) {
 			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q is listed more than once", path, t.Name)
 		}
 		seen[t.Name] = struct{}{}
+		roleSeen := map[string]bool{}
+		for _, role := range t.Roles {
+			if role == "" || roleSeen[role] {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has an empty or duplicate role", path, t.Name)
+			}
+			if !slices.Contains(envpkg.KnownRoles(), role) {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has unknown role %q", path, t.Name, role)
+			}
+			roleSeen[role] = true
+		}
 		// A misspelt platform makes the tool unsupported everywhere, and the
 		// installer reports an unsupported tool as a skip, so nothing else
 		// would ever say so.
 		// A missing asset is a skip, so a release tool with no asset map (or
 		// one misspelt "assets", which the decoder drops) would install
 		// nothing anywhere and say only "no release asset".
-		if t.Source.Type == "github-release" && len(t.Source.Asset) == 0 {
-			return Catalog{}, fmt.Errorf("parse package catalog %q: github-release tool %q declares no asset", path, t.Name)
+		if isGitHubSource(t.Source.Type) && len(t.Source.Asset) == 0 {
+			return Catalog{}, fmt.Errorf("parse package catalog %q: %s tool %q declares no asset", path, t.Source.Type, t.Name)
 		}
 		// Likewise a misspelt key.
 		for key := range t.Source.Asset {
 			if !platform.ValidKey(key) {
 				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has asset key %q (want a GOOS, or GOOS/GOARCH with amd64 or arm64)", path, t.Name, key)
+			}
+			if t.Source.Type == "github-archive" {
+				if len(t.Source.Member) == 0 {
+					return Catalog{}, fmt.Errorf("parse package catalog %q: github-archive tool %q declares no member", path, t.Name)
+				}
+				for key, member := range t.Source.Member {
+					if !platform.ValidKey(key) {
+						return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has member key %q (want a GOOS, or GOOS/GOARCH with amd64 or arm64)", path, t.Name, key)
+					}
+					if !safeArchiveMember(member) {
+						return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q member %q must be a safe relative archive path", path, t.Name, member)
+					}
+				}
+				if err := validateArchiveSource(t); err != nil {
+					return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q: %w", path, t.Name, err)
+				}
 			}
 		}
 		if p := platform.Unknown(t.Source.Platforms); p != "" {
@@ -250,7 +303,7 @@ func Load(path string) (Catalog, error) {
 // KnownSourceTypes are the source.type values this dotf reads. Install skips any
 // other with a warning, so a guard (not the reader) is what catches a misspelt
 // type in the catalog that ships.
-var KnownSourceTypes = []string{"github-release", "npm", "uv-tool", "system"}
+var KnownSourceTypes = []string{"github-release", "github-archive", "npm", "uv-tool", "system"}
 
 // systemKeys are the source keys a "system" entry may carry. The typed decoder
 // drops any other key without a word, so a misspelt or unsupported manager
@@ -428,6 +481,18 @@ func (t Tool) AssetName(goos, goarch string) string {
 	return t.expand(tmpl, goarch)
 }
 
+// MemberName resolves the exact member path for one platform.
+func (t Tool) MemberName(goos, goarch string) string {
+	tmpl, ok := t.Source.Member[goos+"/"+goarch]
+	if !ok {
+		tmpl, ok = t.Source.Member[goos]
+	}
+	if !ok {
+		return ""
+	}
+	return t.expand(tmpl, goarch)
+}
+
 // ChecksumsName resolves the sha256-manifest filename, or "" when the catalog
 // declares none. {goarch} is accepted for symmetry but checksum manifests are
 // arch-agnostic, so it is rarely present.
@@ -442,4 +507,43 @@ func (t Tool) ChecksumsName(goarch string) string {
 // checksum templates.
 func (t Tool) expand(tmpl, goarch string) string {
 	return strings.NewReplacer("{version}", t.Version, "{goarch}", goarch).Replace(tmpl)
+}
+
+func isGitHubSource(sourceType string) bool {
+	return sourceType == "github-release" || sourceType == "github-archive"
+}
+
+func safeArchiveMember(member string) bool {
+	if member == "" || strings.Contains(member, `\`) || path.IsAbs(member) {
+		return false
+	}
+	if len(member) >= 2 && member[1] == ':' {
+		return false
+	}
+	return path.Clean(member) == member && member != "." && member != ".." &&
+		!strings.HasPrefix(member, "../")
+}
+
+func validateArchiveSource(t Tool) error {
+	for _, asset := range t.Source.Asset {
+		if !supportedArchive(asset) {
+			return fmt.Errorf("asset %q has an unsupported archive type", asset)
+		}
+	}
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, goarch := range []string{"amd64", "arm64"} {
+			hasAsset := t.AssetName(goos, goarch) != ""
+			hasMember := t.MemberName(goos, goarch) != ""
+			if hasAsset != hasMember {
+				return fmt.Errorf("asset and member must resolve for the same platforms (%s/%s)", goos, goarch)
+			}
+		}
+	}
+	return nil
+}
+
+func supportedArchive(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".zip") || strings.HasSuffix(lower, ".tar.gz") ||
+		strings.HasSuffix(lower, ".tgz")
 }

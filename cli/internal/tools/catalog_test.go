@@ -138,6 +138,25 @@ func TestLoad_Platforms(t *testing.T) {
 	}
 }
 
+func TestToolAppliesToRoles(t *testing.T) {
+	common := Tool{Name: "common"}
+	bridge := Tool{Name: "ts-bridge", Roles: []string{"ts-bridge-client"}}
+	if !common.AppliesToRoles(nil) || !common.AppliesToRoles([]string{"other"}) {
+		t.Fatal("a tool with no roles must apply everywhere")
+	}
+	if bridge.AppliesToRoles(nil) || bridge.AppliesToRoles([]string{"other"}) ||
+		!bridge.AppliesToRoles([]string{"ts-bridge-client"}) {
+		t.Fatal("a role-bound tool did not require a matching role")
+	}
+}
+
+func TestLoad_RejectsUnknownToolRole(t *testing.T) {
+	body := `{"tools":[{"name":"tool","roles":["ts-bridge-clinet"],"source":{"type":"system","apt":"tool"}}]}`
+	if _, err := Load(writeCatalog(t, body)); err == nil || !strings.Contains(err.Error(), "ts-bridge-clinet") {
+		t.Fatalf("Load() error = %v", err)
+	}
+}
+
 // The shipped catalog declares hive as a uv tool on every OS, which hive
 // installs itself on Windows: there hive owns its install layout (hive
 // ADR-019), so the catalog must never put a uv copy there. A misspelt
@@ -214,6 +233,43 @@ func TestLoad_RejectsAReleaseToolWithNoAsset(t *testing.T) {
 		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "declares no asset") {
 			t.Errorf("%s: want a load error, got %v", name, err)
 		}
+	}
+}
+
+func TestLoad_AcceptsGitHubArchiveAndResolvesMember(t *testing.T) {
+	body := `{"tools":[{"name":"ts-bridge","version":"1.20.0","profile":"full","source":{
+		"type":"github-archive","repo":"mlorentedev/ts-bridge",
+		"asset":{"windows":"ts-bridge-v{version}-windows-{goarch}.zip"},
+		"checksums":"checksums.txt",
+		"member":{"windows":"ts-bridge.exe"}
+	}}]}`
+	c, err := Load(writeCatalog(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool := c.Tools[0]
+	if got := tool.MemberName("windows", "amd64"); got != "ts-bridge.exe" {
+		t.Fatalf("MemberName() = %q", got)
+	}
+}
+
+func TestLoad_RejectsMalformedGitHubArchive(t *testing.T) {
+	cases := []struct {
+		name, source, want string
+	}{
+		{"missing member", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s"}`, "member"},
+		{"unknown member key", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"macos":"tool"}}`, "macos"},
+		{"asset member mismatch", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"linux":"tool"}}`, "same platforms"},
+		{"parent escape", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"windows":"../tool.exe"}}`, "safe relative"},
+		{"absolute member", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"windows":"C:/tool.exe"}}`, "safe relative"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `{"tools":[{"name":"tool","version":"1.0.0","source":` + tc.source + `}]}`
+			if _, err := Load(writeCatalog(t, body)); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Load() error = %v, want %q", err, tc.want)
+			}
+		})
 	}
 }
 
