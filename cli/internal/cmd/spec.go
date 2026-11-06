@@ -276,7 +276,7 @@ commit and the tree. --initial is refused for any other spec.`,
 			}
 			// The caller's spec folder, uncommitted rounds and the request just
 			// written included, is what the reviewer reads (AC6).
-			if err := copySpecFolder(specDir, treeSpec); err != nil {
+			if err := mirrorSpecFolder(specDir, treeSpec); err != nil {
 				return errors.Join(fmt.Errorf("copying specs/%s/ into the review worktree: %w", id, err), removeReviewTree(tree.path))
 			}
 
@@ -290,6 +290,7 @@ commit and the tree. --initial is refused for any other spec.`,
 			// reported here, with the transcript still in hand, instead of being left
 			// for whoever next tries to archive.
 			runErr := runForeground(tree.path, launch, transcript)
+			finishLeftoverReviewTree(cmd.ErrOrStderr(), filepath.Join(treeSpec, slot.Review), tree.path, specDir)
 			return foregroundOutcome(slot, specDir, transcript, chosen.Runner, runErr)
 		},
 	}

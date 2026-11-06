@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // HARNESS-142 AC4: the reviewer works in the review worktree, on both runners.
@@ -78,6 +79,50 @@ func TestReviewWorktreeCarriesEarlierRounds(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(treeSpec, "review.md")); !os.IsNotExist(err) {
 		t.Errorf("the rotated verdict is still in the review slot of the worktree: %v", err)
+	}
+}
+
+// A verdict committed at HEAD is checked out into the worktree; once the caller
+// rotated it aside, the worktree must not keep it, or a run that ends without a
+// verdict copies the previous round's back as if it were new.
+func TestReviewWorktreeDropsAVerdictTheCallerRotated(t *testing.T) {
+	root := makeRepo(t)
+	tree := stubReviewTree(t)
+	createReviewTree = func(rt reviewTree, _ string, _ time.Duration) error {
+		committed := filepath.Join(rt.path, "specs", "AI-001-x")
+		if err := os.MkdirAll(committed, 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(committed, "review.md"), []byte("---\nverdict: PASS\n---\n"), 0o644)
+	}
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	stubLaunch(t, true)
+
+	if out, errOut, err := execute(t, "spec", "review", "AI-001-x"); err != nil {
+		t.Fatalf("launch failed: %v\n%s", err, out+errOut)
+	}
+	if _, err := os.Stat(filepath.Join(tree, "specs", "AI-001-x", "review.md")); !os.IsNotExist(err) {
+		t.Errorf("the worktree kept the committed verdict the caller rotated aside: %v", err)
+	}
+}
+
+// A foreground run whose reviewer never started (here, the transcript could not
+// be created) leaves no review worktree behind for the lease to outlive.
+func TestReviewForegroundRemovesTheWorktreeWhenTheRunNeverStarts(t *testing.T) {
+	root := makeRepo(t)
+	tree := stubReviewTree(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	prev := runForeground
+	runForeground = func(string, []string, string) error { return os.ErrPermission }
+	t.Cleanup(func() { runForeground = prev })
+
+	if _, _, err := execute(t, "spec", "review", "AI-001-x", "--foreground"); err == nil {
+		t.Fatal("a foreground run that never started succeeded")
+	}
+	if _, err := os.Stat(tree); !os.IsNotExist(err) {
+		t.Errorf("the review worktree outlived a foreground run that never started: %v", err)
 	}
 }
 
