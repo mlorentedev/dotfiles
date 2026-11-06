@@ -16,6 +16,9 @@ import (
 type TreeSnapshot struct {
 	prefix  string // the spec folder, relative to the repository root
 	entries map[string]string
+	// movedIn holds the sources, outside the spec folder, of renames into it:
+	// the entries name only the destination, which the folder filter drops.
+	movedIn []string
 }
 
 // SnapshotTree records the state of the repository holding review. Paths under
@@ -38,15 +41,37 @@ func SnapshotTree(review string) (TreeSnapshot, error) {
 			continue
 		}
 		code, path := f[:2], f[3:]
+		inside := snap.prefix != "" && strings.HasPrefix(path, snap.prefix)
 		if code[0] == 'R' || code[0] == 'C' {
 			i++ // -z writes a rename's source as the next field
+			if code[0] == 'R' && inside && i < len(fields) && !strings.HasPrefix(fields[i], snap.prefix) {
+				snap.movedIn = append(snap.movedIn, fields[i])
+			}
 		}
-		if snap.prefix != "" && strings.HasPrefix(path, snap.prefix) {
+		if inside {
 			continue
 		}
 		snap.entries[path] = code
 	}
 	return snap, nil
+}
+
+// CallerDirt lists, sorted, the tracked changes and untracked files outside
+// specDir in the repository holding it (HARNESS-142 AC5). A reviewer reads a
+// fresh worktree at the reviewed commit, so these are what it will not see;
+// the spec folder's own content is carried into that worktree and is left out.
+func CallerDirt(specDir string) ([]string, error) {
+	snap, err := SnapshotTree(filepath.Join(specDir, "review.md"))
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(snap.entries)+len(snap.movedIn))
+	for path := range snap.entries {
+		paths = append(paths, path)
+	}
+	paths = append(paths, snap.movedIn...)
+	sort.Strings(paths)
+	return paths, nil
 }
 
 // StrayWrites lists the paths whose state after differs from before, sorted.

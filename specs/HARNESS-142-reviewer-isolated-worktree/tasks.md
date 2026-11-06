@@ -32,7 +32,7 @@ Worktree package (`cli/internal/worktree/`):
 
 Launch (`cli/internal/cmd/spec.go`, `cli/internal/spec/`):
 
-- [ ] [P] [AC5] Test then code: `spec review` refuses on a tracked change or untracked file outside `specs/<id>/` (a non-empty `spec.SnapshotTree`, which already leaves the spec folder out), naming the paths and `--allow-dirty`; with the flag it launches and warns; dirt inside `specs/<id>/` launches.
+- [x] [P] [AC5] Test then code: `spec review` refuses on a tracked change or untracked file outside `specs/<id>/` (a non-empty `spec.SnapshotTree`, which already leaves the spec folder out), naming the paths and `--allow-dirty`; with the flag it launches and warns; dirt inside `specs/<id>/` launches.
 - [ ] [AC4] Test: the launch path builds the agy argv with `--add-dir <worktree>`, `TmuxWrap` with the worktree as its start directory, and the prompt naming the fresh worktree at `<sha>`; red against today's repoRoot. Enumerate every `filepath.Join(repoRoot, "specs", id, ...)` on the launch path and assign it a root: reviewer-side (review file, transcript, `.stderr`, the `--review` and `--transcript` flags to `deadline`, the stray-write snapshot) is the worktree; caller-side (`review-request.json`, round rotation, the copy-back destination) is the caller's root.
 - [ ] [AC4] Implement: the launcher creates the review worktree (name: spec id, slot, nonce; TTL: deadline plus margin) and passes it and the caller's spec folder to `deadline`; test green.
 - [ ] [AC6] Test then code: after round rotation, copy the caller's uncommitted `specs/<id>/` content into the worktree's spec folder; a second first-signer round finds `review-round1.md`.
