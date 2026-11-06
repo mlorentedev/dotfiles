@@ -158,3 +158,51 @@ func sddSectionCount(content string, n int) bool {
 	}
 	return count == n
 }
+
+// A heading quoted inside a fenced code block is example text, not a section of
+// the file. hasSection and replaceSection back both the SDD and the Lanes
+// sections, so a fenced quote must neither count as the section nor be rewritten.
+func TestSectionHelpers_IgnoreHeadingsInsideFences(t *testing.T) {
+	const quoted = "# AGENTS.md\n\nHow to write a section:\n\n```md\n## Lanes\nbody of an example\n```\n\n## Other\nkept\n"
+
+	if hasSection(quoted, lanesHeading) {
+		t.Error("hasSection counted a heading inside a fenced block as the section")
+	}
+	if got := replaceSection(quoted, lanesHeading, "## Lanes\nnew"); got != quoted {
+		t.Errorf("replaceSection rewrote text with no real section:\n%s", got)
+	}
+
+	real := quoted + "\n## Lanes\nold body\n\n## Tail\nkept too\n"
+	if !hasSection(real, lanesHeading) {
+		t.Fatal("hasSection missed the real section after a fenced quote")
+	}
+	want := quoted + "\n## Lanes\nnew\n## Tail\nkept too\n"
+	if got := replaceSection(real, lanesHeading, "## Lanes\nnew"); got != want {
+		t.Errorf("replaceSection touched the fenced quote or the wrong region:\n got: %q\nwant: %q", got, want)
+	}
+
+	// A fenced `## ` line inside the old body must not end the replaced region early.
+	inBody := "## Lanes\nold\n```\n## example\n```\nstill old\n\n## Tail\nkept\n"
+	if got := replaceSection(inBody, lanesHeading, "## Lanes\nnew"); got != "## Lanes\nnew\n## Tail\nkept\n" {
+		t.Errorf("a fenced H2 inside the old body ended the replaced region early:\n%q", got)
+	}
+}
+
+func TestBootstrapLane_ForceKeepsFencedQuote(t *testing.T) {
+	root := t.TempDir()
+	prior := "# AGENTS.md\n\n```md\n## Lanes\nexample only\n```\n\n## Other\nkept\n"
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte(prior), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := BootstrapLane(root, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Agents != "appended" {
+		t.Errorf("Agents = %q, want appended: the only heading was a fenced quote", res.Agents)
+	}
+	got := readLaneFile(t, root, "AGENTS.md")
+	if !strings.HasPrefix(got, prior[:len(prior)-1]) {
+		t.Errorf("the prior content, fence included, did not survive:\n%s", got)
+	}
+}
