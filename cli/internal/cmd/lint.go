@@ -13,6 +13,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/docpaths"
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/pwsh"
 )
 
@@ -22,7 +24,73 @@ func newLintCmd() *cobra.Command {
 		Short: "Run CI's lint jobs on this machine",
 	}
 	lint.AddCommand(newLintPowerShellCmd())
+	lint.AddCommand(newLintDocPathsCmd())
 	return lint
+}
+
+func newLintDocPathsCmd() *cobra.Command {
+	var repo, policy string
+	cmd := &cobra.Command{
+		Use:          "doc-paths [file...]",
+		Short:        "Verify live repo paths named by active instruction files",
+		Args:         cobra.ArbitraryArgs,
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, files []string) error {
+			return runLintDocPaths(cmd.OutOrStdout(), cmd.ErrOrStderr(), repo, policy, files)
+		},
+	}
+	cmd.Flags().StringVar(&repo, "repo", "", "checkout to lint (default: the one the working directory is in)")
+	cmd.Flags().StringVar(&policy, "policy", "", "policy file (default: <repo>/harness/doc-paths.json)")
+	return cmd
+}
+
+func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []string) error {
+	if repo == "" {
+		root, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+		if err != nil {
+			return errors.New("not inside a git checkout: run from the checkout or pass --repo")
+		}
+		repo = strings.TrimSpace(string(root))
+	}
+	if policyPath == "" {
+		policyPath = filepath.Join(repo, "harness", "doc-paths.json")
+	}
+	policy, err := docpaths.LoadPolicy(policyPath)
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		files, err = docpaths.Discover(repo, policy)
+		if err != nil {
+			return err
+		}
+	}
+	report, err := docpaths.CheckFiles(docpaths.CheckOptions{
+		RepoRoot: repo, VaultRoot: envpkg.ResolvePath("VAULT_PATH"), Policy: policy,
+	}, files)
+	if err != nil {
+		return err
+	}
+	return printDocPathReport(stdout, stderr, report)
+}
+
+func printDocPathReport(stdout, stderr io.Writer, report docpaths.Report) error {
+	byFile := make(map[string][]docpaths.Finding, len(report.Checked))
+	for _, finding := range report.Findings {
+		byFile[finding.File] = append(byFile[finding.File], finding)
+	}
+	for _, file := range report.Checked {
+		if len(byFile[file]) == 0 {
+			_, _ = fmt.Fprintf(stdout, "doc-paths: OK %s\n", file)
+		}
+	}
+	for _, finding := range report.Findings {
+		_, _ = fmt.Fprintf(stderr, "%s: %s: %s\n", finding.File, finding.Message, finding.Token)
+	}
+	if len(report.Findings) > 0 {
+		return withExitCode(1, fmt.Errorf("%d doc-path finding(s)", len(report.Findings)))
+	}
+	return nil
 }
 
 func newLintPowerShellCmd() *cobra.Command {

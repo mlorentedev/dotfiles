@@ -1,0 +1,58 @@
+[
+  {
+    "id": "BUG-165-doc-path-lint-engine-f1",
+    "behavior": "The Go command preserves every existing accepted and rejected doc-path behavior, including discovery, globs, escapes, vault paths, Windows worktrees and zsh source invariants.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'Test(CheckFiles|Discover|CurrentRepository)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f2",
+    "behavior": "The full repository scan completes in at most two seconds on Windows and is deterministically ordered.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'TestCurrentRepository|TestCheckFilesDeterministicOutput'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f3",
+    "behavior": "PR 1 exposes `dotf lint doc-paths` and CI coverage while leaving the shell hook operational.",
+    "verification": "cd cli && go test ./internal/cmd -run TestLintDocPaths && test -z \"$(git diff --name-only origin/main...HEAD -- .pre-commit-config.yaml scripts/check-doc-paths.sh tests/check-doc-paths.bats tests/check-doc-paths-real.bats)\"",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f4",
+    "behavior": "After release, pre-commit uses the CLI and the shell guard plus both BATS files are absent with no dangling references.",
+    "verification": "test ! -e scripts/check-doc-paths.sh && test ! -e tests/check-doc-paths.bats && test ! -e tests/check-doc-paths-real.bats && ! git grep -n 'check-doc-paths.sh'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f5",
+    "behavior": "Governed instruction or policy changes trigger the Go guard before merge.",
+    "verification": "cd cli && go test ./internal/docpaths -run TestCurrentRepository && git grep -n 'harness/doc-paths.json' -- .github/workflows/cli.yml",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f6",
+    "behavior": "Invalid policy, Git failures, missing paths, empty globs and repo escapes fail non-zero; inability to run never becomes success.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'Test(LoadPolicy|CheckFiles|DiscoverFails)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f7",
+    "behavior": "The checkout-owned policy is versioned and rejects unknown fields or unsupported versions before scanning.",
+    "verification": "cd cli && go test ./internal/docpaths -run TestLoadPolicy",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f8",
+    "behavior": "Behavior tests are synthetic and the real-repository performance check is read-only.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'TestFixturesStayInTempRoot|TestCurrentRepositoryReadOnly'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
