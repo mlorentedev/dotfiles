@@ -112,3 +112,45 @@ func ghEnableDeleteBranchOnMerge(repo string) error {
 	return exec.Command("gh", "api", "-X", "PATCH", "/repos/"+repo,
 		"-f", "delete_branch_on_merge=true").Run()
 }
+
+// squashTitle and squashMessage make a squash commit the PR title with no
+// body. The default body is the branch's commit messages, whose `Refs owner/repo#N`
+// lines release-please's default changelog renders as `closes`, so merging a
+// release PR would close those issues (ci-workflows#24, CI-005).
+const (
+	squashTitle   = "PR_TITLE"
+	squashMessage = "BLANK"
+)
+
+// ApplySquashMergeDefaults ensures squash merges use the PR title and a blank
+// body on repo. Its outcomes mirror ApplyDeleteBranchOnMerge: "skipped" with
+// err==nil when gh or the repo is unreachable, "already-set" as a no-op,
+// "dry-run" without a PATCH, "set" after one, and an error when the PATCH fails.
+func ApplySquashMergeDefaults(repo string, dryRun bool) (GitHubResult, error) {
+	res := GitHubResult{Repo: repo}
+	if _, err := exec.LookPath("gh"); err != nil {
+		res.Action, res.Reason = "skipped", "gh CLI not found (install https://cli.github.com/, then re-run)"
+		return res, nil
+	}
+	out, err := exec.Command("gh", "api", "/repos/"+repo,
+		"--jq", `.squash_merge_commit_title + " " + .squash_merge_commit_message`).Output()
+	if err != nil {
+		res.Action, res.Reason = "skipped", "could not query repo via gh (not authenticated, offline, or repo not found)"
+		return res, nil
+	}
+	switch {
+	case strings.TrimSpace(string(out)) == squashTitle+" "+squashMessage:
+		res.Action = "already-set"
+	case dryRun:
+		res.Action = "dry-run"
+	default:
+		if err := exec.Command("gh", "api", "-X", "PATCH", "/repos/"+repo,
+			"-f", "squash_merge_commit_title="+squashTitle,
+			"-f", "squash_merge_commit_message="+squashMessage).Run(); err != nil {
+			return res, fmt.Errorf("PATCH squash merge defaults on %s failed "+
+				"(insufficient permissions, or repo archived?): %w", repo, err)
+		}
+		res.Action = "set"
+	}
+	return res, nil
+}

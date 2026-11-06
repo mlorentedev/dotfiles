@@ -43,8 +43,11 @@ esac
 # the list is empty. A stub that drops the trailing newline makes `while read`
 # discard the final item — a failure the live script does not have.
 case "$1 $2" in
-    "issue list") [ -n "${STUB_ISSUES:-}" ] && printf '%s\n' "$STUB_ISSUES" ;;
-    "pr list")    [ -n "${STUB_PRS:-}" ] && printf '%s\n' "$STUB_PRS" ;;
+    "repo list")  [ -z "${STUB_REPO_LIST_RC:-}" ] || exit "$STUB_REPO_LIST_RC"
+                  printf '%s\n' "${STUB_REPOS:-}" ;;
+    "issue list") [ -z "${STUB_LIST_RC:-}" ] || exit "$STUB_LIST_RC"
+                  if [ -n "${STUB_ISSUES:-}" ]; then printf '%s\n' "$STUB_ISSUES"; fi ;;
+    "pr list")    if [ -n "${STUB_PRS:-}" ]; then printf '%s\n' "$STUB_PRS"; fi ;;
 esac
 exit 0
 STUB
@@ -155,8 +158,9 @@ esac
 # the list is empty. A stub that drops the trailing newline makes `while read`
 # discard the final item — a failure the live script does not have.
 case "$1 $2" in
-    "issue list") [ -n "${STUB_ISSUES:-}" ] && printf '%s\n' "$STUB_ISSUES" ;;
-    "pr list")    [ -n "${STUB_PRS:-}" ] && printf '%s\n' "$STUB_PRS" ;;
+    "issue list") [ -z "${STUB_LIST_RC:-}" ] || exit "$STUB_LIST_RC"
+                  if [ -n "${STUB_ISSUES:-}" ]; then printf '%s\n' "$STUB_ISSUES"; fi ;;
+    "pr list")    if [ -n "${STUB_PRS:-}" ]; then printf '%s\n' "$STUB_PRS"; fi ;;
 esac
 exit 0
 STUB
@@ -164,6 +168,39 @@ STUB
     run "$SCRIPT" --backfill-only demo
     [ "$status" -ne 0 ]
     [[ "$output" == *"1 ensured, 1 failed"* ]] || false
+}
+
+@test "a listing that fails fails the repo, never a green partial backfill" {
+    default_issues
+    STUB_LIST_RC=1 run "$SCRIPT" --backfill-only demo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"❌ demo: backfill — cannot list every open issue and PR"* ]] || false
+    [[ "$output" != *"✅ demo: backfill"* ]] || false
+    [ "$(count_calls addProjectV2ItemById)" -eq 0 ]
+}
+
+@test "a listing that reaches the limit fails rather than drop what is past it" {
+    default_issues
+    LIST_LIMIT=2 run "$SCRIPT" --backfill-only demo
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"reached 2"* ]] || false
+}
+
+@test "with no repo named, discovery takes every repo that is neither archived nor a fork" {
+    export STUB_REPOS='false false live
+true false archived
+false true forked'
+    run "$SCRIPT" --backfill-only
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"1 repo(s)"* ]] || false
+    [[ "$output" == *"live: backfill"* ]] || false
+    [[ "$output" != *"archived"* && "$output" != *"forked"* ]] || false
+}
+
+@test "a repository listing that fails stops the run, never a green run over no repo" {
+    STUB_REPO_LIST_RC=1 run "$SCRIPT" --backfill-only
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"cannot list the repositories"* ]] || false
 }
 
 @test "a repo with nothing to add stays green - the healthy no-op" {
@@ -263,4 +300,127 @@ STUB
     run "$SCRIPT" --backfill-only demo
     [ "$status" -eq 0 ]
     [ ! -e "$DOTF_LOG" ]
+}
+
+# ── a protected branch: the PR path (#3160 item 9) ────────────────────────────
+
+# gh stub for a protected default branch: a PUT without `branch=` is refused, as
+# GitHub answers 409, so every workflow takes the PR path. STUB_OPEN_PR is the
+# number an open PR on ci/bitacora-workflows answers with; STUB_BRANCH_COPY makes
+# the branch already carry the canonical copies.
+protected_stub() {
+    cat > "$FIX/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_LOG"
+all="$*"
+case "$all" in
+    *"projectV2(number: 1) { id }"*) printf 'PVT_test123\n'; exit 0 ;;
+    *"-X PUT"*contents/*branch=*) exit 0 ;;
+    *"-X PUT"*contents/*) exit 1 ;;
+    *"-X POST"*git/refs*) exit "${STUB_BRANCH_EXISTS:-0}" ;;
+    *"?ref=ci/bitacora-workflows -q .content"*)
+        wf="${all%%\?ref=*}"; wf="${wf##*/}"
+        [ -n "${STUB_BRANCH_COPY:-}" ] && base64 < "$CANON/$wf"
+        exit 0 ;;
+    *"pr list"*"--head ci/bitacora-workflows"*)
+        [ -n "${STUB_PR_LIST_FAILS:-}" ] && exit 1
+        [ -n "${STUB_OPEN_PR:-}" ] && printf '%s\n' "$STUB_OPEN_PR"
+        exit 0 ;;
+esac
+exit 0
+STUB
+    chmod +x "$FIX/bin/gh"
+    export CANON="$BATS_TEST_DIRNAME/../.github/workflows"
+}
+
+@test "a re-run with the rollout PR open adds commits to its branch, never resetting it" {
+    protected_stub
+    STUB_OPEN_PR=3097 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 0 ]
+    refute_grep 'force=true' "$GH_LOG"
+    refute_grep 'git/refs' "$GH_LOG"
+    refute_grep 'pr create' "$GH_LOG"
+    grep -q -- '-X PUT .*branch=ci/bitacora-workflows' "$GH_LOG"
+    [[ "$output" == *"open PR #3097 updated"* ]] || false
+}
+
+@test "a re-run whose open PR already carries the copies commits nothing" {
+    protected_stub
+    STUB_OPEN_PR=3097 STUB_BRANCH_COPY=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 0 ]
+    refute_grep 'branch=ci/bitacora-workflows' "$GH_LOG"
+}
+
+@test "with no open PR a leftover branch is reset to base and a PR is opened" {
+    protected_stub
+    STUB_BRANCH_EXISTS=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -eq 0 ]
+    grep -q 'force=true' "$GH_LOG"
+    grep -q 'pr create' "$GH_LOG"
+    [[ "$output" == *"PR opened for review"* ]] || false
+}
+
+@test "a failed open-PR lookup fails the repo and never resets the branch" {
+    protected_stub
+    STUB_PR_LIST_FAILS=1 STUB_BRANCH_EXISTS=1 BITACORA_PAT=stub run "$SCRIPT" demo
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"demo: cannot list open PRs on ci/bitacora-workflows"* ]] || false
+    refute_grep 'force=true' "$GH_LOG"
+    refute_grep 'pr create' "$GH_LOG"
+}
+
+# ── pacing the PR pushes (#3188) ──────────────────────────────────────────────
+
+# Every push to a rollout PR starts a PR-Agent review, and NaN serves five at a
+# time: a rollout that pushed eight PRs at once left three unreviewed. The sleep
+# stub writes into the gh log, so a test can see where the pause falls.
+sleep_stub() {
+    cat > "$FIX/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+printf 'SLEEP %s\n' "$*" >> "$GH_LOG"
+STUB
+    chmod +x "$FIX/bin/sleep"
+}
+
+# The repository each PR push went to, in order, with the pauses between them.
+push_order() {
+    grep -E '^SLEEP|^api -X PUT repos/mlorentedev/[^/]+/contents/.*branch=' "$GH_LOG" \
+        | sed -E 's#^api -X PUT repos/mlorentedev/([^/]+)/contents/.*#\1#' | uniq
+}
+
+@test "the PR pushes go out in batches of four, with a pause between batches" {
+    protected_stub; sleep_stub
+    BITACORA_PAT=stub run "$SCRIPT" r1 r2 r3 r4 r5 r6 r7 r8 r9
+    [ "$status" -eq 0 ]
+    [ "$(push_order | tr '\n' ' ')" = "r1 r2 r3 r4 SLEEP 900 r5 r6 r7 r8 SLEEP 900 r9 " ]
+}
+
+@test "a repo whose PR already carries the copies is not counted against a batch" {
+    protected_stub; sleep_stub
+    STUB_OPEN_PR=7 STUB_BRANCH_COPY=1 BITACORA_PAT=stub run "$SCRIPT" r1 r2 r3 r4 r5 r6
+    [ "$status" -eq 0 ]
+    [ "$(count_calls '^SLEEP')" -eq 0 ]
+}
+
+@test "ROLLOUT_BATCH and ROLLOUT_PAUSE set the batch and the pause" {
+    protected_stub; sleep_stub
+    ROLLOUT_BATCH=2 ROLLOUT_PAUSE=30 BITACORA_PAT=stub run "$SCRIPT" r1 r2 r3
+    [ "$status" -eq 0 ]
+    [ "$(push_order | tr '\n' ' ')" = "r1 r2 SLEEP 30 r3 " ]
+}
+
+@test "--check pushes nothing, so it never pauses" {
+    protected_stub; sleep_stub
+    BITACORA_PAT=stub run "$SCRIPT" --check r1 r2 r3 r4 r5
+    [ "$status" -eq 0 ]
+    [ "$(count_calls '^SLEEP')" -eq 0 ]
+}
+
+@test "a ROLLOUT_BATCH that is not a positive integer stops the run before any repo" {
+    protected_stub; sleep_stub
+    ROLLOUT_BATCH=0 BITACORA_PAT=stub run "$SCRIPT" r1
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ROLLOUT_BATCH"* ]] || false
+    # Not a single gh call: the run stopped before discovery and every repo.
+    [ ! -e "$GH_LOG" ]
 }

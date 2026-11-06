@@ -2,9 +2,9 @@
 // config files: the plugins `claude plugin install` adds, and the snapshot
 // guard every claude CLI call needs around it (CLI-063, #1339).
 //
-// It is the Go side of a port. setup-linux.sh and setup-windows.ps1 still do
-// the same work until the cutover, and tests/claude-plugins.bats keeps the
-// three plugin lists equal while they coexist.
+// It is the Go side of a port that is now the only side: neither setup script
+// installs a plugin or registers an MCP server any more (#2336, #2000), and
+// tests/claude-plugins.bats and the setup bats guards keep it that way.
 package claude
 
 import (

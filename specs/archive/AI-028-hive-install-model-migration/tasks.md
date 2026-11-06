@@ -74,7 +74,8 @@ Two halves. The deletion needs no decision; the retire step on live machines doe
 - [x] [AC9] Failing tests, then the `hive-upgrade-retire` converge step (owner, 2026-10-21: converge, not `doctor --fix`). It removes `hive-upgrade.timer`, the `DotfilesHiveUpgrade` task and the script copy at `~/.claude/scripts/hive-upgrade.ps1` from a machine that has them, unmanaged as they are, and a second run changes nothing (`TestHiveUpgradeRetire_*`, `cli/internal/converge/hiveupgrade.go`)
 - [x] [AC9] Live: `dotf converge --only hive-upgrade-retire` twice on msi (1 change, then 0), after a release carrying it
       *Measured from msi's run records, not from `--only` runs:* full converges on 0.77.0, `[CHANGE]` removed `hive-upgrade.timer` at `20261025T044811Z`, then `[ OK ]` at `20261025T050456Z` and `20261026T192529Z` (verification.md, "AC9 on msi")
-- [ ] [AC9] Live on the work-lab box, elevated (the task an elevated setup registered is S4U): the same two runs remove `DotfilesHiveUpgrade` and the script
+- [x] [AC9] Live on Windows, elevated (the task an elevated setup registered is S4U): the same two runs remove `DotfilesHiveUpgrade` and the script. *Planned on the work-lab box; measured on a seeded `dotf vm windows` guest instead*
+      *Measured 2026-11-05* (owner, 2026-11-04: use the VM). The work-lab box had already converged with no output kept, so a rerun there could only show the clean-machine half. Seeded elevated with `tests/fixtures/windows/seed-hive-upgrade-task.ps1` (S4U task plus script copy), then two full elevated converges on 0.79.0: `[CHANGE]` 2 at `20261105T063135Z`, `[ OK ]` 0 at `20261105T063314Z` (verification.md, "AC9 on Windows")
 - [x] [AC9] Edit the stale mentions outside the deletion: `docs/architecture.md:27,29` and the comments in `systemd/hive.service.d/10-dotf-secrets.conf:8,58`, plus `docs/troubleshooting/hive-mcp-orphaned-trampoline.md`, which now calls the timer historical
 - [x] State in the PR: until #1993 retires `prerequisite_command`, Windows setup still runs `uv tool install --upgrade hive-vault` on every run
 
@@ -114,13 +115,15 @@ Owner: "lo que recomiende el advisor", which was C on #2991. A box holding a `uv
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks pass (`pwsh` parse / shellcheck as applicable)
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+*Checked 2026-11-05.* Of the nine criteria, AC3 and AC7 are withdrawn. AC1 is superseded: its script and suite were deleted with the timer (AC9). AC5 and AC6 are documentation decisions, so they have no executable test. Their proof is the text they cite: `specs/archive/AI-022-hive-daemon-activation/tasks.md:55` carries the A3 supersession, `specs/archive/AI-023-hive-auto-upgrade-timer/proposal.md:19` the forward pointer, and `proposal.md:40-41` the Linux decision. The two lines below cover the criteria that make a behavioural claim: AC2, AC4, AC8 and AC9.
+
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test. AC2 and AC8 are covered by f8's suite, and AC2 also by the two-converge guest run. AC4 is covered by `tests/hive-daemon-gate.bats` (f4). AC9 is covered by f9, plus msi and the seeded Windows guest
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command (f4, f8, f9; AC2 shares f8, whose `SelfInstall` tests are the Windows bootstrap)
+- [x] Type checks pass (`pwsh` parse / shellcheck as applicable): `dotf lint powershell` analyzed 31 files, exit 0; no shell script changed in the last PRs
+- [x] Lint passes: CI green on every PR of the spec, the last ones being #3130 and #3183
+- [x] No unrelated changes in the diff (no scope creep): each PR was scoped to one task block (PR1 to PR8)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder (#796, #2876, #2901, #2922, #2994, #3013, #3130, #3183)
 
 ## Machine-readable features
 

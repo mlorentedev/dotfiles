@@ -30,6 +30,10 @@ setup() {
 # going stale for that one suite specifically would have gone undetected. That
 # is the exact failure mode this file exists to catch, reproduced inside itself.
 #
+#   add-to-project-script     stubs `gh` — a real run adds the issue to the live board. Its subject
+#                             is what the step's own script captures and sends when a call fails or
+#                             the project resolves to null, which a real gh cannot be made to do on
+#                             demand. The real call runs on every issue opened in a consumer.
 #   bashrc-guards             stubs `terraform` as an empty executable that is never run, for the
 #                             same reason as zshrc-guards below: the subject is the .bashrc guard,
 #                             and a real terraform gives the same answer.
@@ -88,7 +92,7 @@ setup() {
 #                             resolves a terraform, and against that path. A real terraform gives
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
-EXEMPT_SUITES="bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper gh-auth-helper guard-memory-sink guard-no-gui
+EXEMPT_SUITES="add-to-project-script bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper gh-auth-helper guard-memory-sink guard-no-gui
 hermes-setup install model-canary release-pr-body-refs review-attestation-workflow setup-no-arch-downloads shell-profile skills-pipeline
 tmux vault-maintenance-weekly zshrc-guards"
 

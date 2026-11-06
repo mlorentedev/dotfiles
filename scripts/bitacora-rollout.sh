@@ -26,6 +26,9 @@
 #                    .github/workflows/bitacora-reconcile.yml to heal items an
 #                    event-driven add dropped (OPS-023, #809). Needs no age key.
 #
+# Env:   ROLLOUT_BATCH (4) rollout PRs pushed before a pause of ROLLOUT_PAUSE (900) s,
+#        so their PR-Agent reviews fit NaN's five slots (#3188)
+#
 # Exit:  0 ok, 1 on any failed step
 
 set -euo pipefail
@@ -44,7 +47,7 @@ for arg in "$@"; do
     case "$arg" in
         --check) CHECK=1 ;;
         --backfill-only) BACKFILL_ONLY=1 ;;
-        --help|-h) sed -n '3,22p' "$0"; exit 0 ;;
+        --help|-h) sed -n '3,32p' "$0"; exit 0 ;;
         *) REPOS+=("$arg") ;;
     esac
 done
@@ -56,12 +59,43 @@ ok()  { echo "✅ $1"; }
 err() { echo "❌ $1"; FAILED=1; }
 run() { if [ "$CHECK" = 1 ]; then echo "   (dry-run) $*"; else "$@"; fi; }
 
+# Every listing asks for up to LIST_LIMIT rows, and one that reaches it fails:
+# gh truncates silently, and a cut list reads exactly like a complete one.
+LIST_LIMIT="${LIST_LIMIT:-2000}"
+
+# Every push to a rollout PR starts a PR-Agent review, and NaN serves five at a
+# time; one review there takes 9 to 13 minutes. Eight PRs pushed at once left
+# three unreviewed (#3188). So the PR pushes go out ROLLOUT_BATCH repos at a time,
+# below the slot count, with ROLLOUT_PAUSE seconds between batches.
+ROLLOUT_BATCH="${ROLLOUT_BATCH:-4}"
+ROLLOUT_PAUSE="${ROLLOUT_PAUSE:-900}"
+for n in "$ROLLOUT_BATCH" "$ROLLOUT_PAUSE"; do
+    case "$n" in *[!0-9]*|'') echo "❌ ROLLOUT_BATCH and ROLLOUT_PAUSE must be whole numbers"; exit 1 ;; esac
+done
+[ "$ROLLOUT_BATCH" -gt 0 ] || { echo "❌ ROLLOUT_BATCH must be at least 1"; exit 1; }
+PR_PUSHES=0
+
+# pace_pr_push — called once per repo, before its first push to the rollout PR.
+# A repo whose PR already carries the copies pushes nothing and is not counted.
+pace_pr_push() {
+    if [ "$PR_PUSHES" -gt 0 ] && [ $((PR_PUSHES % ROLLOUT_BATCH)) -eq 0 ]; then
+        echo "⏸  $PR_PUSHES rollout PR(s) pushed; waiting ${ROLLOUT_PAUSE}s for their reviews"
+        sleep "$ROLLOUT_PAUSE"
+    fi
+    PR_PUSHES=$((PR_PUSHES + 1))
+}
+
 # ── Repo discovery: every non-archived, non-fork repo (forks never run our CI) ──
 if [ "${#REPOS[@]}" -eq 0 ]; then
+    all_repos="$(gh repo list "$OWNER" --limit "$LIST_LIMIT" --json name,isArchived,isFork \
+        -q '.[] | "\(.isArchived) \(.isFork) \(.name)"')" \
+        || { echo "❌ cannot list the repositories of $OWNER"; exit 1; }
+    if [ "$(printf '%s' "$all_repos" | grep -c . || true)" -ge "$LIST_LIMIT" ]; then
+        echo "❌ the repository listing reached ${LIST_LIMIT}; raise LIST_LIMIT"; exit 1
+    fi
     # A read loop, not mapfile: macOS bash 3.2 has none (ADR-003, PLAT-001 W3).
-    while IFS= read -r repo; do REPOS+=("$repo"); done < <(gh repo list "$OWNER" --limit 100 \
-        --json name,isArchived,isFork \
-        -q '.[] | select(.isArchived == false and .isFork == false) | .name' | sort)
+    while IFS= read -r repo; do REPOS+=("$repo"); done < <(
+        printf '%s\n' "$all_repos" | awk '$1 == "false" && $2 == "false" { print $3 }' | sort)
 fi
 echo "=== bitácora rollout$( [ "$CHECK" = 1 ] && echo ' (--check, read-only)') — ${#REPOS[@]} repo(s) ==="
 
@@ -108,15 +142,24 @@ deploy_workflow() {  # $1 = repo, $2 = workflow filename
 }
 
 deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR for review (never auto-merge)
-    local repo="$1" branch="ci/bitacora-workflows" base base_sha wf wf_path src sha
+    local repo="$1" branch="ci/bitacora-workflows" base base_sha wf wf_path src sha open_pr paced=0
     base="$(gh api "repos/$OWNER/$repo" -q '.default_branch')"
     base_sha="$(gh api "repos/$OWNER/$repo/git/ref/heads/$base" -q '.object.sha')"
-    # Create the branch at base HEAD; if it already exists, FORCE-reset it to base.
-    # Blind reuse caused merge conflicts: after the previous PR was squash-merged the
-    # leftover branch held stale commits that textually conflicted with the new base
-    # (observed on pollex/yt-metrics-cli/pdf-modifier-mcp, 2026-06-10). Re-PUTting the
-    # canonical files on a base-fresh branch is the convergent form.
-    if ! gh api -X POST "repos/$OWNER/$repo/git/refs" \
+    # A failed lookup stops this repo, not the run. It never reads as "no open PR":
+    # that would reset the branch and close the very PR this guards.
+    open_pr="$(gh pr list --repo "$OWNER/$repo" --head "$branch" --state open --json number -q '.[].number')" \
+        || { err "$repo: cannot list open PRs on $branch"; return; }
+    # An open PR keeps its branch: the files below land as new commits on it. A
+    # reset to base empties the PR's diff, GitHub closes it, and its reviews and
+    # triage stay behind on a closed PR (#3160 item 9: kubelab#3077 → #3097 → #3100).
+    #
+    # Without an open PR, create the branch at base HEAD, or FORCE-reset a leftover
+    # one to base. Blind reuse caused merge conflicts: after the previous PR was
+    # squash-merged the leftover branch held stale commits that textually conflicted
+    # with the new base (observed on pollex/yt-metrics-cli/pdf-modifier-mcp,
+    # 2026-06-10). Re-PUTting the canonical files on a base-fresh branch is the
+    # convergent form.
+    if [ -z "$open_pr" ] && ! gh api -X POST "repos/$OWNER/$repo/git/refs" \
         -f ref="refs/heads/$branch" -f sha="$base_sha" >/dev/null 2>&1; then
         gh api -X PATCH "repos/$OWNER/$repo/git/refs/heads/$branch" \
             -f sha="$base_sha" -F force=true >/dev/null \
@@ -125,14 +168,18 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
     for wf in "${PR_FILES[@]}"; do
         wf_path=".github/workflows/$wf"
         src="$REPO_ROOT/.github/workflows/$wf"
+        # A kept branch may already carry this copy: skip it rather than commit nothing.
+        [ "$(gh api "repos/$OWNER/$repo/contents/$wf_path?ref=$branch" -q '.content' 2>/dev/null \
+            | base64 -d 2>/dev/null || true)" = "$(cat "$src")" ] && continue
         sha="$(gh api "repos/$OWNER/$repo/contents/$wf_path?ref=$branch" -q '.sha' 2>/dev/null || true)"
         local -a put_args=(-X PUT "repos/$OWNER/$repo/contents/$wf_path"
             -f message="ci: deploy bitácora workflow $wf (OPS-002)"
             -f content="$(base64 -w0 < "$src")" -f branch="$branch")
         [ -n "$sha" ] && put_args+=(-f sha="$sha")
+        [ "$paced" = 1 ] || { pace_pr_push; paced=1; }
         gh api "${put_args[@]}" >/dev/null || { err "$repo: PUT $wf to $branch failed"; return; }
     done
-    if ! gh pr list --repo "$OWNER/$repo" --head "$branch" --state open --json number -q '.[].number' | grep -q .; then
+    if [ -z "$open_pr" ]; then
         gh pr create --repo "$OWNER/$repo" --base "$base" --head "$branch" \
             --title "ci: deploy bitácora workflows (OPS-002)" \
             --body "Canonical \`add-to-project.yml\` + \`bitacora-status.yml\` from \`mlorentedev/dotfiles\` (runbook §7). Deployed via \`scripts/bitacora-rollout.sh\` — this repo's default branch is protected, so the rollout lands through a PR." >/dev/null \
@@ -141,7 +188,11 @@ deploy_via_pr() {  # $1 = repo; deploys ${PR_FILES[@]} on a branch + opens a PR 
     # Merge is a supervised human action: auto-merge is forbidden repo-wide
     # (it lands a PR the instant CI is green, bypassing human review), so the
     # rollout only opens the PR and leaves the merge to a reviewer.
-    ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
+    if [ -n "$open_pr" ]; then
+        ok "$repo: protected branch — open PR #$open_pr updated (${PR_FILES[*]})"
+    else
+        ok "$repo: protected branch — PR opened for review (${PR_FILES[*]})"
+    fi
 }
 
 # apply_github_defaults REPO — hand the repo-level defaults to `dotf init
@@ -188,6 +239,20 @@ resolve_project_id() {
     fi
 }
 
+# list_open KIND REPO — every open issue or PR (KIND = issue | pr) of REPO, one
+# "<node id> <url>" per line. gh pages up to --limit itself. A listing that fails,
+# or that reaches the limit, fails rather than hand the backfill a partial list:
+# the reconciler is what the add workflow's warning promises, so a silent cut
+# would break that promise with a green run.
+list_open() {
+    local out n
+    out="$(gh "$1" list --repo "$OWNER/$2" --state open --limit "$LIST_LIMIT" \
+        --json id,url -q '.[] | "\(.id) \(.url)"')" || return 1
+    n="$(printf '%s' "$out" | grep -c . || true)"
+    [ "$n" -lt "$LIST_LIMIT" ] || return 1
+    [ -z "$out" ] || printf '%s\n' "$out"
+}
+
 # backfill_repo REPO — ensure every OPEN issue and PR of REPO is on the board.
 # addProjectV2ItemById returns the existing item when the content is already
 # there, so this is idempotent and safe to run on a schedule; that idempotence is
@@ -198,7 +263,11 @@ resolve_project_id() {
 # it for `id` alongside `url` yields the GraphQL node ID the mutation wants
 # without a second round-trip per item.
 backfill_repo() {
-    local repo="$1" node_id url backfilled=0 failed=0
+    local repo="$1" node_id url backfilled=0 failed=0 issues prs
+    if ! issues="$(list_open issue "$repo")" || ! prs="$(list_open pr "$repo")"; then
+        err "$repo: backfill — cannot list every open issue and PR (the listing failed, or reached ${LIST_LIMIT})"
+        return
+    fi
     while IFS=' ' read -r node_id url; do
         [ -z "$node_id" ] && continue
         # SC2016: $project and $contentId are GraphQL variables bound by the -f
@@ -215,10 +284,7 @@ backfill_repo() {
             failed=$((failed + 1))
             err "$repo: item-add failed for $url"
         fi
-    done < <(
-        gh issue list --repo "$OWNER/$repo" --state open --limit 200 --json id,url -q '.[] | "\(.id) \(.url)"' 2>/dev/null
-        gh pr list    --repo "$OWNER/$repo" --state open --limit 200 --json id,url -q '.[] | "\(.id) \(.url)"' 2>/dev/null
-    )
+    done < <(printf '%s\n%s\n' "$issues" "$prs")
     # The tag has to come from the outcome, not from the count. `0 ensured` is
     # the healthy no-op AND the total-failure case, so a hardcoded ✅ reported a
     # repo where every add failed exactly like one with nothing to do (#887).

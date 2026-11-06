@@ -72,8 +72,9 @@ This decision is grounded in a 6-repo empirical audit (Regla del 3, per ADR-015)
 | `dotf init [path]` | **Default orchestrator** — full scaffold. Runs every step below; host-coupled steps auto-skip (C7). |
 | `dotf init agents [--repo P] [--force]` | Re-runnable: bootstrap / refresh `AGENTS.md` + SDD section. Standalone target for **HARNESS-013** (fleet-wide AGENTS.md backfill). |
 | `dotf init github [--repo o/n] [--dry-run]` | Re-runnable: apply GitHub repo defaults (`delete_branch_on_merge`). |
+| `dotf init lane [--repo P] [--dry-run] [--force]` | Re-runnable: scaffold the lane contract (`.dotf/lane.json`, `.dotf/lane-prompt.md`, the `## Lanes` section of `AGENTS.md`). Also a step of the default orchestrator, skipped by `--skip-lane` or `--skip-agents`. |
 
-Parent flags: `--stack {go,python,node,none}`, `--skip-vault`, `--skip-github`, `--skip-agents`, `--work-sdk <family> <component>` (vault-only mode, retained for parity — flagged to migrate to `dotf vault`).
+Parent flags: `--stack {go,python,node,none}`, `--skip-vault`, `--skip-github`, `--skip-agents`, `--skip-lane`, `--work-sdk <family> <component>` (vault-only mode, retained for parity — flagged to migrate to `dotf vault`).
 
 ### What `dotf init` bakes (the practice stack)
 

@@ -82,7 +82,7 @@
           "strict": true,
           "checks": [
             {
-              "context": "lint",
+              "context": "gate",
               "app_id": 15368
             }
           ]

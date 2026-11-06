@@ -365,6 +365,25 @@ jobs:
           rm -rf bats.tar.gz "bats-core-${BATS_VERSION}"
           bats --version
 
+      # The canonical bitácora workflows must pass actionlint with no ignores,
+      # as ts-bridge runs it (tests/bitacora-canonical-consumer-rules.bats).
+      # Without it on PATH that test skipped here, and drift reached the
+      # consumers first (#3160 item 7). Same pins as dotf init's lint.yml; a
+      # test ties the two together.
+      - name: Install actionlint (pinned release, checksum verified)
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$tarball" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum -c -
+          tar -xzf "$tarball" actionlint && rm "$tarball"
+          sudo install -m0755 actionlint /usr/local/bin/actionlint && rm actionlint
+          actionlint -version
+
       - name: Setup mock environment
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         # One definition for both jobs; it fails the step on a missing key or an
@@ -378,6 +397,8 @@ jobs:
           # The runner image ships pwsh: a missing or broken one fails the
           # PowerShell tests instead of skipping them (tests/lib/pwsh.bash).
           DOTFILES_CI_EXPECT_PWSH: '1'
+          # Installed above: a missing actionlint fails its test instead of skipping.
+          DOTFILES_CI_EXPECT_ACTIONLINT: '1'
           # The network leg of pr-agent-config.bats (#2021).
           DOTF_TEST_NETWORK: >-
             ${{ (github.event_name == 'push' || needs.changes.outputs.pr_agent_contract == 'true') && '1' || '' }}
@@ -817,6 +838,10 @@ jobs:
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
           DOTFILES_SKIP_PI_PACKAGES: ${{ (github.event_name == 'pull_request' && needs.changes.outputs.pi != 'true') && '1' || '' }}
+          # For mise alone: it verifies GitHub artifact attestations through
+          # the API, and a shared runner IP has used up the anonymous limit
+          # (#3182). mise never reads GH_TOKEN, so gh here stays unauthenticated.
+          MISE_GITHUB_TOKEN: ${{ github.token }}
         run: .\setup-windows.ps1
 
       # The gate. Setup itself stays non-fatal on doctor (degrade-not-break, C9,
