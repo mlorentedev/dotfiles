@@ -154,6 +154,9 @@ type System struct {
 	// HKCU\Environment), the scope a profile-less process inherits; nil where
 	// the OS has no such scope, which skips checkPersistedEnv (CLI-058, #1324).
 	UserEnv func(name string) (string, bool, error)
+	// UserPath reads the user scope's stored Path (Windows: HKCU\Environment),
+	// unexpanded; nil where the OS keeps no such value.
+	UserPath func() (string, error)
 
 	// SSHTargetPaths and MeshAddrs point checkWorkstationTarget at a test tree
 	// and a test address list; nil means /etc/ssh and the real interfaces.
@@ -298,6 +301,7 @@ func realSystem() *System {
 		},
 		BWServeReadable: secrets.BWServeClient{}.Readable,
 		UserEnv:         userEnvReader(),
+		UserPath:        userPathReader(),
 		Scheduler: func(goos, home string) (schedule.Backend, error) {
 			return update.NativeBackend(goos, home, os.Getenv, os.Getuid(), schedule.Elevated)
 		},
@@ -431,6 +435,16 @@ func userEnvReader() func(name string) (string, bool, error) {
 		return nil
 	}
 	return store.Get
+}
+
+// userPathReader adapts env.NewUserPathStore to the seam: nil where the OS
+// keeps no user Path value.
+func userPathReader() func() (string, error) {
+	store, err := env.NewUserPathStore()
+	if err != nil {
+		return nil
+	}
+	return store.ReadPath
 }
 
 // httpGetBody is the production HTTPGetBody. 15s covers /v1/usage, which
