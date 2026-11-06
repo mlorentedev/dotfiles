@@ -93,6 +93,58 @@ func TestConfigsDeploy_ATemplateChangeIsPlannedAndFailsTheProbeUntilApplied(t *t
 	}
 }
 
+func TestConfigsDeploy_CopilotRetiredSettingsPlanApplyAndSecondPlan(t *testing.T) {
+	repo, home := t.TempDir(), t.TempDir()
+	copilotHome := filepath.Join(home, ".copilot")
+	writeFixture(t, repo, map[string]string{
+		"ai/deploy.json": `{"version": 6, "configs": [{
+		  "name": "copilot-settings",
+		  "src": "ai/copilot/settings.json",
+		  "dst": "{COPILOT_HOME}/settings.json",
+		  "mode": "0644",
+		  "strategy": "merge",
+		  "requires": "copilot"
+		}]}`,
+		"ai/copilot/settings.json":         `{"model":"gpt-5.6-sol"}`,
+		"ai/copilot/retired-settings.json": `{"version":1,"retired_paths":["telemetry.disabled"]}`,
+	})
+	writeFixture(t, home, map[string]string{
+		".copilot/settings.json": `{"telemetry":{"disabled":true},"model":"gpt-5.6-sol","keep":true}`,
+	})
+	env := Env{RepoRoot: repo, Home: home, GOOS: "windows"}
+	r := configsDeploy{
+		render: func(string) error { return nil },
+		resolve: func(name string) string {
+			if name == "COPILOT_HOME" {
+				return copilotHome
+			}
+			return ""
+		},
+		has: func(name string) bool { return name == "copilot" },
+	}
+
+	plan, err := r.Reconcile(env, true)
+	if err != nil || plan.Changes != 1 {
+		t.Fatalf("plan = %+v, err=%v", plan, err)
+	}
+	if raw, _ := os.ReadFile(filepath.Join(copilotHome, "settings.json")); !strings.Contains(string(raw), "telemetry") {
+		t.Fatal("plan rewrote settings")
+	}
+
+	applied, err := r.Reconcile(env, false)
+	if err != nil || applied.Changes != 1 {
+		t.Fatalf("apply = %+v, err=%v", applied, err)
+	}
+	raw, err := os.ReadFile(filepath.Join(copilotHome, "settings.json"))
+	if err != nil || strings.Contains(string(raw), "telemetry") || !strings.Contains(string(raw), `"keep": true`) {
+		t.Fatalf("settings = %s, err=%v", raw, err)
+	}
+	again, err := r.Reconcile(env, true)
+	if err != nil || again.Changes != 0 {
+		t.Fatalf("second plan = %+v, err=%v", again, err)
+	}
+}
+
 // A registry built without the secrets renderer would install {env:VAR}
 // placeholders over resolved values; it fails instead of passing quietly.
 func TestConfigsDeploy_WithoutARendererFailsLoudly(t *testing.T) {
