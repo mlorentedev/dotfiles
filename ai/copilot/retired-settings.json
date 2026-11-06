@@ -1,0 +1,11 @@
+{
+  "$comment": [
+    "Local Copilot settings that current runtimes reject before session creation.",
+    "Paths are dotted object keys. Repair removes only the declared leaf and",
+    "prunes a parent only when that removal leaves the parent empty."
+  ],
+  "version": 1,
+  "retired_paths": [
+    "telemetry.disabled"
+  ]
+}
