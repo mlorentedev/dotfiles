@@ -55,7 +55,9 @@ func checkCoreTools(sys *System, c *Contract, rep *Report) {
 // found from `git --exec-path` as tools.HomeRunners finds it. The PATH is not
 // consulted, so a WSL bash there neither passes nor fails it (#3214).
 func checkGitBash(sys *System, rep *Report) {
-	out, err := sys.CommandOutput("git", "--exec-path")
+	// Stdout alone: the answer is a path, and a stderr line merged into it
+	// would make the root it names garbage.
+	out, err := sys.CommandStdoutDir("", "git", "--exec-path")
 	if err != nil {
 		rep.Fail("Git Bash not found: `git --exec-path` failed (install Git for Windows)")
 		return
