@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
 
@@ -22,12 +23,34 @@ type Catalog struct {
 	Tools []Tool `json:"tools"`
 }
 
+// AppliesToRoles reports whether a no-argument install includes the tool.
+func (t Tool) AppliesToRoles(roles []string) bool {
+	if len(t.Roles) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(t.Roles, func(role string) bool {
+		return slices.Contains(roles, role)
+	})
+}
+
+// ForRoles keeps common tools plus those selected by a machine role.
+func ForRoles(list []Tool, roles []string) []Tool {
+	out := make([]Tool, 0, len(list))
+	for _, tool := range list {
+		if tool.AppliesToRoles(roles) {
+			out = append(out, tool)
+		}
+	}
+	return out
+}
+
 // Tool is one catalog entry: a pinned, cross-OS-installable package.
 type Tool struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Profile string `json:"profile"`
-	Source  Source `json:"source"`
+	Name    string   `json:"name"`
+	Version string   `json:"version"`
+	Profile string   `json:"profile"`
+	Roles   []string `json:"roles,omitempty"`
+	Source  Source   `json:"source"`
 }
 
 // Source declares how to fetch a tool. Four kinds:
@@ -212,6 +235,16 @@ func Load(path string) (Catalog, error) {
 			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q is listed more than once", path, t.Name)
 		}
 		seen[t.Name] = struct{}{}
+		roleSeen := map[string]bool{}
+		for _, role := range t.Roles {
+			if role == "" || roleSeen[role] {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has an empty or duplicate role", path, t.Name)
+			}
+			if !slices.Contains(envpkg.KnownRoles(), role) {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has unknown role %q", path, t.Name, role)
+			}
+			roleSeen[role] = true
+		}
 		// A misspelt platform makes the tool unsupported everywhere, and the
 		// installer reports an unsupported tool as a skip, so nothing else
 		// would ever say so.

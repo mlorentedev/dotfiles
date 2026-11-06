@@ -61,6 +61,18 @@ func newToolsInstallCmd() *cobra.Command {
 			if len(args) == 1 {
 				name = args[0]
 			}
+			var roles []string
+			if name == "" {
+				roles, err = env.LoadMachineRoles(env.MachinePath(env.Home()))
+				if err != nil {
+					return err
+				}
+			}
+			selected, err := selectToolsForRoles(cat, name, roles)
+			if err != nil {
+				return err
+			}
+			cat.Tools, name = selected, ""
 			in := toolsInstaller(filepath.Join(env.Home(), ".local", "bin"), cmd.OutOrStdout())
 			if dryRun {
 				return planToolsInstall(in, cat, name, cmd.OutOrStdout())
@@ -168,6 +180,13 @@ func selectTools(cat tools.Catalog, name string) ([]tools.Tool, error) {
 		}
 	}
 	return nil, fmt.Errorf("%q is not in the catalog (packages.json)", name)
+}
+
+func selectToolsForRoles(cat tools.Catalog, name string, roles []string) ([]tools.Tool, error) {
+	if name != "" {
+		return selectTools(cat, name)
+	}
+	return tools.ForRoles(cat.Tools, roles), nil
 }
 
 // installAll installs each selected tool best-effort: a failure on one is logged

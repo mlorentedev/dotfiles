@@ -45,7 +45,7 @@ Things this PR explicitly does NOT include. Forces a sharp boundary and prevents
 
 Failure modes, dependencies, and unknowns to clarify before implementation. If any item here is unresolved, do not move to `tasks.md` yet.
 
-- Rollout: old dotf binaries ignore the new `github-archive` source type and must keep converging unrelated tools.
+- Rollout: pre-PR-1 binaries ignore the new `github-archive` source type; PR 1 must enforce catalog roles before PR 2 publishes a role-bound archive entry.
 - Archive safety: extraction selects one exact regular-file member and never expands arbitrary archive paths to disk.
 - Role safety: no role means no bridge proxy; role removal deletes only the dotf-owned drop-in.
 - Runtime proof: listener `READY` is distinct from a TLS-valid Gitea destination probe.

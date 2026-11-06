@@ -31,14 +31,15 @@ owner: manu
 - [x] [AC1] [AC2] Add failing installer tests for zip/tar.gz success, checksum-before-extract, missing/duplicate/directory/symlink member, unsupported archive and unchanged destination on failure.
 - [x] [AC1] [AC2] Implement streaming exact-member extraction and atomic placement by reusing the existing release fetch/checksum/version-floor flow.
 - [x] [AC3] Preserve old-reader safety: unknown source types remain explicit skips and do not block other tools.
+- [x] [AC4] Land the generic catalog `roles` field, known `ts-bridge-client` role and no-argument install/converge filtering before any role-bound archive entry is published; named install remains an explicit override.
+- [x] [AC3] [AC4] Add a mixed-version regression proving a PR 1 binary excludes a future role-bound `github-archive` entry on a no-role machine.
 - [x] [AC1] [AC2] Run focused tools tests, full `internal/tools`, vet and formatting.
 - [x] [AC1] [AC2] Apply independent review findings: atomic mode-correct placement, plan/refusal archive parity and asset/member platform parity.
-- [ ] Open PR 1 referencing ADR-058 and this spec.
+- [x] Open PR 1 referencing ADR-058 and this spec.
 
 ### PR 2 - Role selection and Git drop-in
 
-- [ ] [AC4] Add `ts-bridge-client` to known machine roles with add/remove/idempotence tests.
-- [ ] [AC4] Add optional role selection to catalog tools; no-arg install and converge filter, named install remains an explicit override.
+- [x] [AC4] Consume the role/filtering precondition landed in PR 1.
 - [ ] [AC1] [AC4] Add the v1.20.0 ts-bridge `github-archive` entry with Windows/POSIX assets, checksums and member paths.
 - [ ] [AC5] [AC6] Add the always-included optional Git drop-in path and a role-gated reconciler that creates/removes only `ts-bridge.gitconfig`.
 - [ ] [AC4] [AC5] [AC6] Prove non-role machines and GitHub remotes remain direct; second converge changes nothing.
