@@ -28,21 +28,21 @@ Worktree package (`cli/internal/worktree/`):
 - [ ] [P] [AC3] Test: `AddDetached` creates a worktree detached at a given sha, with metadata `Issue: 0`, `ReapOK: true`, a lease of the given TTL and `Kind: "review"`; fails red because `AddRunner` has no detached path. `go test ./internal/worktree/ -run AddDetached`
 - [ ] [AC3] Add `WorktreeAddDetached(repo, target, sha)` to `AddRunner` and `RealAddRunner`, a `Kind` field to `Metadata`, and `AddDetached`; test green.
 - [ ] [AC3] Test then code: `dotf worktree list` labels a `Kind: "review"` worktree, and `refuseHeldIssue` never counts it (it holds no issue).
-- [ ] [AC3] Test then code: `sweep` removes an expired review worktree whose `ReapOK` is true.
+- [ ] [AC3] Test then code (`TestReviewWorktreeSwept`): `sweep` removes an expired review worktree whose `ReapOK` is true.
 
 Launch (`cli/internal/cmd/spec.go`, `cli/internal/spec/`):
 
-- [ ] [P] [AC5] Test then code: `spec review` refuses on tracked dirt (via `worktree.Dirt`) and names `--allow-dirty`; with the flag it launches and warns.
+- [ ] [P] [AC5] Test then code: `spec review` refuses on a tracked change or untracked file outside `specs/<id>/` (a non-empty `spec.SnapshotTree`, which already leaves the spec folder out), naming the paths and `--allow-dirty`; with the flag it launches and warns; dirt inside `specs/<id>/` launches.
 - [ ] [AC4] Test: the launch path builds the agy argv with `--add-dir <worktree>`, `TmuxWrap` with the worktree as its start directory, and the prompt naming the fresh worktree at `<sha>`; red against today's repoRoot. Enumerate every `filepath.Join(repoRoot, "specs", id, ...)` on the launch path and assign it a root: reviewer-side (review file, transcript, `.stderr`, the `--review` and `--transcript` flags to `deadline`, the stray-write snapshot) is the worktree; caller-side (`review-request.json`, round rotation, the copy-back destination) is the caller's root.
 - [ ] [AC4] Implement: the launcher creates the review worktree (name: spec id, slot, nonce; TTL: deadline plus margin) and passes it and the caller's spec folder to `deadline`; test green.
-- [ ] [AC6] Test then code: before launch, copy the caller's `specs/<id>/` review history into the worktree's spec folder.
+- [ ] [AC6] Test then code: after round rotation, copy the caller's uncommitted `specs/<id>/` content into the worktree's spec folder; a second first-signer round finds `review-round1.md`.
 - [ ] [AC4] Prompt sentence: fresh worktree at `<sha>`, no build artifacts, install what the suite needs first. Correct the `agyReviewerCommand` comment.
 
 Deadline (`spec deadline`):
 
-- [ ] [AC1] [AC3] Test: with a fake reviewer, outputs are copied back and the worktree removed on exit 0, 4, 124 and 125; red first.
+- [ ] [AC1] [AC3] Test: with a fake reviewer, the slot's outputs (`slot.Review`, `slot.Transcript`, `.stderr`) are copied back and the worktree removed on exit 0, 4, 124 and 125, for the first slot and for `--second` (`review-second.md`); red first.
 - [ ] [AC1] [AC3] Implement copy-back and removal on every exit path; a failed removal is reported on stderr and left for `sweep`.
-- [ ] [AC1] [AC2] Integration test: a fake reviewer creates `tests/probe_test.go` and edits a tracked file; the caller's `git status --porcelain` is unchanged, `review.md` and the transcript arrive, both paths are named and the run exits 4.
+- [ ] [AC1] [AC2] Integration test: a fake reviewer creates `tests/probe_test.go` and edits a tracked file; the caller's `git status --porcelain` outside `specs/<id>/` is unchanged, inside it only the slot's outputs changed, the review file and transcript arrive, both paths are named and the run exits 4.
 
 Verification of the whole:
 

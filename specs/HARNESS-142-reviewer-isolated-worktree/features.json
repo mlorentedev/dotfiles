@@ -1,43 +1,43 @@
 [
   {
     "id": "HARNESS-142-reviewer-isolated-worktree-f1",
-    "behavior": "A reviewer that writes a probe test and edits a tracked file leaves the caller's git status unchanged, and review.md and the transcript arrive in the caller's tree",
-    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewInWorktreeLeavesCallerTreeUntouched -count=1",
+    "behavior": "A reviewer that writes a probe test and edits a tracked file leaves the caller's git status outside specs/<id>/ unchanged; inside it only the slot's outputs change, and the review file and transcript arrive",
+    "verification": "cd cli && go test -v ./internal/cmd/ -run '^TestReviewInWorktreeLeavesCallerTreeUntouched$' -count=1 2>&1 | grep -q -- '--- PASS: TestReviewInWorktreeLeavesCallerTreeUntouched'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-142-reviewer-isolated-worktree-f2",
     "behavior": "The same run names both stray paths on stderr and exits 4",
-    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewInWorktreeStillReportsStrayWrites -count=1",
+    "verification": "cd cli && go test -v ./internal/cmd/ -run '^TestReviewInWorktreeStillReportsStrayWrites$' -count=1 2>&1 | grep -q -- '--- PASS: TestReviewInWorktreeStillReportsStrayWrites'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-142-reviewer-isolated-worktree-f3",
-    "behavior": "Outputs are copied back and the review worktree removed on exit 0, 4, 124 and 125; an interrupted cleanup leaves a labelled, lease-free worktree that sweep removes",
-    "verification": "cd cli && go test ./internal/cmd/ ./internal/worktree/ -run 'TestDeadlineCopiesBackAndRemovesReviewWorktree|TestReviewWorktree' -count=1",
+    "behavior": "The slot's outputs (review-second.md for --second) are copied back and the review worktree removed on exit 0, 4, 124 and 125; an interrupted cleanup leaves a labelled, lease-free worktree that sweep removes",
+    "verification": "cd cli && out=$(go test -v ./internal/cmd/ ./internal/worktree/ -run '^(TestDeadlineCopiesBackAndRemovesReviewWorktree|TestReviewWorktreeSwept)$' -count=1 2>&1) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestDeadlineCopiesBackAndRemovesReviewWorktree' && printf '%s' \"$out\" | grep -q -- '--- PASS: TestReviewWorktreeSwept'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-142-reviewer-isolated-worktree-f4",
     "behavior": "Both runners work in the review worktree: agy --add-dir, the tmux start directory and the prompt name it",
-    "verification": "cd cli && go test ./internal/spec/ ./internal/cmd/ -run TestReviewLaunchUsesReviewWorktree -count=1",
+    "verification": "cd cli && go test -v ./internal/spec/ ./internal/cmd/ -run '^TestReviewLaunchUsesReviewWorktree$' -count=1 2>&1 | grep -q -- '--- PASS: TestReviewLaunchUsesReviewWorktree'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-142-reviewer-isolated-worktree-f5",
-    "behavior": "spec review refuses a caller tree with tracked uncommitted changes unless --allow-dirty",
-    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewRefusesDirtyTreeWithoutAllowDirty -count=1",
+    "behavior": "spec review refuses a caller tree with a tracked change or untracked file outside specs/<id>/ unless --allow-dirty; dirt inside specs/<id>/ does not refuse",
+    "verification": "cd cli && go test -v ./internal/cmd/ -run '^TestReviewRefusesDirtyTreeWithoutAllowDirty$' -count=1 2>&1 | grep -q -- '--- PASS: TestReviewRefusesDirtyTreeWithoutAllowDirty'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-142-reviewer-isolated-worktree-f6",
-    "behavior": "A second-round review in the worktree sees the caller's uncommitted earlier rounds",
-    "verification": "cd cli && go test ./internal/cmd/ -run TestReviewWorktreeCarriesEarlierRounds -count=1",
+    "behavior": "A second-round first-signer review in the worktree finds the caller's uncommitted first-round verdict as review-round1.md",
+    "verification": "cd cli && go test -v ./internal/cmd/ -run '^TestReviewWorktreeCarriesEarlierRounds$' -count=1 2>&1 | grep -q -- '--- PASS: TestReviewWorktreeCarriesEarlierRounds'",
     "state": "pending",
     "evidence": ""
   }
