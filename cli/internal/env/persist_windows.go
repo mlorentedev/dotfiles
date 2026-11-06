@@ -63,6 +63,41 @@ func (registryUserEnv) Delete(name string) error {
 	return nil
 }
 
+// NewUserPathStore returns the HKCU\Environment `Path` on Windows.
+func NewUserPathStore() (UserPathStore, error) { return registryUserEnv{}, nil }
+
+// ReadPath returns the stored `Path` unexpanded, whatever its type, so a
+// merge compares and keeps `%VAR%` entries as written. Absent is empty.
+func (r registryUserEnv) ReadPath() (string, error) {
+	v, _, err := r.Get("Path")
+	return v, err
+}
+
+// WritePath stores `Path` as REG_EXPAND_SZ, the type Windows gives it: a
+// REG_SZ write would turn every `%VAR%` entry into a literal no process
+// expands.
+func (registryUserEnv) WritePath(value string) error {
+	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = k.Close() }()
+	if err := k.SetExpandStringValue("Path", value); err != nil {
+		return err
+	}
+	broadcastEnvironmentChange()
+	return nil
+}
+
+// ExpandUserPath expands `%VAR%` references the way the registry does for a
+// REG_EXPAND_SZ value; an entry it cannot expand compares as written.
+func ExpandUserPath(s string) string {
+	if v, err := registry.ExpandString(s); err == nil {
+		return v
+	}
+	return s
+}
+
 // broadcastEnvironmentChange tells running shells and Explorer that the user
 // environment changed (what setx does after writing the same key), so a
 // terminal opened from the taskbar afterwards sees the value without a

@@ -2,9 +2,11 @@ package doctor
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // checkPersistedEnv (CLI-058, #1324) reports whether the resolved contract
@@ -26,6 +28,7 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 	}
 	rep.Section("Persisted environment (user scope)")
 	home := sys.home()
+	defer checkUserPathHead(sys, home, rep)
 	contractPath := envpkg.ResolveRepoFirst("env-contract.json", sys.Getenv("DOTFILES_REPO_DIR"), cfg.DotfilesDir, "")
 	if contractPath == "" {
 		rep.Skip("env-contract.json not found — nothing to compare")
@@ -89,11 +92,36 @@ func checkPersistedEnv(sys *System, cfg *Config, rep *Report) {
 // persistRemedy names the command that repairs the user scope, and who reads
 // it. On macOS the scope is the launchd session, which logout clears, so the
 // fix is the converge step that also loads the login agent re-applying it.
+// On Windows the same step also puts the tool directories on the user Path,
+// which `dotf env persist` does not.
 func persistRemedy(goos string) (fix, who string) {
 	if goos == "darwin" {
 		return "`dotf converge --only env-persist`", "apps launched from the Dock, Finder or Spotlight"
 	}
-	return "`dotf env persist`", "profile-less processes such as Copilot tool calls"
+	return "`dotf converge --only env-persist`", "profile-less processes such as Copilot tool calls"
+}
+
+// checkUserPathHead reports whether mise's shims and ~/.local/bin head the
+// user Path, the only PATH a process started with no profile gets from us
+// (W2b PR 2, PLAT-001c blocker 2). Without them a clean Windows box resolved
+// neither dotf nor mise outside a shell that ran the profile. Skipped where
+// the OS keeps no user Path value (sys.UserPath is nil).
+func checkUserPathHead(sys *System, home string, rep *Report) {
+	if sys.UserPath == nil {
+		return
+	}
+	stored, err := sys.UserPath()
+	if err != nil {
+		rep.Warn("user Path unreadable (" + err.Error() + ")")
+		return
+	}
+	want := []string{tools.MiseShimsDir(home, sys.GOOS, sys.Getenv), filepath.Join(home, ".local", "bin")}
+	if _, changed := envpkg.MergePath(stored, want, nil, envpkg.ExpandUserPath); changed {
+		rep.Warn("the user Path does not start with " + strings.Join(want, " and ") +
+			", so a process with no profile (a Scheduled Task, `pwsh -NoProfile`) finds neither dotf nor the pinned CLIs — run `dotf converge --only env-persist`")
+		return
+	}
+	rep.Pass("the user Path starts with mise's shims and ~/.local/bin")
 }
 
 // userEnvAdapter lets the doctor seam (a function) satisfy env.UserEnvReader —
