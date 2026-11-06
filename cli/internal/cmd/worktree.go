@@ -581,6 +581,12 @@ func doneNotFound(arg string, tried []string, wtRoot string) error {
 	return errors.New(msg)
 }
 
+// listWorktrees is the note's read of git's worktree list, a var so tests can
+// hand it a failure or a listing that does not parse (#3122).
+var listWorktrees = func(root string) (string, error) {
+	return (&worktree.RealGitRunner{}).WorktreeListPorcelain(root)
+}
+
 // knownWorktreesNote says what done takes and lists each linked worktree git
 // knows by the directory name that is its slug and by its branch, so a miss
 // names what would have worked. A renamed branch no longer matches its directory
@@ -591,7 +597,7 @@ func knownWorktreesNote(repoDir string) string {
 	if err != nil {
 		return takes
 	}
-	porcelain, err := (&worktree.RealGitRunner{}).WorktreeListPorcelain(root)
+	porcelain, err := listWorktrees(root)
 	if err != nil {
 		return takes
 	}
