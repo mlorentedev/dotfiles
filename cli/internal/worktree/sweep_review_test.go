@@ -116,6 +116,16 @@ func TestSweepKeepsAReviewWorktreeThatMayHoldTheOnlyVerdict(t *testing.T) {
 	if report := unreadable.sweep(t, now); len(report.Reaped) != 0 || len(unreadable.forced) != 0 {
 		t.Errorf("unreadable state: reaped %d, forced %v", len(report.Reaped), unreadable.forced)
 	}
+	// list must say what sweep just did, not promise a removal it refuses (#3215).
+	infos, err := ListWithRunner(unreadable.repo, unreadable.runner, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, info := range infos {
+		if info.Path == unreadable.wt && (info.State == StateReapable || !strings.Contains(info.StateReason, "cannot be read")) {
+			t.Errorf("list: %s (%s), want it kept because its state cannot be read, as sweep keeps it", info.State, info.StateReason)
+		}
+	}
 }
 
 func TestSweepKeepsAReviewWorktreeWhileItsLeaseLivesOrAReviewerRuns(t *testing.T) {
