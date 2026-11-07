@@ -1,5 +1,64 @@
 # Changelog
 
+## [0.80.0](https://github.com/mlorentedev/dotfiles/compare/v0.79.0...v0.80.0) (2026-11-07)
+
+
+### Features
+
+* **converge:** plan the skill records from their rendered form ([#3162](https://github.com/mlorentedev/dotfiles/issues/3162)) ([8103070](https://github.com/mlorentedev/dotfiles/commit/81030700182ccbaf4e39b3b64bcfb43b2d1564a5))
+* **converge:** put the tool directories on the Windows user Path in env-persist ([#3222](https://github.com/mlorentedev/dotfiles/issues/3222)) ([6fccad0](https://github.com/mlorentedev/dotfiles/commit/6fccad069ec9103ce7b1e7a0ef0ca6a4b517550f))
+* **converge:** re-tune Orca's Copilot hooks on every converge ([#3144](https://github.com/mlorentedev/dotfiles/issues/3144)) ([5b8efae](https://github.com/mlorentedev/dotfiles/commit/5b8efae50f3fca09f52e4e58c205bc317665416e))
+* **doctor:** diagnose ts-bridge client health ([#3245](https://github.com/mlorentedev/dotfiles/issues/3245)) ([a1563d7](https://github.com/mlorentedev/dotfiles/commit/a1563d7d9a6000cccc8677fcd01fef180f4bbd25))
+* **git:** gate Gitea proxy by machine role ([#3236](https://github.com/mlorentedev/dotfiles/issues/3236)) ([afb8b27](https://github.com/mlorentedev/dotfiles/commit/afb8b27e7b3a2b1da6c8769a982377035c9b8014))
+* **init:** let each stack declare its directories, and add a workflows stack ([#3164](https://github.com/mlorentedev/dotfiles/issues/3164)) ([e0b0bff](https://github.com/mlorentedev/dotfiles/commit/e0b0bfff9d18e03c13f33ead047a93764969efa9)), closes [#3093](https://github.com/mlorentedev/dotfiles/issues/3093)
+* **init:** scaffold the lane contract with dotf init lane ([#3155](https://github.com/mlorentedev/dotfiles/issues/3155)) ([5246100](https://github.com/mlorentedev/dotfiles/commit/52461005a58dbed0881670b6d19e7a3af013901f))
+* **init:** squash with the PR title and no body as a GitHub repo default ([#3170](https://github.com/mlorentedev/dotfiles/issues/3170)) ([6a6ffaa](https://github.com/mlorentedev/dotfiles/commit/6a6ffaaf0ea8704c0562a0b2f89dde5018b264ed)), closes [#3169](https://github.com/mlorentedev/dotfiles/issues/3169)
+* **lint:** add single-process doc path guard ([#3201](https://github.com/mlorentedev/dotfiles/issues/3201)) ([d1d2076](https://github.com/mlorentedev/dotfiles/commit/d1d2076afeb39ece36222b2eb9856c4a15dd01fb))
+* **secrets:** declare the GHCR push and pull tokens ([#3171](https://github.com/mlorentedev/dotfiles/issues/3171)) ([1a4b976](https://github.com/mlorentedev/dotfiles/commit/1a4b9763c263b04b00389cc453d31cfeac815f46))
+* **secrets:** register the token of the agents' Gitea account ([#3152](https://github.com/mlorentedev/dotfiles/issues/3152)) ([7d3235e](https://github.com/mlorentedev/dotfiles/commit/7d3235e823d304aa6986451fa7615ab088708e17))
+* **spec:** refuse a review launch on changes the reviewer would not see ([#3205](https://github.com/mlorentedev/dotfiles/issues/3205)) ([f82baf0](https://github.com/mlorentedev/dotfiles/commit/f82baf009e8ea6326bd1c541c39e6ea396130290))
+* **spec:** run the reviewer in a disposable review worktree ([#3213](https://github.com/mlorentedev/dotfiles/issues/3213)) ([9aa21e5](https://github.com/mlorentedev/dotfiles/commit/9aa21e5c91b30cd1916ecfe05e30088bb14dd47e))
+* **tools:** install checksummed archive releases ([#3231](https://github.com/mlorentedev/dotfiles/issues/3231)) ([a7d7225](https://github.com/mlorentedev/dotfiles/commit/a7d7225422fae08cf3f69db5d89bf4edc32e5f2a))
+* **tools:** name a winget id per arch in a system entry ([#3226](https://github.com/mlorentedev/dotfiles/issues/3226)) ([fe3c60d](https://github.com/mlorentedev/dotfiles/commit/fe3c60d114051ad48c539adc07985d1012d44c2e))
+* **worktree:** add a detached, lease-free review worktree ([#3195](https://github.com/mlorentedev/dotfiles/issues/3195)) ([bbeb4d9](https://github.com/mlorentedev/dotfiles/commit/bbeb4d986f95a4abefcd0cd14d4fdfecf0c49ec1))
+* **worktree:** let sweep reap a review worktree once its lease passes ([#3196](https://github.com/mlorentedev/dotfiles/issues/3196)) ([fa3cbac](https://github.com/mlorentedev/dotfiles/commit/fa3cbac7ab092d075fc862d070be43cd644180f3))
+
+
+### Bug Fixes
+
+* **bitacora-rollout:** push rollout PRs in batches that fit NaN's review slots ([#3197](https://github.com/mlorentedev/dotfiles/issues/3197)) ([7c3ea9c](https://github.com/mlorentedev/dotfiles/commit/7c3ea9ca5a961ccf9346c4baacbb6cf77edd7988))
+* **bitacora:** guard the status move by id, live state and retry ([#3167](https://github.com/mlorentedev/dotfiles/issues/3167)) ([427d903](https://github.com/mlorentedev/dotfiles/commit/427d9033fb2e8382b5b1029948e495cb056f119d)), closes [#3160](https://github.com/mlorentedev/dotfiles/issues/3160)
+* **bitacora:** keep the rollout PR open and lint canonical copies in CI ([#3168](https://github.com/mlorentedev/dotfiles/issues/3168)) ([c62bc80](https://github.com/mlorentedev/dotfiles/commit/c62bc80a9f2e724c38f5d88b2c2630dcefa5677b)), closes [#3160](https://github.com/mlorentedev/dotfiles/issues/3160)
+* **bitacora:** retry the read-then-write as one unit and read GraphQL rate-limit headers ([#3187](https://github.com/mlorentedev/dotfiles/issues/3187)) ([8104969](https://github.com/mlorentedev/dotfiles/commit/8104969d9c79cda825fb23378912f7374b91fbff))
+* **ci:** hold the canonical bitácora workflows to their consumers' checks ([#3158](https://github.com/mlorentedev/dotfiles/issues/3158)) ([9f238cc](https://github.com/mlorentedev/dotfiles/commit/9f238cc464989db951e9d5ac6ff21f9f4e1b40d7))
+* **ci:** keep the bitácora retry notice out of the captured project id ([#3166](https://github.com/mlorentedev/dotfiles/issues/3166)) ([095adb9](https://github.com/mlorentedev/dotfiles/commit/095adb95643b1bb0c79192dfbfc6c2198e3e3879)), closes [#3160](https://github.com/mlorentedev/dotfiles/issues/3160)
+* **ci:** retry refused connections and wait a minute on a secondary limit ([#3179](https://github.com/mlorentedev/dotfiles/issues/3179)) ([7042624](https://github.com/mlorentedev/dotfiles/commit/7042624936dc08189b8153ce91276fc56d3fa76a))
+* **ci:** silence the GraphQL-variable shellcheck note in add-to-project ([#3159](https://github.com/mlorentedev/dotfiles/issues/3159)) ([944e6f5](https://github.com/mlorentedev/dotfiles/commit/944e6f55b1902970c52a1a2ff1c8cbb64e1ae816)), closes [#3157](https://github.com/mlorentedev/dotfiles/issues/3157)
+* **copilot:** retire unsupported local settings ([#3218](https://github.com/mlorentedev/dotfiles/issues/3218)) ([5075a66](https://github.com/mlorentedev/dotfiles/commit/5075a661098930d96ac51a186364ceda89931e55))
+* **doctor:** fail when a foreign user-scope HOME splits the Windows home ([#3234](https://github.com/mlorentedev/dotfiles/issues/3234)) ([7af7c37](https://github.com/mlorentedev/dotfiles/commit/7af7c37189966e1230e647fdde0b2494987daa87)), closes [#2432](https://github.com/mlorentedev/dotfiles/issues/2432)
+* **doctor:** find bash on Windows where dotf runs it, from git --exec-path ([#3217](https://github.com/mlorentedev/dotfiles/issues/3217)) ([05d30b0](https://github.com/mlorentedev/dotfiles/commit/05d30b0a6b938d833087325f16f83eefd14cefab))
+* **forge:** refuse a head only when its envelope differs from the base's ([#3126](https://github.com/mlorentedev/dotfiles/issues/3126)) ([12ce422](https://github.com/mlorentedev/dotfiles/commit/12ce422836ef1b33cb78565d581418ce2879616f))
+* **guard:** check-actions-pinned takes an optional root directory ([#3129](https://github.com/mlorentedev/dotfiles/issues/3129)) ([85f7fdc](https://github.com/mlorentedev/dotfiles/commit/85f7fdc58546ca6a1824136cd9465cdd8b039c38))
+* **harness:** report a vault record no refresh committed, and let the manifest exclude one ([#3175](https://github.com/mlorentedev/dotfiles/issues/3175)) ([5d100b7](https://github.com/mlorentedev/dotfiles/commit/5d100b792e0e04d4115ab29b8abee3c4acb65462))
+* **init:** ignore a section heading quoted inside a code fence ([#3206](https://github.com/mlorentedev/dotfiles/issues/3206)) ([d99773a](https://github.com/mlorentedev/dotfiles/commit/d99773a328ad650a7331eb917bdf1fa3227342b4))
+* **init:** pin the scaffolded CI templates' actions to commit SHAs ([#3136](https://github.com/mlorentedev/dotfiles/issues/3136)) ([2dce60d](https://github.com/mlorentedev/dotfiles/commit/2dce60dddbd7b5652656b31524fae39397a80203))
+* **install:** name a Defender quarantine when the Windows install fails ([#3225](https://github.com/mlorentedev/dotfiles/issues/3225)) ([ec426aa](https://github.com/mlorentedev/dotfiles/commit/ec426aabec2e4ac946035208407f59c31a2ad94c)), closes [#3172](https://github.com/mlorentedev/dotfiles/issues/3172)
+* **lessons:** keep a renumbered lesson's id style ([#3224](https://github.com/mlorentedev/dotfiles/issues/3224)) ([4bd5d78](https://github.com/mlorentedev/dotfiles/commit/4bd5d787decd61693ba0c9a1ee50bef8892b1174))
+* **pi:** lower deepseek-chat's maxTokens to OpenRouter's current 16000 ([#3161](https://github.com/mlorentedev/dotfiles/issues/3161)) ([730cc9d](https://github.com/mlorentedev/dotfiles/commit/730cc9d5811b941a182983ad4d638038a63dc42a))
+* **skills:** arming an autopilot run is not a stopping point ([#3086](https://github.com/mlorentedev/dotfiles/issues/3086)) ([#3132](https://github.com/mlorentedev/dotfiles/issues/3132)) ([85ef9a8](https://github.com/mlorentedev/dotfiles/commit/85ef9a8f70192e52ba8d4d855e3d2f7af9904e3a))
+* **spec:** enter the review worktree in deadline instead of trusting tmux -c ([#3221](https://github.com/mlorentedev/dotfiles/issues/3221)) ([89c84c8](https://github.com/mlorentedev/dotfiles/commit/89c84c82384b188b536dacd345a3820afda879a1))
+* **spec:** tell a reviewer to stream long commands, and a stalled run how to rerun ([#3137](https://github.com/mlorentedev/dotfiles/issues/3137)) ([340a3ce](https://github.com/mlorentedev/dotfiles/commit/340a3ce29171d42a53a899f3c48452ed96d34f1b))
+* **tools:** count a system command in a registered PATH directory as installed ([#3229](https://github.com/mlorentedev/dotfiles/issues/3229)) ([49f5001](https://github.com/mlorentedev/dotfiles/commit/49f5001d82d0da0f62e1a32298cec55331f24ca0)), closes [#3142](https://github.com/mlorentedev/dotfiles/issues/3142)
+* **tools:** give Git Bash to bats alone during a Windows sync ([#3235](https://github.com/mlorentedev/dotfiles/issues/3235)) ([5a5ac59](https://github.com/mlorentedev/dotfiles/commit/5a5ac590314e238b4eab20277f5549df0b53f886)), closes [#2346](https://github.com/mlorentedev/dotfiles/issues/2346)
+* **tools:** name a missing Git Bash when bats fails its pin on Windows ([#3239](https://github.com/mlorentedev/dotfiles/issues/3239)) ([89ae1cd](https://github.com/mlorentedev/dotfiles/commit/89ae1cdaf88700b624147b50e773391e771d4ec8)), closes [#2445](https://github.com/mlorentedev/dotfiles/issues/2445)
+* **tools:** refresh winget's source once when an install hits 0x8a15000f ([#3233](https://github.com/mlorentedev/dotfiles/issues/3233)) ([a0adf42](https://github.com/mlorentedev/dotfiles/commit/a0adf42aef8c3e181089d03679da694f137aa06b)), closes [#2445](https://github.com/mlorentedev/dotfiles/issues/2445)
+* **tools:** size mise's download budget to the largest pinned asset ([#3194](https://github.com/mlorentedev/dotfiles/issues/3194)) ([7d08dca](https://github.com/mlorentedev/dotfiles/commit/7d08dca889d8895a54cc1c84b3ac0d5ff2bcb41c)), closes [#3181](https://github.com/mlorentedev/dotfiles/issues/3181)
+* **vm:** let one up at a time check and claim a session ([#3131](https://github.com/mlorentedev/dotfiles/issues/3131)) ([f873b6d](https://github.com/mlorentedev/dotfiles/commit/f873b6d407443902a91f63adda80192294b1bdd8)), closes [#3105](https://github.com/mlorentedev/dotfiles/issues/3105)
+* **vm:** resolve the Windows session before judging exec's input ([#3134](https://github.com/mlorentedev/dotfiles/issues/3134)) ([fcefe0e](https://github.com/mlorentedev/dotfiles/commit/fcefe0e0f5c758cae9617d792b9a0107de069a2d)), closes [#3106](https://github.com/mlorentedev/dotfiles/issues/3106)
+* **vm:** show a timed-out Windows step's output and what still runs ([#3216](https://github.com/mlorentedev/dotfiles/issues/3216)) ([45baa19](https://github.com/mlorentedev/dotfiles/commit/45baa19ea8d3fc02f1410368ba4231a6249f192b))
+* **worktree:** list keeps a review worktree whose state cannot be read, as sweep does ([#3237](https://github.com/mlorentedev/dotfiles/issues/3237)) ([f7ae59e](https://github.com/mlorentedev/dotfiles/commit/f7ae59efc144e9c58d3c996671b9d652dff136ad))
+* **worktree:** say when an issue's lease holder is idle, and how to release it ([#3138](https://github.com/mlorentedev/dotfiles/issues/3138)) ([c54aad6](https://github.com/mlorentedev/dotfiles/commit/c54aad6462cd4b9187037b0561c89dffc52c7d28))
+
 ## [0.79.0](https://github.com/mlorentedev/dotfiles/compare/v0.78.0...v0.79.0) (2026-11-03)
 
 
