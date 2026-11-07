@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -24,6 +25,18 @@ func TestSelectToolsForRolesFiltersOnlyNoArgRuns(t *testing.T) {
 	got, err = selectToolsForRoles(cat, "ts-bridge", nil)
 	if err != nil || !reflect.DeepEqual(toolNames(got), []string{"ts-bridge"}) {
 		t.Fatalf("explicit selection = %v, %v", toolNames(got), err)
+	}
+}
+
+func TestToolsInstallHelpDescribesRoleFiltering(t *testing.T) {
+	stdout, _, err := execute(t, "tools", "install", "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "common tools and") ||
+		!strings.Contains(stdout, "tools for this machine's roles") ||
+		strings.Contains(stdout, "every catalog tool") {
+		t.Fatalf("install help does not describe role filtering:\n%s", stdout)
 	}
 }
 

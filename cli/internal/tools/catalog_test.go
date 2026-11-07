@@ -157,6 +157,36 @@ func TestLoad_RejectsUnknownToolRole(t *testing.T) {
 	}
 }
 
+func TestTheRepoCatalogDeclaresTsBridgeForTheClientRole(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range c.Tools {
+		if tool.Name != "ts-bridge" {
+			continue
+		}
+		if tool.Version != "1.20.0" || tool.Source.Type != "github-archive" ||
+			!slices.Equal(tool.Roles, []string{"ts-bridge-client"}) {
+			t.Fatalf("ts-bridge tool = %+v", tool)
+		}
+		for platform, want := range map[[2]string]string{
+			{"linux", "amd64"}:   "ts-bridge-linux-amd64/ts-bridge",
+			{"linux", "arm64"}:   "ts-bridge-linux-arm64/ts-bridge",
+			{"darwin", "amd64"}:  "ts-bridge-darwin-amd64/ts-bridge",
+			{"darwin", "arm64"}:  "ts-bridge-darwin-arm64/ts-bridge",
+			{"windows", "amd64"}: "ts-bridge-windows-amd64/ts-bridge.exe",
+			{"windows", "arm64"}: "ts-bridge-windows-arm64/ts-bridge.exe",
+		} {
+			if got := tool.MemberName(platform[0], platform[1]); got != want {
+				t.Errorf("ts-bridge member for %s/%s = %q, want %q", platform[0], platform[1], got, want)
+			}
+		}
+		return
+	}
+	t.Fatal("packages.json declares no ts-bridge")
+}
+
 // The shipped catalog declares hive as a uv tool on every OS, which hive
 // installs itself on Windows: there hive owns its install layout (hive
 // ADR-019), so the catalog must never put a uv copy there. A misspelt

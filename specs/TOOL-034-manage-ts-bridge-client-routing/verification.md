@@ -14,7 +14,7 @@ owner: manu
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
 - [x] Criteria 1-3 -> PR 1 generic archive source and rollout-safety tests
-- [ ] Criteria 4-6 -> PR 2 role/catalog/drop-in tests
+- [x] Criteria 4-6 -> PR 2 role/catalog/drop-in tests
 - [ ] Criteria 7-8 -> PR 3 doctor and live consequence evidence
 
 ## Test status
@@ -25,7 +25,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - Unsupported archive extensions are refused by both Plan and Install before download/extraction.
   - Catalog load requires asset/member resolution parity for every supported GOOS/GOARCH pair.
 - Rollout review: a PR 1 binary would recognize `github-archive` but silently ignore a later `roles` field. The generic role schema and no-argument install/converge filters now land in PR 1, before PR 2 publishes the ts-bridge entry; explicit named install remains an override.
-- PR 2 tests: pending
+- PR 2: full `go test ./internal/env ./internal/tools ./internal/converge` -> PASS; `go test -timeout 20m ./internal/cmd` -> PASS in 582.381s; exact f3/f4 selectors and focused vet -> PASS.
+- PR 2 live install: the release checksum matched, all six archive member paths were inventoried, and the managed Windows install placed ts-bridge v1.20.0 successfully.
 - PR 3 tests/live smoke: pending
 
 ## Decisions made during implementation
@@ -36,12 +37,15 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Tool role filtering lands before the first role-bound archive entry: pre-PR-1 binaries skip the unknown source, while PR-1-and-newer binaries understand and enforce `roles`.
 - Git routing uses an entirely dotf-owned include file, not writes into the user/gh-owned `~/.gitconfig`.
 - PR 1 streams only the exact member into a temp file after the release checksum passes; no archive path is expanded onto disk.
+- PR 2 filters role-bound tools for no-argument install/converge while an explicit named install remains an operator override.
+- The proxy is a complete dotf-owned drop-in. A foreign file at that path is refused, not overwritten or removed.
+- Catalog tests assert the observed member path in every published OS/architecture asset; synthetic archives alone do not prove release layout.
 
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: `docs/lessons/lesson-564-land-the-capability-before-data-that-activates-it.md`
+- [x] Lesson for the repo's `docs/lessons/`? yes: `docs/lessons/lesson-565-test-exact-archive-members-against-the-release.md`
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: `docs/adr/adr-058-role-gated-userspace-bridge-client.md`
 - [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: existing setup-idempotence and per-machine-override patterns cover the reusable method.
 

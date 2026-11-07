@@ -58,9 +58,9 @@ Observable outcomes. Each must be testable.
 - [x] `github-archive` verifies the release checksum before extracting one exact declared member from zip or tar.gz into the staged binary destination.
 - [x] Missing, duplicate, directory, symlink, unsupported or unsafe archive members fail non-zero without replacing the installed binary.
 - [x] An older dotf treats the new source type as an explicit skip; unrelated catalog tools continue converging.
-- [ ] A `ts-bridge-client` machine role selects the ts-bridge catalog entry; no role means the entry is not planned or installed.
-- [ ] Role convergence owns `~/.config/git/ts-bridge.gitconfig` with only the Gitea URL proxy, and role removal deletes that file.
-- [ ] GitHub stays direct; no hosts, DNS, environment-wide proxy or system proxy is changed.
+- [x] A `ts-bridge-client` machine role selects the ts-bridge catalog entry; no role means the entry is not planned or installed.
+- [x] Role convergence owns `~/.config/git/ts-bridge.gitconfig` with only the Gitea URL proxy, and role removal deletes that file.
+- [x] GitHub stays direct; no hosts, DNS, environment-wide proxy or system proxy is changed.
 - [ ] Doctor reports pinned-version drift, bridge-listener readiness and TLS-valid Gitea destination reachability without credential values.
 - [ ] A second install/converge reports zero changes, and bridge-down behavior is explicit rather than healthy.
 
