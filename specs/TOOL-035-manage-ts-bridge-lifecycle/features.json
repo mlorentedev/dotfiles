@@ -1,0 +1,37 @@
+[
+  {
+    "id": "TOOL-035-manage-ts-bridge-lifecycle-f1",
+    "behavior": "Status distinguishes stopped, starting, destination-failed, healthy and unowned states with error/why/fix and no credential values.",
+    "verification": "cd cli && out=\"$(go test ./internal/bridge ./internal/cmd -run '^(TestClassifyStatus|TestStatusResultUsesAgentOrientedErrors|TestServiceStatusUsesOwnedProcessAndHealth|TestBridgeStatusCommandHealthy)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestClassifyStatus' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestStatusResultUsesAgentOrientedErrors' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestServiceStatusUsesOwnedProcessAndHealth' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestBridgeStatusCommandHealthy'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-035-manage-ts-bridge-lifecycle-f2",
+    "behavior": "The first start records a safe descriptor and returns only after READY plus destination health; a second healthy start spawns no duplicate.",
+    "verification": "cd cli && out=\"$(go test ./internal/bridge ./internal/cmd -run '^(TestServiceStartFirstLaunchBecomesHealthy|TestServiceStartHealthyIsNoOp|TestBridgeStartCommand)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestServiceStartFirstLaunchBecomesHealthy' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestServiceStartHealthyIsNoOp' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestBridgeStartCommand'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-035-manage-ts-bridge-lifecycle-f3",
+    "behavior": "Stop acts only on the exact owned process identity, is idempotent when absent and refuses stale or reused PID state.",
+    "verification": "cd cli && out=\"$(go test ./internal/bridge ./internal/cmd -run '^(TestServiceStopRefusesReusedPID|TestServiceStopAbsentIsNoOp|TestBridgeStopCommand)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestServiceStopRefusesReusedPID' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestServiceStopAbsentIsNoOp' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestBridgeStopCommand'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-035-manage-ts-bridge-lifecycle-f4",
+    "behavior": "State and bounded logs live below the per-user dotf state directory and work through Windows and POSIX process seams.",
+    "verification": "cd cli && out=\"$(go test ./internal/bridge -run '^(TestStoreRoundTripsLaunchAndProcessState|TestCaptureAndInspectCurrentProcess|TestBridgeLogIsBounded)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestStoreRoundTripsLaunchAndProcessState' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestCaptureAndInspectCurrentProcess' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestBridgeLogIsBounded'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-035-manage-ts-bridge-lifecycle-f5",
+    "behavior": "Copilot App stale origin identity is recovered by remove/re-add after bridge health, never by writing its internal database.",
+    "verification": "grep -q 'remove the affected repository registration' docs/runbooks/ts-bridge-client.md && ! git grep -n 'data.db' -- cli/internal/bridge cli/internal/cmd/bridge.go",
+    "state": "pending",
+    "evidence": ""
+  }
+]
