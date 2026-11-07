@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -76,9 +77,13 @@ func TestStoreReplacesExistingLaunchState(t *testing.T) {
 }
 
 func TestStoreRefusesRelativeStateRoot(t *testing.T) {
+	t.Chdir(t.TempDir())
 	if err := NewStore("").SaveLaunch(testDescriptor("office")); err == nil ||
 		!strings.Contains(err.Error(), "absolute") {
 		t.Fatalf("SaveLaunch() error = %v; want absolute state root refusal", err)
+	}
+	if _, err := os.Stat(filepath.Join("bridge", "office", "launch.json")); !os.IsNotExist(err) {
+		t.Fatalf("relative state escaped into the cwd: %v", err)
 	}
 }
 
