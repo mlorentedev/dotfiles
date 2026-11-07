@@ -2,7 +2,7 @@
   {
     "id": "TOOL-035-manage-ts-bridge-lifecycle-f1",
     "behavior": "Status distinguishes stopped, starting, destination-failed, healthy and unowned states with error/why/fix and no credential values.",
-    "verification": "cd cli && go test ./internal/bridge ./internal/cmd -run 'Test.*Bridge.*Status'",
+    "verification": "cd cli && go test ./internal/bridge ./internal/cmd -run '^(TestClassifyStatus|TestStatusResultUsesAgentOrientedErrors|TestServiceStatus.*|TestBridgeStatusCommand.*)$'",
     "state": "pending",
     "evidence": ""
   },
@@ -23,7 +23,7 @@
   {
     "id": "TOOL-035-manage-ts-bridge-lifecycle-f4",
     "behavior": "State and bounded logs live below the per-user dotf state directory and work through Windows and POSIX process seams.",
-    "verification": "cd cli && go test ./internal/bridge -run 'Test.*Bridge.*(State|Log|Process)'",
+    "verification": "cd cli && go test ./internal/bridge -run '^(TestStore.*|TestProcessRecord.*|Test.*Bridge.*(Log|Process))$'",
     "state": "pending",
     "evidence": ""
   },

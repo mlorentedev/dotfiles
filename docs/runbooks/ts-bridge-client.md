@@ -42,6 +42,17 @@ PID so it can be stopped by identity rather than by process name.
 
 ## Verify the three layers
 
+After a lifecycle start has recorded the profile state, use:
+
+```powershell
+dotf bridge status --profile <profile>
+dotf bridge status --profile <profile> --json
+```
+
+Healthy exits 0. Every other state exits non-zero; human output uses
+`ERROR` / `WHY` / `FIX`, while JSON carries the same fields. Until the start
+command lands in TOOL-035 PR5, use doctor for a manually-started bridge.
+
 ```powershell
 dotf doctor --scope machine --verbose
 ```

@@ -53,7 +53,7 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 
 Observable outcomes. Each must be testable.
 
-- [ ] `dotf bridge status` reports stopped, starting, listener-ready,
+- [x] `dotf bridge status` reports stopped, starting, listener-ready,
   destination-failed, healthy and unowned states with machine-readable
   `error`/`why`/`fix` fields and no credential values.
 - [ ] A first `bridge start --profile ...` records a non-secret descriptor,
@@ -63,7 +63,7 @@ Observable outcomes. Each must be testable.
   becomes a no-op when absent and refuses stale/reused PID state.
 - [ ] State and bounded logs live below the per-user dotf state directory and
   work on Windows, Linux and macOS through platform-specific seams.
-- [ ] Copilot App recovery is documented: after bridge health is restored, a
+- [x] Copilot App recovery is documented: after bridge health is restored, a
   project with stale origin identity is removed/re-added rather than repaired
   through internal database writes.
 

@@ -27,13 +27,13 @@ owner: manu
 
 ### PR 4 - State model and read-only status
 
-- [ ] [P] [AC1] Add table tests in `cli/internal/bridge/state_test.go` for safe profile names, atomic descriptor/process state, one-profile defaulting, ambiguous profiles and rejection of credential-bearing arguments. Expected: FAIL because the package does not exist.
-- [ ] [AC1] Implement `cli/internal/bridge/state.go` under `env.StateDir()/bridge/<profile>` with bounded log paths and atomic JSON writes. Expected: focused state tests PASS.
-- [ ] [P] [AC1] Add health-state tests in `cli/internal/bridge/status_test.go` for stopped, starting, listener-ready/destination-failed, healthy and unowned states plus JSON `error`/`why`/`fix`. Expected: FAIL before the shared probe exists.
-- [ ] [AC1] Extract the TOOL-034 listener/destination interpretation into `cli/internal/bridge/status.go`; refactor doctor to consume it without changing its report. Expected: doctor and bridge focused tests PASS.
-- [ ] [AC1] Add `dotf bridge status [--profile] [--json]` in `cli/internal/cmd/bridge.go` and command tests in `bridge_test.go`; non-healthy states exit non-zero. Expected: command tests PASS.
-- [ ] [AC5] Update `docs/runbooks/ts-bridge-client.md` with the status command and stale Copilot App origin recovery.
-- [ ] Run `go test ./internal/bridge ./internal/doctor ./internal/cmd` and focused vet; commit PR4.
+- [x] [P] [AC1] Add table tests in `cli/internal/bridge/state_test.go` for safe profile names, atomic descriptor/process state, one-profile defaulting, ambiguous profiles and rejection of credential-bearing arguments. Expected: FAIL because the package does not exist.
+- [x] [AC1] Implement `cli/internal/bridge/state.go` under `env.StateDir()/bridge/<profile>` with bounded log paths and atomic JSON writes. Expected: focused state tests PASS.
+- [x] [P] [AC1] Add health-state tests in `cli/internal/bridge/status_test.go` for stopped, starting, listener-ready/destination-failed, healthy and unowned states plus JSON `error`/`why`/`fix`. Expected: FAIL before the shared probe exists.
+- [x] [AC1] Extract the TOOL-034 listener/destination interpretation into `cli/internal/bridge/status.go`; refactor doctor to consume it without changing its report. Expected: doctor and bridge focused tests PASS.
+- [x] [AC1] Add `dotf bridge status [--profile] [--json]` in `cli/internal/cmd/bridge.go` and command tests in `bridge_test.go`; non-healthy states exit non-zero. Expected: command tests PASS.
+- [x] [AC5] Update `docs/runbooks/ts-bridge-client.md` with the status command and stale Copilot App origin recovery.
+- [x] Run `go test ./internal/bridge ./internal/doctor ./internal/cmd` and focused vet; commit PR4.
 
 ### PR 5 - Owned start/stop lifecycle
 

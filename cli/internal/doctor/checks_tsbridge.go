@@ -1,19 +1,14 @@
 package doctor
 
 import (
-	"encoding/json"
-	"fmt"
 	"slices"
-	"strings"
-	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/bridge"
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 const (
 	tsBridgeHealthURL = "http://127.0.0.1:9081/health/ready"
-	tsBridgeSocks     = "socks5h://127.0.0.1:1081"
-	tsBridgeGiteaURL  = "https://gitea.kubelab.live/api/healthz"
 )
 
 func checkTsBridge(sys *System, cfg *Config, rep *Report) {
@@ -41,45 +36,19 @@ func checkTsBridge(sys *System, cfg *Config, rep *Report) {
 		rep.Fail("curl is unavailable, so bridge and destination health cannot be proved")
 		return
 	}
-	if !tsBridgeListenerReady(sys) {
+	health := bridge.ProbeHealth(sys.CommandOutputBounded, bridge.LaunchDescriptor{
+		Profile:    "doctor",
+		Socks5:     "127.0.0.1:1081",
+		HealthAddr: "127.0.0.1:9081",
+	})
+	if !health.ListenerReady {
 		rep.Warn("bridge listener not ready at " + tsBridgeHealthURL + " (start the configured ts-bridge profile)")
 		return
 	}
 	rep.Pass("bridge listener ready")
-	if !tsBridgeDestinationReady(sys) {
+	if !health.DestinationReady {
 		rep.Fail("Gitea destination through ts-bridge failed with verified TLS")
 		return
 	}
 	rep.Pass("Gitea destination reachable with verified TLS")
-}
-
-func tsBridgeListenerReady(sys *System) bool {
-	body, err := tsBridgeCurl(sys, 7*time.Second,
-		"--fail", "--silent", "--show-error", "--max-time", "5", tsBridgeHealthURL)
-	return err == nil && jsonStatus(body) == "ok"
-}
-
-func tsBridgeDestinationReady(sys *System) bool {
-	body, err := tsBridgeCurl(sys, 20*time.Second,
-		"--proxy", tsBridgeSocks, "--noproxy", "",
-		"--fail", "--silent", "--show-error", "--max-time", "15", tsBridgeGiteaURL)
-	return err == nil && jsonStatus(body) == "pass"
-}
-
-func tsBridgeCurl(sys *System, timeout time.Duration, args ...string) (string, error) {
-	stdout, _, err := sys.CommandOutputBounded(timeout, "curl", args...)
-	if err != nil {
-		return "", fmt.Errorf("curl: %w", err)
-	}
-	return stdout, nil
-}
-
-func jsonStatus(body string) string {
-	var doc struct {
-		Status string `json:"status"`
-	}
-	if err := json.Unmarshal([]byte(body), &doc); err != nil {
-		return ""
-	}
-	return strings.ToLower(doc.Status)
 }
