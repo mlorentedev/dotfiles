@@ -7,9 +7,7 @@ import (
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
-const (
-	tsBridgeHealthURL = "http://127.0.0.1:9081/health/ready"
-)
+const tsBridgeHealthURL = bridge.ListenerHealthURL
 
 func checkTsBridge(sys *System, cfg *Config, rep *Report) {
 	rep.Section("ts-bridge client")
@@ -38,8 +36,8 @@ func checkTsBridge(sys *System, cfg *Config, rep *Report) {
 	}
 	health := bridge.ProbeHealth(sys.CommandOutputBounded, bridge.LaunchDescriptor{
 		Profile:    "doctor",
-		Socks5:     "127.0.0.1:1081",
-		HealthAddr: "127.0.0.1:9081",
+		Socks5:     bridge.SocksAddress,
+		HealthAddr: bridge.HealthAddress,
 	})
 	if !health.ListenerReady {
 		rep.Warn("bridge listener not ready at " + tsBridgeHealthURL + " (start the configured ts-bridge profile)")

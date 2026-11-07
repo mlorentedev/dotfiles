@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-const destinationHealthURL = "https://gitea.kubelab.live/api/healthz"
-
 // CommandRunner runs one bounded command and keeps stdout and stderr separate.
 type CommandRunner func(timeout time.Duration, name string, args ...string) (stdout, stderr string, err error)
 
@@ -23,7 +21,7 @@ func ProbeHealth(run CommandRunner, launch LaunchDescriptor) Health {
 		return Health{}
 	}
 	stdout, _, err := run(7*time.Second, "curl",
-		"--fail", "--silent", "--show-error", "--max-time", "5",
+		"--noproxy", "*", "--fail", "--silent", "--show-error", "--max-time", "5",
 		"http://"+launch.HealthAddr+"/health/ready")
 	if err != nil || healthStatus(stdout) != "ok" {
 		return Health{}
@@ -32,7 +30,7 @@ func ProbeHealth(run CommandRunner, launch LaunchDescriptor) Health {
 	stdout, _, err = run(20*time.Second, "curl",
 		"--proxy", "socks5h://"+launch.Socks5, "--noproxy", "",
 		"--fail", "--silent", "--show-error", "--max-time", "15",
-		destinationHealthURL)
+		DestinationHealthURL)
 	health.DestinationReady = err == nil && healthStatus(stdout) == "pass"
 	return health
 }

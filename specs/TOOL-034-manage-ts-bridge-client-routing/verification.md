@@ -28,6 +28,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - PR 2: full `go test ./internal/env ./internal/tools ./internal/converge` -> PASS; `go test -timeout 20m ./internal/cmd` -> PASS in 582.381s; exact f3/f4 selectors and focused vet -> PASS.
 - PR 2 live install: the release checksum matched, all six archive member paths were inventoried, and the managed Windows install placed ts-bridge v1.20.0 successfully.
 - PR 3 focused tests: `go test ./internal/doctor -run '^TestCheckTsBridge' -count=1` -> PASS in 4.573s; `go test ./internal/tools -run '^TestInstallGitHubArchiveSecondRunSkipsWithoutFetch$' -count=1` -> PASS in 2.594s; focused vet -> PASS.
+- Synthetic idempotence: `go test ./internal/cmd -run '^TestConverge_TsBridgeClientSecondRunIsZero$' -v -count=1` -> `--- PASS` in 0.19s; the second command run asserted `0 changed` and the current drop-in detail.
 - PR 3 live doctor: pinned ts-bridge v1.20.0 -> PASS; listener -> PASS; TLS-valid Gitea destination through SOCKS -> PASS.
 - Live routing: global Gitea URL proxy resolved to `socks5h://127.0.0.1:1081`; GitHub resolved direct; Copilot App's bundled Git completed `ls-remote` against both origins.
 - Copilot App recovery: an origin cached as `github_owner/repo` while Gitea was unreachable remained rejected after Git recovered. Removing and re-adding the project created neutral forge metadata and workspace initialization succeeded.

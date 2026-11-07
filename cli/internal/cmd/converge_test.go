@@ -99,6 +99,23 @@ func TestConverge_AppliesThenASecondRunChangesNothing(t *testing.T) {
 	}
 }
 
+func TestConverge_TsBridgeClientSecondRunIsZero(t *testing.T) {
+	repo, home := convergeFixture(t)
+	if _, err := env.SetMachineRole(env.MachinePath(home), env.RoleTSBridgeClient, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := execute(t, "converge", "--only", "ts-bridge-client", "--repo", repo); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, err := execute(t, "converge", "--only", "ts-bridge-client", "--repo", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "0 changed") || !strings.Contains(stdout, "Gitea Git proxy drop-in is current") {
+		t.Fatalf("second bridge converge is not zero:\n%s", stdout)
+	}
+}
+
 // An apply persists what it did under the user state directory, and a second
 // run on a converged machine records zero changes. A plan persists nothing.
 func TestConverge_SecondRunIsANoOpAndPersistsTheReport(t *testing.T) {

@@ -13,7 +13,8 @@ private Git forge through the userspace ts-bridge SOCKS listener.
 ```powershell
 dotf env role add ts-bridge-client
 dotf tools install ts-bridge
-dotf converge --only ts-bridge-client
+dotf deploy gitconfig
+dotf converge --only git-config,ts-bridge-client
 ```
 
 The role owns:
@@ -28,6 +29,10 @@ system DNS, browser proxy settings or an unattended service.
 ## Start the bridge
 
 Until #3244 provides lifecycle commands, start the declared profile explicitly:
+
+The effective health address must be `127.0.0.1:9081`, matching doctor. Check
+`TS_HEALTH_ADDR` and the current directory's `.env` for overrides before
+starting.
 
 ```powershell
 ts-bridge connect `
@@ -105,13 +110,12 @@ system DNS remains unchanged. Direct browser access to the private forge is
 therefore not evidence that the Git bridge is unhealthy. Browser/PAC routing is
 a separate architecture decision and must not be hidden inside this role.
 
-## Stop a detached bridge
+## Stop the bridge
 
-On Windows, resolve the exact listener owner and stop only that PID:
+Until TOOL-035 PR5 lands an owned `dotf bridge stop`, keep the bridge attached
+and stop it with Ctrl+C. Do not derive a PID from port 1081 or kill by process
+name: another application may own that listener, and PID reuse makes a stale
+number unsafe.
 
-```powershell
-$bridgePid = (Get-NetTCPConnection -LocalPort 1081 -State Listen).OwningProcess
-Stop-Process -Id $bridgePid
-```
-
-Then re-run doctor. Listener-down must be explicit; it must never look healthy.
+After the owned stop command lands, use it and re-run doctor. Listener-down must
+be explicit; it must never look healthy.
