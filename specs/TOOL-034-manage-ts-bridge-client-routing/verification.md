@@ -49,6 +49,13 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Health response bodies are parsed only for status and never printed, so profile or credential-adjacent fields cannot enter the report.
 - Copilot App project metadata is repaired through remove/re-add, never by writing its internal database.
 
+## Adversarial review disposition
+
+- Independent verdict: PASS by `agy/gemini-3.8-flash-high` at commit `6b359af3477102fa53ab37334585111182832f12`.
+- Formatting finding: refuted for committed content. The three reported Go blobs contain zero CRLF sequences, and PR CI `lint` / `cli-lint` passed. The review observed Windows working-tree conversion, not repository formatting drift.
+- Windows executable replacement while running: accepted and tracked by TOOL-035/#3244, which owns explicit start/stop and exact process identity.
+- Arbitrary `TS_HEALTH_ADDR` override: declined for this contract. The managed client role and runbook pin `127.0.0.1:9081`; doctor intentionally verifies that declared managed endpoint rather than discovering foreign profile overrides.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
