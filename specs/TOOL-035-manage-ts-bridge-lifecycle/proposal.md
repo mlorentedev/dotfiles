@@ -53,8 +53,8 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 
 Observable outcomes. Each must be testable.
 
-- [ ] `dotf bridge status` reports stopped, starting, listener-ready,
-  destination-failed, healthy and unowned states with machine-readable
+- [ ] `dotf bridge status` reports stopped, starting, destination-failed,
+  healthy and unowned states with machine-readable
   `error`/`why`/`fix` fields and no credential values.
 - [ ] A first `bridge start --profile ...` records a non-secret descriptor,
   returns only after `READY` plus TLS-valid destination health, and a second
@@ -65,7 +65,8 @@ Observable outcomes. Each must be testable.
   work on Windows, Linux and macOS through platform-specific seams.
 - [x] Copilot App recovery is documented: after bridge health is restored, a
   project with stale origin identity is removed/re-added rather than repaired
-  through internal database writes.
+  through internal database writes. Existing proof:
+  `docs/runbooks/ts-bridge-client.md` section "Recover Copilot App origin verification".
 
 ## References
 

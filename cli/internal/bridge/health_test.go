@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -41,11 +42,14 @@ func TestProbeHealthSeparatesListenerAndDestination(t *testing.T) {
 }
 
 func TestProbeHealthUsesTLSAndRemoteDNSWithoutWeakening(t *testing.T) {
-	var commands []string
+	type invocation struct {
+		name string
+		args []string
+	}
+	var commands []invocation
 	run := func(_ time.Duration, name string, args ...string) (string, string, error) {
-		command := name + " " + strings.Join(args, " ")
-		commands = append(commands, command)
-		if strings.Contains(command, "/health/ready") {
+		commands = append(commands, invocation{name: name, args: append([]string(nil), args...)})
+		if strings.Contains(strings.Join(args, " "), "/health/ready") {
 			return `{"status":"ok"}`, "", nil
 		}
 		return `{"status":"pass"}`, "", nil
@@ -54,13 +58,18 @@ func TestProbeHealthUsesTLSAndRemoteDNSWithoutWeakening(t *testing.T) {
 	if got := ProbeHealth(run, testDescriptor("office")); !got.DestinationReady {
 		t.Fatalf("ProbeHealth() = %+v", got)
 	}
-	joined := strings.Join(commands, "\n")
-	for _, want := range []string{"--proxy socks5h://127.0.0.1:1081", "https://gitea.kubelab.live/api/healthz"} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("commands missing %q:\n%s", want, joined)
-		}
+	want := []invocation{
+		{name: "curl", args: []string{
+			"--noproxy", "*", "--fail", "--silent", "--show-error", "--max-time", "5",
+			"http://127.0.0.1:9081/health/ready",
+		}},
+		{name: "curl", args: []string{
+			"--proxy", "socks5h://127.0.0.1:1081", "--noproxy", "",
+			"--fail", "--silent", "--show-error", "--max-time", "15",
+			"https://gitea.kubelab.live/api/healthz",
+		}},
 	}
-	if strings.Contains(joined, "--insecure") {
-		t.Fatalf("probe weakened TLS:\n%s", joined)
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("ProbeHealth commands = %#v; want %#v", commands, want)
 	}
 }

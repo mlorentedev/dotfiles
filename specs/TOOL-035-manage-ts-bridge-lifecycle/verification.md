@@ -26,6 +26,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Shared health foundation: `TestProbeHealth*` and `TestCheckTsBridge*` -> PASS without changing TOOL-034 doctor behavior.
 - Exact identity regression: `TestInspectProcessRequiresExactStartIdentity`, `TestInspectProcessRequiresExactExecutable`, `TestInspectProcessDistinguishesMissingFromInspectionFailure` and `TestCaptureAndInspectCurrentProcess` -> PASS on Windows.
 - Platform compilation: Windows tests run natively; `GOOS=linux GOARCH=amd64 go test -c ./internal/bridge` and `GOOS=darwin GOARCH=amd64 go test -c ./internal/bridge` -> PASS.
+- TLS guard: `TestProbeHealthUsesTLSAndRemoteDNSWithoutWeakening` asserts the exact listener and destination curl argument vectors, so `-k`, `--insecure` or an alternate CA cannot enter unnoticed.
+- Feature predicates: f1-f4 each exit non-zero while their exact future named tests are absent; f5 exits zero against the existing runbook recovery guard.
 - Copilot recovery guard: the `features.json` f5 verification predicate -> PASS; the runbook contains remove/re-add recovery and no lifecycle code references `data.db`.
 - Focused vet: `go vet ./internal/bridge ./internal/doctor` -> PASS.
 - Race detector: not run locally because the installed Go has CGO disabled; this foundation adds no goroutines.

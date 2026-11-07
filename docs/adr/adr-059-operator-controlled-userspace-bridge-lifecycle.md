@@ -141,7 +141,7 @@ Status distinguishes:
 
 - `stopped`: no owned live process;
 - `starting`: owned process, listener not ready;
-- `listener-ready`: listener ready, destination failed;
+- `destination-failed`: listener ready, destination failed;
 - `healthy`: process owned, listener ready, destination valid;
 - `unowned`: PID/process identity mismatch or foreign listener.
 
