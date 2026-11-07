@@ -108,14 +108,78 @@ func TestTsBridgeClientWithoutRoleRefusesForeignIncludedDropIn(t *testing.T) {
 	}
 }
 
+func TestTsBridgeClientProbeByState(t *testing.T) {
+	cases := []struct {
+		name, file    string
+		role, wantErr bool
+	}{
+		{name: "opted out and missing", file: "missing"},
+		{name: "opted in and missing", file: "missing", role: true, wantErr: true},
+		{name: "opted in and current", file: "current", role: true},
+		{name: "opted out and managed", file: "current", wantErr: true},
+		{name: "foreign file", file: "foreign", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			home := t.TempDir()
+			if tc.role {
+				if _, err := envpkg.SetMachineRole(envpkg.MachinePath(home), envpkg.RoleTSBridgeClient, true); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.file != "missing" {
+				path := tsBridgeGitConfig(home)
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				body := tsBridgeGitContent
+				if tc.file == "foreign" {
+					body = []byte("[http]\n\tproxy = http://foreign\n")
+				}
+				if err := os.WriteFile(path, body, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := (tsBridgeClient{}).Probe(Env{Home: home}); (err != nil) != tc.wantErr {
+				t.Fatalf("Probe() error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestDotfilesGitConfigIncludesOptionalTsBridgeDropIn(t *testing.T) {
 	repo := filepath.Join("..", "..", "..")
 	raw, err := os.ReadFile(filepath.Join(repo, "git", "dotfiles.gitconfig"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), "path = ~/.config/git/ts-bridge.gitconfig") {
+	if !strings.Contains(string(raw), "path = ts-bridge.gitconfig") {
 		t.Fatal("dotfiles.gitconfig does not include the role-owned drop-in")
+	}
+}
+
+func TestDotfilesGitConfigResolvesTsBridgeDropInBesideParent(t *testing.T) {
+	repo := filepath.Join("..", "..", "..")
+	dir := t.TempDir()
+	parent := filepath.Join(dir, "dotfiles.gitconfig")
+	raw, err := os.ReadFile(filepath.Join(repo, "git", "dotfiles.gitconfig"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(parent, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ts-bridge.gitconfig"), tsBridgeGitContent, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	otherHome := t.TempDir()
+	cmd := exec.Command("git", "config", "--file", parent, "--includes",
+		"--get-urlmatch", "http.proxy", "https://gitea.kubelab.live")
+	cmd.Env = append(os.Environ(), "HOME="+otherHome, "USERPROFILE="+otherHome)
+	out, err := cmd.Output()
+	if err != nil || strings.TrimSpace(string(out)) != "socks5h://127.0.0.1:1081" {
+		t.Fatalf("relative bridge include = %q, %v", out, err)
 	}
 }
 
