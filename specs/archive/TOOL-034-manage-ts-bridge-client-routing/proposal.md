@@ -1,7 +1,7 @@
 ---
 id: "TOOL-034-manage-ts-bridge-client-routing"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-05"
 issue: "mlorentedev/dotfiles#3219"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -69,3 +69,5 @@ Observable outcomes. Each must be testable.
 - Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - Related ADR: `docs/adr/adr-058-role-gated-userspace-bridge-client.md`
 - Related patterns: `pattern-setup-script-idempotence`, `pattern-contract-defaults-per-machine-override`
+
+<!-- archived 2026-11-07 — PR: https://github.com/mlorentedev/dotfiles/pull/3245 -->
