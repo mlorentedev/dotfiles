@@ -121,7 +121,7 @@ func TestCheckTsBridgeProvesTlsDestinationWithoutInsecureOrCredentials(t *testin
 			t.Errorf("commands missing %q:\n%s", want, joined)
 		}
 	}
-	for _, forbidden := range []string{"--insecure", "authkey", "credential", "listener-sentinel", "destination-sentinel"} {
+	for _, forbidden := range []string{"--insecure", "-k", "authkey", "credential", "listener-sentinel", "destination-sentinel"} {
 		if strings.Contains(strings.ToLower(joined), forbidden) || strings.Contains(strings.ToLower(out), forbidden) {
 			t.Errorf("secret/TLS weakening token %q leaked:\n%s\n%s", forbidden, joined, out)
 		}
@@ -131,6 +131,7 @@ func TestCheckTsBridgeProvesTlsDestinationWithoutInsecureOrCredentials(t *testin
 func tsBridgeDoctorFixture(t *testing.T, role bool, onPath []string) (*System, *Config) {
 	t.Helper()
 	repo, home := t.TempDir(), t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	writeFile(t, filepath.Join(repo, "packages.json"), `{"tools":[{
 		"name":"ts-bridge","version":"1.20.0","profile":"full","roles":["ts-bridge-client"],
 		"source":{"type":"github-archive","repo":"o/r","asset":{"windows":"tool.zip"},

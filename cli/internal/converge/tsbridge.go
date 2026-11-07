@@ -8,14 +8,13 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/bridge"
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 const tsBridgeManagedHeader = "# Managed by dotf for the ts-bridge-client role.\n"
 
-var tsBridgeGitContent = []byte(tsBridgeManagedHeader + `[http "https://gitea.kubelab.live"]
-	proxy = socks5h://127.0.0.1:1081
-`)
+var tsBridgeGitContent = []byte(tsBridgeManagedHeader + bridge.GitConfigBlock)
 
 type tsBridgeClient struct{}
 

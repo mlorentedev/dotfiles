@@ -7,14 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/bridge"
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
-const (
-	tsBridgeHealthURL = "http://127.0.0.1:9081/health/ready"
-	tsBridgeSocks     = "socks5h://127.0.0.1:1081"
-	tsBridgeGiteaURL  = "https://gitea.kubelab.live/api/healthz"
-)
+const tsBridgeHealthURL = bridge.ListenerHealthURL
 
 func checkTsBridge(sys *System, cfg *Config, rep *Report) {
 	rep.Section("ts-bridge client")
@@ -55,14 +52,14 @@ func checkTsBridge(sys *System, cfg *Config, rep *Report) {
 
 func tsBridgeListenerReady(sys *System) bool {
 	body, err := tsBridgeCurl(sys, 7*time.Second,
-		"--fail", "--silent", "--show-error", "--max-time", "5", tsBridgeHealthURL)
+		"--noproxy", "*", "--fail", "--silent", "--show-error", "--max-time", "5", tsBridgeHealthURL)
 	return err == nil && jsonStatus(body) == "ok"
 }
 
 func tsBridgeDestinationReady(sys *System) bool {
 	body, err := tsBridgeCurl(sys, 20*time.Second,
-		"--proxy", tsBridgeSocks, "--noproxy", "",
-		"--fail", "--silent", "--show-error", "--max-time", "15", tsBridgeGiteaURL)
+		"--proxy", bridge.SocksURL, "--noproxy", "",
+		"--fail", "--silent", "--show-error", "--max-time", "15", bridge.DestinationHealthURL)
 	return err == nil && jsonStatus(body) == "pass"
 }
 
