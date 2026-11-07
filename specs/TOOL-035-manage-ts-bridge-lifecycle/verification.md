@@ -25,7 +25,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - State foundation: focused `Store`, `LaunchDescriptor` and `ProcessRecord` tests -> PASS.
 - Shared health foundation: `TestProbeHealth*` and `TestCheckTsBridge*` -> PASS without changing TOOL-034 doctor behavior.
 - Exact identity regression: `TestInspectProcessRequiresExactStartIdentity`, `TestInspectProcessRequiresExactExecutable`, `TestInspectProcessDistinguishesMissingFromInspectionFailure` and `TestCaptureAndInspectCurrentProcess` -> PASS on Windows.
-- Platform compilation: Windows tests run natively; `GOOS=linux GOARCH=amd64 go test -c ./internal/bridge` and `GOOS=darwin GOARCH=amd64 go test -c ./internal/bridge` -> PASS.
+- Linux CI: the Ubuntu CLI test job passes the bridge package at head `46e589f4` ([job](https://github.com/mlorentedev/dotfiles/actions/runs/42412126870/job/128522345004)).
+- Platform compilation: `GOOS=linux GOARCH=amd64 go test -c ./internal/bridge` and `GOOS=darwin GOARCH=amd64 go test -c ./internal/bridge` -> PASS. This proves macOS compilation only; a live macOS current-process run remains pending.
 - TLS guard: `TestProbeHealthUsesTLSAndRemoteDNSWithoutWeakening` asserts the exact listener and destination curl argument vectors, so `-k`, `--insecure` or an alternate CA cannot enter unnoticed.
 - Feature predicates: f1-f4 each exit non-zero while their exact future named tests are absent; f5 exits zero against the existing runbook recovery guard.
 - Copilot recovery guard: the `features.json` f5 verification predicate -> PASS; the runbook contains remove/re-add recovery and no lifecycle code references `data.db`.
