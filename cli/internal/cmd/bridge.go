@@ -12,14 +12,13 @@ import (
 
 	bridgepkg "github.com/mlorentedev/dotfiles/cli/internal/bridge"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
-	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
 )
 
 type bridgeDeps struct {
 	StateDir    func() (string, error)
 	RoleEnabled func() (bool, error)
-	Inspect     func(bridgepkg.ProcessRecord) bridgepkg.ProcessInspection
+	Inspect     func(bridgepkg.ProcessRecord) (bridgepkg.ProcessInspection, error)
 	Probe       func(bridgepkg.LaunchDescriptor) bridgepkg.Health
 }
 
@@ -30,12 +29,7 @@ func newBridgeCmd() *cobra.Command {
 			roles, err := env.LoadMachineRoles(env.MachinePath(env.Home()))
 			return slices.Contains(roles, env.RoleTSBridgeClient), err
 		},
-		// PR4 is read-only. PR5 replaces this liveness-only seam with exact
-		// executable/start identity verification before stop can exist.
-		Inspect: func(process bridgepkg.ProcessRecord) bridgepkg.ProcessInspection {
-			alive := secrets.ProcessAlive(process.PID)
-			return bridgepkg.ProcessInspection{Present: alive, Owned: alive}
-		},
+		Inspect: bridgepkg.InspectProcess,
 		Probe: func(launch bridgepkg.LaunchDescriptor) bridgepkg.Health {
 			return bridgepkg.ProbeHealth(runBridgeProbe, launch)
 		},

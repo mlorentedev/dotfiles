@@ -34,7 +34,7 @@ type ProcessInspection struct {
 // Service resolves stored state and produces a read-only lifecycle verdict.
 type Service struct {
 	Store   Store
-	Inspect func(ProcessRecord) ProcessInspection
+	Inspect func(ProcessRecord) (ProcessInspection, error)
 	Probe   func(LaunchDescriptor) Health
 }
 
@@ -102,20 +102,23 @@ func (s Service) Status(profile string) (StatusResult, error) {
 		return NewStatusResult(resolved, StateStopped), nil
 	}
 	if err != nil {
-		result := NewStatusResult(resolved, StateUnowned)
-		result.Why = fmt.Sprintf("the recorded process state is unreadable: %v", err)
-		result.Fix = "remove only the corrupt process state after confirming no bridge process is running"
-		return result, nil
+		return StatusResult{}, err
 	}
-	inspection := ProcessInspection{}
-	if s.Inspect != nil {
-		inspection = s.Inspect(process)
+	if s.Inspect == nil {
+		return StatusResult{}, errors.New("bridge process inspector is not configured")
+	}
+	inspection, err := s.Inspect(process)
+	if err != nil {
+		return StatusResult{}, fmt.Errorf("inspect bridge process: %w", err)
 	}
 	observation := Observation{
 		ProcessPresent: inspection.Present,
 		ProcessOwned:   inspection.Owned,
 	}
-	if inspection.Present && inspection.Owned && s.Probe != nil {
+	if inspection.Present && inspection.Owned {
+		if s.Probe == nil {
+			return StatusResult{}, errors.New("bridge health probe is not configured")
+		}
 		health := s.Probe(launch)
 		observation.ListenerReady = health.ListenerReady
 		observation.DestinationReady = health.DestinationReady

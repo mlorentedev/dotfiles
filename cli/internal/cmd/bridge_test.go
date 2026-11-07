@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/bridge"
 	"github.com/spf13/cobra"
@@ -27,10 +26,10 @@ func bridgeCommandFixture(t *testing.T, process bool, inspection bridge.ProcessI
 	}
 	if process {
 		if err := store.SaveProcess("office", bridge.ProcessRecord{
-			PID:         42,
-			Executable:  filepath.Join(t.TempDir(), "ts-bridge"),
-			StartedAt:   time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC),
-			Fingerprint: "sha256:launch",
+			PID:           42,
+			Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
+			StartIdentity: "platform:12345",
+			Fingerprint:   "sha256:launch",
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -38,8 +37,10 @@ func bridgeCommandFixture(t *testing.T, process bool, inspection bridge.ProcessI
 	command := newBridgeCmdWithDeps(bridgeDeps{
 		StateDir:    func() (string, error) { return stateDir, nil },
 		RoleEnabled: func() (bool, error) { return true, nil },
-		Inspect:     func(bridge.ProcessRecord) bridge.ProcessInspection { return inspection },
-		Probe:       func(bridge.LaunchDescriptor) bridge.Health { return health },
+		Inspect: func(bridge.ProcessRecord) (bridge.ProcessInspection, error) {
+			return inspection, nil
+		},
+		Probe: func(bridge.LaunchDescriptor) bridge.Health { return health },
 	})
 	return command, store
 }

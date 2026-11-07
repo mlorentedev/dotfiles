@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"time"
 )
 
 var profileNameRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
@@ -42,10 +41,10 @@ func (d LaunchDescriptor) Validate() error {
 
 // ProcessRecord identifies the detached process a later stop may own.
 type ProcessRecord struct {
-	PID         int       `json:"pid"`
-	Executable  string    `json:"executable"`
-	StartedAt   time.Time `json:"started_at"`
-	Fingerprint string    `json:"fingerprint"`
+	PID           int    `json:"pid"`
+	Executable    string `json:"executable"`
+	StartIdentity string `json:"start_identity"`
+	Fingerprint   string `json:"fingerprint"`
 }
 
 // Validate refuses an identity that cannot distinguish an owned process.
@@ -55,7 +54,7 @@ func (p ProcessRecord) Validate() error {
 		return errors.New("process PID must be positive")
 	case !filepath.IsAbs(p.Executable):
 		return errors.New("process executable must be an absolute path")
-	case p.StartedAt.IsZero():
+	case p.StartIdentity == "":
 		return errors.New("process start identity is missing")
 	case p.Fingerprint == "":
 		return errors.New("process launch fingerprint is missing")

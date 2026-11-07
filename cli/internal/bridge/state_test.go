@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func testDescriptor(profile string) LaunchDescriptor {
@@ -20,10 +19,10 @@ func TestStoreRoundTripsLaunchAndProcessState(t *testing.T) {
 	store := NewStore(t.TempDir())
 	launch := testDescriptor("office")
 	process := ProcessRecord{
-		PID:         4242,
-		Executable:  filepath.Join(t.TempDir(), "ts-bridge"),
-		StartedAt:   time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC),
-		Fingerprint: "sha256:launch",
+		PID:           4242,
+		Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
+		StartIdentity: "platform:12345",
+		Fingerprint:   "sha256:launch",
 	}
 
 	if err := store.SaveLaunch(launch); err != nil {
@@ -114,10 +113,10 @@ func TestLaunchDescriptorRejectsUnsafeValues(t *testing.T) {
 
 func TestProcessRecordRejectsInvalidIdentity(t *testing.T) {
 	valid := ProcessRecord{
-		PID:         42,
-		Executable:  filepath.Join(t.TempDir(), "ts-bridge"),
-		StartedAt:   time.Now().UTC(),
-		Fingerprint: "sha256:launch",
+		PID:           42,
+		Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
+		StartIdentity: "platform:12345",
+		Fingerprint:   "sha256:launch",
 	}
 	cases := []struct {
 		name   string
@@ -125,7 +124,7 @@ func TestProcessRecordRejectsInvalidIdentity(t *testing.T) {
 	}{
 		{"pid", func(p *ProcessRecord) { p.PID = 0 }},
 		{"executable", func(p *ProcessRecord) { p.Executable = "" }},
-		{"start", func(p *ProcessRecord) { p.StartedAt = time.Time{} }},
+		{"start", func(p *ProcessRecord) { p.StartIdentity = "" }},
 		{"fingerprint", func(p *ProcessRecord) { p.Fingerprint = "" }},
 	}
 	for _, tc := range cases {

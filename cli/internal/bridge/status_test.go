@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestClassifyStatus(t *testing.T) {
@@ -80,10 +79,10 @@ func TestServiceStatusUsesOwnedProcessAndHealth(t *testing.T) {
 			}
 			if tt.process {
 				process := ProcessRecord{
-					PID:         42,
-					Executable:  filepath.Join(t.TempDir(), "ts-bridge"),
-					StartedAt:   time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC),
-					Fingerprint: "sha256:launch",
+					PID:           42,
+					Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
+					StartIdentity: "platform:12345",
+					Fingerprint:   "sha256:launch",
 				}
 				if err := store.SaveProcess("office", process); err != nil {
 					t.Fatal(err)
@@ -91,8 +90,8 @@ func TestServiceStatusUsesOwnedProcessAndHealth(t *testing.T) {
 			}
 			service := Service{
 				Store: store,
-				Inspect: func(ProcessRecord) ProcessInspection {
-					return tt.inspection
+				Inspect: func(ProcessRecord) (ProcessInspection, error) {
+					return tt.inspection, nil
 				},
 				Probe: func(LaunchDescriptor) Health {
 					return tt.health
@@ -106,7 +105,7 @@ func TestServiceStatusUsesOwnedProcessAndHealth(t *testing.T) {
 	}
 }
 
-func TestServiceStatusTreatsCorruptProcessStateAsUnowned(t *testing.T) {
+func TestServiceStatusReturnsErrorForCorruptProcessState(t *testing.T) {
 	store := NewStore(t.TempDir())
 	if err := store.SaveLaunch(testDescriptor("office")); err != nil {
 		t.Fatal(err)
@@ -117,7 +116,52 @@ func TestServiceStatusTreatsCorruptProcessStateAsUnowned(t *testing.T) {
 	}
 
 	got, err := (Service{Store: store}).Status("office")
-	if err != nil || got.State != StateUnowned || !strings.Contains(got.Why, "process state") {
-		t.Fatalf("Status() = %+v, %v; want unowned corrupt-state verdict", got, err)
+	if err == nil || got != (StatusResult{}) || !strings.Contains(err.Error(), "process executable") {
+		t.Fatalf("Status() = %+v, %v; want unavailable corrupt-state error", got, err)
+	}
+}
+
+func TestServiceStatusRequiresProcessInspector(t *testing.T) {
+	store := NewStore(t.TempDir())
+	if err := store.SaveLaunch(testDescriptor("office")); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveProcess("office", ProcessRecord{
+		PID:           42,
+		Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
+		StartIdentity: "platform:12345",
+		Fingerprint:   "sha256:launch",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := (Service{Store: store}).Status("office")
+	if err == nil || got != (StatusResult{}) || !strings.Contains(err.Error(), "inspector") {
+		t.Fatalf("Status() = %+v, %v; want missing-inspector error", got, err)
+	}
+}
+
+func TestServiceStatusRequiresHealthProbeForOwnedProcess(t *testing.T) {
+	store := NewStore(t.TempDir())
+	if err := store.SaveLaunch(testDescriptor("office")); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveProcess("office", ProcessRecord{
+		PID:           42,
+		Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
+		StartIdentity: "platform:12345",
+		Fingerprint:   "sha256:launch",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := (Service{
+		Store: store,
+		Inspect: func(ProcessRecord) (ProcessInspection, error) {
+			return ProcessInspection{Present: true, Owned: true}, nil
+		},
+	}).Status("office")
+	if err == nil || got != (StatusResult{}) || !strings.Contains(err.Error(), "health probe") {
+		t.Fatalf("Status() = %+v, %v; want missing-probe error", got, err)
 	}
 }
