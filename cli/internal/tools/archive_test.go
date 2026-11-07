@@ -62,6 +62,19 @@ func TestInstallGitHubArchiveTarGz(t *testing.T) {
 	}
 }
 
+func TestInstallGitHubArchiveSecondRunSkipsWithoutFetch(t *testing.T) {
+	const asset = "ts-bridge-v1.20.0-windows-amd64.zip"
+	in := newTestInstaller(t, "1.20.0", func(string, string) error {
+		t.Fatal("an installed archive tool at its pin must not fetch again")
+		return nil
+	})
+	in.GOOS = "windows"
+
+	if res, err := in.Install(githubArchiveTool(asset, "ts-bridge.exe")); err != nil || res != Skipped {
+		t.Fatalf("second Install() = %v, %v; want skipped", res, err)
+	}
+}
+
 func TestInstallGitHubArchiveRejectsInvalidMembersAndKeepsInstalledBinary(t *testing.T) {
 	cases := []struct {
 		name, asset, member string

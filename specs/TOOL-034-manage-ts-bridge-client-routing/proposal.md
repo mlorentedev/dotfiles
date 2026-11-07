@@ -61,8 +61,8 @@ Observable outcomes. Each must be testable.
 - [x] A `ts-bridge-client` machine role selects the ts-bridge catalog entry; no role means the entry is not planned or installed.
 - [x] Role convergence owns `~/.config/git/ts-bridge.gitconfig` with only the Gitea URL proxy, and role removal deletes that file.
 - [x] GitHub stays direct; no hosts, DNS, environment-wide proxy or system proxy is changed.
-- [ ] Doctor reports pinned-version drift, bridge-listener readiness and TLS-valid Gitea destination reachability without credential values.
-- [ ] A second install/converge reports zero changes, and bridge-down behavior is explicit rather than healthy.
+- [x] Doctor reports pinned-version drift, bridge-listener readiness and TLS-valid Gitea destination reachability without credential values.
+- [x] A second install/converge reports zero changes, and bridge-down behavior is explicit rather than healthy.
 
 ## References
 
