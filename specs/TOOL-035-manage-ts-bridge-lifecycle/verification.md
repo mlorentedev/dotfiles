@@ -24,6 +24,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Pre-implementation consistency check: PASS; every criterion has tagged tasks and a non-vacuous feature command.
 - State foundation: focused `Store`, `LaunchDescriptor` and `ProcessRecord` tests -> PASS.
 - Shared health foundation: `TestProbeHealth*` and `TestCheckTsBridge*` -> PASS without changing TOOL-034 doctor behavior.
+- TLS guard: `TestProbeHealthUsesTLSAndRemoteDNSWithoutWeakening` asserts the exact listener and destination curl argument vectors, so `-k`, `--insecure` or an alternate CA cannot enter unnoticed.
+- Feature predicates: f1-f4 each exit non-zero while their exact future named tests are absent; f5 exits zero against the existing runbook recovery guard.
 - Copilot recovery guard: the `features.json` f5 verification predicate -> PASS; the runbook contains remove/re-add recovery and no lifecycle code references `data.db`.
 - Focused vet: `go vet ./internal/bridge ./internal/doctor` -> PASS.
 - Race detector: not run locally because the installed Go has CGO disabled; this foundation adds no goroutines.
