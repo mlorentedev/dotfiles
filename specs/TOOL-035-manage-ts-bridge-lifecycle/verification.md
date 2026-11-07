@@ -13,7 +13,7 @@ owner: manu
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] Criterion 1 -> shared health foundation complete; status classifier and command pending
+- [x] Criterion 1 -> shared health, exact ownership, status classifier and command tests
 - [ ] Criterion 2 -> start manager and no-duplicate tests pending
 - [ ] Criterion 3 -> exact process identity complete; owned stop pending
 - [ ] Criterion 4 -> strict state store and platform process seams complete; bounded logs pending
@@ -27,8 +27,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Exact identity regression: `TestInspectProcessRequiresExactStartIdentity`, `TestInspectProcessRequiresExactExecutable`, `TestInspectProcessDistinguishesMissingFromInspectionFailure` and `TestCaptureAndInspectCurrentProcess` -> PASS on Windows.
 - Linux CI: the Ubuntu CLI test job passes the bridge package at head `46e589f4` ([job](https://github.com/mlorentedev/dotfiles/actions/runs/42412126870/job/128522345004)).
 - Platform compilation: `GOOS=linux GOARCH=amd64 go test -c ./internal/bridge` and `GOOS=darwin GOARCH=amd64 go test -c ./internal/bridge` -> PASS. This proves macOS compilation only; a live macOS current-process run remains pending.
+- Status regression: `TestClassifyStatus`, `TestStatusResultUsesAgentOrientedErrors`, `TestServiceStatus*` and `TestBridgeStatusCommand*` -> PASS on Windows.
+- Corrupt or unreadable process state and missing inspector/probe dependencies return status unavailable instead of a success-shaped fallback.
 - TLS guard: `TestProbeHealthUsesTLSAndRemoteDNSWithoutWeakening` asserts the exact listener and destination curl argument vectors, so `-k`, `--insecure` or an alternate CA cannot enter unnoticed.
-- Feature predicates: f1-f4 each exit non-zero while their exact future named tests are absent; f5 exits zero against the existing runbook recovery guard.
+- Feature predicates: f1 and f5 exit zero; f2-f4 remain non-zero until their exact future named tests are complete.
 - Copilot recovery guard: the `features.json` f5 verification predicate -> PASS; the runbook contains remove/re-add recovery and no lifecycle code references `data.db`.
 - Focused vet: `go vet ./internal/bridge ./internal/doctor` -> PASS.
 - Race detector: not run locally because the installed Go has CGO disabled; this foundation adds no goroutines.
@@ -44,6 +46,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The original state/status PR exceeded the atomic review cap after exact ownership became mandatory. The user approved splitting it into state, process-identity and status PRs before start/stop.
 - The state foundation owns only strict non-secret descriptors, process records and the shared health interpretation; it exposes no command.
 - Status and later stop share one exact identity seam: PID liveness alone is never ownership.
+- Read-only status landed only after the process seam could distinguish exact ownership from a reused PID.
 
 ## Promotion candidates
 

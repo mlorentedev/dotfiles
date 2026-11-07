@@ -42,11 +42,11 @@ owner: manu
 
 ### Read-only status
 
-- [ ] [P] [AC1] Add status tests for stopped, starting, destination-failed, healthy, unowned and unavailable states plus JSON `error`/`why`/`fix`.
-- [ ] [AC1] Implement the read-only status classifier and service using exact process ownership plus the shared health probe.
-- [ ] [AC1] Add `dotf bridge status [--profile] [--json]` and command tests; non-healthy states exit non-zero.
-- [ ] [AC5] Update `docs/runbooks/ts-bridge-client.md` with the status command while preserving stale Copilot App remove/re-add recovery.
-- [ ] Run focused bridge, doctor and command tests plus vet; commit the read-only status command.
+- [x] [P] [AC1] Add status tests for stopped, starting, destination-failed, healthy, unowned and unavailable states plus JSON `error`/`why`/`fix`.
+- [x] [AC1] Implement the read-only status classifier and service using exact process ownership plus the shared health probe.
+- [x] [AC1] Add `dotf bridge status [--profile] [--json]` and command tests; non-healthy states exit non-zero.
+- [x] [AC5] Update `docs/runbooks/ts-bridge-client.md` with the status command while preserving stale Copilot App remove/re-add recovery.
+- [x] Run focused bridge, doctor and command tests plus vet; commit the read-only status command.
 
 ### Owned start/stop lifecycle
 
