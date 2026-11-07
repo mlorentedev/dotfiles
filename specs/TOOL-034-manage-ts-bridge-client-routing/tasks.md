@@ -46,19 +46,21 @@ owner: manu
 
 ### PR 3 - Doctor and end-to-end evidence
 
-- [ ] [AC7] Add role-gated doctor tests for binary pin, listener-down, listener-ready/destination-failed and TLS-valid destination success.
-- [ ] [AC7] Implement bounded health probes without printing profile/credential values.
-- [ ] [AC8] Run a synthetic bridge-client converge twice and record zero changes.
-- [ ] [AC7] [AC8] Record live consequence probes for health, Gitea TLS and Git remote access; finish verification and adversarial review.
+- [x] [AC7] Add role-gated doctor tests for binary pin, listener-down, listener-ready/destination-failed and TLS-valid destination success.
+- [x] [AC7] Implement bounded health probes without printing profile/credential values.
+- [x] [AC8] Run a synthetic bridge-client converge twice and record zero changes.
+- [x] [AC7] [AC8] Record live consequence probes for health, Gitea TLS and Git remote access.
+- [x] [AC7] [AC8] Document operator verification and Copilot App origin-cache recovery in `docs/runbooks/ts-bridge-client.md`.
+- [ ] Run independent adversarial review and record the verdict before archive.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
 - [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features
