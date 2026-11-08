@@ -83,7 +83,14 @@ func (Hive) Dispatch(ctx context.Context, req Request) Response {
 		// rather than worked around here.
 		"--prompt", req.Task,
 	}
-	stdout, stderr, code, err := runProcess(ctx, "hive", args, "")
+	var extraEnv []string
+	if req.WorkerID != "" {
+		extraEnv = append(extraEnv, "DOTF_WORKER_ID="+req.WorkerID)
+	}
+	if req.Role != "" {
+		extraEnv = append(extraEnv, "DOTF_ROLE="+req.Role)
+	}
+	stdout, stderr, code, err := runProcess(ctx, "hive", args, "", extraEnv...)
 	if err != nil {
 		return Response{Status: StatusTaskFailed, Exit: 1,
 			Output: fmt.Sprintf("could not run hive delegate: %v", err)}

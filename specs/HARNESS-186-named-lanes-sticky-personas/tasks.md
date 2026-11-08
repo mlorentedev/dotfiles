@@ -31,7 +31,7 @@ owner: manu
 
 ### Batch 2: Layer 1 (Persistent Named Lanes `init` / `switch` / `park` & In-Place `worktree` / `handoff` / `mem` Lifecycle)
 
-- [ ] [P] [AC1] [AC2] **Task 5 (RED — Write failing tests for Named Lanes & In-Place Park):**
+- [x] [P] [AC1] [AC2] **Task 5 (RED — Write failing tests for Named Lanes & In-Place Park):**
   - **Files to create:**
     1. `cli/internal/worktree/park_test.go`
     2. `cli/internal/lane/lanes_test.go`
@@ -54,7 +54,7 @@ owner: manu
   - **Run to verify RED:**
     `cd cli && go test ./internal/worktree/... ./internal/lane/... -run "TestLaneInitIdempotent|TestLaneSwitchRoutingAndWIPCap|TestLaneParkInPlaceAndTipVerification" -count=1`
 
-- [ ] [AC1] [AC2] **Task 6 (GREEN — Implement `Park()`, `InitLanes()`, `SwitchLane()`, `handoff.go` reuse, and `SessionEnd` guard):**
+- [x] [AC1] [AC2] **Task 6 (GREEN — Implement `Park()`, `InitLanes()`, `SwitchLane()`, `handoff.go` reuse, and `SessionEnd` guard):**
   - **Files to modify/create:**
     1. `cli/internal/worktree/worktree.go`: Add `Lane`, `State`, `Persona` to `Metadata`; add `StateParked` and `StateParkable` to `LifecycleState`; update `Classify()` so named lanes (`meta.Lane != ""`) transition between `StateParked`, `StateActive`, and `StateParkable` (fixing **B5**, **M2**).
     2. `cli/internal/worktree/done.go` & `cli/internal/worktree/sweep.go`: Implement `Park(repoRoot, wtPath string, opts DoneOptions) (DoneResult, error)` using `filelock.Lock(DefaultLockPath(), time.Minute)` (fixing **M1**), `branchLanding` SHA check (fixing **M3**), `git checkout --detach`, `git branch -D <oldBranch>`, `.dotf-lane-prompt.md` removal (fixing **M4**), and `.dotf-worktree.json` reset to `PARKED`. In `Done()`, if `meta.Lane != ""`, call `Park()`. In `Sweep()`, for `StateParkable` entries, call `Park()` and release `refs/dotf/claims/<issue>`.
@@ -67,7 +67,7 @@ owner: manu
 
 ### Batch 3: Layer 4 (`pre-commit` Scoped Lane Guard, `board-pickup.sh` CWD Detach, & Forge `Environment` Provenance)
 
-- [ ] [P] [AC5] **Task 7 (RED — Write failing tests for `pre-commit` lane guard & `board-pickup.sh`):**
+- [x] [P] [AC5] **Task 7 (RED — Write failing tests for `pre-commit` lane guard & `board-pickup.sh`):**
   - **File to create:** `cli/internal/hooks/lane_guard_test.go` (`TestPreCommitLaneGuard`)
   - **Exact behaviors to assert (fixes B6, M6, m4):**
     1. Commits in a repository WITHOUT `.dotf/lane.json` or with `.obsidian/` directory on `main`/`master` succeed (`exit 0`).
@@ -79,7 +79,7 @@ owner: manu
   - **Run to verify RED:**
     `cd cli && go test ./internal/hooks/... -run TestPreCommitLaneGuard -count=1`
 
-- [ ] [AC5] **Task 8 (GREEN — Implement `git-hooks/lib/lane-guard.sh`, wire into `git-hooks/pre-commit`, and detach CWD in `git-hooks/lib/board-pickup.sh`):**
+- [x] [AC5] **Task 8 (GREEN — Implement `git-hooks/lib/lane-guard.sh`, wire into `git-hooks/pre-commit`, and detach CWD in `git-hooks/lib/board-pickup.sh`):**
   - **Files to modify/create:**
     1. Create `git-hooks/lib/lane-guard.sh` implementing the checks tested in Task 7.
     2. Source/invoke `lane-guard.sh` from `git-hooks/pre-commit`.
@@ -87,7 +87,7 @@ owner: manu
   - **Run to verify GREEN:**
     `cd cli && go test ./internal/hooks/... -run TestPreCommitLaneGuard -v -count=1`
 
-- [ ] [P] [AC6] **Task 9 (RED — Write failing tests for Cross-OS Forge `Environment` Provenance & `no-attribution`):**
+- [x] [P] [AC6] **Task 9 (RED — Write failing tests for Cross-OS Forge `Environment` Provenance & `no-attribution`):**
   - **File to create:** `cli/internal/forgewrite/provenance_test.go` (`TestForgePRProvenanceNoAttribution`)
   - **Exact behaviors to assert (fixes m2, m3):**
     1. `FormatEnvironmentProvenance(machineID, goos, goarch, lane string) string` returns `Environment: <machineID> (<goos>/<goarch>) · <lane>` (e.g. `Environment: EGW-LEN029 (windows/amd64) · feat-lane-primary`).
@@ -96,7 +96,7 @@ owner: manu
   - **Run to verify RED:**
     `cd cli && go test ./internal/forgewrite/... -run TestForgePRProvenanceNoAttribution -count=1`
 
-- [ ] [AC6] **Task 10 (GREEN — Implement `FormatEnvironmentProvenance` & `ValidateProvenanceNoAttribution` in `cli/internal/forgewrite/provenance.go`):**
+- [x] [AC6] **Task 10 (GREEN — Implement `FormatEnvironmentProvenance` & `ValidateProvenanceNoAttribution` in `cli/internal/forgewrite/provenance.go`):**
   - **Files to create/modify:**
     1. Create `cli/internal/forgewrite/provenance.go` implementing `FormatEnvironmentProvenance` and `ValidateProvenanceNoAttribution` and wiring it into PR body / review triage comment generation.
     2. Verify `docs/adr/adr-060-persistent-named-lanes-sticky-personas-and-meeseek-workers.md` is committed.
@@ -105,10 +105,10 @@ owner: manu
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` (`AC1`–`AC6`) is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Type checks pass (`cd cli && go vet ./...`)
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` (`AC1`–`AC6`) is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Type checks pass (`cd cli && go vet ./...`)
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder (`specs/HARNESS-186-named-lanes-sticky-personas`)

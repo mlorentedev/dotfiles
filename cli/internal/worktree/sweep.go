@@ -338,6 +338,23 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	absCwd, _ := filepath.Abs(cwd)
 
 	for _, info := range infos {
+		if info.State == StateParkable {
+			if reason := sessionSkipReason(opts.Sessions, info.Path, now); reason != "" {
+				report.SkippedCount++
+				report.SessionSkips = append(report.SessionSkips, SessionSkip{Path: info.Path, Reason: reason})
+				continue
+			}
+			if opts.DryRun {
+				report.Reaped = append(report.Reaped, info)
+				continue
+			}
+			if parkSingleNamedLane(opts.RepoRoot, info, runner, opts.LandedHeads) {
+				report.Reaped = append(report.Reaped, info)
+			} else {
+				report.SkippedCount++
+			}
+			continue
+		}
 		reading, candidate := gateF(info, absCwd)
 		if reading.Uninspectable > report.UninspectableProcesses {
 			report.UninspectableProcesses = reading.Uninspectable
@@ -370,6 +387,54 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	}
 
 	return report, nil
+}
+
+func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) bool {
+	if isDirty(info.Path, runner) {
+		return false
+	}
+	if landedHeads != nil {
+		if _, _, landed, _ := branchLanding(repoRoot, info.Path, landedHeads); !landed {
+			return false
+		}
+	} else if !isMerged(repoRoot, info.Branch, runner) {
+		return false
+	}
+	laneName := filepath.Base(info.Path)
+	createdAt := time.Now()
+	issueNum := 0
+	if info.Metadata != nil {
+		if info.Metadata.Lane != "" {
+			laneName = info.Metadata.Lane
+		}
+		if !info.Metadata.CreatedAt.IsZero() {
+			createdAt = info.Metadata.CreatedAt
+		}
+		issueNum = info.Metadata.Issue
+	}
+	// Write State="PARKED" before checkout --detach / branch delete (M-CODE-2).
+	if err := SaveMetadata(info.Path, Metadata{
+		Lane:      laneName,
+		State:     string(StateParked),
+		CreatedAt: createdAt,
+		ReapOK:    false,
+	}); err != nil {
+		return false
+	}
+	baseRef := resolveBaseRef(repoRoot)
+	if baseRef == "" {
+		baseRef = "HEAD"
+	}
+	if err := exec.Command("git", "-C", info.Path, "checkout", "--detach", baseRef).Run(); err != nil {
+		if info.Metadata != nil {
+			_ = SaveMetadata(info.Path, *info.Metadata)
+		}
+		return false
+	}
+	_ = os.Remove(filepath.Join(info.Path, ".dotf-lane-prompt.md"))
+	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
+	releaseIssueClaimRefs(repoRoot, issueNum)
+	return true
 }
 
 func Sweep(opts SweepOptions) (*SweepReport, error) {

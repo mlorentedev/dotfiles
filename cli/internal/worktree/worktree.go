@@ -17,6 +17,8 @@ type LifecycleState string
 const (
 	StateActive   LifecycleState = "ACTIVE"
 	StateReapable LifecycleState = "REAPABLE"
+	StateParked   LifecycleState = "PARKED"
+	StateParkable LifecycleState = "PARKABLE"
 	StateDirty    LifecycleState = "DIRTY"
 	StateUnmerged LifecycleState = "UNMERGED"
 	StateOrphan   LifecycleState = "ORPHAN"
@@ -31,6 +33,9 @@ const MetadataFileName = ".dotf-worktree.json"
 type Metadata struct {
 	Creator        string    `json:"creator,omitempty"`
 	Issue          int       `json:"issue,omitempty"`
+	Lane           string    `json:"lane,omitempty"`
+	State          string    `json:"state,omitempty"`
+	Persona        string    `json:"persona,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	LeaseExpiresAt time.Time `json:"lease_expires_at"`
 	ReapOK         bool      `json:"reap_ok"`
@@ -209,6 +214,31 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 	// Gate (a): explicit metadata exists in .dotf-worktree.json with reap_ok: true
 	if info.Metadata == nil {
 		return StateUnadopted, "no dotf lease; sweep will not reap it until `dotf worktree adopt <path>`"
+	}
+
+	// Persistent named lanes (HARNESS-186) are never deleted (reap_ok=false),
+	// Instead, they transition between PARKED, ACTIVE, and PARKABLE (in-place reset).
+	if info.Metadata.Lane != "" {
+		if strings.EqualFold(info.Metadata.State, string(StateParked)) {
+			return StateParked, fmt.Sprintf("parked persistent lane (%s)", info.Metadata.Lane)
+		}
+		if info.Metadata.LeaseExpiresAt.After(now) {
+			return StateActive, fmt.Sprintf("named lane %s, lease active until %s", info.Metadata.Lane, info.Metadata.LeaseExpiresAt.Format(time.RFC3339))
+		}
+		if now.Sub(info.Metadata.CreatedAt) < 15*time.Minute {
+			return StateActive, "newly created (age < 15m)"
+		}
+		if !info.PRMerged {
+			unknown := ""
+			if info.PRMergedUnknown != "" {
+				unknown = " (the forge could not be asked: " + info.PRMergedUnknown + ")"
+			}
+			if info.IsOrphan {
+				return StateOrphan, "upstream branch gone and PR not merged" + unknown
+			}
+			return StateUnmerged, "PR not merged" + unknown
+		}
+		return StateParkable, fmt.Sprintf("merged persistent lane eligible for in-place park (%s)", info.Metadata.Lane)
 	}
 
 	if !info.Metadata.ReapOK {

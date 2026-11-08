@@ -103,7 +103,7 @@ func classifyProcess(stdout, stderr string, code int, runErr error) Response {
 	}
 	if code != 0 {
 		combined := combine(stdout, stderr)
-		if strings.Contains(combined, "No matching provider is authenticated") {
+		if strings.Contains(combined, "No matching provider is authenticated") || strings.Contains(combined, "No API key found for") {
 			return Response{Status: StatusPoolUnavailable, Exit: code, Output: combined}
 		}
 		// The child's stderr is the useful half of the report; a bare exit code

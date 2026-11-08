@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/forgewrite"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // forgeWriteTimeout bounds one write, so a hung forge degrades to an error.
@@ -177,6 +179,7 @@ func newForgeCommentCmd(what string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			body = maybeAppendLaneProvenance(body)
 			repo, backend, err := forgeTarget()
 			if err != nil {
 				return err
@@ -298,6 +301,7 @@ func newForgePRCreateCmd() *cobra.Command {
 				}
 				return fmt.Errorf("ERROR: head %q carries a %s that %s does not. WHY: that is an unattended run's branch, which holds its ledger and is never merged. FIX: %s", head, runEnvelopePath, base, fix)
 			}
+			body = maybeAppendLaneProvenance(body)
 			repo, backend, err := forgeTarget()
 			if err != nil {
 				return err
@@ -385,6 +389,7 @@ func newForgeIssueCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			body = maybeAppendLaneProvenance(body)
 			repo, backend, err := forgeTarget()
 			if err != nil {
 				return err
@@ -497,4 +502,29 @@ func readForgeBody(path string) (string, error) {
 		return "", fmt.Errorf("ERROR: the body is empty. WHY: an empty comment is never what was meant. FIX: write the text to the file first")
 	}
 	return string(data), nil
+}
+
+// maybeAppendLaneProvenance appends the non-attributed cross-OS environment
+// footer ("Environment: <machine-id> (<goos>/<goarch>) · <lane>") when run
+// inside a persistent named lane worktree (HARNESS-186, M-CODE-4).
+func maybeAppendLaneProvenance(body string) string {
+	cwd, err := os.Getwd()
+	if err != nil || cwd == "" {
+		return body
+	}
+	meta, err := worktree.LoadMetadata(cwd)
+	if err != nil || meta == nil || strings.TrimSpace(meta.Lane) == "" {
+		return body
+	}
+	machineID := strings.TrimSpace(os.Getenv("DOTF_MACHINE_ID"))
+	if machineID == "" {
+		if h, herr := os.Hostname(); herr == nil {
+			machineID = strings.TrimSpace(h)
+		}
+	}
+	withProv := forgewrite.AppendEnvironmentProvenance(body, machineID, runtime.GOOS, runtime.GOARCH, meta.Lane)
+	if err := forgewrite.ValidateProvenanceNoAttribution(withProv); err != nil {
+		return body
+	}
+	return withProv
 }

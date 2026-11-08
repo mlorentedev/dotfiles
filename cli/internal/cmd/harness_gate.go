@@ -13,6 +13,8 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/agent"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/mem"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // gateExitBlock is the exit code every harness reads as "stop this tool call".
@@ -160,7 +162,18 @@ A blocked call is answered "deny" with the reason.`,
 					call.DispatchName, call.DispatchType)
 			}
 
+			workDir := repoRoot
+			if workDir == "" {
+				workDir, _ = os.Getwd()
+			}
+			currentBranch, wtPersona := currentGateWorktreeContext(workDir)
+
 			if rec, ok := skillCallRecord(call, base, unscoped, statePath); ok {
+				if !unscoped && rec.Skill != "" {
+					if inferred := inferPersonaFromSkill(rec.Skill); inferred != "" && harness.LoadStickyPersona(harness.PersonaStatePath(stateDir, scope), currentBranch) == "" {
+						_ = harness.BindStickyPersona(harness.PersonaStatePath(stateDir, scope), inferred, currentBranch)
+					}
+				}
 				record(journalScope, rec)
 				if rec.Outcome == harness.OutcomeSkillUnnamed {
 					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
@@ -168,7 +181,10 @@ A blocked call is answered "deny" with the reason.`,
 				return finish(false, "")
 			}
 
-			requested := effectiveRoleWithSticky(role, call.AgentType, stateDir, scope, "")
+			requested := effectiveRoleWithSticky(role, call.AgentType, stateDir, scope, currentBranch)
+			if requested == "" && wtPersona != "" {
+				requested = wtPersona
+			}
 			// Whether the operator NAMED the role decides which source is
 			// authoritative below. A --role flag is a human's explicit
 			// instruction and outranks anything the payload implies; a
@@ -178,7 +194,7 @@ A blocked call is answered "deny" with the reason.`,
 			dispatched := harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID))
 			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested, dispatched, fromFlag)
 			if persona != nil && !unscoped {
-				_ = harness.BindStickyPersona(harness.PersonaStatePath(stateDir, scope), persona.Name, "")
+				_ = harness.BindStickyPersona(harness.PersonaStatePath(stateDir, scope), persona.Name, currentBranch)
 			}
 
 			// A persona is in scope and the payload named no session: there is no
@@ -486,6 +502,38 @@ func effectiveRoleWithSticky(flag, fromPayload, stateDir, scope, branch string) 
 		return ""
 	}
 	return harness.LoadStickyPersona(harness.PersonaStatePath(stateDir, scope), branch)
+}
+
+func currentGateWorktreeContext(workDir string) (branch, wtPersona string) {
+	if workDir == "" {
+		return "", ""
+	}
+	if meta, merr := worktree.LoadMetadata(workDir); merr == nil && meta != nil {
+		wtPersona = strings.TrimSpace(meta.Persona)
+		if id, ok := mem.RepoIdentity(workDir); ok {
+			branch = strings.TrimSpace(id.Branch)
+		}
+	}
+	return branch, wtPersona
+}
+
+func inferPersonaFromSkill(skill string) string {
+	switch strings.ToLower(strings.TrimSpace(skill)) {
+	case "read-all-adrs", "architecture-session", "pattern-loader":
+		return "architect"
+	case "test-driven-development", "test", "systematic-debugging":
+		return "builder"
+	case "crystallize", "handoff", "vault-doctor", "insights", "genre-picker", "context-refresh", "place-knowledge", "dispose-proposals":
+		return "curator"
+	case "spec", "new-ticket", "prd-to-issues":
+		return "planner"
+	case "adversarial-review", "security-audit":
+		return "reviewer"
+	case "using-git-worktrees", "docker", "helm", "terraform":
+		return "shipper"
+	default:
+		return ""
+	}
 }
 
 // harnessAgy names Antigravity's CLI.
