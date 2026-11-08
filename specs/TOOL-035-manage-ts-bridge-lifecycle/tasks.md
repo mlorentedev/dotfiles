@@ -35,9 +35,10 @@ owner: manu
 
 ### Exact process identity
 
-- [ ] [P] [AC3] Add process-identity tests for exact ownership, stale PID, PID reuse, executable mismatch, absent state and inspection failure on platform seams.
-- [ ] [AC3] Implement Windows, Linux and macOS process observation using PID, executable and a platform-native process-start identity.
-- [ ] [AC3] [AC4] Cross-compile the bridge package for Windows, Linux and macOS and run the live current-process regression on supported CI hosts.
+- [x] [P] [AC3] Add process-identity tests for exact ownership, stale PID, PID reuse, executable mismatch, absent state and inspection failure on platform seams.
+- [x] [AC3] Implement Windows, Linux and macOS process observation using PID, executable and a platform-native process-start identity.
+- [x] [AC3] [AC4] Cross-compile the bridge package for Windows, Linux and macOS.
+- [ ] [AC3] [AC4] Run `TestCaptureAndInspectCurrentProcess` on Windows, Linux and macOS CI hosts. Windows and Ubuntu pass; a live macOS run is pending.
 
 ### Read-only status
 
