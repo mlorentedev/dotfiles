@@ -4,22 +4,38 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-// cleanEnv clears every variable Quiet sets, restoring them after the test.
+// cleanEnv clears every GIT_CONFIG_* variable Quiet reads or writes, restoring
+// them after the test: a harness may pin its own pairs there, and a test that
+// asserts what Quiet wrote needs a known starting point.
 func cleanEnv(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
-	for _, k := range []string{countVar, "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1", systemVar, "GIT_CONFIG_NOSYSTEM"} {
-		t.Setenv(k, "")
-		if err := os.Unsetenv(k); err != nil {
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		if !strings.HasPrefix(name, "GIT_CONFIG_") {
+			continue
+		}
+		t.Setenv(name, "") // registers the restore of the caller's value
+		if err := os.Unsetenv(name); err != nil {
 			t.Fatal(err)
 		}
 	}
+}
+
+// quietVars names every variable Quiet writes for n pairs.
+func quietVars(n int) []string {
+	vars := []string{countVar}
+	for i := 0; i < n; i++ {
+		vars = append(vars, keyVar+strconv.Itoa(i), valueVar+strconv.Itoa(i))
+	}
+	return vars
 }
 
 // gitConfig reads key in dir through a git started with env, or with the
@@ -85,16 +101,55 @@ func TestQuietKeepsTheSystemConfigInForce(t *testing.T) {
 	}
 }
 
-// TestQuietRefusesAnEnvironmentThatAlreadyCarriesConfig — overwriting another
-// caller's GIT_CONFIG_COUNT would drop its keys silently.
-func TestQuietRefusesAnEnvironmentThatAlreadyCarriesConfig(t *testing.T) {
+// TestQuietKeepsTheCallersConfig — a harness pins config through the same
+// variables (Copilot CLI exports safe.bareRepository, credential.interactive
+// and core.fsmonitor). Overwriting them would drop keys the harness relies on,
+// and refusing would abort the whole test binary, which is how #3253 surfaced.
+func TestQuietKeepsTheCallersConfig(t *testing.T) {
+	cleanEnv(t)
 	t.Setenv(countVar, "1")
-	defer func() {
-		if recover() == nil {
-			t.Fatal("Quiet overwrote an existing " + countVar)
-		}
-	}()
+	t.Setenv(keyVar+"0", "gittestdemo.caller")
+	t.Setenv(valueVar+"0", "kept")
 	Quiet()
+	if got := gitConfig(t, t.TempDir(), "gittestdemo.caller", nil); got != "kept" {
+		t.Errorf("the caller's pair was dropped: gittestdemo.caller = %q", got)
+	}
+	if got := gitConfig(t, t.TempDir(), "gc.auto", nil); got != "0" {
+		t.Errorf("gc.auto = %q, want 0: Quiet did not append after the caller's pair", got)
+	}
+	if got, want := os.Getenv(countVar), strconv.Itoa(1+len(quietPairs)); got != want {
+		t.Errorf("%s = %q, want %q (1 caller pair + %d appended)", countVar, got, want, len(quietPairs))
+	}
+}
+
+// TestQuietAppendsAfterAForeignEnvironment — the shape that aborted the test
+// binary: three pairs the harness pinned, none of them ours.
+func TestQuietAppendsAfterAForeignEnvironment(t *testing.T) {
+	cleanEnv(t)
+	foreign := [][2]string{
+		{"safe.bareRepository", "explicit"},
+		{"credential.interactive", "never"},
+		{"core.fsmonitor", "false"},
+	}
+	t.Setenv(countVar, strconv.Itoa(len(foreign)))
+	for i, pair := range foreign {
+		t.Setenv(keyVar+strconv.Itoa(i), pair[0])
+		t.Setenv(valueVar+strconv.Itoa(i), pair[1])
+	}
+	Quiet()
+	if got, want := os.Getenv(countVar), strconv.Itoa(len(foreign)+len(quietPairs)); got != want {
+		t.Errorf("%s = %q, want %q", countVar, got, want)
+	}
+	for _, pair := range foreign {
+		if got := gitConfig(t, t.TempDir(), pair[0], nil); got != pair[1] {
+			t.Errorf("%s = %q, want %q: the harness pair was dropped", pair[0], got, pair[1])
+		}
+	}
+	for _, pair := range quietPairs {
+		if got := gitConfig(t, t.TempDir(), pair[0], nil); got != pair[1] {
+			t.Errorf("%s = %q, want %q: Quiet's pair does not outrank the caller's", pair[0], got, pair[1])
+		}
+	}
 }
 
 // TestQuietRefusesNoSystem — git would skip the file that quiets a remote.
@@ -110,12 +165,18 @@ func TestQuietRefusesNoSystem(t *testing.T) {
 }
 
 // TestQuietAcceptsItsOwnKeys — a test binary that re-executes itself as a
-// helper process inherits them, and its TestMain calls Quiet again.
+// helper process inherits them, and its TestMain calls Quiet again. A second
+// call must add nothing rather than append duplicates on every generation.
 func TestQuietAcceptsItsOwnKeys(t *testing.T) {
-	for k, v := range quiet {
-		t.Setenv(k, v)
-	}
+	cleanEnv(t)
 	Quiet()
+	Quiet()
+	if got, want := os.Getenv(countVar), strconv.Itoa(len(quietPairs)); got != want {
+		t.Errorf("%s = %q after a second Quiet, want %q", countVar, got, want)
+	}
+	if got := gitConfig(t, t.TempDir(), "maintenance.auto", nil); got != "false" {
+		t.Errorf("maintenance.auto = %q, want false", got)
+	}
 }
 
 // TestQuietDoesNotIncludeItsOwnFile — a re-executed binary whose COUNT keys
@@ -125,7 +186,7 @@ func TestQuietDoesNotIncludeItsOwnFile(t *testing.T) {
 	cleanEnv(t)
 	Quiet()
 	first := os.Getenv(systemVar)
-	for _, k := range []string{countVar, "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1"} {
+	for _, k := range quietVars(len(quietPairs)) {
 		if err := os.Unsetenv(k); err != nil {
 			t.Fatal(err)
 		}

@@ -11,23 +11,29 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 )
 
 const (
 	countVar  = "GIT_CONFIG_COUNT"
+	keyVar    = "GIT_CONFIG_KEY_"
+	valueVar  = "GIT_CONFIG_VALUE_"
 	systemVar = "GIT_CONFIG_SYSTEM"
 	// filePrefix names the system config Quiet writes, so a re-executed test
 	// binary recognises its parent's file instead of including it in itself.
 	filePrefix = "gittest-"
 )
 
-var quiet = map[string]string{
-	countVar:             "2",
-	"GIT_CONFIG_KEY_0":   "gc.auto",
-	"GIT_CONFIG_VALUE_0": "0",
-	"GIT_CONFIG_KEY_1":   "maintenance.auto",
-	"GIT_CONFIG_VALUE_1": "false",
+// quietPairs are the keys Quiet appends to whatever the environment already
+// carries. Appended, never overwritten: git applies the pairs in index order,
+// so ours still win, while a harness that pins config through the same
+// variables (Copilot CLI exports safe.bareRepository and friends) keeps its own
+// keys instead of aborting the whole test binary (#3253).
+var quietPairs = [][2]string{
+	{"gc.auto", "0"},
+	{"maintenance.auto", "false"},
 }
 
 // remoteKeys go in the system config Quiet points GIT_CONFIG_SYSTEM at. A
@@ -39,33 +45,65 @@ const remoteKeys = "[gc]\n\tauto = 0\n[maintenance]\n\tauto = false\n[receive]\n
 
 // Quiet turns off auto gc and auto maintenance for every git this process
 // starts, the remote side of a local transport included. Call it from TestMain
-// before m.Run. A test binary that re-executes itself inherits the keys, so
-// finding exactly these is fine; any other GIT_CONFIG_COUNT panics, since
-// overwriting it would drop the caller's keys.
+// before m.Run. It appends its keys after any the environment already carries,
+// and a test binary that re-executes itself inherits them, so a second call
+// adds nothing.
 func Quiet() {
-	if v, ok := os.LookupEnv(countVar); ok {
-		if alreadyQuiet() {
-			return
-		}
-		panic("gittest: " + countVar + " is already set (" + v + ")")
-	}
 	if err := quietSystem(); err != nil {
 		panic("gittest: " + err.Error())
 	}
-	for k, v := range quiet {
-		if err := os.Setenv(k, v); err != nil {
+	caller, err := callerPairs()
+	if err != nil {
+		panic("gittest: " + err.Error())
+	}
+	added := 0
+	for _, pair := range quietPairs {
+		if slices.Contains(caller, pair) {
+			continue
+		}
+		if err := setPair(len(caller)+added, pair); err != nil {
 			panic("gittest: " + err.Error())
 		}
+		added++
+	}
+	if added == 0 {
+		return
+	}
+	if err := os.Setenv(countVar, strconv.Itoa(len(caller)+added)); err != nil {
+		panic("gittest: " + err.Error())
 	}
 }
 
-func alreadyQuiet() bool {
-	for k, v := range quiet {
-		if os.Getenv(k) != v {
-			return false
+// callerPairs reads the pairs the environment already carries, so Quiet can
+// append to them rather than drop them. A missing GIT_CONFIG_COUNT means none;
+// a malformed one is refused, since git would read the same number.
+func callerPairs() ([][2]string, error) {
+	raw, ok := os.LookupEnv(countVar)
+	if !ok {
+		return nil, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return nil, errors.New(countVar + " is not a non-negative integer: " + raw)
+	}
+	pairs := make([][2]string, n)
+	for i := range pairs {
+		pairs[i] = [2]string{
+			os.Getenv(keyVar + strconv.Itoa(i)),
+			os.Getenv(valueVar + strconv.Itoa(i)),
 		}
 	}
-	return true
+	return pairs, nil
+}
+
+// setPair writes one pair at index, which must be past every index the caller
+// already uses.
+func setPair(index int, pair [2]string) error {
+	suffix := strconv.Itoa(index)
+	if err := os.Setenv(keyVar+suffix, pair[0]); err != nil {
+		return err
+	}
+	return os.Setenv(valueVar+suffix, pair[1])
 }
 
 // quietSystem points GIT_CONFIG_SYSTEM at a file that includes the system
