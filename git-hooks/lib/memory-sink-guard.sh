@@ -39,10 +39,18 @@ fi
 # Scan staged additions/modifications for memory artifacts: a MEMORY.md file in
 # any directory, or any path under a memory/ directory. Narrow by design — a
 # legitimate need is unblocked with --no-verify (user approval).
+#
+# Fixture trees are data, not the repo's own agent memory. A test that
+# reproduces a vault layout (a bootstrap fixture under testdata/ that contains
+# memory/MEMORY.md) is exactly the case this guard must not block, so paths with
+# a testdata/ or fixtures/ segment are exempt. Measured on GO-001, where the
+# captured Python controller corpus is such a fixture.
 staged="$(git diff --cached --name-only --diff-filter=AM 2>/dev/null)"
 [ -n "$staged" ] || exit 0
 
-offenders="$(printf '%s\n' "$staged" | grep -E '(^|/)MEMORY\.md$|(^|/)memory/' || true)"
+offenders="$(printf '%s\n' "$staged" \
+    | grep -E '(^|/)MEMORY\.md$|(^|/)memory/' \
+    | grep -vE '(^|/)(testdata|fixtures?|__fixtures__)/' || true)"
 [ -n "$offenders" ] || exit 0
 
 {

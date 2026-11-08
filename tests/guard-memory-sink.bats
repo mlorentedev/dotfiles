@@ -126,3 +126,19 @@ teardown() { rm -rf "$VAULT" "$WORK"; }
     run git -C "$NONVAULT" commit -m "try"
     [ "$status" -ne 0 ]
 }
+
+@test "AC1: allows a vault-shaped fixture under testdata/ (data, not memory)" {
+    mkdir -p "$NONVAULT/internal/testdata/corpus/root/50_work/a/memory"
+    echo x > "$NONVAULT/internal/testdata/corpus/root/50_work/a/memory/MEMORY.md"
+    git -C "$NONVAULT" add internal/testdata/corpus/root/50_work/a/memory/MEMORY.md
+    run git -C "$NONVAULT" commit -m "fixture"
+    [ "$status" -eq 0 ]
+}
+
+@test "AC1: still rejects a memory/ path outside the fixture exemptions" {
+    mkdir -p "$NONVAULT/docs/memory"
+    echo x > "$NONVAULT/docs/memory/MEMORY.md"
+    git -C "$NONVAULT" add docs/memory/MEMORY.md
+    run git -C "$NONVAULT" commit -m "try"
+    [ "$status" -ne 0 ]
+}
