@@ -15,7 +15,7 @@ func TestClassifyStatus(t *testing.T) {
 	}{
 		{"stopped", Observation{}, StateStopped},
 		{"unowned", Observation{ProcessPresent: true}, StateUnowned},
-		{"starting", Observation{ProcessPresent: true, ProcessOwned: true}, StateStarting},
+		{"listener down", Observation{ProcessPresent: true, ProcessOwned: true}, StateListenerDown},
 		{"destination failed", Observation{ProcessPresent: true, ProcessOwned: true, ListenerReady: true}, StateDestinationFailed},
 		{"healthy", Observation{ProcessPresent: true, ProcessOwned: true, ListenerReady: true, DestinationReady: true}, StateHealthy},
 	}
@@ -33,9 +33,10 @@ func TestStatusResultUsesAgentOrientedErrors(t *testing.T) {
 		state State
 		want  string
 	}{
-		{StateStopped, "dotf bridge start --profile office"},
+		{StateStopped, "docs/runbooks/ts-bridge-client.md"},
 		{StateUnowned, "refusing to signal it"},
-		{StateStarting, "listener is not ready"},
+		{StateLaunchMismatch, "different descriptor"},
+		{StateListenerDown, "readiness probe"},
 		{StateDestinationFailed, "private destination failed"},
 	} {
 		t.Run(string(tc.state), func(t *testing.T) {
@@ -55,20 +56,35 @@ func TestStatusResultUsesAgentOrientedErrors(t *testing.T) {
 	}
 }
 
+func TestStatusResultFixesAvoidUnregisteredCommands(t *testing.T) {
+	states := []State{StateStopped, StateUnowned, StateLaunchMismatch, StateListenerDown, StateDestinationFailed}
+	unregistered := []string{"bridge start", "bridge stop", "bridge logs", "bounded bridge log"}
+	for _, state := range states {
+		got := NewStatusResult("office", state)
+		for _, token := range unregistered {
+			if strings.Contains(got.Fix, token) {
+				t.Fatalf("%s fix %q names %q, which this release does not register", state, got.Fix, token)
+			}
+		}
+	}
+}
+
 func TestServiceStatusUsesOwnedProcessAndHealth(t *testing.T) {
 	tests := []struct {
-		name       string
-		process    bool
-		inspection ProcessInspection
-		health     Health
-		want       State
+		name        string
+		process     bool
+		fingerprint string
+		inspection  ProcessInspection
+		health      Health
+		want        State
 	}{
-		{"stopped without process state", false, ProcessInspection{}, Health{}, StateStopped},
-		{"stopped when recorded process is gone", true, ProcessInspection{}, Health{}, StateStopped},
-		{"unowned", true, ProcessInspection{Present: true}, Health{}, StateUnowned},
-		{"starting", true, ProcessInspection{Present: true, Owned: true}, Health{}, StateStarting},
-		{"destination failed", true, ProcessInspection{Present: true, Owned: true}, Health{ListenerReady: true}, StateDestinationFailed},
-		{"healthy", true, ProcessInspection{Present: true, Owned: true}, Health{ListenerReady: true, DestinationReady: true}, StateHealthy},
+		{"stopped without process state", false, "", ProcessInspection{}, Health{}, StateStopped},
+		{"stopped when recorded process is gone", true, "", ProcessInspection{}, Health{}, StateStopped},
+		{"unowned", true, "", ProcessInspection{Present: true}, Health{}, StateUnowned},
+		{"launch mismatch outranks healthy probes", true, "sha256:resaved", ProcessInspection{Present: true, Owned: true}, Health{ListenerReady: true, DestinationReady: true}, StateLaunchMismatch},
+		{"listener down", true, "", ProcessInspection{Present: true, Owned: true}, Health{}, StateListenerDown},
+		{"destination failed", true, "", ProcessInspection{Present: true, Owned: true}, Health{ListenerReady: true}, StateDestinationFailed},
+		{"healthy", true, "", ProcessInspection{Present: true, Owned: true}, Health{ListenerReady: true, DestinationReady: true}, StateHealthy},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,11 +94,15 @@ func TestServiceStatusUsesOwnedProcessAndHealth(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tt.process {
+				fingerprint := tt.fingerprint
+				if fingerprint == "" {
+					fingerprint = launch.Fingerprint()
+				}
 				process := ProcessRecord{
 					PID:           42,
 					Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
 					StartIdentity: "platform:12345",
-					Fingerprint:   "sha256:launch",
+					Fingerprint:   fingerprint,
 				}
 				if err := store.SaveProcess("office", process); err != nil {
 					t.Fatal(err)
@@ -130,7 +150,7 @@ func TestServiceStatusRequiresProcessInspector(t *testing.T) {
 		PID:           42,
 		Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
 		StartIdentity: "platform:12345",
-		Fingerprint:   "sha256:launch",
+		Fingerprint:   testDescriptor("office").Fingerprint(),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +170,7 @@ func TestServiceStatusRequiresHealthProbeForOwnedProcess(t *testing.T) {
 		PID:           42,
 		Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
 		StartIdentity: "platform:12345",
-		Fingerprint:   "sha256:launch",
+		Fingerprint:   testDescriptor("office").Fingerprint(),
 	}); err != nil {
 		t.Fatal(err)
 	}

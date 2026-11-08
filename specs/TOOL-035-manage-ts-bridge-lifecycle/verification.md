@@ -28,6 +28,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Linux CI: the Ubuntu CLI test job passes the bridge package at head `46e589f4` ([job](https://github.com/mlorentedev/dotfiles/actions/runs/42412126870/job/128522345004)).
 - Platform compilation: `GOOS=linux GOARCH=amd64 go test -c ./internal/bridge` and `GOOS=darwin GOARCH=amd64 go test -c ./internal/bridge` -> PASS. This proves macOS compilation only; a live macOS current-process run remains pending.
 - Status regression: `TestClassifyStatus`, `TestStatusResultUsesAgentOrientedErrors`, `TestServiceStatus*` and `TestBridgeStatusCommand*` -> PASS on Windows.
+- Review follow-up (`launch_mismatch`, `listener_down`, runbook-only `FIX` text): `TestStatusResultFixesAvoidUnregisteredCommands`, `TestLaunchDescriptorFingerprintIsStableAndDiscriminating` and the mismatch case in `TestServiceStatusUsesOwnedProcessAndHealth` -> PASS. `TestServiceStatusUsesOwnedProcessAndHealth` feeds healthy listener and destination probes on the mismatch case, so a stale descriptor cannot report `healthy`.
+- Cross-compilation after the follow-up: `GOOS=linux` and `GOOS=darwin` `go test -c ./internal/bridge` -> PASS; `go vet ./internal/bridge ./internal/cmd ./internal/doctor` -> PASS.
 - Corrupt or unreadable process state and missing inspector/probe dependencies return status unavailable instead of a success-shaped fallback.
 - TLS guard: `TestProbeHealthUsesTLSAndRemoteDNSWithoutWeakening` asserts the exact listener and destination curl argument vectors, so `-k`, `--insecure` or an alternate CA cannot enter unnoticed.
 - Feature predicates: f1 and f5 exit zero; f2-f4 remain non-zero until their exact future named tests are complete.
@@ -47,6 +49,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - The state foundation owns only strict non-secret descriptors, process records and the shared health interpretation; it exposes no command.
 - Status and later stop share one exact identity seam: PID liveness alone is never ownership.
 - Read-only status landed only after the process seam could distinguish exact ownership from a reused PID.
+- Four review findings on the status PR were accepted and applied in one follow-up commit. `launch_mismatch` became a distinct state instead of folding into `unowned`, because the fix differs: restart the recorded profile versus resolve a foreign process. It is evaluated only for an owned process, so `stopped` and `unowned` keep precedence.
+- The launch fingerprint is derived by `LaunchDescriptor.Fingerprint()` rather than stored as a second field, so descriptor and process record cannot drift and no state migration is needed. It hashes the profile, config path, SOCKS5 address and health address; config file content is deliberately not hashed, because the descriptor never owns profile content.
+- `starting` was removed rather than kept as an alias: read-only status cannot distinguish a slow startup from a listener that will never come up, so reporting it would be a guess. Startup waiting belongs to the lifecycle `start` command, which can bound it.
+- Status `FIX` strings name no `bridge start`, `bridge stop` or `bridge logs` command until those commands are registered; they point at the runbook procedure instead. `TestStatusResultFixesAvoidUnregisteredCommands` enforces this so a later PR cannot silently reintroduce dead-end guidance.
 
 ## Promotion candidates
 

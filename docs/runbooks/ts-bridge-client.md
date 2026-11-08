@@ -72,10 +72,20 @@ The `ts-bridge client` section must report:
 
 The states are intentionally separate:
 
-- listener down: the operator-controlled bridge is stopped or starting;
-- listener ready, destination failed: the bridge is alive but cannot carry
-  private-forge traffic;
-- destination pass: TLS was verified through `socks5h`.
+- `stopped`: no process record exists, so status cannot prove a bridge is
+  running under this profile;
+- `unowned`: the recorded PID is alive but fails the exact identity check, so
+  status refuses to signal it;
+- `launch_mismatch`: the profile was re-saved after the process started, so the
+  running bridge no longer matches the declared descriptor — restart it from
+  the recorded profile;
+- `listener_down`: the owned process is alive but the readiness probe does not
+  answer; read the attached `ts-bridge` terminal output. Read-only status
+  cannot tell a slow startup from a listener that will never come up, so
+  bounded logs arrive with the lifecycle `start` command;
+- `destination_failed`: the listener answers but cannot carry private-forge
+  traffic;
+- `healthy`: listener ready and TLS verified through `socks5h`.
 
 Verify Git routing independently:
 

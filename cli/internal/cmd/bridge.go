@@ -77,7 +77,7 @@ func runBridgeStatus(command *cobra.Command, deps bridgeDeps, profile string, js
 	result, err := service.Status(profile)
 	if err != nil {
 		return writeBridgeFailure(command, "bridge status is unavailable", err.Error(),
-			"run `dotf bridge start --profile <name>` with the profile launch settings")
+			"repair or remove the invalid bridge state below the dotf state directory, or pass `--profile` when more than one is configured, then retry")
 	}
 	return writeBridgeStatus(command, result, jsonOut)
 }

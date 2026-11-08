@@ -29,7 +29,7 @@ func bridgeCommandFixture(t *testing.T, process bool, inspection bridge.ProcessI
 			PID:           42,
 			Executable:    filepath.Join(t.TempDir(), "ts-bridge"),
 			StartIdentity: "platform:12345",
-			Fingerprint:   "sha256:launch",
+			Fingerprint:   launch.Fingerprint(),
 		}); err != nil {
 			t.Fatal(err)
 		}

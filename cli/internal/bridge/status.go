@@ -12,7 +12,8 @@ type State string
 const (
 	StateStopped           State = "stopped"
 	StateUnowned           State = "unowned"
-	StateStarting          State = "starting"
+	StateLaunchMismatch    State = "launch_mismatch"
+	StateListenerDown      State = "listener_down"
 	StateDestinationFailed State = "destination_failed"
 	StateHealthy           State = "healthy"
 )
@@ -49,7 +50,7 @@ func Classify(o Observation) State {
 	case !o.ProcessOwned:
 		return StateUnowned
 	case !o.ListenerReady:
-		return StateStarting
+		return StateListenerDown
 	case !o.DestinationReady:
 		return StateDestinationFailed
 	default:
@@ -64,19 +65,23 @@ func NewStatusResult(profile string, state State) StatusResult {
 	case StateStopped:
 		r.Error = "bridge is stopped"
 		r.Why = "no owned bridge process is running"
-		r.Fix = "run `dotf bridge start --profile " + profile + "`"
+		r.Fix = "start the profile as described in docs/runbooks/ts-bridge-client.md, then re-run `dotf bridge status --profile " + profile + "`"
 	case StateUnowned:
 		r.Error = "bridge process identity is unowned"
 		r.Why = "the recorded PID does not match the managed launch; refusing to signal it"
-		r.Fix = "inspect the bridge state and start the profile again after the foreign process is resolved"
-	case StateStarting:
-		r.Error = "bridge is not ready"
-		r.Why = "the owned process is running but its listener is not ready"
-		r.Fix = "read the bounded bridge log, then retry `dotf bridge status --profile " + profile + "`"
+		r.Fix = "resolve the foreign process, then start the profile as described in docs/runbooks/ts-bridge-client.md"
+	case StateLaunchMismatch:
+		r.Error = "bridge launch descriptor changed since start"
+		r.Why = "the running process was launched from a different descriptor than the stored profile"
+		r.Fix = "restart the profile as described in docs/runbooks/ts-bridge-client.md, then re-run `dotf bridge status --profile " + profile + "`"
+	case StateListenerDown:
+		r.Error = "bridge listener is down"
+		r.Why = "the owned process is alive but its listener does not answer the readiness probe"
+		r.Fix = "read the attached ts-bridge terminal output for this profile, then re-run `dotf bridge status --profile " + profile + "`"
 	case StateDestinationFailed:
 		r.Error = "bridge destination is unreachable"
 		r.Why = "the listener is ready but the private destination failed its TLS health probe"
-		r.Fix = "check the SSH bootstrap and private route, then restart the profile"
+		r.Fix = "check the SSH bootstrap and private route, then restart the profile as described in docs/runbooks/ts-bridge-client.md"
 	}
 	return r
 }
@@ -110,6 +115,9 @@ func (s Service) Status(profile string) (StatusResult, error) {
 		ProcessOwned:   inspection.Owned,
 	}
 	if inspection.Present && inspection.Owned {
+		if process.Fingerprint != launch.Fingerprint() {
+			return NewStatusResult(resolved, StateLaunchMismatch), nil
+		}
 		if s.Probe == nil {
 			return StatusResult{}, errors.New("bridge health probe is not configured")
 		}
