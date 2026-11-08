@@ -27,8 +27,11 @@ clones), in repositories no fixture helper configured.
 
 `internal/gittest.Quiet()` sets `GIT_CONFIG_COUNT` with `gc.auto=0` and `maintenance.auto=false` in the test process's
 environment. Each package whose tests run git calls it from `TestMain`, so every git the process starts sees the
-keys: the fixture's and the code under test's. `Quiet` accepts its own keys when a test binary re-executes itself,
-which converge's helper-process tests do, and panics on any other `GIT_CONFIG_COUNT`.
+keys: the fixture's and the code under test's. `Quiet` appends its pairs after whatever the environment already
+carries, so a harness that pins its own config through the same variables (Copilot CLI exports `safe.bareRepository`,
+`credential.interactive` and `core.fsmonitor`) keeps them instead of aborting the binary — the earlier version panicked
+on any other `GIT_CONFIG_COUNT`, which is #3253. Appending also makes a re-executed test binary, which converge's
+helper-process tests are, a no-op: its inherited pairs are already there.
 
 That did not reach the remote's `receive-pack`, as first claimed here. A local push or fetch starts the remote side with
 the repository-local environment stripped, `GIT_CONFIG_COUNT` included. `GIT_TRACE=1 git push` on git 2.54 shows
