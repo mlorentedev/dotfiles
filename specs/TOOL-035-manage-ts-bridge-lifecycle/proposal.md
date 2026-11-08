@@ -53,8 +53,8 @@ Failure modes, dependencies, and unknowns to clarify before implementation. If a
 
 Observable outcomes. Each must be testable.
 
-- [ ] `dotf bridge status` reports stopped, starting, destination-failed,
-  healthy and unowned states with machine-readable
+- [x] `dotf bridge status` reports stopped, unowned, launch-mismatch,
+  listener-down, destination-failed and healthy states with machine-readable
   `error`/`why`/`fix` fields and no credential values.
 - [ ] A first `bridge start --profile ...` records a non-secret descriptor,
   returns only after `READY` plus TLS-valid destination health, and a second

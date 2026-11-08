@@ -15,6 +15,29 @@ func testDescriptor(profile string) LaunchDescriptor {
 	}
 }
 
+func TestLaunchDescriptorFingerprintIsStableAndDiscriminating(t *testing.T) {
+	base := testDescriptor("office")
+	if base.Fingerprint() != testDescriptor("office").Fingerprint() {
+		t.Fatalf("identical descriptors produced %q and %q", base.Fingerprint(), testDescriptor("office").Fingerprint())
+	}
+	if !strings.HasPrefix(base.Fingerprint(), "sha256:") {
+		t.Fatalf("fingerprint %q is not a sha256 digest", base.Fingerprint())
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(LaunchDescriptor) LaunchDescriptor
+	}{
+		{"profile", func(d LaunchDescriptor) LaunchDescriptor { d.Profile = "branch"; return d }},
+		{"config", func(d LaunchDescriptor) LaunchDescriptor { d.Config = filepath.Join("/tmp", "office.yml"); return d }},
+		{"socks5", func(d LaunchDescriptor) LaunchDescriptor { d.Socks5 = "127.0.0.1:1082"; return d }},
+		{"health", func(d LaunchDescriptor) LaunchDescriptor { d.HealthAddr = "127.0.0.1:9082"; return d }},
+	} {
+		if got := tc.change(base).Fingerprint(); got == base.Fingerprint() {
+			t.Fatalf("%s change did not alter the fingerprint", tc.name)
+		}
+	}
+}
+
 func TestStoreRoundTripsLaunchAndProcessState(t *testing.T) {
 	store := NewStore(t.TempDir())
 	launch := testDescriptor("office")

@@ -3,6 +3,8 @@
 package bridge
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 var profileNameRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
@@ -37,6 +40,13 @@ func (d LaunchDescriptor) Validate() error {
 		return err
 	}
 	return loopbackAddress("health", d.HealthAddr)
+}
+
+// Fingerprint derives the launch identity a process record must carry. It is
+// computed, never stored, so the two copies cannot drift.
+func (d LaunchDescriptor) Fingerprint() string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{d.Profile, d.Config, d.Socks5, d.HealthAddr}, "\x00")))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 // ProcessRecord identifies the detached process a later stop may own.

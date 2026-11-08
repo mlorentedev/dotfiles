@@ -47,6 +47,17 @@ PID so it can be stopped by identity rather than by process name.
 
 ## Verify the three layers
 
+After a lifecycle start has recorded the profile state, use:
+
+```powershell
+dotf bridge status --profile <profile>
+dotf bridge status --profile <profile> --json
+```
+
+Healthy exits 0. Every other state exits non-zero; human output uses
+`ERROR` / `WHY` / `FIX`, while JSON carries the same fields. Until the start
+command lands in TOOL-035 PR5, use doctor for a manually-started bridge.
+
 ```powershell
 dotf doctor --scope machine --verbose
 ```
@@ -61,10 +72,23 @@ The `ts-bridge client` section must report:
 
 The states are intentionally separate:
 
-- listener down: the operator-controlled bridge is stopped or starting;
-- listener ready, destination failed: the bridge is alive but cannot carry
-  private-forge traffic;
-- destination pass: TLS was verified through `socks5h`.
+- `stopped`: no process record exists, or the recorded PID is no longer
+  running, so status cannot prove a bridge is running under this profile. A
+  bridge started by hand from this runbook leaves no record, so `stopped` does
+  not mean nothing is listening: confirm the listener before starting a second
+  bridge, which cannot bind the port the first one holds;
+- `unowned`: the recorded PID is alive but fails the exact identity check, so
+  status refuses to signal it;
+- `launch_mismatch`: the profile was re-saved after the process started, so the
+  running bridge no longer matches the declared descriptor — restart it from
+  the recorded profile;
+- `listener_down`: the owned process is alive but the readiness probe does not
+  answer; read the attached `ts-bridge` terminal output. Read-only status
+  cannot tell a slow startup from a listener that will never come up, so
+  bounded logs arrive with the lifecycle `start` command;
+- `destination_failed`: the listener answers but cannot carry private-forge
+  traffic;
+- `healthy`: listener ready and TLS verified through `socks5h`.
 
 Verify Git routing independently:
 
