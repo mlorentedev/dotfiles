@@ -69,6 +69,45 @@ func TestStatusResultFixesAvoidUnregisteredCommands(t *testing.T) {
 	}
 }
 
+// TestStatusResultRendersNoDescriptorOrCredentialMaterial — the behavior clause
+// is "no credential values". The descriptor is non-secret by construction, so
+// what this locks in is that a verdict is rendered from the profile alone: no
+// config path, proxy address or health address can reach the output, which is
+// the route any future credential-bearing field would have to take.
+func TestStatusResultRendersNoDescriptorOrCredentialMaterial(t *testing.T) {
+	descriptor := LaunchDescriptor{
+		Profile:    "office",
+		Config:     filepath.Join(t.TempDir(), "SENTINEL-CONFIG.json"),
+		Socks5:     "127.0.0.1:1081",
+		HealthAddr: "127.0.0.1:1082",
+	}
+	material := []string{descriptor.Config, descriptor.Socks5, descriptor.HealthAddr, "SENTINEL-CONFIG"}
+	states := []State{
+		StateStopped, StateUnowned, StateLaunchMismatch, StateListenerDown,
+		StateDestinationFailed, StateHealthy,
+	}
+	for _, state := range states {
+		got := NewStatusResult(descriptor.Profile, state)
+		rendered := got.Error + " " + got.Why + " " + got.Fix
+		for _, token := range material {
+			if strings.Contains(rendered, token) {
+				t.Fatalf("%s verdict %q leaks %q", state, rendered, token)
+			}
+		}
+	}
+}
+
+// TestStoppedWarnsThatAHandStartedBridgeIsInvisible — status cannot see a
+// bridge started outside dotf, so the verdict must say so: a fix that only says
+// "start the profile" sends the operator to a second bridge that cannot bind
+// the port the first one holds.
+func TestStoppedWarnsThatAHandStartedBridgeIsInvisible(t *testing.T) {
+	got := NewStatusResult("office", StateStopped)
+	if !strings.Contains(got.Why, "by hand") {
+		t.Fatalf("stopped why %q does not say a hand-started bridge is invisible", got.Why)
+	}
+}
+
 func TestServiceStatusUsesOwnedProcessAndHealth(t *testing.T) {
 	tests := []struct {
 		name        string

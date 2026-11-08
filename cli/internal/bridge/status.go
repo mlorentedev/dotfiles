@@ -16,6 +16,10 @@ const (
 	StateListenerDown      State = "listener_down"
 	StateDestinationFailed State = "destination_failed"
 	StateHealthy           State = "healthy"
+	// StateUnavailable is never classified: it reports that the stored state
+	// could not be read, so there is no observation to classify. It exists as a
+	// state rather than a bare error so a --json run still emits a document.
+	StateUnavailable State = "unavailable"
 )
 
 // Observation is the evidence status classification consumes.
@@ -64,8 +68,8 @@ func NewStatusResult(profile string, state State) StatusResult {
 	switch state {
 	case StateStopped:
 		r.Error = "bridge is stopped"
-		r.Why = "no owned bridge process is running"
-		r.Fix = "start the profile as described in docs/runbooks/ts-bridge-client.md, then re-run `dotf bridge status --profile " + profile + "`"
+		r.Why = "no owned bridge process is running; a bridge started by hand outside dotf leaves no process record, so status cannot see it"
+		r.Fix = "start the profile as described in docs/runbooks/ts-bridge-client.md, or, when a bridge may already be serving this profile, confirm its listener with `dotf doctor --scope machine --verbose` rather than starting a second one"
 	case StateUnowned:
 		r.Error = "bridge process identity is unowned"
 		r.Why = "the recorded PID does not match the managed launch; refusing to signal it"

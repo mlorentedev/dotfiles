@@ -67,48 +67,63 @@ func newBridgeStatusCmd(deps bridgeDeps) *cobra.Command {
 }
 
 func runBridgeStatus(command *cobra.Command, deps bridgeDeps, profile string, jsonOut bool) error {
-	if err := requireBridgeRole(command, deps); err != nil {
+	if err := requireBridgeRole(command, deps, profile, jsonOut); err != nil {
 		return err
 	}
-	service, err := bridgeStatusService(command, deps)
+	service, err := bridgeStatusService(command, deps, profile, jsonOut)
 	if err != nil {
 		return err
 	}
 	result, err := service.Status(profile)
 	if err != nil {
-		return writeBridgeFailure(command, "bridge status is unavailable", err.Error(),
-			"repair or remove the invalid bridge state below the dotf state directory, or pass `--profile` when more than one is configured, then retry")
+		return writeBridgeFailure(command, jsonOut, bridgeUnavailable(profile, "bridge status is unavailable", err.Error(),
+			"repair or remove the invalid bridge state below the dotf state directory, or pass `--profile` when more than one is configured, then retry"))
 	}
 	return writeBridgeStatus(command, result, jsonOut)
 }
 
-func requireBridgeRole(command *cobra.Command, deps bridgeDeps) error {
+// bridgeUnavailable is the verdict for a failure that produced no state. It
+// carries the same fields as a classified result so a --json run reports it on
+// stdout: a consumer that parses stdout must be able to tell a corrupt state
+// from a successful empty run.
+func bridgeUnavailable(profile, problem, why, fix string) bridgepkg.StatusResult {
+	return bridgepkg.StatusResult{
+		Profile: profile,
+		State:   bridgepkg.StateUnavailable,
+		Error:   problem,
+		Why:     why,
+		Fix:     fix,
+	}
+}
+
+func requireBridgeRole(command *cobra.Command, deps bridgeDeps, profile string, jsonOut bool) error {
 	if deps.RoleEnabled == nil {
-		return writeBridgeFailure(command, "bridge role cannot be checked",
-			"no machine-role reader is configured", "repair the dotf installation")
+		return writeBridgeFailure(command, jsonOut, bridgeUnavailable(profile,
+			"bridge role cannot be checked", "no machine-role reader is configured", "repair the dotf installation"))
 	}
 	enabled, err := deps.RoleEnabled()
 	if err != nil {
-		return writeBridgeFailure(command, "bridge role cannot be checked", err.Error(),
-			"repair machine.json, then retry")
+		return writeBridgeFailure(command, jsonOut, bridgeUnavailable(profile,
+			"bridge role cannot be checked", err.Error(), "repair machine.json, then retry"))
 	}
 	if !enabled {
-		return writeBridgeFailure(command, "bridge lifecycle is not enabled",
+		return writeBridgeFailure(command, jsonOut, bridgeUnavailable(profile,
+			"bridge lifecycle is not enabled",
 			"this machine does not declare the ts-bridge-client role",
-			"run `dotf env role add ts-bridge-client`, then converge the role")
+			"run `dotf env role add ts-bridge-client`, then converge the role"))
 	}
 	return nil
 }
 
-func bridgeStatusService(command *cobra.Command, deps bridgeDeps) (bridgepkg.Service, error) {
+func bridgeStatusService(command *cobra.Command, deps bridgeDeps, profile string, jsonOut bool) (bridgepkg.Service, error) {
 	if deps.StateDir == nil {
-		return bridgepkg.Service{}, writeBridgeFailure(command, "bridge state cannot be located",
-			"no state-directory resolver is configured", "repair the dotf installation")
+		return bridgepkg.Service{}, writeBridgeFailure(command, jsonOut, bridgeUnavailable(profile,
+			"bridge state cannot be located", "no state-directory resolver is configured", "repair the dotf installation"))
 	}
 	stateDir, err := deps.StateDir()
 	if err != nil {
-		return bridgepkg.Service{}, writeBridgeFailure(command, "bridge state cannot be located", err.Error(),
-			"set an absolute HOME or XDG_STATE_HOME, then retry")
+		return bridgepkg.Service{}, writeBridgeFailure(command, jsonOut, bridgeUnavailable(profile,
+			"bridge state cannot be located", err.Error(), "set an absolute HOME or XDG_STATE_HOME, then retry"))
 	}
 	return bridgepkg.Service{
 		Store:   bridgepkg.NewStore(stateDir),
@@ -133,9 +148,12 @@ func writeBridgeStatus(command *cobra.Command, result bridgepkg.StatusResult, js
 	return nil
 }
 
-func writeBridgeFailure(command *cobra.Command, problem, why, fix string) error {
-	writeErrorWhyFix(command, problem, why, fix)
-	return withExitCode(1, errors.New(problem))
+func writeBridgeFailure(command *cobra.Command, jsonOut bool, result bridgepkg.StatusResult) error {
+	if jsonOut {
+		return writeBridgeStatus(command, result, true)
+	}
+	writeErrorWhyFix(command, result.Error, result.Why, result.Fix)
+	return withExitCode(1, errors.New(result.Error))
 }
 
 func writeErrorWhyFix(command *cobra.Command, problem, why, fix string) {
