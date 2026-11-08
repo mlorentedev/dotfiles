@@ -72,8 +72,11 @@ The `ts-bridge client` section must report:
 
 The states are intentionally separate:
 
-- `stopped`: no process record exists, so status cannot prove a bridge is
-  running under this profile;
+- `stopped`: no process record exists, or the recorded PID is no longer
+  running, so status cannot prove a bridge is running under this profile. A
+  bridge started by hand from this runbook leaves no record, so `stopped` does
+  not mean nothing is listening: confirm the listener before starting a second
+  bridge, which cannot bind the port the first one holds;
 - `unowned`: the recorded PID is alive but fails the exact identity check, so
   status refuses to signal it;
 - `launch_mismatch`: the profile was re-saved after the process started, so the
