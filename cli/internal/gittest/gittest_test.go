@@ -180,6 +180,31 @@ func TestQuietOutranksAConflictingCallerPair(t *testing.T) {
 	}
 }
 
+// TestQuietOutranksACallerThatSetsTheSameKeyTwice — git keeps the last pair for
+// a key, so a caller that pins gc.auto twice ends on its second value. A check
+// for "the pair appears anywhere" would read the caller's first pair, decide it
+// already had what Quiet wants, and leave the second one in force — the exact
+// condition #2803 exists to prevent.
+func TestQuietOutranksACallerThatSetsTheSameKeyTwice(t *testing.T) {
+	cleanEnv(t)
+	repinned := [][2]string{
+		{"gc.auto", "0"}, // already what Quiet wants, so a naive check skips it
+		{"gc.auto", "1"}, // ...and this is what git would then resolve
+	}
+	t.Setenv(countVar, strconv.Itoa(len(repinned)))
+	for i, pair := range repinned {
+		t.Setenv(keyVar+strconv.Itoa(i), pair[0])
+		t.Setenv(valueVar+strconv.Itoa(i), pair[1])
+	}
+	Quiet()
+	if got, want := gitConfig(t, t.TempDir(), "gc.auto", nil), "0"; got != want {
+		t.Errorf("gc.auto = %q, want %q: the caller's last pair outranked Quiet's", got, want)
+	}
+	if got, want := os.Getenv(countVar), strconv.Itoa(len(repinned)+len(quietPairs)); got != want {
+		t.Errorf("%s = %q, want %q (%d caller pairs + %d appended)", countVar, got, want, len(repinned), len(quietPairs))
+	}
+}
+
 // TestQuietRefusesBeforeItTouchesTheEnvironment — a count Quiet cannot use is
 // refused before quietSystem writes a file and points GIT_CONFIG_SYSTEM at it,
 // so a refused call leaves the environment as it found it. The count is
@@ -197,8 +222,14 @@ func TestQuietRefusesBeforeItTouchesTheEnvironment(t *testing.T) {
 			before := os.Getenv(systemVar)
 			func() {
 				defer func() {
-					if recover() == nil {
+					r := recover()
+					if r == nil {
 						t.Fatalf("Quiet accepted %s=%q", countVar, count)
+					}
+					// Naming the variable is what makes this the count refusal
+					// and not any other panic on the way in.
+					if msg, ok := r.(string); !ok || !strings.Contains(msg, countVar) {
+						t.Errorf("panic = %v, want a string naming %s: it did not come from the count refusal", r, countVar)
 					}
 				}()
 				Quiet()

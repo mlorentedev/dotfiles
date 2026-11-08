@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -60,7 +59,11 @@ func Quiet() {
 	}
 	added := 0
 	for _, pair := range quietPairs {
-		if slices.Contains(caller, pair) {
+		// Skip only when the caller's last word on the key is already ours.
+		// Skipping on "the pair appears anywhere" would let an earlier
+		// identical pair hide a later caller override, which is the one shape
+		// where our pair stops winning.
+		if value, ok := lastValue(caller, pair[0]); ok && value == pair[1] {
 			continue
 		}
 		if err := setPair(len(caller)+added, pair); err != nil {
@@ -104,6 +107,18 @@ func callerPairs() ([][2]string, error) {
 		pairs = append(pairs, [2]string{key, value})
 	}
 	return pairs, nil
+}
+
+// lastValue is the value git resolves for key from pairs, reporting false when
+// pairs does not set key. git applies the pairs in index order and keeps the
+// last, so only the final one decides what a child reads.
+func lastValue(pairs [][2]string, key string) (string, bool) {
+	for i := len(pairs) - 1; i >= 0; i-- {
+		if pairs[i][0] == key {
+			return pairs[i][1], true
+		}
+	}
+	return "", false
 }
 
 // setPair writes one pair at index, which must be past every index the caller

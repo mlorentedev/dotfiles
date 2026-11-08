@@ -43,6 +43,9 @@ owner: manu
 - [x] Adversarial review round 1 dispositions applied (`review.md`, verdict FAIL: one REAL Major + two code Minors)
 - [x] `TestQuietOutranksAConflictingCallerPair` — the Major: a caller pair on a key Quiet also sets, asserting Quiet's value is what a child reads
 - [x] `TestQuietRefusesBeforeItTouchesTheEnvironment` — the two Minors: refusal ordered before `quietSystem` writes anything, and the count read pair-by-pair so a huge one costs nothing
+- [x] `TestQuietOutranksACallerThatSetsTheSameKeyTwice` — PR round 2 (CodeRabbit Minor): the dedupe tests the caller's *last* pair for the key, not "the pair appears anywhere", so a caller that pins the key twice is still outranked. A/B: reverted to `slices.Contains`, it reports `gc.auto = "1", want "0"`; restored, it passes.
+- [x] Rescope AC1 to startup-only — PR round 2 (CodeRabbit Major): `-run '^$'` cannot evidence a full-suite claim, so the claim now matches the predicate and CI owns the full run
+- [x] Refusal test asserts the panic names `GIT_CONFIG_COUNT`, so it cannot pass on an unrelated panic — PR round 2 (pr-agent REAL)
 - [ ] Adversarial review round 2 (a REAL Major requires re-review; round 1 is superseded)
 - [ ] PR opened referencing this spec folder
 

@@ -30,9 +30,10 @@ carries, keeps every inherited `GIT_CONFIG_KEY_i`/`GIT_CONFIG_VALUE_i` pair, and
 appends `gc.auto=0` and `maintenance.auto=false` at the next free indices, so
 git still reads the caller's pairs and still applies `Quiet`'s (the later index
 wins). A test binary that re-executes itself inherits its parent's pairs, so a
-second `Quiet` finds them present and adds nothing. A `GIT_CONFIG_COUNT` that is
-not a non-negative integer is still refused, because git would read the same
-number and fail somewhere the operator cannot see.
+second `Quiet` finds its own value already last for each key and adds nothing. A
+`GIT_CONFIG_COUNT` that is not a non-negative integer, or that promises a pair
+the environment does not carry, is still refused, because git would read the
+same number and fail somewhere the operator cannot see.
 
 ## Out of scope
 
@@ -46,20 +47,27 @@ number and fail somewhere the operator cannot see.
 ## Risks / open questions
 
 - **Index collisions.** `Quiet` never writes at an index the caller uses; it
-  writes at `len(caller) + added`. A caller whose count disagrees with the pairs
-  actually set is preserved verbatim rather than corrected — git reports that
-  case itself, as it does without this package.
-- **Duplicate keys.** If the caller already pins `gc.auto`, both pairs are
-  present and the later one wins. That is the intended precedence, and it is
-  asserted rather than assumed.
+  writes at `len(caller) + added`. A count that promises a pair the environment
+  does not carry is refused, the way git refuses it, rather than corrected on
+  the caller's behalf: writing over an index git cannot read would hide the
+  caller's own bug behind ours.
+- **Duplicate keys.** git keeps the last pair for a key, so `Quiet` appends
+  unless the caller's *last* word on that key is already the value it wants. The
+  distinction matters: a caller that pins `gc.auto=0` at one index and
+  `gc.auto=1` at the next ends on `1`, so "the pair is somewhere in the list" is
+  not the same test as "the pair wins". Both shapes are asserted, not assumed.
 - **Long-lived divergence.** `alreadyQuiet()` disappears, so the fast path is
-  now "the pair is already in the list", which the re-execution test covers.
+  now "the caller's last pair for the key already carries our value", which the
+  re-execution test covers.
 
 ## Acceptance criteria
 
-- [x] `go test ./internal/cmd -count=1` starts and runs its tests with
+- [x] `go test ./internal/cmd -count=1` starts and exits cleanly with
       `GIT_CONFIG_COUNT=3` and three inherited pairs in the environment, where
-      it previously aborted in `TestMain`.
+      it previously aborted in `TestMain` before running a single test. The
+      criterion is startup, not the whole suite: on a host whose global
+      `core.hooksPath` makes every fixture commit run a full hook chain, the
+      suite exceeds Go's per-binary timeout, so CI is the authority for it.
 - [x] The inherited pairs are still readable by a child `git config`, and
       `Quiet`'s own pairs apply on top of them.
 - [x] A second `Quiet` call adds nothing, so a re-executed test binary does not

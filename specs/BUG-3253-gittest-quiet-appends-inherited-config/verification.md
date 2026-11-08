@@ -11,18 +11,18 @@ owner: manu
 
 ## Evidence
 
-- [x] Criterion 1 -> `cli/internal/cmd` `-count=1` under `GIT_CONFIG_COUNT=3` with three inherited pairs: the binary starts and runs its tests, where the pre-fix control aborted at `gittest.go:50` (the A/B below). `go test ./internal/cmd -run '^$'` -> exit 0 in 1.36s. The adversarial reviewer independently reproduced two real fixtures to completion under the same environment — `TestDeclaredCapacity` (2.0s) and `TestHarnessRefresh_AFailedRenderIsAnErrorAndWritesNothing` (67.7s) — so "runs its tests" is evidenced beyond `TestMain`.
+- [x] Criterion 1 -> `cli/internal/cmd` `-count=1` under `GIT_CONFIG_COUNT=3` with three inherited pairs: the binary starts and exits cleanly, where the pre-fix control aborted at `gittest.go:50` (the A/B below). `go test ./internal/cmd -run '^$'` -> exit 0 in 1.36s. The criterion is **startup only** — `-run '^$'` selects no tests, so it cannot speak for the suite. That tests now run at all is evidenced separately: the adversarial reviewer reproduced two real fixtures to completion under the same environment — `TestDeclaredCapacity` (2.0s) and `TestHarnessRefresh_AFailedRenderIsAnErrorAndWritesNothing` (67.7s) — and CI owns the full run (suite note below).
 - [x] Criterion 2 -> `TestQuietKeepsTheCallersConfig`, `TestQuietAppendsAfterAForeignEnvironment`, `TestQuietOutranksAConflictingCallerPair` (the last two in this commit): each inherited pair still reads back through a child `git config`, and `gc.auto=0` / `maintenance.auto=false` apply on top — including where the caller pins the same keys to the opposite value.
 - [x] Criterion 3 -> `TestQuietAcceptsItsOwnKeys`, `TestQuietDoesNotIncludeItsOwnFile` (commit `8881f845`): a second `Quiet` leaves `GIT_CONFIG_COUNT` unchanged and does not rewrite the system config.
 - [x] Criterion 4 -> `TestQuietRefusesAMalformedCount`, `TestQuietRefusesBeforeItTouchesTheEnvironment` (this commit), `TestQuietRefusesNoSystem` (pre-existing): `abc` and `-1` still panic, as do `GIT_CONFIG_NOSYSTEM`, a count promising a pair the environment does not carry, and a count too large to be real.
 
 ## Test status
 
-- `go test ./internal/gittest -run '^TestQuiet' -v -count=1` with `GIT_CONFIG_COUNT=3` in the environment -> 11 tests PASS, `ok ... 7.546s`.
+- `go test ./internal/gittest -run '^TestQuiet' -v -count=1` with `GIT_CONFIG_COUNT=3` in the environment -> 12 tests PASS, `ok ... 6.014s`.
 - `go test ./internal/cmd -count=1` with `GIT_CONFIG_COUNT=3` in the environment -> the binary starts and runs its tests instead of aborting in `TestMain`; the package itself cannot finish inside the default timeout on this host (see the suite note below, measured cause).
 - Feature predicates: all four `features.json` entries ran under bash with every `GIT_CONFIG_*` cleared -> `PASS` x4, exit 0.
 - **A/B control:** with the harness environment intact, `git stash push` of the change makes `go test ./internal/cmd` panic at `gittest.go:50`; `git stash pop` restores exit 0. The panic is the bug, and it is the only difference between the two runs.
-- **Precedence is observable, so the new test is not vacuous:** with `GIT_CONFIG_COUNT=2` and both pairs on `gc.auto`, `git config gc.auto` reads `0` when `1` is at index 0 and `1` when `0` is at index 0 — the last pair wins. A `Quiet` that appended at the wrong index would fail `TestQuietOutranksAConflictingCallerPair`.
+- **Precedence is observable, so both precedence tests are non-vacuous:** with `GIT_CONFIG_COUNT=2` and both pairs on `gc.auto`, `git config gc.auto` reads `0` when `1` is at index 0 and `1` when `0` is at index 0 — the last pair wins. A `Quiet` that appended at the wrong index would fail `TestQuietOutranksAConflictingCallerPair`, and one that skipped on "the pair appears anywhere" would fail `TestQuietOutranksACallerThatSetsTheSameKeyTwice`: reverted to that check, the test reports `gc.auto = "1", want "0"` and `GIT_CONFIG_COUNT = "3", want "4"`; restored, it passes.
 - No regressions: `go test ./internal/gittest -count=1` green; `go vet ./internal/gittest` clean.
 
 ## Review dispositions (round 1, `review.md`, verdict FAIL)
@@ -58,6 +58,21 @@ The acceptance criterion is therefore evidenced by the run reaching the tests at
 all (it used to abort in `TestMain`) plus the package-start predicate in
 `features.json` f4, not by the package finishing.
 
+## Review dispositions (round 2 — PR review bots on #3254)
+
+Round 2 has not run yet as `dotf spec review`; these are the two bots that
+reviewed the PR, triaged and applied before the second adversarial pass so it
+sees the corrected contract set.
+
+| Finding | Disposition |
+|---|---|
+| CodeRabbit **Minor** — `slices.Contains(caller, pair)` skips the append when the pair appears *anywhere*, so a caller pinning `gc.auto=0` at one index and `gc.auto=1` at the next leaves `1` in force and background gc on | **Fixed.** `lastValue()` resolves the caller's last pair for the key, and `Quiet` appends unless that value is already its own — which also preserves the re-execution dedupe, since a re-executed binary's own pairs are last. `TestQuietOutranksACallerThatSetsTheSameKeyTwice` covers it, and the A/B above shows it failing against the old check. |
+| CodeRabbit **Major** — f4's `-run '^$'` selects no tests, so it cannot support a claim that the full `internal/cmd` suite runs, which `proposal.md` AC1 made | **Fixed by narrowing the claim, not the predicate.** The bug was `TestMain` aborting the binary, so startup is the regression surface; `proposal.md` AC1, `features.json` f4 and the Criterion 1 evidence now say startup-only and name CI as the owner of the full run. A predicate that took 40 minutes on this host would be a worse artifact than an honest one. |
+| pr-agent **REAL** — `quietSystem()` ran before the count was validated, so a refusal was not side-effect-free, and the refusal test passed on *any* panic | **Already fixed in `fc3f37c4`** (the bot reviewed `f87a8731`), and completed here: the refusal test now asserts the panic message names `GIT_CONFIG_COUNT`, so it can no longer pass on an unrelated panic. |
+| pr-agent **THEORETICAL** — the `slices.Contains` precedence assumption | **Already fixed in `fc3f37c4`**, and hardened further by the CodeRabbit fix above. |
+| pr-agent **THEORETICAL** — `make([][2]string, n)` from a caller-controlled count | **Already fixed in `fc3f37c4`.** |
+| Both bots class the duplicate-key trigger as unrealistic ("requires a harness that sets the same key twice") | **Severity accepted, skip rejected.** The guard's contract is "each git this process starts is quiet"; it should hold for the input rather than for today's harnesses, and the fix was one helper plus one test. |
+
 ## Decisions made during implementation
 
 - **Append, not overwrite and not refuse.** Overwriting would drop keys a harness
@@ -70,9 +85,7 @@ all (it used to abort in `TestMain`) plus the package-start predicate in
   whose count promises pairs the environment does not carry is **refused**, not
   guessed at: git refuses that environment itself, and inventing the missing
   pair would silently set config the caller never asked for.
-- **`alreadyQuiet()` deleted.** The fast path is now "the pair is already in the
-  list", which is what a re-executed test binary hits; keeping both would have
-  left two notions of "already quiet" to keep in sync.
+- **`alreadyQuiet()` deleted.** The fast path is now "the caller's last pair for the key already carries our value", which is what a re-executed test binary hits; keeping both would have left two notions of "already quiet" to keep in sync.
 - **`cleanEnv` clears by prefix.** A test that asserts what `Quiet` wrote needs a
   known starting point, and a harness may have pinned pairs there. Clearing
   `GIT_CONFIG_COUNT` alone would have left orphaned `KEY_i`/`VALUE_i` variables.
