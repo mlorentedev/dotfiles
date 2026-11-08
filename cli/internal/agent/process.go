@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -25,9 +26,12 @@ const waitDelay = 2 * time.Second
 //
 // stdin carries the task text where the tool accepts it: argv is world-readable
 // through `ps` and is bounded by ARG_MAX, and a task is arbitrary user text.
-func runProcess(ctx context.Context, bin string, args []string, stdin string) (stdout, stderr string, code int, err error) {
+func runProcess(ctx context.Context, bin string, args []string, stdin string, extraEnv ...string) (stdout, stderr string, code int, err error) {
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.WaitDelay = waitDelay
+	if len(extraEnv) > 0 {
+		cmd.Env = append(os.Environ(), extraEnv...)
+	}
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
@@ -98,9 +102,13 @@ func classifyProcess(stdout, stderr string, code int, runErr error) Response {
 			Output: fmt.Sprintf("could not run the backend: %v", runErr)}
 	}
 	if code != 0 {
+		combined := combine(stdout, stderr)
+		if strings.Contains(combined, "No matching provider is authenticated") {
+			return Response{Status: StatusPoolUnavailable, Exit: code, Output: combined}
+		}
 		// The child's stderr is the useful half of the report; a bare exit code
 		// sends the reader back to a terminal to reproduce it.
-		return Response{Status: StatusTaskFailed, Exit: code, Output: combine(stdout, stderr)}
+		return Response{Status: StatusTaskFailed, Exit: code, Output: combined}
 	}
 	if strings.TrimSpace(stdout) == "" {
 		return Response{Status: StatusTaskFailed, Exit: 0, Output: combine(stderr,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/agent"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
 )
@@ -167,7 +168,7 @@ A blocked call is answered "deny" with the reason.`,
 				return finish(false, "")
 			}
 
-			requested := effectiveRole(role, call.AgentType)
+			requested := effectiveRoleWithSticky(role, call.AgentType, stateDir, scope, "")
 			// Whether the operator NAMED the role decides which source is
 			// authoritative below. A --role flag is a human's explicit
 			// instruction and outranks anything the payload implies; a
@@ -176,6 +177,9 @@ A blocked call is answered "deny" with the reason.`,
 			fromFlag := strings.TrimSpace(role) != ""
 			dispatched := harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID))
 			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested, dispatched, fromFlag)
+			if persona != nil && !unscoped {
+				_ = harness.BindStickyPersona(harness.PersonaStatePath(stateDir, scope), persona.Name, "")
+			}
 
 			// A persona is in scope and the payload named no session: there is no
 			// ledger to consult, and consulting an empty one would BLOCK - a blocked
@@ -411,6 +415,9 @@ func loadGatePersona(warn io.Writer, repoRoot, role string, dispatched map[strin
 			lookup = trueType
 		}
 	}
+	if parsedRole, _, ok := agent.ParseWorkerID(lookup); ok {
+		lookup = parsedRole
+	}
 
 	agentsDir := filepath.Join(repoRoot, "harness", "agents")
 	path := filepath.Join(agentsDir, lookup, "AGENT.md")
@@ -462,7 +469,23 @@ func effectiveRole(flag, fromPayload string) string {
 	if r := strings.TrimSpace(flag); r != "" {
 		return r
 	}
-	return strings.TrimSpace(fromPayload)
+	if r := strings.TrimSpace(fromPayload); r != "" {
+		return r
+	}
+	if r := strings.TrimSpace(os.Getenv("DOTF_WORKER_ID")); r != "" {
+		return r
+	}
+	return strings.TrimSpace(os.Getenv("DOTF_ROLE"))
+}
+
+func effectiveRoleWithSticky(flag, fromPayload, stateDir, scope, branch string) string {
+	if r := effectiveRole(flag, fromPayload); r != "" {
+		return r
+	}
+	if scope == "" || stateDir == "" {
+		return ""
+	}
+	return harness.LoadStickyPersona(harness.PersonaStatePath(stateDir, scope), branch)
 }
 
 // harnessAgy names Antigravity's CLI.

@@ -20,7 +20,7 @@ var harnessFor = map[string]struct {
 	args func(model string) []string
 }{
 	"claude": {bin: "claude", args: func(m string) []string { return []string{"-p", "--model", m} }},
-	"nan":    {bin: "pi", args: func(m string) []string { return []string{"--print", "--model", m} }},
+	"nan":    {bin: "pi", args: func(m string) []string { return []string{"--print", "--provider", "nan", "--model", m} }},
 }
 
 // Subprocess dispatches by running a harness binary in non-interactive mode.
@@ -39,7 +39,14 @@ func (Subprocess) Dispatch(ctx context.Context, req Request) Response {
 		return Response{Status: StatusPoolUnavailable,
 			Output: fmt.Sprintf("no harness binary is mapped to pool %q", req.Pool)}
 	}
-	stdout, stderr, code, err := runProcess(ctx, h.bin, h.args(req.Model), req.Task)
+	var extraEnv []string
+	if req.WorkerID != "" {
+		extraEnv = append(extraEnv, "DOTF_WORKER_ID="+req.WorkerID)
+	}
+	if req.Role != "" {
+		extraEnv = append(extraEnv, "DOTF_ROLE="+req.Role)
+	}
+	stdout, stderr, code, err := runProcess(ctx, h.bin, h.args(req.Model), req.Task, extraEnv...)
 	return classifyProcess(stdout, stderr, code, err)
 }
 

@@ -7,8 +7,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
+
+var atomicWriteMu sync.Mutex
 
 // The dispatch map implements HARNESS-109 (#1434): it is how the gate learns
 // which PERSONA a named subagent actually is.
@@ -192,25 +195,48 @@ func RecordDispatch(path, name, agentType string) error {
 	// The temp file is created in the SAME directory for that guarantee: a
 	// rename across filesystems is not atomic and not even permitted.
 	sweepStrandedDispatchTemps(dir)
+	return atomicWriteFile(path, raw, 0o600)
+}
 
+// atomicWriteFile writes raw to a temporary file in the same directory as path
+// and renames it into place with bounded retry (5 attempts, 5-25ms backoff) so
+// concurrent PreToolUse hook processes on Windows do not fail with
+// ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION.
+func atomicWriteFile(path string, raw []byte, perm os.FileMode) error {
+	atomicWriteMu.Lock()
+	defer atomicWriteMu.Unlock()
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(dir, ".dispatch-*.tmp")
 	if err != nil {
 		return err
 	}
 	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }() // no-op once the rename succeeds
+	defer func() { _ = os.Remove(tmpName) }()
 	if _, err := tmp.Write(raw); err != nil {
 		_ = tmp.Close()
 		return err
 	}
-	if err := tmp.Chmod(0o600); err != nil {
+	if err := tmp.Chmod(perm); err != nil {
 		_ = tmp.Close()
 		return err
 	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	var lastErr error
+	for attempt := 0; attempt < 15; attempt++ {
+		if err := os.Rename(tmpName, path); err == nil {
+			return nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(time.Duration(attempt+1) * 5 * time.Millisecond)
+	}
+	return lastErr
 }
 
 // sweepStrandedDispatchTemps removes temp files a killed gate left behind.

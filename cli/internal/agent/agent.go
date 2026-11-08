@@ -68,12 +68,13 @@ const OutputCap = 64 * 1024
 // Request is what the dispatcher hands a backend for ONE chain entry. Pool and
 // Model are already resolved: a backend chooses nothing about routing.
 type Request struct {
-	Pool    string
-	Model   string
-	Role    string
-	Task    string
-	Cwd     string
-	Timeout time.Duration
+	Pool     string
+	Model    string
+	Role     string
+	WorkerID string
+	Task     string
+	Cwd      string
+	Timeout  time.Duration
 }
 
 // Response is what a backend reports for one attempt. Backends return the four
