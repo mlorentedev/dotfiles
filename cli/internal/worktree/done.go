@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
+	"github.com/mlorentedev/dotfiles/cli/internal/mem"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
 
 type DoneOptions struct {
@@ -176,6 +178,7 @@ func Park(opts DoneOptions) (DoneResult, error) {
 
 	_ = os.Remove(filepath.Join(absWT, ".dotf-lane-prompt.md"))
 	releaseIssueClaimRefs(absRepo, issueNum)
+	archiveBranchMemoryThread(absRepo, branch)
 
 	switch {
 	case branch == "":
@@ -197,9 +200,32 @@ func releaseIssueClaimRefs(absRepo string, issueNum int) {
 	}
 	claimRef := fmt.Sprintf("refs/dotf/claims/%d", issueNum)
 	seenRef := fmt.Sprintf("refs/dotf/seen/%d", issueNum)
+	expectedOut, _ := exec.Command("git", "-C", absRepo, "rev-parse", "--verify", "--quiet", seenRef).Output()
+	expectedSHA := strings.TrimSpace(string(expectedOut))
+	if expectedSHA == "" {
+		claimOut, _ := exec.Command("git", "-C", absRepo, "rev-parse", "--verify", "--quiet", claimRef).Output()
+		expectedSHA = strings.TrimSpace(string(claimOut))
+	}
 	_ = exec.Command("git", "-C", absRepo, "update-ref", "-d", claimRef).Run()
 	_ = exec.Command("git", "-C", absRepo, "update-ref", "-d", seenRef).Run()
-	_ = exec.Command("git", "-C", absRepo, "push", "--quiet", "--no-verify", "origin", ":"+claimRef).Run()
+	if expectedSHA != "" {
+		_ = exec.Command("git", "-C", absRepo, "push", "--quiet", "--no-verify", "--force-with-lease="+claimRef+":"+expectedSHA, "origin", ":"+claimRef).Run()
+	} else {
+		_ = exec.Command("git", "-C", absRepo, "push", "--quiet", "--no-verify", "origin", ":"+claimRef).Run()
+	}
+}
+
+// archiveBranchMemoryThread archives memory/threads/<branch>.md and prunes MEMORY.md when VAULT_PATH resolves.
+func archiveBranchMemoryThread(absRepo, branch string) {
+	if strings.TrimSpace(branch) == "" {
+		return
+	}
+	vaultPath := vault.ResolveVault()
+	if strings.TrimSpace(vaultPath) == "" {
+		return
+	}
+	project := filepath.Base(filepath.Clean(absRepo))
+	_ = mem.ArchiveAndPruneThread(filepath.Join(vaultPath, "10_projects", project), branch)
 }
 
 // branchLanding reads the worktree's branch and tip, and whether that tip has

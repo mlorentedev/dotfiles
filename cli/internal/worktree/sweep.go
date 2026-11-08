@@ -393,12 +393,18 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 	if isDirty(info.Path, runner) {
 		return false
 	}
-	if landedHeads != nil {
+	if !isMerged(repoRoot, info.Branch, runner) {
+		heads := landedHeads
+		if heads == nil {
+			heads = mergedPRHeads
+		}
+		if _, _, landed, _ := branchLanding(repoRoot, info.Path, heads); !landed {
+			return false
+		}
+	} else if landedHeads != nil {
 		if _, _, landed, _ := branchLanding(repoRoot, info.Path, landedHeads); !landed {
 			return false
 		}
-	} else if !isMerged(repoRoot, info.Branch, runner) {
-		return false
 	}
 	laneName := filepath.Base(info.Path)
 	createdAt := time.Now()
@@ -434,6 +440,7 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 	_ = os.Remove(filepath.Join(info.Path, ".dotf-lane-prompt.md"))
 	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
 	releaseIssueClaimRefs(repoRoot, issueNum)
+	archiveBranchMemoryThread(repoRoot, info.Branch)
 	return true
 }
 

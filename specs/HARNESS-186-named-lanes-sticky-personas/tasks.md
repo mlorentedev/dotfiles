@@ -111,4 +111,4 @@ owner: manu
 - [x] Lint passes
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder (`specs/HARNESS-186-named-lanes-sticky-personas`)
+- [x] PR opened referencing this spec folder (`specs/HARNESS-186-named-lanes-sticky-personas` -> `mlorentedev/dotfiles#3259`)

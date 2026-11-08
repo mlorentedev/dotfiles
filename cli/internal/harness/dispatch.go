@@ -199,8 +199,9 @@ func RecordDispatch(path, name, agentType string) error {
 }
 
 // atomicWriteFile writes raw to a temporary file in the same directory as path
-// and renames it into place with bounded retry (5 attempts, 5-25ms backoff) so
-// concurrent PreToolUse hook processes on Windows do not fail with
+// and renames it into place. It serializes callers within the same process via
+// atomicWriteMu and retries os.Rename up to 15 attempts (5–75ms linear backoff)
+// so concurrent PreToolUse hook processes on Windows do not fail with
 // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION.
 func atomicWriteFile(path string, raw []byte, perm os.FileMode) error {
 	atomicWriteMu.Lock()
@@ -210,7 +211,11 @@ func atomicWriteFile(path string, raw []byte, perm os.FileMode) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(dir, ".dispatch-*.tmp")
+	pattern := ".atomic-" + filepath.Base(path) + "-*.tmp"
+	if strings.HasSuffix(path, ".dispatched.json") {
+		pattern = ".dispatch-*.tmp"
+	}
+	tmp, err := os.CreateTemp(dir, pattern)
 	if err != nil {
 		return err
 	}

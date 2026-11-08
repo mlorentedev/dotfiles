@@ -522,9 +522,10 @@ func maybeAppendLaneProvenance(body string) string {
 			machineID = strings.TrimSpace(h)
 		}
 	}
-	withProv := forgewrite.AppendEnvironmentProvenance(body, machineID, runtime.GOOS, runtime.GOARCH, meta.Lane)
-	if err := forgewrite.ValidateProvenanceNoAttribution(withProv); err != nil {
+	line := forgewrite.FormatEnvironmentProvenance(machineID, runtime.GOOS, runtime.GOARCH, meta.Lane)
+	if err := forgewrite.ValidateProvenanceNoAttribution(line); err != nil {
+		fmt.Fprintln(os.Stderr, "WARN: environment footer skipped:", err)
 		return body
 	}
-	return withProv
+	return forgewrite.AppendEnvironmentProvenance(body, machineID, runtime.GOOS, runtime.GOARCH, meta.Lane)
 }

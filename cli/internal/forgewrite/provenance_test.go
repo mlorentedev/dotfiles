@@ -28,6 +28,14 @@ func TestForgePRProvenanceNoAttribution(t *testing.T) {
 		t.Fatalf("expected idempotent AppendEnvironmentProvenance, got:\n%s", withProv2)
 	}
 
+	// Hostnames like raspberry-pi or builder must not fail ValidateProvenanceNoAttribution.
+	for _, host := range []string{"raspberry-pi", "pi", "builder"} {
+		line := FormatEnvironmentProvenance(host, "linux", "arm64", "feat-lane-primary")
+		if err := ValidateProvenanceNoAttribution(line); err != nil {
+			t.Fatalf("expected host %q provenance %q to pass ValidateProvenanceNoAttribution, got %v", host, line, err)
+		}
+	}
+
 	// Forbidden AI/agent/persona/meeseek tokens must be rejected (m2, m3).
 	forbiddenInputs := []string{
 		"Environment: EGW-LEN029 (windows/amd64) · claude",

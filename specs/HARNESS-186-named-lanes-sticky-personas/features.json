@@ -18,14 +18,14 @@
     "behavior": "AC3: dotf harness gate exempts read-only tools, persists sticky primary persona per (session_id, branch), and uses atomic replace with retry on Windows",
     "verification": "cd cli && go test ./internal/harness/... ./internal/cmd/... -run \"TestDecide_ExemptsReadOnly|TestStickyPersona|TestAtomicWriteFile|TestHarnessGateStickyPersona\" -count=1",
     "state": "passing",
-    "evidence": "PASS: TestDecide_ExemptsReadOnlyDiscoveryTools, TestStickyPersona_PersistsAcrossKnowledgeTouchAndResetsOnBranchChange, TestAtomicWriteFile_ConcurrentWritesOnWindowsDoNotFail, TestHarnessGateStickyPersonaAndMeeseekWorkerID"
+    "evidence": "PASS: TestDecide_ExemptsReadOnlyDiscoveryTools, TestStickyPersona_BindsOncePerBranchAndResetsOnBranchSwitch, TestAtomicWriteFile_ConcurrentWritesOnWindowsDoNotFail, TestHarnessGateStickyPersonaAndMeeseekResolution"
   },
   {
     "id": "HARNESS-186-named-lanes-sticky-personas-f4",
     "behavior": "AC4: dotf agent auto/run allocates meeseek-<role>-<fruit> without replacement from 64-fruit dictionary, resolves role in loadGatePersona, and passes --provider to piBackend",
     "verification": "cd cli && go test ./internal/agent/... -run \"TestFruit|TestParseWorkerID|TestDispatch_PopulatesMeeseek|TestPiBackend\" -count=1",
     "state": "passing",
-    "evidence": "PASS: TestFruitsDictionaryHas64UniqueLowercaseEntries, TestFruitDeckDraws64UniqueBeforeReshuffle, TestParseWorkerID, TestDispatch_PopulatesMeeseekWorkerIDAndEnv, TestPiBackend_IncludesProviderFlagAndClassifiesAuthError"
+    "evidence": "PASS: TestFruitDeck_64SequentialDrawsHaveZeroCollisions, TestParseWorkerID_RejectsPluralAndMalformedNames, TestDispatch_PopulatesMeeseekWorkerIDAndPropagatesToRequest, TestPiBackend_IncludesProviderFlagAndClassifiesUnauthenticatedAsUnavailable"
   },
   {
     "id": "HARNESS-186-named-lanes-sticky-personas-f5",

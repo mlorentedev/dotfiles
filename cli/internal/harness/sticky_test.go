@@ -94,4 +94,8 @@ func TestAtomicWriteFile_ConcurrentWritesOnWindowsDoNotFail(t *testing.T) {
 	for err := range errs {
 		t.Errorf("concurrent state write failed: %v", err)
 	}
+	consumed := LoadConsumed(path)
+	if !consumed["skill"] {
+		t.Fatalf("LoadConsumed(%s) = %v, want skill=true", path, consumed)
+	}
 }

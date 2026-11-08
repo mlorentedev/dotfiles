@@ -15,15 +15,22 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [x] Criterion 1 (`AC1` — Persistent Named Lanes & Idempotent Provisioning) -> `TestLaneInitIdempotent`, `TestLaneSwitchRoutingAndWIPCap` (`cli/internal/lane/lanes_test.go`)
 - [x] Criterion 2 (`AC2` — Safe In-Place Lane Park & Housekeeping) -> `TestLaneParkInPlaceAndTipVerification` (`cli/internal/worktree/park_test.go`)
-- [x] Criterion 3 (`AC3` — Sticky Persona Gate & Read-Only Exemption) -> commit `7027fa36` / `TestDecide_ExemptsReadOnlyDiscoveryTools`, `TestStickyPersona_PersistsAcrossKnowledgeTouchAndResetsOnBranchChange`, `TestAtomicWriteFile_ConcurrentWritesOnWindowsDoNotFail`, `TestHarnessGateStickyPersonaAndMeeseekWorkerID`
-- [x] Criterion 4 (`AC4` — `meeseek-<role>-<fruit>` Ephemeral Worker Identity & `pi` Pool Fallback) -> commit `7027fa36` / `TestFruitsDictionaryHas64UniqueLowercaseEntries`, `TestFruitDeckDraws64UniqueBeforeReshuffle`, `TestParseWorkerID`, `TestDispatch_PopulatesMeeseekWorkerIDAndEnv`, `TestPiBackend_IncludesProviderFlagAndClassifiesAuthError`
+- [x] Criterion 3 (`AC3` — Sticky Persona Gate & Read-Only Exemption) -> commit `7027fa36` / `TestDecide_ExemptsReadOnlyDiscoveryTools`, `TestStickyPersona_BindsOncePerBranchAndResetsOnBranchSwitch`, `TestAtomicWriteFile_ConcurrentWritesOnWindowsDoNotFail`, `TestHarnessGateStickyPersonaAndMeeseekResolution`
+- [x] Criterion 4 (`AC4` — `meeseek-<role>-<fruit>` Ephemeral Worker Identity & `pi` Pool Fallback) -> commit `7027fa36` / `TestFruitDeck_64SequentialDrawsHaveZeroCollisions`, `TestParseWorkerID_RejectsPluralAndMalformedNames`, `TestDispatch_PopulatesMeeseekWorkerIDAndPropagatesToRequest`, `TestPiBackend_IncludesProviderFlagAndClassifiesUnauthenticatedAsUnavailable`
 - [x] Criterion 5 (`AC5` — Scoped `pre-commit` Lane Guard & Rebase Exemption) -> `TestPreCommitLaneGuard` (`cli/internal/hooks/lane_guard_test.go`)
 - [x] Criterion 6 (`AC6` — Cross-OS Forge Provenance (`no-attribution` Compliant)) -> `TestForgePRProvenanceNoAttribution` (`cli/internal/forgewrite/provenance_test.go`)
 
 ## Test status
 
-- Test suite: `cd cli && go test ./internal/agent/... ./internal/harness/... ./internal/worktree/... ./internal/lane/... ./internal/hooks/... ./internal/forgewrite/... -> PASS`
-- Manual smoke test: Provisioned `feat-lane-primary` for `dotfiles`, cleaned 19 safe worktrees on `EGW-LEN029` (`35 -> 16`), verified `dotf agent auto --role reviewer --timeout 5m` dispatches `pi --provider nan`.
+- Test suite:
+  - `ok github.com/mlorentedev/dotfiles/cli/internal/agent 2.870s`
+  - `ok github.com/mlorentedev/dotfiles/cli/internal/harness 2.181s`
+  - `ok github.com/mlorentedev/dotfiles/cli/internal/forgewrite 2.181s`
+  - `ok github.com/mlorentedev/dotfiles/cli/internal/hooks 48.142s`
+  - `ok github.com/mlorentedev/dotfiles/cli/internal/worktree 52.406s`
+  - `ok github.com/mlorentedev/dotfiles/cli/internal/lane 182.730s`
+  - `ok github.com/mlorentedev/dotfiles/cli/internal/cmd 33.492s`
+- Manual smoke test: Provisioned `feat-lane-primary` for `dotfiles`, cleaned 19 safe worktrees on `EGW-LEN029` (`35 -> 16`), verified `dotf agent run --tier mid --role reviewer` dispatches `pi --provider nan` (`meeseek-reviewer-durian` and `meeseek-reviewer-guava`).
 - No regressions in existing test suite: yes
 
 ## Decisions made during implementation

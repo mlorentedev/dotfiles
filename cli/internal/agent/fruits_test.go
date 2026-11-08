@@ -46,6 +46,9 @@ func TestParseWorkerID_RejectsPluralAndMalformedNames(t *testing.T) {
 			t.Errorf("ParseWorkerID(%q) = (%q, %q, true), want false", in, role, fruit)
 		}
 	}
+	if role, fruit, ok := ParseWorkerID("meeseek-code-review-avocado"); !ok || role != "code-review" || fruit != "avocado" {
+		t.Errorf("ParseWorkerID(meeseek-code-review-avocado) = (%q, %q, %v), want (code-review, avocado, true)", role, fruit, ok)
+	}
 }
 
 func TestDispatch_PopulatesMeeseekWorkerIDAndPropagatesToRequest(t *testing.T) {

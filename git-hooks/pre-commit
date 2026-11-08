@@ -15,7 +15,7 @@ DISPATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # 2. Scoped lane guard: enforce persistent named lanes in .dotf/lane.json repos (HARNESS-186).
 if [ -f "$DISPATCH_DIR/lib/lane-guard.sh" ]; then
-  "$DISPATCH_DIR/lib/lane-guard.sh" || exit $?
+  bash "$DISPATCH_DIR/lib/lane-guard.sh" || exit $?
 fi
 
 # 3. Chain to the repo-local hook (shadowed by the global core.hooksPath).

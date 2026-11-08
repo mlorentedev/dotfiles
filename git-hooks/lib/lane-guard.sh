@@ -20,8 +20,18 @@ top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -n "$top" ] || exit 0
 
 git_dir="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
-common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || common_dir="$git_dir"
-main_root="$(dirname "$common_dir")"
+common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || common_dir="$git_dir"
+case "$common_dir" in
+  /*|[A-Za-z]:/*|[A-Za-z]:\\*) ;;
+  *) common_dir="$top/$common_dir" ;;
+esac
+common_slash="${common_dir//\\//}"
+common_slash="${common_slash%/}"
+if [ "${common_slash##*/}" = ".git" ]; then
+  main_root="$(dirname "$common_dir")"
+else
+  main_root="$top"
+fi
 
 # 1. Exempt active git rebase, cherry-pick, revert, or sequencer (B6, m-CODE-4).
 if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ] || [ -d "$git_dir/sequencer" ] || [ -f "$git_dir/CHERRY_PICK_HEAD" ] || [ -f "$git_dir/MERGE_HEAD" ] || [ -f "$git_dir/REVERT_HEAD" ]; then
@@ -39,8 +49,9 @@ if [ ! -f "$top/.dotf/lane.json" ] && [ ! -f "$main_root/.dotf/lane.json" ]; the
 fi
 
 # 4. Block commits in copilot-worktrees/ for lane-managed repos (m4).
-case "$top" in
-  */copilot-worktrees/*|*\\copilot-worktrees\\*)
+top_slash="${top//\\//}"
+case "$top_slash" in
+  */copilot-worktrees/*)
     echo "ERROR: commits inside copilot-worktrees/ ($top) are blocked in lane-managed repositories." >&2
     echo "FIX: claim a persistent named lane with: dotf lane switch <branch>" >&2
     exit 1
@@ -55,7 +66,8 @@ if [ -f "$top/.dotf-worktree.json" ]; then
     exit 1
   fi
 else
-  case "$(basename "$top")" in
+  lane_base="${top_slash##*/}"
+  case "$lane_base" in
     feat-lane-primary|feat-lane-secondary|fast-track-lane)
       echo "ERROR: canonical lane directory $top is missing .dotf-worktree.json lease metadata." >&2
       echo "FIX: initialize and switch the lane with: dotf lane init && dotf lane switch <type>/<issue>-<slug>" >&2
@@ -64,10 +76,15 @@ else
   esac
 fi
 
-# 6. Block direct commits on main/master at the main repository checkout.
+# 6. Block direct commits on main/master or detached HEAD at the main repository checkout.
 branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
   echo "ERROR: direct commits on '$branch' are blocked in lane-managed repository ($top)." >&2
+  echo "FIX: use a persistent named lane instead: dotf lane switch <type>/<issue>-<slug>" >&2
+  exit 1
+fi
+if [ -z "$branch" ] && [ ! -f "$top/.dotf-worktree.json" ]; then
+  echo "ERROR: detached HEAD commits at the main checkout are blocked in lane-managed repository ($top)." >&2
   echo "FIX: use a persistent named lane instead: dotf lane switch <type>/<issue>-<slug>" >&2
   exit 1
 fi

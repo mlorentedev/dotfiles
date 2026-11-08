@@ -286,10 +286,9 @@ func HasNamedLanes(repoRoot, worktreeRoot string) bool {
 // ParkLane parks the specified lane (or the lane at cwd) in-place, releases any
 // issue claim ref, and archives/prunes its memory thread in vaultPath.
 func ParkLane(repoRoot, lanePath, vaultPath string, force bool) (worktree.DoneResult, error) {
-	meta, _ := worktree.LoadMetadata(lanePath)
-	issueNum := 0
-	if meta != nil {
-		issueNum = meta.Issue
+	meta, err := worktree.LoadMetadata(lanePath)
+	if err != nil || meta == nil || meta.Lane == "" {
+		return worktree.DoneResult{}, fmt.Errorf("lane park: %s is not a persistent named lane", lanePath)
 	}
 	branchOut, _ := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 	oldBranch := strings.TrimSpace(string(branchOut))
@@ -302,13 +301,6 @@ func ParkLane(repoRoot, lanePath, vaultPath string, force bool) (worktree.DoneRe
 	})
 	if err != nil {
 		return res, err
-	}
-	if issueNum > 0 {
-		ref := fmt.Sprintf("refs/dotf/claims/%d", issueNum)
-		seen := fmt.Sprintf("refs/dotf/seen/%d", issueNum)
-		_ = exec.Command("git", "-C", repoRoot, "update-ref", "-d", ref).Run()
-		_ = exec.Command("git", "-C", repoRoot, "update-ref", "-d", seen).Run()
-		_ = exec.Command("git", "-C", repoRoot, "push", "--quiet", "--no-verify", "origin", ":"+ref).Run()
 	}
 	if vaultPath != "" && oldBranch != "" {
 		project := filepath.Base(filepath.Clean(repoRoot))

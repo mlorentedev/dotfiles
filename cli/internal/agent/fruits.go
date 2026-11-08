@@ -89,23 +89,42 @@ func NextWorkerID(role string) string {
 }
 
 // ParseWorkerID parses a canonical `meeseek-<role>-<fruit>` identifier (singular
-// prefix `meeseek-`, lowercase `[a-z]+` role, and a known fruit from Fruits).
+// prefix `meeseek-`, lowercase `[a-z]+(?:-[a-z]+)*` role, and a known fruit from Fruits).
 func ParseWorkerID(id string) (role, fruit string, ok bool) {
 	if !strings.HasPrefix(id, "meeseek-") {
 		return "", "", false
 	}
 	rest := strings.TrimPrefix(id, "meeseek-")
-	role, fruit, found := strings.Cut(rest, "-")
-	if !found || role == "" || fruit == "" || strings.Contains(fruit, "-") {
+	idx := strings.LastIndex(rest, "-")
+	if idx <= 0 || idx == len(rest)-1 {
 		return "", "", false
 	}
-	for i := 0; i < len(role); i++ {
-		if role[i] < 'a' || role[i] > 'z' {
-			return "", "", false
-		}
+	role = rest[:idx]
+	fruit = rest[idx+1:]
+	if !isValidWorkerRole(role) {
+		return "", "", false
 	}
 	if !fruitSet[fruit] {
 		return "", "", false
 	}
 	return role, fruit, true
+}
+
+func isValidWorkerRole(role string) bool {
+	if role == "" || role[0] == '-' || role[len(role)-1] == '-' {
+		return false
+	}
+	for i := 0; i < len(role); i++ {
+		c := role[i]
+		if c == '-' {
+			if i > 0 && role[i-1] == '-' {
+				return false
+			}
+			continue
+		}
+		if c < 'a' || c > 'z' {
+			return false
+		}
+	}
+	return true
 }
