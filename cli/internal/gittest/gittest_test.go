@@ -152,6 +152,24 @@ func TestQuietAppendsAfterAForeignEnvironment(t *testing.T) {
 	}
 }
 
+// TestQuietRefusesAMalformedCount — git reads the same number, so a count Quiet
+// cannot parse is a failure to surface, not a value to guess at: appending at a
+// guessed index would silently drop the pairs the caller meant to set.
+func TestQuietRefusesAMalformedCount(t *testing.T) {
+	for _, raw := range []string{"abc", "-1"} {
+		t.Run(raw, func(t *testing.T) {
+			cleanEnv(t)
+			t.Setenv(countVar, raw)
+			defer func() {
+				if recover() == nil {
+					t.Fatalf("Quiet accepted %s=%q, which git cannot read either", countVar, raw)
+				}
+			}()
+			Quiet()
+		})
+	}
+}
+
 // TestQuietRefusesNoSystem — git would skip the file that quiets a remote.
 func TestQuietRefusesNoSystem(t *testing.T) {
 	cleanEnv(t)

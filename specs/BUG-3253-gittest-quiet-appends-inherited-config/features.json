@@ -1,0 +1,30 @@
+[
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f1",
+    "behavior": "Quiet keeps every config pair the environment already carries and appends its own after them, so both the caller's keys and Quiet's apply.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietKeepsTheCallersConfig|TestQuietAppendsAfterAForeignEnvironment)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietKeepsTheCallersConfig' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietAppendsAfterAForeignEnvironment'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f2",
+    "behavior": "A second Quiet call in a re-executed test binary adds nothing: no duplicate pairs and no nested system config.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietAcceptsItsOwnKeys|TestQuietDoesNotIncludeItsOwnFile)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietAcceptsItsOwnKeys' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietDoesNotIncludeItsOwnFile'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f3",
+    "behavior": "The refusals that must survive still panic: a malformed GIT_CONFIG_COUNT and GIT_CONFIG_NOSYSTEM.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietRefusesAMalformedCount|TestQuietRefusesNoSystem)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesAMalformedCount' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesNoSystem'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f4",
+    "behavior": "The internal/cmd test binary starts and exits cleanly under the harness environment that used to abort it at TestMain.",
+    "verification": "cd cli && GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=explicit GIT_CONFIG_KEY_1=credential.interactive GIT_CONFIG_VALUE_1=never GIT_CONFIG_KEY_2=core.fsmonitor GIT_CONFIG_VALUE_2=false go test ./internal/cmd -run '^$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
