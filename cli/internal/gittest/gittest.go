@@ -49,11 +49,13 @@ const remoteKeys = "[gc]\n\tauto = 0\n[maintenance]\n\tauto = false\n[receive]\n
 // and a test binary that re-executes itself inherits them, so a second call
 // adds nothing.
 func Quiet() {
-	if err := quietSystem(); err != nil {
-		panic("gittest: " + err.Error())
-	}
+	// Validated before quietSystem writes a file and points GIT_CONFIG_SYSTEM
+	// at it, so a refused call leaves the environment as it found it.
 	caller, err := callerPairs()
 	if err != nil {
+		panic("gittest: " + err.Error())
+	}
+	if err := quietSystem(); err != nil {
 		panic("gittest: " + err.Error())
 	}
 	added := 0
@@ -77,6 +79,11 @@ func Quiet() {
 // callerPairs reads the pairs the environment already carries, so Quiet can
 // append to them rather than drop them. A missing GIT_CONFIG_COUNT means none;
 // a malformed one is refused, since git would read the same number.
+//
+// Read one pair at a time rather than preallocating the count: the count is
+// caller-controlled, so a huge one would ask for gigabytes before the first
+// pair was looked at. Reading stops at the first pair the environment does not
+// carry, which is also what git refuses (a count promising keys it cannot read).
 func callerPairs() ([][2]string, error) {
 	raw, ok := os.LookupEnv(countVar)
 	if !ok {
@@ -86,12 +93,15 @@ func callerPairs() ([][2]string, error) {
 	if err != nil || n < 0 {
 		return nil, errors.New(countVar + " is not a non-negative integer: " + raw)
 	}
-	pairs := make([][2]string, n)
-	for i := range pairs {
-		pairs[i] = [2]string{
-			os.Getenv(keyVar + strconv.Itoa(i)),
-			os.Getenv(valueVar + strconv.Itoa(i)),
+	var pairs [][2]string
+	for i := 0; i < n; i++ {
+		suffix := strconv.Itoa(i)
+		key, hasKey := os.LookupEnv(keyVar + suffix)
+		value, hasValue := os.LookupEnv(valueVar + suffix)
+		if !hasKey || !hasValue {
+			return nil, errors.New(countVar + " is " + raw + " but " + keyVar + suffix + " is not set")
 		}
+		pairs = append(pairs, [2]string{key, value})
 	}
 	return pairs, nil
 }

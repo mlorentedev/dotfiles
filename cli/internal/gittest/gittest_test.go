@@ -152,6 +152,64 @@ func TestQuietAppendsAfterAForeignEnvironment(t *testing.T) {
 	}
 }
 
+// TestQuietOutranksAConflictingCallerPair — the precedence the spec claims in
+// Risks, and the only case where "applies on top" is observable: a caller pair
+// on a key Quiet also sets. git applies the pairs in index order, so the pair
+// Quiet appends last must be the one a child reads. A caller pair on a key
+// Quiet does not set (TestQuietAppendsAfterAForeignEnvironment) cannot show
+// this — where the keys differ, "on top" has no effect to see.
+func TestQuietOutranksAConflictingCallerPair(t *testing.T) {
+	cleanEnv(t)
+	conflicting := [][2]string{
+		{"gc.auto", "1"},
+		{"maintenance.auto", "true"},
+	}
+	t.Setenv(countVar, strconv.Itoa(len(conflicting)))
+	for i, pair := range conflicting {
+		t.Setenv(keyVar+strconv.Itoa(i), pair[0])
+		t.Setenv(valueVar+strconv.Itoa(i), pair[1])
+	}
+	Quiet()
+	for _, pair := range quietPairs {
+		if got := gitConfig(t, t.TempDir(), pair[0], nil); got != pair[1] {
+			t.Errorf("%s = %q, want %q: the caller's conflicting pair outranked Quiet's", pair[0], got, pair[1])
+		}
+	}
+	if got, want := os.Getenv(countVar), strconv.Itoa(len(conflicting)+len(quietPairs)); got != want {
+		t.Errorf("%s = %q, want %q (%d caller pairs + %d appended)", countVar, got, want, len(conflicting), len(quietPairs))
+	}
+}
+
+// TestQuietRefusesBeforeItTouchesTheEnvironment — a count Quiet cannot use is
+// refused before quietSystem writes a file and points GIT_CONFIG_SYSTEM at it,
+// so a refused call leaves the environment as it found it. The count is
+// caller-controlled: one that promises pairs the environment does not carry is
+// refused the way git refuses it, and a huge one costs nothing to reject.
+func TestQuietRefusesBeforeItTouchesTheEnvironment(t *testing.T) {
+	for name, count := range map[string]string{
+		"malformed count": "abc",
+		"missing pair":    "1",
+		"huge count":      "1000000000",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cleanEnv(t)
+			t.Setenv(countVar, count)
+			before := os.Getenv(systemVar)
+			func() {
+				defer func() {
+					if recover() == nil {
+						t.Fatalf("Quiet accepted %s=%q", countVar, count)
+					}
+				}()
+				Quiet()
+			}()
+			if got := os.Getenv(systemVar); got != before {
+				t.Errorf("%s = %q after a refused Quiet, want %q: the refusal is not side-effect free", systemVar, got, before)
+			}
+		})
+	}
+}
+
 // TestQuietRefusesAMalformedCount — git reads the same number, so a count Quiet
 // cannot parse is a failure to surface, not a value to guess at: appending at a
 // guessed index would silently drop the pairs the caller meant to set.

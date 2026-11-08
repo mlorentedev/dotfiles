@@ -40,6 +40,10 @@ owner: manu
 - [x] Lint passes (`gofmt -l` clean on Linux CI; CRLF makes the local signal unusable on Windows)
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
+- [x] Adversarial review round 1 dispositions applied (`review.md`, verdict FAIL: one REAL Major + two code Minors)
+- [x] `TestQuietOutranksAConflictingCallerPair` — the Major: a caller pair on a key Quiet also sets, asserting Quiet's value is what a child reads
+- [x] `TestQuietRefusesBeforeItTouchesTheEnvironment` — the two Minors: refusal ordered before `quietSystem` writes anything, and the count read pair-by-pair so a huge one costs nothing
+- [ ] Adversarial review round 2 (a REAL Major requires re-review; round 1 is superseded)
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features

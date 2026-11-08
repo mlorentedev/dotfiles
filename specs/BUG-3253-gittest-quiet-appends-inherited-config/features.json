@@ -1,8 +1,8 @@
 [
   {
     "id": "BUG-3253-gittest-quiet-appends-inherited-config-f1",
-    "behavior": "Quiet keeps every config pair the environment already carries and appends its own after them, so both the caller's keys and Quiet's apply.",
-    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietKeepsTheCallersConfig|TestQuietAppendsAfterAForeignEnvironment)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietKeepsTheCallersConfig' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietAppendsAfterAForeignEnvironment'",
+    "behavior": "Quiet keeps every config pair the environment already carries and appends its own after them, so both the caller's keys and Quiet's apply — including where the caller pins the same key to the opposite value, which is the only case where precedence is observable.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietKeepsTheCallersConfig|TestQuietAppendsAfterAForeignEnvironment|TestQuietOutranksAConflictingCallerPair)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietKeepsTheCallersConfig' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietAppendsAfterAForeignEnvironment' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietOutranksAConflictingCallerPair'",
     "state": "pending",
     "evidence": ""
   },
@@ -15,8 +15,8 @@
   },
   {
     "id": "BUG-3253-gittest-quiet-appends-inherited-config-f3",
-    "behavior": "The refusals that must survive still panic: a malformed GIT_CONFIG_COUNT and GIT_CONFIG_NOSYSTEM.",
-    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietRefusesAMalformedCount|TestQuietRefusesNoSystem)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesAMalformedCount' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesNoSystem'",
+    "behavior": "The refusals that must survive still panic — a malformed GIT_CONFIG_COUNT, a count promising a pair the environment does not carry, a count too large to be real, and GIT_CONFIG_NOSYSTEM — and a refused call leaves the environment as it found it.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietRefusesAMalformedCount|TestQuietRefusesBeforeItTouchesTheEnvironment|TestQuietRefusesNoSystem)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesAMalformedCount' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesBeforeItTouchesTheEnvironment' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesNoSystem'",
     "state": "pending",
     "evidence": ""
   },
