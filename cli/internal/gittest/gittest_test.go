@@ -1,6 +1,7 @@
 package gittest
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -252,6 +253,102 @@ func TestQuietRefusesAMalformedCount(t *testing.T) {
 			defer func() {
 				if recover() == nil {
 					t.Fatalf("Quiet accepted %s=%q, which git cannot read either", countVar, raw)
+				}
+			}()
+			Quiet()
+		})
+	}
+}
+
+// gitEnv is the process environment with every GIT_CONFIG_* variable dropped,
+// then the count form under test and one pair for git to read.
+func gitEnv(raw string) []string {
+	env := make([]string, 0, len(os.Environ())+3)
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "GIT_CONFIG_") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env, countVar+"="+raw, keyVar+"0=gittestdemo.caller", valueVar+"0=kept")
+}
+
+// gitReadsCount reports whether git reads a count form without failing. A form
+// git reads as zero finds no key and exits 1, which is still a read rather than
+// a refusal, so only an exit past 1 means git rejected the count.
+func gitReadsCount(t *testing.T, raw string) bool {
+	t.Helper()
+	c := exec.Command("git", "config", "--get-all", "gittestdemo.caller")
+	c.Env = gitEnv(raw)
+	err := c.Run()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return exit.ExitCode() == 1
+	}
+	return err == nil
+}
+
+// TestQuietReadsTheCountTheWayGitDoes — refusing means panicking, and that
+// aborts the test binary, which is the #3253 symptom, so Quiet may only refuse
+// a count git refuses too. git treats an empty value as no pairs, skips leading
+// whitespace, and then reads one decimal integer that has to end the value.
+// Assert the two agree form by form rather than against a table that could
+// drift away from git.
+func TestQuietReadsTheCountTheWayGitDoes(t *testing.T) {
+	forms := []string{"", "0", "1", " 1", "\t1", "+1", "01", "1 ", "-1", "0x1", " ", "abc", "1a"}
+	for _, raw := range forms {
+		t.Run(strconv.Quote(raw), func(t *testing.T) {
+			cleanEnv(t)
+			gitReads := gitReadsCount(t, raw)
+			// The pair is complete, so the only thing left to refuse is the
+			// count itself: a count git reads as one finds this pair, and a
+			// count it reads as zero ignores it.
+			t.Setenv(countVar, raw)
+			t.Setenv(keyVar+"0", "gittestdemo.caller")
+			t.Setenv(valueVar+"0", "kept")
+			func() {
+				defer func() {
+					r := recover()
+					if gitReads && r != nil {
+						t.Errorf("Quiet refused %s=%s, which git reads: %v", countVar, strconv.Quote(raw), r)
+					}
+					if !gitReads && r == nil {
+						t.Fatalf("Quiet accepted %s=%s, which git cannot read", countVar, strconv.Quote(raw))
+					}
+				}()
+				Quiet()
+			}()
+		})
+	}
+}
+
+// TestQuietNamesTheVariableThatIsMissing — the refusal exists so the operator
+// can see the caller's bug, so it has to name the half of the pair that is
+// actually absent rather than always the key.
+func TestQuietNamesTheVariableThatIsMissing(t *testing.T) {
+	for name, tc := range map[string]struct {
+		setKey, setValue bool
+		wantVar          string
+	}{
+		"key absent":   {setValue: true, wantVar: keyVar},
+		"value absent": {setKey: true, wantVar: valueVar},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cleanEnv(t)
+			t.Setenv(countVar, "1")
+			if tc.setKey {
+				t.Setenv(keyVar+"0", "gittestdemo.caller")
+			}
+			if tc.setValue {
+				t.Setenv(valueVar+"0", "kept")
+			}
+			defer func() {
+				r := recover()
+				if r == nil {
+					t.Fatalf("Quiet accepted an incomplete pair: %s0 set=%v, %s0 set=%v", keyVar, tc.setKey, valueVar, tc.setValue)
+				}
+				if msg, ok := r.(string); !ok || !strings.Contains(msg, tc.wantVar+"0") {
+					t.Errorf("panic = %v, want a string naming %s0: it points at the wrong half of the pair", r, tc.wantVar)
 				}
 			}()
 			Quiet()

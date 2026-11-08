@@ -1,7 +1,7 @@
 ---
 id: "BUG-3253-gittest-quiet-appends-inherited-config"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-07"
 issue: "mlorentedev/dotfiles#3253"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

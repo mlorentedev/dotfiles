@@ -18,7 +18,7 @@ owner: manu
 
 ## Test status
 
-- `go test ./internal/gittest -run '^TestQuiet' -v -count=1` with `GIT_CONFIG_COUNT=3` in the environment -> 12 tests PASS, `ok ... 6.014s`.
+- `go test ./internal/gittest -run '^TestQuiet' -v -count=1` with `GIT_CONFIG_COUNT=3` in the environment -> 14 top-level tests PASS, `ok ... 8.993s`.
 - `go test ./internal/cmd -count=1` with `GIT_CONFIG_COUNT=3` in the environment -> the binary starts and runs its tests instead of aborting in `TestMain`; the package itself cannot finish inside the default timeout on this host (see the suite note below, measured cause).
 - Feature predicates: all four `features.json` entries ran under bash with every `GIT_CONFIG_*` cleared -> `PASS` x4, exit 0.
 - **A/B control:** with the harness environment intact, `git stash push` of the change makes `go test ./internal/cmd` panic at `gittest.go:50`; `git stash pop` restores exit 0. The panic is the bug, and it is the only difference between the two runs.
@@ -73,6 +73,25 @@ sees the corrected contract set.
 | pr-agent **THEORETICAL** — `make([][2]string, n)` from a caller-controlled count | **Already fixed in `fc3f37c4`.** |
 | Both bots class the duplicate-key trigger as unrealistic ("requires a harness that sets the same key twice") | **Severity accepted, skip rejected.** The guard's contract is "each git this process starts is quiet"; it should hold for the input rather than for today's harnesses, and the fix was one helper plus one test. |
 
+## Review dispositions (round 3 — `review.md`, verdict PASS-WITH-GAPS)
+
+Signed by `nan/deepseek-v4-flash` against `670e6529`. No Blocker, no REAL Major,
+no failing rubric item (Correctness B, Verification B, Scope A, Reliability B,
+Maintainability A, Handoff-readiness B). It was the third launch: the first
+stalled at the default 10m transcript window and the second was stopped at the
+45m deadline mid-analysis. Neither wrote a verdict, and neither provisional is
+kept here — an unsigned PENDING artifact with no findings is not a review, and
+the transcript for both is gitignored. The third finished inside
+`--timeout 75m`.
+
+| Finding | Disposition |
+|---|---|
+| **Major (THEORETICAL)** — `Quiet` refused two environments git reads without error: `GIT_CONFIG_COUNT=""` (git: zero pairs) and `GIT_CONFIG_COUNT=" 3"` (git skips leading whitespace), so the proposal's "git would read the same number and fail" was false for those two forms. `UNTESTED`. | **Fixed.** git's parser was probed directly rather than assumed — 13 forms, one pair present, `git config --get-all` as the oracle: `""` reads as zero pairs and resolves nothing (exit 1, no output); `"1"`, `" 1"`, `"\t1"`, `"+1"`, `"01"`, `"0001"` all resolve the pair; `"1 "` is `error: bogus count in GIT_CONFIG_COUNT` (exit 128); `"-1"` is `error: too many entries` (exit 128); `"0x1"`, `" "`, `"abc"`, `"1a"` are bogus counts. `parseCount` now reproduces that: empty is zero, one `Atoi` after `TrimLeft` of the C whitespace set, and a refusal on error or a negative. `TestQuietReadsTheCountTheWayGitDoes` is differential — it asks git per form and asserts `Quiet` agrees — so the table cannot drift from git the way a hand-written one would. A/B control: with `parseCount` reverted to a bare `strconv.Atoi(raw)` the test fails on exactly `""`, `" 1"` and `"\t1"`, and the file was restored byte-identical afterwards. |
+| **Minor (REAL)** — the missing-pair refusal always named `GIT_CONFIG_KEY_<i>`, so an absent `GIT_CONFIG_VALUE_0` produced "but GIT_CONFIG_KEY_0 is not set". | **Fixed.** The single `!hasKey || !hasValue` branch is split, and each names the variable that is actually absent. `TestQuietNamesTheVariableThatIsMissing` covers both halves and asserts the message contains the expected name, so it fails on the old single-branch form. |
+| **Minor (REAL)** — `ResolveReviewBaseDetail` returns the parent of the commit that *added* the spec folder, which lands after the implementation whenever the spec is committed later than the first code commit, hiding the production diff. Both rounds had to widen the base by hand. | **Deferred to its own ticket, not fixed here.** `cli/internal/spec/review_request.go` is a different subsystem with its own tests and its own failure modes; changing it inside a `gittest` bugfix would put an unreviewed behaviour change in a PR whose verdict covers only the `gittest` diff. The reviewer's own note agrees ("not this change"). The procedural workaround — `dotf spec init` before the first code commit — is recorded in the round-1 table above, and the prompt already states the base so a reviewer can widen from it. |
+| **Minor (REAL)** — `tasks.md` says the round-1 verdict was recorded in `review.md`, but the harness renamed it to `review-round1.md`. | **Accepted into the archive.** `tasks.md` is a contract file: editing prose in it changes its digest and invalidates the round-3 verdict, forcing a fourth ~50-minute round to fix a stale filename in a historical note. The accurate pointer is this document, which is not in the contract set and is read first at archive time. |
+| **Minor (REAL)** — the PR head was `f87a8731`, two commits behind, so the green CI never ran the reviewed code, and the PR body still claimed 9 tests. | **Resolved by the push in this change**, together with a PR-body refresh: 14 `TestQuiet*` tests now, and the reviewed SHA is the branch head. |
+
 ## Decisions made during implementation
 
 - **Append, not overwrite and not refuse.** Overwriting would drop keys a harness
@@ -98,7 +117,7 @@ sees the corrected contract set.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-3253-gittest-quiet-appends-inherited-config/` -> `specs/archive/BUG-3253-gittest-quiet-appends-inherited-config/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-3253-gittest-quiet-appends-inherited-config/` -> `specs/archive/BUG-3253-gittest-quiet-appends-inherited-config/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)

@@ -81,7 +81,8 @@ func Quiet() {
 
 // callerPairs reads the pairs the environment already carries, so Quiet can
 // append to them rather than drop them. A missing GIT_CONFIG_COUNT means none;
-// a malformed one is refused, since git would read the same number.
+// a value git would not read is refused (parseCount), so a refusal here always
+// means git would have failed on the same environment.
 //
 // Read one pair at a time rather than preallocating the count: the count is
 // caller-controlled, so a huge one would ask for gigabytes before the first
@@ -92,21 +93,44 @@ func callerPairs() ([][2]string, error) {
 	if !ok {
 		return nil, nil
 	}
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < 0 {
-		return nil, errors.New(countVar + " is not a non-negative integer: " + raw)
+	n, err := parseCount(raw)
+	if err != nil {
+		return nil, err
 	}
 	var pairs [][2]string
 	for i := 0; i < n; i++ {
 		suffix := strconv.Itoa(i)
 		key, hasKey := os.LookupEnv(keyVar + suffix)
 		value, hasValue := os.LookupEnv(valueVar + suffix)
-		if !hasKey || !hasValue {
+		// Name the half that is actually absent: the refusal exists so the
+		// operator can see the caller's bug, and pointing at the pair that is
+		// present sends them to fix the wrong one.
+		if !hasKey {
 			return nil, errors.New(countVar + " is " + raw + " but " + keyVar + suffix + " is not set")
+		}
+		if !hasValue {
+			return nil, errors.New(countVar + " is " + raw + " but " + valueVar + suffix + " is not set")
 		}
 		pairs = append(pairs, [2]string{key, value})
 	}
 	return pairs, nil
+}
+
+// parseCount reads GIT_CONFIG_COUNT the way git does, so a count git accepts is
+// never refused: refusing means panicking, which aborts the test binary that is
+// the #3253 symptom. git treats an empty value as no pairs, skips leading
+// whitespace, and then reads one decimal integer that has to end the value.
+// Anything else is "bogus count" to git, and a negative or oversized value is
+// refused as too many entries, which strconv reports as a sign or an overflow.
+func parseCount(raw string) (int, error) {
+	if raw == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(strings.TrimLeft(raw, " \t\n\v\f\r"))
+	if err != nil || n < 0 {
+		return 0, errors.New(countVar + " is not a non-negative integer: " + raw)
+	}
+	return n, nil
 }
 
 // lastValue is the value git resolves for key from pairs, reporting false when
