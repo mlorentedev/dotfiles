@@ -209,3 +209,33 @@ func TestLaneSwitchRoutingAndWIPCap(t *testing.T) {
 		t.Errorf("lane3 = %q, want %q", lane3, LaneFastTrack)
 	}
 }
+
+func TestLaneInitExcludesMetadataThroughTheCommonGitDir(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+
+	// A linked worktree's .git is a pointer FILE, so resolving info/exclude as
+	// <repo>/.git/info/exclude names a path that cannot exist and the exclusion
+	// silently did nothing there — BUG-043's shape, on the Go side. Init from
+	// the linked worktree: it must not fail, and the exclusion must land in the
+	// COMMON dir, which is the one git actually reads.
+	linked := filepath.Join(t.TempDir(), "linked")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "side", linked)
+
+	if _, err := InitLanes(linked, wtRoot); err != nil {
+		t.Fatalf("InitLanes from a linked worktree failed: %v", err)
+	}
+
+	common := runGitLaneTest(t, linked, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	data, err := os.ReadFile(filepath.Join(common, "info", "exclude"))
+	if err != nil {
+		t.Fatalf("reading %s/info/exclude: %v", common, err)
+	}
+	for _, name := range []string{worktree.MetadataFileName, PromptFile} {
+		if !strings.Contains(string(data), name) {
+			t.Errorf("the common dir's info/exclude is missing %q:\n%s", name, data)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(linked, ".git", "info", "exclude")); err == nil {
+		t.Errorf("%s/.git is a pointer file; the exclusion was written there instead of the common dir", linked)
+	}
+}

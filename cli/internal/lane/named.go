@@ -91,9 +91,22 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 		return 0, fmt.Errorf("lane init: mkdir %s: %w", repoWTRoot, err)
 	}
 
-	gitCommonDir := filepath.Join(absRepo, ".git")
-	_ = excludeFile(gitCommonDir, worktree.MetadataFileName)
-	_ = excludeFile(gitCommonDir, PromptFile)
+	// info/exclude lives in the COMMON git dir, not in <repo>/.git: in a linked
+	// worktree that path is a pointer FILE, so the exclusion silently did
+	// nothing there and the metadata showed up as untracked — the BUG-043 shape
+	// on the Go side. Both errors are returned rather than discarded: a missing
+	// exclusion makes every `git status` dirty, and the marker below is written
+	// only after this succeeds, so a failed init leaves the lane guard INACTIVE
+	// instead of half-configured.
+	gitCommonDir, err := resolveGitCommonDir(absRepo)
+	if err != nil {
+		return 0, err
+	}
+	for _, name := range []string{worktree.MetadataFileName, PromptFile} {
+		if err := excludeFile(gitCommonDir, name); err != nil {
+			return 0, err
+		}
+	}
 
 	if _, err := writeLanesMarker(absRepo); err != nil {
 		return 0, err
@@ -110,6 +123,22 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 		}
 	}
 	return changed, nil
+}
+
+// resolveGitCommonDir answers the repository's shared git directory — where
+// info/exclude lives — for a main checkout, a linked worktree and a bare repo
+// alike. --path-format=absolute keeps a relative answer from being joined to
+// the wrong base (git answers `.git` for an ordinary checkout).
+func resolveGitCommonDir(repo string) (string, error) {
+	out, err := exec.Command("git", "-C", repo, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
+	if err != nil {
+		return "", fmt.Errorf("lane init: resolving the git common dir of %s: %w", repo, err)
+	}
+	common := strings.TrimSpace(string(out))
+	if common == "" {
+		return "", fmt.Errorf("lane init: git reported no common dir for %s", repo)
+	}
+	return common, nil
 }
 
 // provisionLane makes the lane at lanePath exist detached at baseRef and carry
