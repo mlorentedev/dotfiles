@@ -90,6 +90,18 @@ Knowledge added: `docs/runbooks/guide-persistent-named-lanes.md` (layer model, m
 decision flow, lane lifecycle, use cases, activation checklist, agnostic validation runbook) and
 `docs/lessons/lesson-569-generate-test-fixtures-from-the-writer-not-by-hand.md`.
 
+## Review-fix evidence (Batch 6 — independent adversarial review)
+
+`specs/HARNESS-186-named-lanes-sticky-personas/review.md` (reviewer `agy/gemini-3.8-flash-high`, `reviewed_sha d6c552a6`, verdict PASS-WITH-GAPS) raised three findings. Disposition of each, applied or ticketed — none left silent:
+
+| # | Severity | Finding | Disposition |
+|---|----------|---------|-------------|
+| 1 | Major / THEORETICAL | `currentGateWorktreeContext` nested `mem.RepoIdentity` inside the `.dotf-worktree.json` branch, so a plain checkout got `branch == ""` and the sticky persona was never invalidated on a branch switch | **FIXED** — `cli/internal/cmd/harness_gate.go`: the identity lookup is hoisted out of the metadata branch. Regression test `TestCurrentGateWorktreeContextReadsBranchOutsideWorktreeMetadata` (`cli/internal/cmd/harness_gate_sticky_test.go`) builds a plain checkout with only `.git/HEAD`; red without the fix (`branch = ""`), green with it |
+| 2 | Minor / THEORETICAL | `sweepStrandedDispatchTemps` swept only `.dispatch-*.tmp` while `atomicWriteFile` also strands `.atomic-<base>-*.tmp` (persona and ledger writes) | **FIXED** — `cli/internal/harness/dispatch.go`: `isGateTempName` accepts both prefixes; test `TestSweepStrandedDispatchTempsCoversBothTempPatterns` (`cli/internal/harness/dispatch_test.go`) asserts both aged patterns go and neither a fresh temp nor a real file does. Red without the fix, green with it |
+| 3 | Minor / REAL | `Park` (92 lines), `parkSingleNamedLane` (54), `switchLaneLocked` (49) exceed the repo's `< 40` line rule | **TICKETED** — pure extraction across 195 lines of already-verified control flow, with no behavioural test to pin the extraction boundary. Doing it here would move more code than this PR's remaining budget after a 24-minute review run, for style only. Filed on the bitácora with the three call sites and the rule it breaks |
+
+`verification.md` is not one of `contractFiles` (`proposal.md`, `tasks.md`, `features.json`, `spec.md`), so recording these dispositions here does not move the contract digest and the review stays fresh for the archive gate.
+
 ## Decisions made during implementation
 
 - Added `.dotf-lane-prompt.md` to `isDisposableExactPath` in `cli/internal/worktree/clean.go` so `Dirt()` never marks a named lane dirty solely due to a handoff prompt file before `Park()` removes it.
