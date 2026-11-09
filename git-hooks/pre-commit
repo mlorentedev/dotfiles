@@ -13,9 +13,11 @@ DISPATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # 1. Global concern: block memory artifacts outside the vault.
 "$DISPATCH_DIR/lib/memory-sink-guard.sh" || exit $?
 
-# 2. Scoped lane guard: enforce persistent named lanes in .dotf/lane.json repos (HARNESS-186).
+# 2. Scoped lane guard: enforce persistent named lanes in .dotf/lanes.json repos (HARNESS-186).
+#    The guard is POSIX sh by contract, so invoke it with sh — not bash — to keep it
+#    portable to hosts without bash and to fail loudly if a bashism is reintroduced.
 if [ -f "$DISPATCH_DIR/lib/lane-guard.sh" ]; then
-  bash "$DISPATCH_DIR/lib/lane-guard.sh" || exit $?
+  sh "$DISPATCH_DIR/lib/lane-guard.sh" || exit $?
 fi
 
 # 3. Chain to the repo-local hook (shadowed by the global core.hooksPath).
