@@ -13,12 +13,13 @@ import (
 // the map's one reader, and a second parse in this package would be a second
 // place the routing rules are true — the failure model-map.json exists to end.
 type Options struct {
-	Tier    string
-	Role    string
-	Task    string
-	Cwd     string
-	Chain   []string
-	Timeout time.Duration
+	Tier     string
+	Role     string
+	WorkerID string
+	Task     string
+	Cwd      string
+	Chain    []string
+	Timeout  time.Duration
 	// Denied reports whether this machine forbids a pool. Evaluated per entry
 	// AT DISPATCH TIME rather than resolved once at config time (ADR-032 §7):
 	// otherwise a level-2 dispatch from a personal session could route work
@@ -78,6 +79,7 @@ type Record struct {
 	// HARNESS-120: before it, the role reached only the dry-run backend's echo
 	// string, so a consumer could not tell from the record which persona ran.
 	Role       string `json:"role,omitempty"`
+	WorkerID   string `json:"worker_id,omitempty"`
 	Pool       string `json:"pool"`
 	Model      string `json:"model"`
 	Exit       int    `json:"exit"`
@@ -104,7 +106,11 @@ func Dispatch(ctx context.Context, opts Options, be Backend) Record {
 		now = time.Now
 	}
 	started := now()
-	rec := Record{Tier: opts.Tier, Role: opts.Role}
+	workerID := opts.WorkerID
+	if workerID == "" && opts.Role != "" {
+		workerID = NextWorkerID(opts.Role)
+	}
+	rec := Record{Tier: opts.Tier, Role: opts.Role, WorkerID: workerID}
 
 	// ADR-032 §4: the top tier queues or escalates, it never degrades. The rule
 	// is applied to behaviour unconditionally rather than inferred from the map
@@ -159,7 +165,7 @@ func Dispatch(ctx context.Context, opts Options, be Backend) Record {
 		}
 
 		resp, timedOut := attempt(ctx, opts, be, Request{
-			Pool: pool, Model: model, Role: opts.Role, Task: opts.Task,
+			Pool: pool, Model: model, Role: opts.Role, WorkerID: workerID, Task: opts.Task,
 			Cwd: opts.Cwd, Timeout: opts.Timeout,
 		}, slot)
 

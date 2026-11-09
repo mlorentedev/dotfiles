@@ -310,3 +310,86 @@ const ThreadsDir = threadsDir
 // name StoreThreadAs writes. A reader that must find a thread's file derives
 // the name here, so it cannot disagree with the writer.
 func ThreadFileName(key string) (string, error) { return threadFileName(key) }
+
+// ArchiveAndPruneThread moves memory/threads/<sanitized-branch>.md into
+// memory/archive/ and prunes its entry from MEMORY.md under LockHandoffMemory
+// when a persistent named lane parks its merged branch (HARNESS-186).
+func ArchiveAndPruneThread(projectDir, branch string) error {
+	if strings.TrimSpace(projectDir) == "" || strings.TrimSpace(branch) == "" {
+		return nil
+	}
+	memDir := filepath.Join(projectDir, "memory")
+	memoryPath := filepath.Join(memDir, "MEMORY.md")
+	unlock, err := LockHandoffMemory(memoryPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	key := sanitizeThread(branch)
+	if key == "" || key == "main" || key == "master" {
+		return nil
+	}
+
+	archiveDir := filepath.Join(memDir, "archive")
+	threadsPath := filepath.Join(memDir, threadsDir)
+	if entries, err := os.ReadDir(threadsPath); err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			if name == key+".md" || strings.HasPrefix(name, key+"+") && strings.HasSuffix(name, ".md") {
+				if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+					return err
+				}
+				src := filepath.Join(threadsPath, name)
+				dst := filepath.Join(archiveDir, name)
+				if err := os.Rename(src, dst); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	raw, err := os.ReadFile(memoryPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	pruned, changed := pruneThreadFromMemory(string(raw), key)
+	if !changed {
+		return nil
+	}
+	return ReplaceFile(memoryPath, pruned, 0o644)
+}
+
+func pruneThreadFromMemory(content, key string) (string, bool) {
+	lines := strings.Split(content, "\n")
+	changed := false
+	for {
+		start, end := handoffSection(lines)
+		if start < 0 {
+			break
+		}
+		foundStart, foundEnd := -1, -1
+		for i := start + 1; i < end; i++ {
+			hk, ok := threadHeadingKey(lines[i])
+			if !ok {
+				continue
+			}
+			if hk == key || strings.HasPrefix(hk, key+"+") {
+				foundStart, foundEnd = threadSpan(lines, start, end, hk)
+				break
+			}
+		}
+		if foundStart < 0 {
+			break
+		}
+		lines = append(lines[:foundStart], lines[foundEnd:]...)
+		changed = true
+	}
+	return strings.Join(lines, "\n"), changed
+}

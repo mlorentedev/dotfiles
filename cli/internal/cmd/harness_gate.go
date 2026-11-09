@@ -10,8 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/agent"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/harness"
+	"github.com/mlorentedev/dotfiles/cli/internal/mem"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // gateExitBlock is the exit code every harness reads as "stop this tool call".
@@ -74,162 +77,7 @@ A blocked call is answered "deny" with the reason.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			payload, _ := io.ReadAll(cmd.InOrStdin())
-			if stateDir == "" {
-				dir, err := env.StateDir()
-				if err != nil {
-					// Fail open, like an unreadable payload: a gate that blocks on
-					// its own setup blocks every call. Nothing can be recorded
-					// without a state dir, so the reason goes to stderr.
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow:", err)
-					return gateAnswer(cmd.OutOrStdout(), harnessName, false, "")
-				}
-				stateDir = dir
-			}
-			// One closure, used by every exit below, because the requirement is
-			// that NO path returns without leaving a record. Writing it at each
-			// `return` is how the three early paths came to leave none: each was
-			// individually correct, and the omission existed only in aggregate —
-			// the same shape as the defect this spec started from.
-			record := func(scope string, rec harness.DecisionRecord) {
-				rec.Harness = harnessName
-				rec.Scope = scope
-				_ = harness.RecordDecision(harness.DecisionPath(stateDir, scope), rec)
-			}
-
-			// Every return below goes through gateAnswer; see there.
-			finish := func(block bool, reason string) error {
-				return gateAnswer(cmd.OutOrStdout(), harnessName, block, reason)
-			}
-
-			call, understood := normaliseToolCall(harnessName, payload)
-			if !understood {
-				record(harness.UnparsedScope, harness.DecisionRecord{
-					Outcome:      harness.OutcomePayloadUnrecognised,
-					Allowed:      true,
-					Reason:       "payload not recognised",
-					PayloadBytes: len(payload),
-				})
-				// MEASURED 2026-08-26: this branch is why it exists. Without
-				// it a malformed payload produced a zero ToolCall, Decide saw
-				// a valid persona with nothing consumed, and the gate BLOCKED
-				// — the opposite of the documented contract, and invisible to
-				// unit tests that call Decide directly. A gate that blocks on
-				// input it cannot read blocks on every harness upgrade.
-				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: payload not recognised")
-				return finish(false, "")
-			}
-			// Scoped to the acting persona when the harness names one: a subagent
-			// reuses the parent session id, so keying by session alone would let one
-			// persona's skill runs satisfy another's gate.
-			scope := call.ConsumptionScope()
-			statePath := harness.StatePath(stateDir, scope)
-			// A payload that named no session has no scope: nothing durable may be
-			// keyed by it (StatePath and DispatchPath hand back no path), and the
-			// journal files it under its own name instead of the digest of "".
-			unscoped := scope == ""
-			journalScope := scope
-			if unscoped {
-				journalScope = harness.UnscopedScope
-			}
-
-			// Every record from here carries what the harness said was acting.
-			// THIS IS WHAT CONVERTS agent_type FROM INFERRED TO MEASURED: it is
-			// read straight off the payload, before any persona lookup, so even
-			// the skill path below — which returns before that lookup — leaves
-			// evidence that the field arrived and of what it contained.
-			base := harness.DecisionRecord{
-				Session:   call.SessionID,
-				AgentType: call.AgentType,
-				AgentID:   call.AgentID,
-				Tool:      call.Tool,
-			}
-
-			// HARNESS-109: if THIS call is a dispatch, remember what it
-			// dispatched before deciding anything about it. PreToolUse is
-			// synchronous, so this write completes before the child exists —
-			// the ordering the whole mechanism rests on, and the reason it
-			// happens here rather than on some later event. The error is
-			// ignored for RecordConsumed's reason: losing the entry costs
-			// enforcement for one subagent, while failing here would block a
-			// session over a full disk.
-			if call.DispatchType != "" {
-				_ = harness.RecordDispatch(
-					harness.DispatchPath(stateDir, call.SessionID),
-					call.DispatchName, call.DispatchType)
-			}
-
-			if rec, ok := skillCallRecord(call, base, unscoped, statePath); ok {
-				record(journalScope, rec)
-				if rec.Outcome == harness.OutcomeSkillUnnamed {
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
-				}
-				return finish(false, "")
-			}
-
-			requested := effectiveRole(role, call.AgentType)
-			// Whether the operator NAMED the role decides which source is
-			// authoritative below. A --role flag is a human's explicit
-			// instruction and outranks anything the payload implies; a
-			// payload-derived role is a caller-supplied string the dispatch map
-			// can correct.
-			fromFlag := strings.TrimSpace(role) != ""
-			dispatched := harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID))
-			persona, resolution := loadGatePersona(cmd.ErrOrStderr(), repoRoot, requested, dispatched, fromFlag)
-
-			// A persona is in scope and the payload named no session: there is no
-			// ledger to consult, and consulting an empty one would BLOCK - a blocked
-			// call can never record the skill that would satisfy it, so the persona
-			// would be stuck for good. Enforcement is impossible here, so allow, and
-			// say so in the journal and on stderr rather than passing for healthy.
-			if unscoped && persona != nil {
-				rec := base
-				rec.RoleRequested = requested
-				rec.RoleResolved = persona.Name
-				rec.Outcome = harness.OutcomeSessionUnscoped
-				rec.Allowed = true
-				rec.Reason = fmt.Sprintf("persona %q in scope but the payload named no session: nothing to scope consumption to, so nothing is enforced", persona.Name)
-				record(journalScope, rec)
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] allow: %s\n", rec.Reason)
-				return finish(false, "")
-			}
-
-			result := harness.Decide(harness.GateInput{
-				Persona:  persona,
-				Call:     call,
-				Consumed: harness.LoadConsumed(statePath),
-			})
-
-			rec := base
-			rec.RoleRequested = requested
-			rec.Reason = result.Reason
-			rec.Warned = result.Warned
-			rec.Missing = result.Missing
-			rec.Allowed = result.Decision != harness.Block
-			if persona != nil {
-				rec.RoleResolved = persona.Name
-			}
-			rec.Outcome = gateOutcome(resolution, result)
-			// Written before the return below, not after: the block path used to
-			// call os.Exit, which runs no defers, so a record deferred past it
-			// would be the one decision never written — the only one anybody
-			// would go looking for.
-			record(journalScope, rec)
-
-			for _, w := range result.Warned {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] warn: %s not consumed\n", w)
-			}
-			if result.Decision == harness.Block {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] blocked: %s\n", result.Reason)
-				// withExitCode rather than os.Exit, which is what this called
-				// before. The status is identical — main resolves it through
-				// ExitCode — but os.Exit kills the test runner, so the ONE path
-				// that matters most could never be driven end to end in process.
-				// The command sets SilenceErrors, so main prints nothing extra
-				// and the reason a human reads is still the line above.
-				return finish(true, result.Reason)
-			}
-			return finish(false, "")
+			return runHarnessGate(cmd, harnessName, role, repoRoot, stateDir)
 		},
 	}
 
@@ -238,6 +86,170 @@ A blocked call is answered "deny" with the reason.`,
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "root containing harness/agents (default: the deploy dir, else the checkout)")
 	cmd.Flags().StringVar(&stateDir, "state-dir", "", "where per-session consumption is recorded")
 	return cmd
+}
+
+func runHarnessGate(cmd *cobra.Command, harnessName, role, repoRoot, stateDir string) error {
+	payload, _ := io.ReadAll(cmd.InOrStdin())
+	if stateDir == "" {
+		dir, err := env.StateDir()
+		if err != nil {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow:", err)
+			return gateAnswer(cmd.OutOrStdout(), harnessName, false, "")
+		}
+		stateDir = dir
+	}
+	record := func(scope string, rec harness.DecisionRecord) {
+		rec.Harness = harnessName
+		rec.Scope = scope
+		_ = harness.RecordDecision(harness.DecisionPath(stateDir, scope), rec)
+	}
+	finish := func(block bool, reason string) error {
+		return gateAnswer(cmd.OutOrStdout(), harnessName, block, reason)
+	}
+
+	call, understood := normaliseToolCall(harnessName, payload)
+	if !understood {
+		record(harness.UnparsedScope, harness.DecisionRecord{
+			Outcome:      harness.OutcomePayloadUnrecognised,
+			Allowed:      true,
+			Reason:       "payload not recognised",
+			PayloadBytes: len(payload),
+		})
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: payload not recognised")
+		return finish(false, "")
+	}
+	scope := call.ConsumptionScope()
+	statePath := harness.StatePath(stateDir, scope)
+	unscoped := scope == ""
+	journalScope := scope
+	if unscoped {
+		journalScope = harness.UnscopedScope
+	}
+
+	base := harness.DecisionRecord{
+		Session:   call.SessionID,
+		AgentType: call.AgentType,
+		AgentID:   call.AgentID,
+		Tool:      call.Tool,
+	}
+
+	if call.DispatchType != "" {
+		_ = harness.RecordDispatch(
+			harness.DispatchPath(stateDir, call.SessionID),
+			call.DispatchName, call.DispatchType)
+	}
+
+	currentBranch, wtPersona := resolveGateContextForRepo(repoRoot)
+	if handled, err := handleGateSkillCall(cmd, call, base, unscoped, stateDir, scope, currentBranch, statePath, journalScope, record, finish); handled {
+		return err
+	}
+
+	requested, persona, resolution := resolveAndBindGatePersona(cmd.ErrOrStderr(), role, call, repoRoot, stateDir, scope, currentBranch, wtPersona, unscoped)
+	if unscoped && persona != nil {
+		rec := base
+		rec.RoleRequested = requested
+		rec.RoleResolved = persona.Name
+		rec.Outcome = harness.OutcomeSessionUnscoped
+		rec.Allowed = true
+		rec.Reason = fmt.Sprintf("persona %q in scope but the payload named no session: nothing to scope consumption to, so nothing is enforced", persona.Name)
+		record(journalScope, rec)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] allow: %s\n", rec.Reason)
+		return finish(false, "")
+	}
+
+	return evaluateGateDecision(cmd, base, requested, persona, resolution, call, statePath, journalScope, record, finish)
+}
+
+func resolveGateContextForRepo(repoRoot string) (string, string) {
+	workDir := repoRoot
+	if workDir == "" {
+		workDir, _ = os.Getwd()
+	}
+	return currentGateWorktreeContext(workDir)
+}
+
+func handleGateSkillCall(
+	cmd *cobra.Command,
+	call harness.ToolCall,
+	base harness.DecisionRecord,
+	unscoped bool,
+	stateDir, scope, currentBranch, statePath, journalScope string,
+	record func(string, harness.DecisionRecord),
+	finish func(bool, string) error,
+) (bool, error) {
+	rec, ok := skillCallRecord(call, base, unscoped, statePath)
+	if !ok {
+		return false, nil
+	}
+	if !unscoped && rec.Skill != "" {
+		if inferred := inferPersonaFromSkill(rec.Skill); inferred != "" && harness.LoadStickyPersona(harness.PersonaStatePath(stateDir, scope), currentBranch) == "" {
+			_ = harness.BindStickyPersona(harness.PersonaStatePath(stateDir, scope), inferred, currentBranch)
+		}
+	}
+	record(journalScope, rec)
+	if rec.Outcome == harness.OutcomeSkillUnnamed {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "[gate] allow: skill invocation with no readable name")
+	}
+	return true, finish(false, "")
+}
+
+func resolveAndBindGatePersona(
+	warn io.Writer,
+	role string,
+	call harness.ToolCall,
+	repoRoot, stateDir, scope, currentBranch, wtPersona string,
+	unscoped bool,
+) (string, *harness.Persona, roleResolution) {
+	requested := effectiveRoleWithSticky(role, call.AgentType, stateDir, scope, currentBranch)
+	if requested == "" && wtPersona != "" {
+		requested = wtPersona
+	}
+	fromFlag := strings.TrimSpace(role) != ""
+	dispatched := harness.LoadDispatched(harness.DispatchPath(stateDir, call.SessionID))
+	persona, resolution := loadGatePersona(warn, repoRoot, requested, dispatched, fromFlag)
+	if persona != nil && !unscoped {
+		_ = harness.BindStickyPersona(harness.PersonaStatePath(stateDir, scope), persona.Name, currentBranch)
+	}
+	return requested, persona, resolution
+}
+
+func evaluateGateDecision(
+	cmd *cobra.Command,
+	base harness.DecisionRecord,
+	requested string,
+	persona *harness.Persona,
+	resolution roleResolution,
+	call harness.ToolCall,
+	statePath, journalScope string,
+	record func(string, harness.DecisionRecord),
+	finish func(bool, string) error,
+) error {
+	result := harness.Decide(harness.GateInput{
+		Persona:  persona,
+		Call:     call,
+		Consumed: harness.LoadConsumed(statePath),
+	})
+
+	rec := base
+	rec.RoleRequested = requested
+	rec.Reason = result.Reason
+	rec.Warned = result.Warned
+	rec.Missing = result.Missing
+	rec.Allowed = result.Decision != harness.Block
+	if persona != nil {
+		rec.RoleResolved = persona.Name
+	}
+	rec.Outcome = gateOutcome(resolution, result)
+	record(journalScope, rec)
+
+	for _, w := range result.Warned {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] warn: %s not consumed\n", w)
+	}
+	if result.Decision == harness.Block {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "[gate] blocked: %s\n", result.Reason)
+		return finish(true, result.Reason)
+	}
+	return finish(false, "")
 }
 
 // gateAnswer is the ONE place a decision leaves the gate, so the two answer
@@ -411,6 +423,9 @@ func loadGatePersona(warn io.Writer, repoRoot, role string, dispatched map[strin
 			lookup = trueType
 		}
 	}
+	if parsedRole, _, ok := agent.ParseWorkerID(lookup); ok {
+		lookup = parsedRole
+	}
 
 	agentsDir := filepath.Join(repoRoot, "harness", "agents")
 	path := filepath.Join(agentsDir, lookup, "AGENT.md")
@@ -462,7 +477,60 @@ func effectiveRole(flag, fromPayload string) string {
 	if r := strings.TrimSpace(flag); r != "" {
 		return r
 	}
-	return strings.TrimSpace(fromPayload)
+	if r := strings.TrimSpace(fromPayload); r != "" {
+		return r
+	}
+	if r := strings.TrimSpace(os.Getenv("DOTF_WORKER_ID")); r != "" {
+		return r
+	}
+	return strings.TrimSpace(os.Getenv("DOTF_ROLE"))
+}
+
+func effectiveRoleWithSticky(flag, fromPayload, stateDir, scope, branch string) string {
+	if r := effectiveRole(flag, fromPayload); r != "" {
+		return r
+	}
+	if scope == "" || stateDir == "" {
+		return ""
+	}
+	return harness.LoadStickyPersona(harness.PersonaStatePath(stateDir, scope), branch)
+}
+
+func currentGateWorktreeContext(workDir string) (branch, wtPersona string) {
+	if workDir == "" {
+		return "", ""
+	}
+	if meta, merr := worktree.LoadMetadata(workDir); merr == nil && meta != nil {
+		wtPersona = strings.TrimSpace(meta.Persona)
+	}
+	// The branch is not worktree metadata: a plain checkout has no
+	// .dotf-worktree.json and still needs its sticky persona invalidated when
+	// the operator switches branch. Reading it only inside the metadata branch
+	// left `branch` empty there, so LoadStickyPersona could never tell two
+	// branches apart and the persona outlived the switch (#HARNESS-186 review).
+	if id, ok := mem.RepoIdentity(workDir); ok {
+		branch = strings.TrimSpace(id.Branch)
+	}
+	return branch, wtPersona
+}
+
+func inferPersonaFromSkill(skill string) string {
+	switch strings.ToLower(strings.TrimSpace(skill)) {
+	case "read-all-adrs", "architecture-session", "pattern-loader":
+		return "architect"
+	case "test-driven-development", "test", "systematic-debugging":
+		return "builder"
+	case "crystallize", "handoff", "vault-doctor", "insights", "genre-picker", "context-refresh", "place-knowledge", "dispose-proposals":
+		return "curator"
+	case "spec", "new-ticket", "prd-to-issues":
+		return "planner"
+	case "adversarial-review", "security-audit":
+		return "reviewer"
+	case "using-git-worktrees", "docker", "helm", "terraform":
+		return "shipper"
+	default:
+		return ""
+	}
 }
 
 // harnessAgy names Antigravity's CLI.

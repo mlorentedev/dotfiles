@@ -39,6 +39,10 @@ origin_url="$(git config --get remote.origin.url 2>/dev/null || true)"
 cur_owner="$(printf '%s' "$origin_url" | sed -E 's#^.*[:/]([^/]+)/[^/]+$#\1#; s#\.git$##')"
 cur_repo="$(printf '%s'  "$origin_url" | sed -E 's#^.*[:/][^/]+/([^/]+)$#\1#; s#\.git$##')"
 
+# Detach CWD from the worktree directory before running network calls so a
+# backgrounded post-checkout hook never holds a Windows directory handle (M6).
+cd "${HOME:-/}" 2>/dev/null || cd / 2>/dev/null || true
+
 # Self-assign the issue, only if it is OPEN — never resurrect a closed/Done ticket by assigning
 # it. `gh issue edit --add-assignee @me` is idempotent at the GitHub event layer.
 try_assign() {

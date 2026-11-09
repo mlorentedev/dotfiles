@@ -91,7 +91,7 @@ func isDisposableExactPath(relPath string) bool {
 	clean = strings.TrimPrefix(clean, "./")
 	clean = strings.TrimSuffix(clean, "/")
 
-	if clean == "" || clean == MetadataFileName || clean == ".DS_Store" || clean == "Thumbs.db" {
+	if clean == "" || clean == MetadataFileName || clean == ".dotf-lane-prompt.md" || clean == ".DS_Store" || clean == "Thumbs.db" {
 		return true
 	}
 	// .coverage.<host>.<pid> is coverage.py's parallel-mode data file.
