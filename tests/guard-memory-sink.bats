@@ -70,6 +70,35 @@ teardown() { rm -rf "$VAULT" "$WORK"; }
     [ "$status" -eq 0 ]
 }
 
+@test "AC2: the vault comparison resolves git's path dialect before comparing" {
+    # AC2 above passes on POSIX but silently failed on Git for Windows, where
+    # `git rev-parse --show-toplevel` answers C:/... while pwd -P answers /c/...:
+    # the vault's own MEMORY.md was blocked. Same mismatch reproduced portably —
+    # the stub answers the toplevel probe with a redundant /./ segment that only
+    # resolution collapses, and defers every other subcommand to the real binary.
+    REAL_GIT="$(command -v git)"
+    STUB="$(mktemp -d)"
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'if [ "${1:-}" = rev-parse ] && [ "${2:-}" = --show-toplevel ]; then'
+        printf '    printf "%%s\\n" "%s/."\n' "$VAULT"
+        echo '    exit 0'
+        echo 'fi'
+        printf 'exec "%s" "$@"\n' "$REAL_GIT"
+    } > "$STUB/git"
+    chmod +x "$STUB/git"
+
+    git -C "$VAULT" init -q
+    git -C "$VAULT" config core.hooksPath "$HOOKS"
+    git -C "$VAULT" config user.email t@t.io
+    git -C "$VAULT" config user.name tester
+    echo x > "$VAULT/MEMORY.md"
+    git -C "$VAULT" add MEMORY.md
+    run env PATH="$STUB:$PATH" git -C "$VAULT" commit -m "vault root, resolved"
+    rm -rf "$STUB"
+    [ "$status" -eq 0 ]
+}
+
 @test "AC3: chains to repo-local .git/hooks/pre-commit (both run)" {
     mkdir -p "$NONVAULT/.git/hooks"
     printf '#!/usr/bin/env bash\ntouch "%s/local-ran"\n' "$WORK" > "$NONVAULT/.git/hooks/pre-commit"

@@ -20,10 +20,19 @@ VAULT="${VAULT_PATH:-$HOME/Projects/knowledge}"
 # configured through a symlink (macOS's /var -> /private/var, a linked
 # ~/Projects) would never compare equal and its own MEMORY.md would be blocked.
 VAULT="$(cd "$VAULT" 2>/dev/null && pwd -P || printf '%s' "$VAULT")"
+# Both sides of the compare below must be read in the SAME path dialect, and the
+# pwd -P above settles only the vault. `git rev-parse --show-toplevel` answers a
+# physical path on POSIX but `C:/...` on Git for Windows, where pwd -P answers
+# `/c/...` — the compare then never matched and the vault's OWN MEMORY.md was
+# blocked (reproduced on the Windows work box, 2026-11-08). Resolving $toplevel
+# through the shell puts it in pwd -P's dialect on every OS. Falls back to the
+# raw value when the directory cannot be entered.
+toplevel_physical="$(cd "$toplevel" 2>/dev/null && pwd -P)"
+[ -n "$toplevel_physical" ] || toplevel_physical="$toplevel"
 
 # Vault detection: the sentinel .obsidian/ at the repo root (cross-machine) or
 # the repo root being the configured vault path. The vault is the allowed sink.
-if [ -d "$toplevel/.obsidian" ] || [ "$toplevel" = "$VAULT" ]; then
+if [ -d "$toplevel/.obsidian" ] || [ "$toplevel_physical" = "$VAULT" ]; then
     exit 0
 fi
 

@@ -483,6 +483,38 @@ YAML
     [[ "$(cat "$ARGS_LOG")" == *"--hook-type post-checkout"* ]] || false
 }
 
+@test "BUG-090: the store exclusion resolves the toplevel before comparing" {
+    # The exclusion compares `git rev-parse --show-toplevel` against the store.
+    # Raw, that compare can only match when both sides happen to be spelled the
+    # same way, and git spells the toplevel in ITS dialect — `C:/...` on Git for
+    # Windows against a store the shell resolved to `/c/...`, so the exclusion
+    # silently did nothing on the one OS where the deadlock it prevents was
+    # reproduced. That dialect divergence cannot be produced on POSIX, so the
+    # stub stands in with a `..` segment: same mechanism (only resolution
+    # collapses it), runs on every OS. The stub answers the toplevel probe and
+    # defers every other subcommand to the real binary, so the red direction
+    # reaches pre-commit exactly as an unnormalized compare does in production.
+    stub_precommit 0
+    STORE_REPO="$WORK/pre-commit-store/repoabc123"
+    add_store_config
+    mkdir -p "$WORK/other"
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'if [ "${1:-}" = rev-parse ] && [ "${2:-}" = --show-toplevel ]; then'
+        printf '    printf "%%s\\n" "%s/other/../pre-commit-store/repoabc123"\n' "$WORK"
+        echo '    exit 0'
+        echo 'fi'
+        printf 'exec "%s" "$@"\n' "$(command -v git)"
+        echo
+    } > "$STUB/git"
+    chmod +x "$STUB/git"
+    cd "$STORE_REPO"
+
+    run bash -c "PATH='$STUB:/usr/bin:/bin' PRE_COMMIT_HOME='$WORK/pre-commit-store' '$CHAIN' post-checkout 0000000000000000000000000000000000000000 abc 1 < /dev/null"
+    [ "$status" -eq 0 ]
+    [ ! -f "$ARGS_LOG" ]
+}
+
 # A merge stopped on a conflict in f, so the index holds unmerged paths.
 make_conflict() {
     fixture_git config user.email t@t.io
