@@ -502,9 +502,14 @@ func currentGateWorktreeContext(workDir string) (branch, wtPersona string) {
 	}
 	if meta, merr := worktree.LoadMetadata(workDir); merr == nil && meta != nil {
 		wtPersona = strings.TrimSpace(meta.Persona)
-		if id, ok := mem.RepoIdentity(workDir); ok {
-			branch = strings.TrimSpace(id.Branch)
-		}
+	}
+	// The branch is not worktree metadata: a plain checkout has no
+	// .dotf-worktree.json and still needs its sticky persona invalidated when
+	// the operator switches branch. Reading it only inside the metadata branch
+	// left `branch` empty there, so LoadStickyPersona could never tell two
+	// branches apart and the persona outlived the switch (#HARNESS-186 review).
+	if id, ok := mem.RepoIdentity(workDir); ok {
+		branch = strings.TrimSpace(id.Branch)
 	}
 	return branch, wtPersona
 }
