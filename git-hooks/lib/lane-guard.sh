@@ -1,18 +1,25 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # lane-guard.sh — Scoped pre-commit guard for persistent named lanes (HARNESS-186).
 #
-# Only enforces lane rules in repositories that opt into the lane system via
-# .dotf/lane.json (located in the current worktree or main repository root),
-# and exempts:
+# POSIX sh on purpose: this runs under bash, zsh, dash and BusyBox alike, on
+# Linux, macOS and Git-for-Windows. No bash-only expansion is permitted here.
+#
+# Opt-in is the committed marker .dotf/lanes.json, written by `dotf lane init`
+# and located in the current worktree or the main repository root. The marker
+# carries no paths and no host names, so it is identical on every OS, agent host
+# and seat, and no other feature's config file can switch this guard on.
+#
+# It exempts:
 #   - Obsidian vaults (.obsidian/ present)
 #   - Active git rebase or cherry-pick operations (rebase-merge, rebase-apply,
 #     or CHERRY_PICK_HEAD present in git-dir, fixing B6)
 #
-# In a .dotf/lane.json repository, blocks:
+# In a repository carrying .dotf/lanes.json, it blocks:
 #   1. Direct commits on main/master at the main checkout (directs to `dotf lane switch`)
 #   2. Commits inside a PARKED persistent lane (.dotf-worktree.json state == "PARKED")
-#   3. Commits inside unleased copilot-worktrees/ directories (fixing m4)
+#   3. Commits inside an unleased canonical lane directory
+#   4. Commits inside a declared third-party session root (third_party_roots)
 
 set -u
 
@@ -25,7 +32,7 @@ case "$common_dir" in
   /*|[A-Za-z]:/*|[A-Za-z]:\\*) ;;
   *) common_dir="$top/$common_dir" ;;
 esac
-common_slash="${common_dir//\\//}"
+common_slash="$(printf '%s' "$common_dir" | sed 's|\\|/|g')"
 common_slash="${common_slash%/}"
 if [ "${common_slash##*/}" = ".git" ]; then
   main_root="$(dirname "$common_dir")"
@@ -43,20 +50,44 @@ if [ -d "$top/.obsidian" ] || [ -d "$main_root/.obsidian" ]; then
   exit 0
 fi
 
-# 3. Only enforce in repositories with .dotf/lane.json.
-if [ ! -f "$top/.dotf/lane.json" ] && [ ! -f "$main_root/.dotf/lane.json" ]; then
-  exit 0
-fi
+# 3. Only enforce where the repository declares the named lane system.
+marker=""
+for candidate in "$top/.dotf/lanes.json" "$main_root/.dotf/lanes.json"; do
+  if [ -f "$candidate" ]; then
+    marker="$candidate"
+    break
+  fi
+done
+[ -n "$marker" ] || exit 0
 
-# 4. Block commits in copilot-worktrees/ for lane-managed repos (m4).
-top_slash="${top//\\//}"
-case "$top_slash" in
-  */copilot-worktrees/*)
-    echo "ERROR: commits inside copilot-worktrees/ ($top) are blocked in lane-managed repositories." >&2
-    echo "FIX: claim a persistent named lane with: dotf lane switch <branch>" >&2
-    exit 1
-    ;;
-esac
+# json_list prints the string elements of a named array, one per line. sed is
+# line-based and `dotf lane init` writes indented JSON, where every array element
+# sits on its own line, so the document is flattened before matching. Names are
+# kebab-case identifiers, so the caller may word-split the result safely.
+json_list() {
+  tr -d '\r\n' <"$marker" 2>/dev/null |
+    sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p" |
+    tr ',' '\n' |
+    sed -e 's/[[:space:]"]//g' -e '/^$/d'
+}
+
+# The marker is the single source of truth: a list it does not declare is a rule
+# that does not apply. No lane name and no session host is hardcoded here, so a
+# repository opts into exactly the roots and lanes it declares.
+third_party_roots="$(json_list third_party_roots)"
+canonical_lanes="$(json_list canonical_lanes)"
+
+# 4. Block commits inside a declared third-party session root (m4).
+top_slash="$(printf '%s' "$top" | sed 's|\\|/|g')"
+for root in $third_party_roots; do
+  case "$top_slash" in
+    */"$root"/*)
+      echo "ERROR: commits inside the third-party session root '$root' ($top) are blocked in lane-managed repositories." >&2
+      echo "FIX: claim a persistent named lane with: dotf lane switch <branch>" >&2
+      exit 1
+      ;;
+  esac
+done
 
 # 5. Block commits inside a PARKED lane or an uninitialized canonical lane directory.
 if [ -f "$top/.dotf-worktree.json" ]; then
@@ -67,13 +98,13 @@ if [ -f "$top/.dotf-worktree.json" ]; then
   fi
 else
   lane_base="${top_slash##*/}"
-  case "$lane_base" in
-    feat-lane-primary|feat-lane-secondary|fast-track-lane)
+  for lane in $canonical_lanes; do
+    if [ "$lane_base" = "$lane" ]; then
       echo "ERROR: canonical lane directory $top is missing .dotf-worktree.json lease metadata." >&2
       echo "FIX: initialize and switch the lane with: dotf lane init && dotf lane switch <type>/<issue>-<slug>" >&2
       exit 1
-      ;;
-  esac
+    fi
+  done
 fi
 
 # 6. Block direct commits on main/master or detached HEAD at the main repository checkout.

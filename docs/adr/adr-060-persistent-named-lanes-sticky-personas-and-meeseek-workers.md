@@ -5,7 +5,7 @@ status: accepted
 owner: manu
 date: "2026-11-07"
 issue: "mlorentedev/dotfiles#3255"
-extends: [adr-032-worktree-first-isolation, adr-049-runtime-skill-enforcement-gate, adr-050-one-lane-contract-for-every-repo-agent-and-forge, adr-052-deterministic-worktree-sweep, adr-057-project-workspace-boundary-and-worktree-roots]
+extends: [adr-050-one-lane-contract-for-every-repo-agent-and-forge, adr-057-project-workspace-boundary-and-worktree-roots]
 tags: [architecture, decision, worktrees, lanes, personas, meeseek, harness, cross-platform]
 created: "2026-11-07"
 ---
@@ -43,3 +43,18 @@ Operating across Herdr, Orca ADE, GitHub Copilot CLI, `tmux`, and bare terminals
 
 - Worktree count per repository is bounded to at most 4 directories (`main` + 3 named lanes), eliminating `MAX_PATH` overflow and Windows directory-deletion locks.
 - Any session on any OS can immediately identify which machine, OS, and lane produced a PR and resume full thread state via `dotf mem resume`.
+
+## References
+
+- [ADR-050](adr-050-one-lane-contract-for-every-repo-agent-and-forge.md) — the lane contract every repo, agent and forge shares; owns the worktree reconciler (`dotf worktree sweep`).
+- [ADR-057](adr-057-project-workspace-boundary-and-worktree-roots.md) — project workspace boundary and the roots a worktree may legally occupy.
+- [ADR-032](adr-032-cross-harness-agent-orchestration.md) — cross-harness agent orchestration; the multi-agent topology this ADR's lanes run inside.
+- [ADR-048](adr-048-one-permission-baseline-for-every-agent.md) — one permission baseline for every agent; the persona gate is a special case of it.
+
+An earlier revision of this record declared `extends` on three ids that were never written:
+`adr-032-worktree-first-isolation`, `adr-049-runtime-skill-enforcement-gate` and
+`adr-052-deterministic-worktree-sweep`. Worktree isolation is ADR-057, the deterministic
+sweep is ADR-050, and no ADR owns a "runtime skill enforcement gate" — that concept lives
+in specs (`SDD-008-skill-pipeline`, `HARNESS-106-skill-capability`). The phantom ids were
+removed rather than repointed, because citing the nearest real ADR would claim an authority
+it does not hold.

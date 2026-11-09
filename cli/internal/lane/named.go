@@ -1,6 +1,8 @@
 package lane
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,11 +23,30 @@ const (
 	LaneFastTrack     = "fast-track-lane"
 )
 
+// LanesMarkerFile is the committed declaration that a repository runs the
+// persistent named lane system, and the only thing the pre-commit lane guard
+// keys off. It carries no paths and no host names, so the same marker is valid
+// on every OS, agent host and seat.
+const LanesMarkerFile = ".dotf/lanes.json"
+
 // CanonicalLanes lists the 3 persistent worktree lanes per repository (HARNESS-186).
 var CanonicalLanes = []string{
 	LaneFeatPrimary,
 	LaneFeatSecondary,
 	LaneFastTrack,
+}
+
+// ThirdPartyWorktreeRoots are directory names, under the projects boundary, that
+// belong to an external agent session host rather than to a lane. They are
+// declared into the marker instead of being hardcoded in the guard, so adding a
+// host is a data change and no host is privileged in the code.
+var ThirdPartyWorktreeRoots = []string{"copilot-worktrees"}
+
+// lanesMarker is the on-disk shape of .dotf/lanes.json.
+type lanesMarker struct {
+	Version         int      `json:"version"`
+	CanonicalLanes  []string `json:"canonical_lanes"`
+	ThirdPartyRoots []string `json:"third_party_roots"`
 }
 
 var branchIssueRe = regexp.MustCompile(`^[a-z]{1,12}/([0-9]{1,7})(?:-[a-z0-9._-]+)?$`)
@@ -74,53 +95,128 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 	_ = excludeFile(gitCommonDir, worktree.MetadataFileName)
 	_ = excludeFile(gitCommonDir, PromptFile)
 
-	now := time.Now()
+	if _, err := writeLanesMarker(absRepo); err != nil {
+		return 0, err
+	}
+
 	changed := 0
 	for _, name := range CanonicalLanes {
-		lanePath := filepath.Join(repoWTRoot, name)
-		if _, statErr := os.Stat(lanePath); statErr == nil {
-			meta, merr := worktree.LoadMetadata(lanePath)
-			if merr == nil && meta != nil && meta.Lane == name && meta.State != "" && !meta.ReapOK {
-				continue
-			}
-			state := string(worktree.StateParked)
-			issueNum := 0
-			if meta != nil && meta.Issue > 0 {
-				issueNum = meta.Issue
-			}
-			if out, berr := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output(); berr == nil && strings.TrimSpace(string(out)) != "" {
-				state = string(worktree.StateActive)
-			}
-			newMeta := worktree.Metadata{
-				Lane:           name,
-				State:          state,
-				Issue:          issueNum,
-				CreatedAt:      now,
-				LeaseExpiresAt: now.Add(leaseTTL),
-				ReapOK:         false,
-			}
-			if err := worktree.SaveMetadata(lanePath, newMeta); err != nil {
-				return changed, fmt.Errorf("lane init: saving metadata for %s: %w", name, err)
-			}
+		created, err := provisionLane(absRepo, filepath.Join(repoWTRoot, name), name, baseRef)
+		if err != nil {
+			return changed, err
+		}
+		if created {
 			changed++
-			continue
 		}
+	}
+	return changed, nil
+}
 
-		if out, err := exec.Command("git", "-C", absRepo, "worktree", "add", "--detach", lanePath, baseRef).CombinedOutput(); err != nil {
-			return changed, fmt.Errorf("lane init: git worktree add --detach %s failed (%w): %s", name, err, strings.TrimSpace(string(out)))
+// provisionLane makes the lane at lanePath exist detached at baseRef and carry
+// lease metadata, reporting whether it wrote anything.
+func provisionLane(absRepo, lanePath, name, baseRef string) (bool, error) {
+	now := time.Now()
+
+	if _, statErr := os.Stat(lanePath); statErr != nil {
+		out, err := exec.Command("git", "-C", absRepo, "worktree", "add", "--detach", lanePath, baseRef).CombinedOutput()
+		if err != nil {
+			return false, fmt.Errorf("lane init: git worktree add --detach %s failed (%w): %s", name, err, strings.TrimSpace(string(out)))
 		}
-		meta := worktree.Metadata{
+		return true, saveLaneMetadata(lanePath, worktree.Metadata{
 			Lane:      name,
 			State:     string(worktree.StateParked),
 			CreatedAt: now,
 			ReapOK:    false,
-		}
-		if err := worktree.SaveMetadata(lanePath, meta); err != nil {
-			return changed, fmt.Errorf("lane init: saving metadata for %s: %w", name, err)
-		}
-		changed++
+		})
 	}
-	return changed, nil
+
+	meta, merr := worktree.LoadMetadata(lanePath)
+	if merr == nil && meta != nil && meta.Lane == name && meta.State != "" && !meta.ReapOK {
+		return false, nil
+	}
+
+	state := string(worktree.StateParked)
+	issueNum := 0
+	if meta != nil && meta.Issue > 0 {
+		issueNum = meta.Issue
+	}
+	if out, berr := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output(); berr == nil && strings.TrimSpace(string(out)) != "" {
+		state = string(worktree.StateActive)
+	}
+	return true, saveLaneMetadata(lanePath, worktree.Metadata{
+		Lane:           name,
+		State:          state,
+		Issue:          issueNum,
+		CreatedAt:      now,
+		LeaseExpiresAt: now.Add(leaseTTL),
+		ReapOK:         false,
+	})
+}
+
+func saveLaneMetadata(lanePath string, meta worktree.Metadata) error {
+	if err := worktree.SaveMetadata(lanePath, meta); err != nil {
+		return fmt.Errorf("lane init: saving metadata for %s: %w", meta.Lane, err)
+	}
+	return nil
+}
+
+// writeLanesMarker idempotently writes .dotf/lanes.json into absRepo and reports
+// whether the file changed. The marker is the named lane system's own opt-in: it
+// is written by `dotf lane init` and read by the pre-commit guard, so no other
+// feature's config file can switch the guard on.
+//
+// canonical_lanes is policy owned by this command and is always rewritten.
+// third_party_roots is host-owned data, so roots already declared on disk are
+// preserved: adding a session host is a data change, never a code change.
+func writeLanesMarker(absRepo string) (bool, error) {
+	path := filepath.Join(absRepo, filepath.FromSlash(LanesMarkerFile))
+
+	roots := append([]string(nil), ThirdPartyWorktreeRoots...)
+	if existing, rerr := os.ReadFile(path); rerr == nil {
+		var prev lanesMarker
+		if json.Unmarshal(existing, &prev) == nil {
+			roots = unionRoots(roots, prev.ThirdPartyRoots)
+		}
+	}
+
+	want, err := json.MarshalIndent(lanesMarker{
+		Version:         1,
+		CanonicalLanes:  CanonicalLanes,
+		ThirdPartyRoots: roots,
+	}, "", "  ")
+	if err != nil {
+		return false, fmt.Errorf("lane init: encoding %s: %w", LanesMarkerFile, err)
+	}
+	want = append(want, '\n')
+
+	if existing, rerr := os.ReadFile(path); rerr == nil && bytes.Equal(existing, want) {
+		return false, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, fmt.Errorf("lane init: mkdir %s: %w", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, want, 0o644); err != nil {
+		return false, fmt.Errorf("lane init: writing %s: %w", LanesMarkerFile, err)
+	}
+	return true, nil
+}
+
+// unionRoots appends the entries of extra that base does not already carry,
+// preserving order and dropping blanks and duplicates.
+func unionRoots(base, extra []string) []string {
+	seen := make(map[string]bool, len(base)+len(extra))
+	out := make([]string, 0, len(base)+len(extra))
+	for _, group := range [][]string{base, extra} {
+		for _, root := range group {
+			root = strings.TrimSpace(root)
+			if root == "" || seen[root] {
+				continue
+			}
+			seen[root] = true
+			out = append(out, root)
+		}
+	}
+	return out
 }
 
 // RouteBranchToLane deterministically selects a PARKED canonical lane for branch (M5).

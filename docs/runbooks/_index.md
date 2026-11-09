@@ -17,4 +17,5 @@ Operational guides and procedures for managing the dotfiles environment.
 | [guide-self-deploy-timer.md](guide-self-deploy-timer.md) | Self-deploy background timer and autodeploy configuration | Active |
 | [release-dotf.md](release-dotf.md) | Releasing and installing `dotf`: mirror, deploy, install, verify by effect | Active |
 | [guide-git-config.md](guide-git-config.md) | Git config ownership (`~/.gitconfig` vs the deployed include) and the GitHub credential helper that works without a shell | Active |
+| [guide-persistent-named-lanes.md](guide-persistent-named-lanes.md) | Persistent named lanes (HARNESS-186): the marker contract, the pre-commit lane guard decision flow, lane lifecycle, use cases, activation checklist and the agnostic validation runbook | Active |
 | [tool-installation.md](tool-installation.md) | How tools reach a machine: one channel per class, the dotf catalog, and adding a tool | Active |

@@ -70,18 +70,20 @@ owner: manu
 - [x] [P] [AC5] **Task 7 (RED — Write failing tests for `pre-commit` lane guard & `board-pickup.sh`):**
   - **File to create:** `cli/internal/hooks/lane_guard_test.go` (`TestPreCommitLaneGuard`)
   - **Exact behaviors to assert (fixes B6, M6, m4):**
-    1. Commits in a repository WITHOUT `.dotf/lane.json` or with `.obsidian/` directory on `main`/`master` succeed (`exit 0`).
-    2. In a repository WITH `.dotf/lane.json`:
+    1. Commits in a repository WITHOUT the `.dotf/lanes.json` marker, or with an `.obsidian/` directory, on `main`/`master` succeed (`exit 0`).
+    2. In a repository WITH `.dotf/lanes.json`:
        - Commits on `main` or `master` at the main repo root are blocked (`exit 1`) with message pointing to `dotf lane switch`.
        - Commits inside a worktree whose `.dotf-worktree.json` has `"state": "PARKED"` are blocked (`exit 1`) when NOT mid-rebase/cherry-pick.
        - Commits during an active `git rebase` or `cherry-pick` (`.git/rebase-merge`, `.git/rebase-apply`, or `CHERRY_PICK_HEAD` present in `git rev-parse --git-dir`) are ALLOWED (`exit 0`) even on detached HEAD (fixing **B6**).
-       - Commits inside `copilot-worktrees/` for a repo with `.dotf/lane.json` are blocked (`exit 1`) with message pointing to `dotf lane switch` (fixing **m4**).
+       - Commits inside a root listed in the marker's `third_party_roots` are blocked (`exit 1`) with message pointing to `dotf lane switch` (fixing **m4**).
+       - **Regression:** a repository carrying only the unrelated issue-queue file `.dotf/lane.json` (from `#2532`) must NOT activate the guard (`exit 0`).
+       - **Agnosticism:** a root declared as `acme-sessions` blocks exactly like `copilot-worktrees` — the script privileges no host name.
   - **Run to verify RED:**
     `cd cli && go test ./internal/hooks/... -run TestPreCommitLaneGuard -count=1`
 
 - [x] [AC5] **Task 8 (GREEN — Implement `git-hooks/lib/lane-guard.sh`, wire into `git-hooks/pre-commit`, and detach CWD in `git-hooks/lib/board-pickup.sh`):**
   - **Files to modify/create:**
-    1. Create `git-hooks/lib/lane-guard.sh` implementing the checks tested in Task 7.
+    1. Create `git-hooks/lib/lane-guard.sh` as **POSIX `sh`** (`#!/bin/sh`, shellcheck-clean with `-s sh`) implementing the checks tested in Task 7. The guard must read `canonical_lanes` and `third_party_roots` from the marker instead of hardcoding lane names or host roots.
     2. Source/invoke `lane-guard.sh` from `git-hooks/pre-commit`.
     3. In `git-hooks/lib/board-pickup.sh`, right after capturing `branch` and `origin_url`, add `cd "$HOME" || cd /` before any `gh` network calls so backgrounded `post-checkout` hooks never hold a Windows directory handle on the worktree (fixing **M6**).
   - **Run to verify GREEN:**
@@ -103,7 +105,64 @@ owner: manu
   - **Run to verify GREEN:**
     `cd cli && go test ./internal/forgewrite/... -run TestForgePRProvenanceNoAttribution -v -count=1`
 
-## Closing
+### Batch 4: Review fixes — guard activation trigger, POSIX portability, agnosticism
+
+Found in review of PR `#3259`: the guard's opt-in was `.dotf/lane.json`, a file that already exists on
+`main` for a *different* subsystem (`#2532`, issue-queue schema), so merging would have activated the
+guard repo-wide with zero named lanes initialized — blocking every commit in every third-party session
+root and on `main`, with no migration path. Fixed by giving the named-lane subsystem its own marker and
+making host/agent specifics data instead of code.
+
+- [x] [P] [AC5] **Task 11 (RED — regression + agnosticism tests in `cli/internal/hooks/lane_guard_test.go`):**
+  - Add `writeLanesMarkerFixture()` writing `.dotf/lanes.json` with `version`, `canonical_lanes`, `third_party_roots`.
+  - Migrate scenarios 1/2/3 from `.dotf/lane.json` to `.dotf/lanes.json`.
+  - **Scenario 3b:** repo carrying only the issue-queue `.dotf/lane.json` → commit ALLOWED (`exit 0`).
+  - **Scenario 8:** marker declaring `third_party_roots: ["acme-sessions"]` → commit inside that root BLOCKED (`exit 1`), proving no host name is privileged.
+  - **Run:** `cd cli && go test ./internal/hooks/... -run TestPreCommitLaneGuard -count=1`
+
+- [x] [AC5] **Task 12 (GREEN — `git-hooks/lib/lane-guard.sh` POSIX rewrite + marker-driven activation):**
+  - Shebang `#!/usr/bin/env bash` → `#!/bin/sh`; remove bashisms (no `${var//pat/rep}`; path normalization via `sed 's|\\|/|g'`).
+  - Activation gate now requires `.dotf/lanes.json`.
+  - `copilot-worktrees` hardcode replaced by a loop over the marker's `third_party_roots`; hardcoded lane-name `case` replaced by a loop over `canonical_lanes`.
+  - Add `json_list()` POSIX reader with documented fallback defaults when the marker is malformed.
+  - **Run:** `sh -n git-hooks/lib/lane-guard.sh && shellcheck -s sh git-hooks/lib/lane-guard.sh`
+
+- [x] [AC1] [AC5] **Task 13 (GREEN — `dotf lane init` writes the marker):**
+  - `cli/internal/lane/named.go`: add `LanesMarkerFile = ".dotf/lanes.json"`, `ThirdPartyWorktreeRoots`, `lanesMarker`, and `writeLanesMarker()`; call it from `initLanesLocked`.
+  - Writer is idempotent (byte-compare, no rewrite) and does **not** increment `changed`, preserving the `changed == 3` contract.
+  - `cli/internal/lane/lanes_test.go`: `TestLaneInitIdempotent` asserts the marker parses, `canonical_lanes` matches `CanonicalLanes`, `third_party_roots` is non-empty, **no value contains `/ \ :`** (machine-independence guard), and the file is byte-identical after the second run.
+  - **Run:** `cd cli && go test ./internal/lane/... -run TestLaneInitIdempotent -count=1`
+
+- [x] **Task 14 (Reference rot):** `docs/adr/adr-060-…md` `extends:` and `proposal.md` `## References` cited three ADR ids that were never written. Repointed to `adr-032-cross-harness-agent-orchestration`, `adr-048-one-permission-baseline-for-every-agent`, `adr-050-one-lane-contract-for-every-repo-agent-and-forge`, `adr-057-project-workspace-boundary-and-worktree-roots`; the phantom ids are recorded and explained in ADR-060's new `## References` section rather than silently repointed.
+
+> The marker is **not** committed by this PR on purpose: activation stays an explicit operator step
+> (`dotf lane init` after deploy), so merging does not block the session containers that predate it.
+
+### Batch 5: Architecture audit — data-driven policy actually reached the reader
+
+Audit of Batch 4 found that the marker was written but never read: `json_list()` was a line-based
+`sed`, `dotf lane init` writes indented JSON with one array element per line, and the test fixture
+kept every array on a single line. The parser therefore returned nothing against the real file and
+the guard silently fell back to hardcoded lane names and one hardcoded host — the exact duplication
+the marker exists to remove, with a green suite.
+
+- [x] [AC5] **Task 15 (RED→GREEN — parser/fixture drift in `git-hooks/lib/lane-guard.sh` + `cli/internal/hooks/lane_guard_test.go`):**
+  - Fixture is now generated from `lane.CanonicalLanes` / `lane.ThirdPartyWorktreeRoots` with `json.MarshalIndent`, reproducing production bytes.
+  - `json_list()` flattens newlines (`tr -d '\r\n'`) before the line-based `sed`, so indented and compact markers both parse.
+  - Hardcoded fallbacks (`copilot-worktrees`, the 3 lane names) removed from the shell: a list the marker does not declare is a rule that does not apply, and no host is privileged in code.
+  - **New scenario 9:** marker with no `third_party_roots` → `copilot-worktrees/` commit ALLOWED, pinning the absence of a fallback.
+  - **New scenario 10:** marker declaring `canonical_lanes: ["spike-lane"]` → unleased `spike-lane/` BLOCKED, proving lane names are data.
+  - **Run:** `cd cli && go test ./internal/hooks/... -run TestPreCommitLaneGuard -count=1`
+
+- [x] [AC1] [AC5] **Task 16 (GREEN — `third_party_roots` is host-owned data, `canonical_lanes` is code-owned policy):**
+  - `writeLanesMarker()` previously rewrote the whole file whenever bytes differed, so a hand-added host was destroyed by the next `dotf lane init`, making "adding a host is a data change" untrue.
+  - Added `unionRoots()`: `third_party_roots` is unioned with what is on disk (order preserved, blanks and duplicates dropped); `canonical_lanes` stays rewritten from code.
+  - `TestLaneInitPreservesDeclaredThirdPartyRoots` asserts the union, the code-owned replacement of a stale lane list, and that the file stays indented one element per line (the shape the guard's parser depends on).
+  - **Run:** `cd cli && go test ./internal/lane/... -run TestLaneInitPreservesDeclaredThirdPartyRoots -count=1`
+
+- [x] **Task 17 (Refactor — Code Quality Rules):** `initLanesLocked` was ~75 lines against the repo's `< 40 lines` rule. Extracted `provisionLane()` (per-lane create/lease) and `saveLaneMetadata()`; behaviour, error messages and the `changed == 3` contract preserved verbatim.
+
+- [x] **Task 18 (Knowledge):** `docs/runbooks/guide-persistent-named-lanes.md` — layer model, marker contract and schema table, guard decision flow, lane lifecycle, use-case table, activation checklist and the agnostic validation runbook (registered in `docs/runbooks/_index.md`). `docs/lessons/lesson-569-generate-test-fixtures-from-the-writer-not-by-hand.md` records the fixture-drift failure mode.
 
 - [x] Every acceptance criterion from `proposal.md` (`AC1`–`AC6`) is covered by at least one test
 - [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command

@@ -67,7 +67,10 @@ func newLaneInitCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintf(c.OutOrStdout(), "lane init: %s (changed=%d)\n", repoRoot, changed)
+			out := c.OutOrStdout()
+			_, _ = fmt.Fprintf(out, "lane init: %s (changed=%d)\n", repoRoot, changed)
+			_, _ = fmt.Fprintf(out, "lane init: worktree root %s\n", wtRoot)
+			_, _ = fmt.Fprintf(out, "lane init: guard marker %s — commit it to arm the pre-commit lane guard on every clone\n", lane.LanesMarkerFile)
 			return nil
 		},
 	}

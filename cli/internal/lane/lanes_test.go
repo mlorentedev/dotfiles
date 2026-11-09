@@ -1,9 +1,12 @@
 package lane
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -62,6 +65,29 @@ func TestLaneInitIdempotent(t *testing.T) {
 		t.Fatalf("first InitLanes changed = %d, want 3", changed)
 	}
 
+	// The opt-in marker is the lane system's own: written by init, carrying no
+	// paths so it is valid on any OS, host and seat.
+	markerPath := filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))
+	firstMarker, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatalf("lane init did not write %s: %v", LanesMarkerFile, err)
+	}
+	var marker lanesMarker
+	if err := json.Unmarshal(firstMarker, &marker); err != nil {
+		t.Fatalf("%s is not valid JSON: %v\n%s", LanesMarkerFile, err, firstMarker)
+	}
+	if len(marker.CanonicalLanes) != len(CanonicalLanes) {
+		t.Errorf("%s canonical_lanes = %v, want %v", LanesMarkerFile, marker.CanonicalLanes, CanonicalLanes)
+	}
+	if len(marker.ThirdPartyRoots) == 0 {
+		t.Errorf("%s third_party_roots is empty; the guard needs at least one declared root", LanesMarkerFile)
+	}
+	for _, v := range append(append([]string{}, marker.CanonicalLanes...), marker.ThirdPartyRoots...) {
+		if strings.ContainsAny(v, `/\:`) {
+			t.Errorf("%s value %q looks like a path; the marker must stay machine-independent", LanesMarkerFile, v)
+		}
+	}
+
 	for _, name := range CanonicalLanes {
 		lanePath := filepath.Join(wtRoot, "dotfiles", name)
 		meta, err := worktree.LoadMetadata(lanePath)
@@ -80,6 +106,61 @@ func TestLaneInitIdempotent(t *testing.T) {
 	}
 	if changed2 != 0 {
 		t.Fatalf("second InitLanes changed = %d, want 0 (idempotent)", changed2)
+	}
+	secondMarker, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatalf("marker vanished after second InitLanes: %v", err)
+	}
+	if !bytes.Equal(firstMarker, secondMarker) {
+		t.Errorf("%s changed on re-run:\nfirst:  %s\nsecond: %s", LanesMarkerFile, firstMarker, secondMarker)
+	}
+}
+
+// TestLaneInitPreservesDeclaredThirdPartyRoots pins the ownership split: the
+// marker's canonical_lanes is policy rewritten from code on every init, while
+// third_party_roots is host-owned data whose manual entries survive a re-run.
+// Without that, "adding a session host is a data change" would be false.
+func TestLaneInitPreservesDeclaredThirdPartyRoots(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+
+	markerPath := filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))
+	if err := os.MkdirAll(filepath.Dir(markerPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(markerPath, []byte(`{"version":1,"canonical_lanes":["stale-lane"],"third_party_roots":["acme-sessions"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes: %v", err)
+	}
+
+	body, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatalf("reading %s: %v", LanesMarkerFile, err)
+	}
+	var marker lanesMarker
+	if err := json.Unmarshal(body, &marker); err != nil {
+		t.Fatalf("%s is not valid JSON: %v\n%s", LanesMarkerFile, err, body)
+	}
+
+	for _, want := range append(append([]string{}, ThirdPartyWorktreeRoots...), "acme-sessions") {
+		if !slices.Contains(marker.ThirdPartyRoots, want) {
+			t.Errorf("third_party_roots = %v, want it to retain %q", marker.ThirdPartyRoots, want)
+		}
+	}
+	if slices.Contains(marker.CanonicalLanes, "stale-lane") {
+		t.Errorf("canonical_lanes = %v, want the code-owned list to replace the stale entry", marker.CanonicalLanes)
+	}
+	if !slices.Equal(marker.CanonicalLanes, CanonicalLanes) {
+		t.Errorf("canonical_lanes = %v, want %v", marker.CanonicalLanes, CanonicalLanes)
+	}
+
+	// The pre-commit guard is a line-based POSIX shell parser, so the marker must
+	// stay indented with one array element per line. A compact rewrite would
+	// silently empty every list the guard reads.
+	if !strings.Contains(string(body), "\n    \"") {
+		t.Errorf("%s is not indented one element per line, which the guard parser requires:\n%s", LanesMarkerFile, body)
 	}
 }
 
