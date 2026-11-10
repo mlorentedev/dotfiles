@@ -20,7 +20,8 @@ owner: manu
 ## Test status
 
 - `cd cli && go test ./...`: every package ok. `go vet ./...` and `GOOS=windows go vet ./...` clean; `golangci-lint run ./...` and `GOOS=windows golangci-lint run ./...`: 0 issues.
-- Manual smoke test: `go run ./cmd/dotf spec review HARNESS-158-review-scope --dry-run --foreground` on this branch prints `Scope: git diff 8b2d0902…...HEAD (1 of 1 commits are the spec's own)`, and its prompt names `#1727` as the matched issue.
+- Manual smoke test: `go run ./cmd/dotf spec review HARNESS-158-review-scope --dry-run --foreground` on this branch prints `Scope: git diff 8b2d0902…...HEAD (4 of 4 commits are the spec's own)`, with no `folder rule only` note, so the issue matched; the printed prompt carries `or reference #1727`. The match itself is pinned by `TestReviewRangeMatchesTheSpecsOwnIssue`, which drives `reviewRange` over a real `proposal.md` and origin.
+- f5 (`TestOwnCommitsRecoversHarness142`) skips on a clone without the pinned commits, so its verification command requires `--- PASS` in `-v` output rather than trusting exit 0.
 - No regressions: the launcher tests that stub the base with fake SHAs now stub the own-commit listing through the same kind of seam (`ownCommitsOf`).
 
 ## Decisions made during implementation
