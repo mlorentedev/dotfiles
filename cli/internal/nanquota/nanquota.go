@@ -121,11 +121,12 @@ func BoundModels(m map[string]any, pool string) []string {
 	return out
 }
 
-// Evaluate reports every model that is bound or moved tokens in the window. A
-// bound id NaN does not serve FAILs, because every agent routed there is
+// Evaluate reports every bound model, and every served model that moved tokens
+// in the window. A bound id NaN does not serve FAILs, because every agent routed there is
 // already failing (the class that kept `qwen3-rerank` bound for weeks while NaN
 // answered 401). Usage is INFO: tokens are not credits, so no share of anything
-// is computed from them. An unbound model the key cannot see is not reported.
+// is computed from them. An unbound model NaN no longer serves is dropped on purpose,
+// usage included: nothing can reach it, so its past tokens answer no question.
 func Evaluate(bound []string, served map[string]bool, u Usage) []Finding {
 	used := map[string]int64{}
 	for _, mt := range u.Totals.ByModel {

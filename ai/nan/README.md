@@ -145,7 +145,7 @@ Empirically measured with `scripts/nan-bench.sh` (2026-05-25):
 | **kokoro 15 RPM** | TTS batch se bloquea | Serializar |
 | **Embeddings 60 RPM / batch ≤ 32** | Indexar vault entero te rate-limit-ea | Throttle a 30 RPM, batch=32 |
 | **API key personal e intransferible** | No compartir entre máquinas/CI | Cada equipo encripta su propia |
-| **No SLA, no deprecation notice, no billing API** | Community-run, best-effort; the credit balance is on the dashboard only | OpenRouter como fallback frontier |
+| **No SLA, no deprecation notice, no billing API** | Community-run, best-effort; the credit balance is on the dashboard only | OpenRouter as the frontier fallback |
 
 ## NaN-recommended defaults (per /docs/models)
 
