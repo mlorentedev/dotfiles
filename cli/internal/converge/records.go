@@ -130,6 +130,7 @@ func Registry(o Options) []Reconciler {
 		shellCompletions{run: o.CompletionRun, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath, resolve: o.ResolvePath},
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
+		tsBridgeClient{},
 		gitLFS{run: o.GitRun, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID, userEnv: o.UserEnv, userPath: o.UserPath, expand: env.ExpandUserPath, bins: o.ToolsBinDirs},

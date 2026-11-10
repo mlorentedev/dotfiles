@@ -19,9 +19,11 @@
     "subscription but no longer contends for the deepseek bucket that `dotf spec review`",
     "draws on. The sharing stays declared; the contention it caused does not.",
     "",
-    "NaN publishes both limits for the base nan_member plan: seven simultaneous requests across",
-    "the whole key, plus the per-model limits declared below. A second model is another lane only",
-    "until the key-wide cap is reached. The reserve is static; adaptive reservation is out of scope.",
+    "NaN publishes per-model concurrency for the base plan (declared below; premium raises 7 to 10)",
+    "and 60 requests per minute per key. Measured 2026-11-10: 12 parallel requests to one model got",
+    "7 through, while 13 spread over three models got 12 through in one run and 7 in another, so a",
+    "second model is another lane but a key-wide limit NaN does not document can still answer 429.",
+    "The reserve is static; adaptive reservation is out of scope.",
     "",
     "THE `top` TIER HAS NO FALLBACK, on purpose (ADR-032 section 4). Degrading the top tier silently is",
     "how a gate becomes a green checkmark. It queues or escalates; it does not quietly get cheaper.",
@@ -67,7 +69,7 @@
         "qwen3.6": 5,
         "gemma4": 5
       },
-      "concurrency_note": "base nan_member plan: 7 simultaneous requests per key; per-model caps also apply",
+      "concurrency_note": "base plan: per-model caps below (premium: 10 for the 7s); a key-wide limit is undocumented and was hit once in two measured runs (2026-11-10)",
       "rpm": 60,
       "reserve_interactive": 2,
       "shared_with": [
@@ -157,7 +159,7 @@
       "copilot": "gpt-5.4-mini",
       "nan": "qwen3.6",
       "$comment_copilot": "copilot ids measured 2026-08-29 on the Windows work box against Copilot CLI 1.0.81 (#1170): a custom agent's .agent.md frontmatter `model:` IS read (a bogus id warns and falls back to the seat default; `--model` with a bogus id is a hard error), so render: agent-md is right; `copilot --model <id> -p` answered for claude-opus-5, claude-sonnet-5, claude-haiku-4.5, gpt-5.4-mini and gpt-5.6-sol (the seat default). Note the dotted spelling (claude-haiku-4.5), unlike the Anthropic API ids the claude pool resolves to. Seat-scoped: another seat may accept a different set; re-measure there before trusting these.",
-      "$comment": "qwen3.6 is the low tier since 2026-09-26 (AI-044, #1762): it has no monthly NaN quota, while qwen3.8-flash (500M/month) reached 83% of its quota as the routed default. Quotas: https://nan.builders/docs/models."
+      "$comment": "qwen3.6 is the low tier since 2026-09-26 (AI-044, #1762). Since 2026-11 NaN bills chat models from one credit pool, and qwen3.6 draws no credits at all, while qwen3.8-flash is the priciest flash per token. Rates: ai/nan/README.md."
     }
   },
   "chains": {

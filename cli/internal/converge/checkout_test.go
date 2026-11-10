@@ -283,6 +283,7 @@ func TestCheckout_SkippedWithoutARunner(t *testing.T) {
 // checkout already exists and never needed a clone (a copied tree, the test
 // guest). Both name the same package, or the two paths install different gits.
 func TestShippedCatalog_DeclaresTheGitTheCheckoutInstalls(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	entries, err := loadCatalog(Env{RepoRoot: filepath.Join("..", "..", "..")})
 	if err != nil {
 		t.Fatal(err)

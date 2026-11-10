@@ -72,7 +72,7 @@ func SessionEndAs(payload []byte, vaultPath, agent string, now time.Time) (strin
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return "", nil // malformed JSON -> no-op
 	}
-	if p.Cwd == "" {
+	if p.Cwd == "" || isWorktreeParked(p.Cwd) {
 		return "", nil
 	}
 	// THE PROJECT IS THE REPOSITORY, not the basename of wherever the session
@@ -268,4 +268,27 @@ func buildRecord(date, project, agent, sid, block string) string {
 	b.WriteString(block)
 	b.WriteByte('\n')
 	return b.String()
+}
+
+// isWorktreeParked returns true when cwd (or an ancestor worktree root) holds a
+// .dotf-worktree.json with state == "PARKED" (HARNESS-186, B3), so SessionEnd
+// never writes a detached <lane>@<host> fallback journal for a parked lane.
+func isWorktreeParked(cwd string) bool {
+	for dir := filepath.Clean(cwd); ; {
+		data, err := os.ReadFile(filepath.Join(dir, ".dotf-worktree.json"))
+		if err == nil {
+			var meta struct {
+				State string `json:"state"`
+			}
+			if json.Unmarshal(data, &meta) == nil && strings.EqualFold(meta.State, "PARKED") {
+				return true
+			}
+			return false
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
 }

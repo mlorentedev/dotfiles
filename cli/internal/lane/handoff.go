@@ -384,6 +384,18 @@ func start(o Options, b Backend, wt Worktree, found bool, branch string, issue I
 			return Started{}, err
 		}
 	}
+	if HasNamedLanes(o.Parent, o.WorktreeRoot) {
+		_, lanePath, err := SwitchLane(o.Parent, o.WorktreeRoot, branch, "")
+		if err != nil {
+			return Started{}, err
+		}
+		namedWT := Worktree{Path: lanePath, Branch: branch}
+		st, err := b.Open(o.Parent, namedWT)
+		if err == nil && st.Worktree.Path == "" {
+			st.Worktree.Path = lanePath
+		}
+		return st, err
+	}
 	return b.Create(o.Parent, branch, o.Config.Base, fmt.Sprintf("#%d %s", issue.Number, Slug(issue.Title)))
 }
 
@@ -442,15 +454,26 @@ func manualCommands(o Options, out Outcome, exec string) ([]string, error) {
 	if o.WorktreeRoot == "" {
 		return nil, errors.New("lane: WORKTREE_ROOT does not resolve, so the worktree's path cannot be printed; run `dotf doctor`")
 	}
-	dir, err := humanPath(worktree.ResolveWorktreePath(o.WorktreeRoot, filepath.Base(o.Parent), out.Branch))
-	if err != nil {
-		return nil, err
-	}
 	parent, err := humanPath(o.Parent)
 	if err != nil {
 		return nil, err
 	}
 	remote, _ := o.Config.Remote()
+	if HasNamedLanes(o.Parent, o.WorktreeRoot) {
+		dotfCmd := o.Dotf
+		if dotfCmd == "" || !plainWord.MatchString(dotfCmd) {
+			dotfCmd = "dotf"
+		}
+		return []string{
+			"git -C " + parent + " fetch " + remote,
+			dotfCmd + " lane switch " + out.Branch,
+			exec,
+		}, nil
+	}
+	dir, err := humanPath(worktree.ResolveWorktreePath(o.WorktreeRoot, filepath.Base(o.Parent), out.Branch))
+	if err != nil {
+		return nil, err
+	}
 	return []string{
 		"git -C " + parent + " fetch " + remote,
 		"git -C " + parent + " worktree add -b " + out.Branch + " " + dir + " " + o.Config.Base,

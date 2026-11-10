@@ -296,7 +296,11 @@ assert_absent() {
     [ "$status" -ne 0 ] || { echo "compaction.json sets enabled -- native auto-compaction stays the box's"; return 1; }
 }
 
-@test "every enabled NaN model compacts at 40% of its models.json window (#1938)" {
+# Every model with a window in models.json compacts, not only the enabledModels
+# cycle: the larger NaN models (kimi-k3.1-pro and the rest) stay out of the
+# cycle on purpose, since they spend credits up to 20x faster, and are picked by
+# hand, which is exactly when a session runs long enough to need compaction.
+@test "every NaN model pi knows compacts at 40% of its models.json window (#1938)" {
     command -v jq >/dev/null || skip "jq not available"
     diff="$(jq -rn \
         --slurpfile s "$PI_SETTINGS" \
@@ -305,12 +309,13 @@ assert_absent() {
         ($c[0].compaction.modelOverrides) as $o
         | ($m[0].providers.nan.modelOverrides) as $w
         | ($s[0].enabledModels | map(select(startswith("nan/")))) as $enabled
-        | ([$enabled[] | . as $k | ($k | ltrimstr("nan/")) as $id
+        | (($enabled + ($w | keys | map("nan/" + .))) | unique) as $known
+        | ([$known[] | . as $k | ($k | ltrimstr("nan/")) as $id
             | if ($w[$id].contextWindow | type) != "number" then "\($k): no contextWindow in models.json"
               elif $o[$k].reserveTokens != ($w[$id].contextWindow * 6 / 10 | round)
               then "\($k): reserveTokens \($o[$k].reserveTokens), want \($w[$id].contextWindow * 6 / 10 | round)"
               else empty end]
-          + [$o | keys[] | select(. as $k | $enabled | index($k) | not) | "\(.): override for a model not in enabledModels"])
+          + [$o | keys[] | select(. as $k | $known | index($k) | not) | "\(.): override for a model neither enabled nor in models.json"])
         | .[]')"
     [ -z "$diff" ] || { echo "$diff"; return 1; }
     # Pin two values by hand, so a broken derivation cannot agree with itself.

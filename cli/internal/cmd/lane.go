@@ -13,6 +13,8 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // laneExec starts the agent; a variable so a test records the argv instead of
@@ -29,7 +31,116 @@ func newLaneCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd(), newLaneClaimCmd(), newLaneReleaseCmd(), newLaneClaimsCmd())
+	c.AddCommand(
+		newLaneExecCmd(),
+		newLaneNextCmd(),
+		newLaneStatusCmd(),
+		newLanePlanCmd(),
+		newLaneApplyCmd(),
+		newLaneClaimCmd(),
+		newLaneReleaseCmd(),
+		newLaneClaimsCmd(),
+		newLaneInitCmd(),
+		newLaneSwitchCmd(),
+		newLaneParkCmd(),
+	)
+	return c
+}
+
+func newLaneInitCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:          "init",
+		Short:        "Idempotently create the 3 persistent named lanes for this repository",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+			wtRoot := env.ResolvePath("WORKTREE_ROOT")
+			changed, err := lane.InitLanes(repoRoot, wtRoot)
+			if err != nil {
+				return err
+			}
+			out := c.OutOrStdout()
+			_, _ = fmt.Fprintf(out, "lane init: %s (changed=%d)\n", repoRoot, changed)
+			_, _ = fmt.Fprintf(out, "lane init: worktree root %s\n", wtRoot)
+			_, _ = fmt.Fprintf(out, "lane init: guard marker %s — commit it to arm the pre-commit lane guard on every clone\n", lane.LanesMarkerFile)
+			return nil
+		},
+	}
+}
+
+func newLaneSwitchCmd() *cobra.Command {
+	var targetLane string
+	c := &cobra.Command{
+		Use:          "switch <branch>",
+		Short:        "Claim a PARKED persistent lane and check out <branch> in it",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+			wtRoot := env.ResolvePath("WORKTREE_ROOT")
+			laneName, lanePath, err := lane.SwitchLane(repoRoot, wtRoot, args[0], targetLane)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(c.OutOrStdout(), "lane switch: %s -> %s (%s)\n", args[0], laneName, lanePath)
+			return nil
+		},
+	}
+	c.Flags().StringVar(&targetLane, "lane", "", "explicit named lane to claim")
+	return c
+}
+
+func newLaneParkCmd() *cobra.Command {
+	var force bool
+	c := &cobra.Command{
+		Use:          "park [lane]",
+		Short:        "Park a persistent named lane in-place after its branch lands",
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+			var lanePath string
+			if len(args) == 1 {
+				wtRoot := env.ResolvePath("WORKTREE_ROOT")
+				lanePath = filepath.Join(wtRoot, filepath.Base(filepath.Clean(repoRoot)), args[0])
+			} else {
+				lanePath, err = worktree.ResolveWorktreeRoot(cwd)
+				if err != nil {
+					return err
+				}
+			}
+			vPath := vault.ResolveVault()
+			res, err := lane.ParkLane(repoRoot, lanePath, vPath, force)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(c.OutOrStdout(), "lane park: %s parked (deleted_branch=%s sha=%s)\n", lanePath, res.DeletedBranch, res.DeletedSHA)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&force, "force", false, "force park even if uncommitted or unpushed")
 	return c
 }
 

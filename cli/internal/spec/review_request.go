@@ -102,6 +102,16 @@ type ReviewScope struct {
 	BaseSHA  string
 	BaseTree string
 	RootSHA  string
+	// Own is the spec's own commits inside BaseSHA..HEAD (HARNESS-158), which
+	// the prompt names so the reviewer starts from them rather than from
+	// everything other work merged in between. Advice to the reviewer only:
+	// the request and the archive gate still record and check BaseSHA.
+	Own OwnCommitSet
+	// OwnIssue is the issue number Own was matched against, or 0 when the
+	// folder alone decided it.
+	OwnIssue int
+	// OwnFolderOnly is why no issue was matched, when OwnIssue is 0.
+	OwnFolderOnly string
 }
 
 // Initial reports whether the scope reviews from the empty tree.
@@ -202,41 +212,59 @@ type ReviewBase struct {
 // born in the root commit has a supported review without a base commit, and an
 // untraceable move must stay refused however it is asked for.
 func ResolveReviewBaseDetail(repoRoot, specDir string) ReviewBase {
+	base, _ := traceSpecFolder(repoRoot, specDir)
+	return base
+}
+
+// SpecFolderNames returns every repository-relative path the spec folder has
+// had, current name first, as the base resolver followed them. A review's own
+// commits (HARNESS-158) are found by these paths: a slice committed before a
+// rename touched the old name, not the one on disk now.
+func SpecFolderNames(repoRoot, specDir string) []string {
+	_, names := traceSpecFolder(repoRoot, specDir)
+	return names
+}
+
+// traceSpecFolder is ResolveReviewBaseDetail that also returns each folder name
+// it followed, so the base and the folder's names cannot disagree.
+func traceSpecFolder(repoRoot, specDir string) (ReviewBase, []string) {
 	rel, err := filepath.Rel(repoRoot, specDir)
 	if err != nil {
 		rel = specDir
 	}
 	rel = filepath.ToSlash(rel)
+	names := []string{rel}
 	// Bounded so a pathological history cannot loop; a spec renamed more than
 	// a handful of times is refused, not reviewed against a guessed base.
 	for hop := 0; hop < 8; hop++ {
 		adding := earliestAdding(repoRoot, rel)
 		if adding == "" {
 			if hop == 0 {
-				return ReviewBase{Refusal: BaseNotCommitted}
+				return ReviewBase{Refusal: BaseNotCommitted}, names
 			}
-			return ReviewBase{Refusal: BaseUntraceable}
+			return ReviewBase{Refusal: BaseUntraceable}, names
 		}
 		parent, isRoot := parentOf(repoRoot, adding)
 		if isRoot {
-			return ReviewBase{Refusal: BaseRootCommit, RootSHA: adding}
+			return ReviewBase{Refusal: BaseRootCommit, RootSHA: adding}, names
 		}
 		if parent == "" {
-			return ReviewBase{Refusal: BaseUntraceable}
+			return ReviewBase{Refusal: BaseUntraceable}, names
 		}
 		from, renamed := renamedFrom(repoRoot, parent, adding, rel)
 		if !renamed {
-			return ReviewBase{SHA: parent}
+			return ReviewBase{SHA: parent}, names
 		}
 		if from == "" {
 			// Something was renamed into the folder but its source cannot be
 			// traced. The parent would be a base after the work, which is the
 			// partial diff this function exists to refuse.
-			return ReviewBase{Refusal: BaseUntraceable}
+			return ReviewBase{Refusal: BaseUntraceable}, names
 		}
 		rel = from
+		names = append(names, rel)
 	}
-	return ReviewBase{Refusal: BaseUntraceable}
+	return ReviewBase{Refusal: BaseUntraceable}, names
 }
 
 // parentOf returns commit's first parent. isRoot is true only when git lists
