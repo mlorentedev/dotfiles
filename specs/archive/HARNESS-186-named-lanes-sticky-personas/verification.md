@@ -92,7 +92,7 @@ decision flow, lane lifecycle, use cases, activation checklist, agnostic validat
 
 ## Review-fix evidence (Batch 6 — independent adversarial review)
 
-`specs/HARNESS-186-named-lanes-sticky-personas/review.md` (reviewer `agy/gemini-3.8-flash-high`, `reviewed_sha d6c552a6`, verdict PASS-WITH-GAPS) raised three findings. Disposition of each, applied or ticketed — none left silent:
+`specs/archive/HARNESS-186-named-lanes-sticky-personas/review.md` (reviewer `agy/gemini-3.8-flash-high`, `reviewed_sha d6c552a6`, verdict PASS-WITH-GAPS) raised three findings. Disposition of each, applied or ticketed — none left silent:
 
 | # | Severity | Finding | Disposition |
 |---|----------|---------|-------------|
@@ -124,7 +124,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-186-named-lanes-sticky-personas/` -> `specs/archive/HARNESS-186-named-lanes-sticky-personas/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-186-named-lanes-sticky-personas/` -> `specs/archive/HARNESS-186-named-lanes-sticky-personas/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [x] Promotions above executed (if any)

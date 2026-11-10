@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-186-named-lanes-sticky-personas"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-07"
 issue: "mlorentedev/dotfiles#3255"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, lanes, worktrees, personas, meeseek]
