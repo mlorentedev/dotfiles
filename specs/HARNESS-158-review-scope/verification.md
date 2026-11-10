@@ -28,6 +28,8 @@ owner: manu
 - HARNESS-142 measured before writing the rule: its closing review (`review-request.json`: base `adf49c93`, reviewed `c4d0e6c8`) ran over 14 commits, of which 5 were its own, and the folder rule alone recovers all five. #3221 fixed HARNESS-142's feature without touching the folder or naming #1649, but it merged after that review, so a correct scope excludes it; the rule was not widened to every issue the spec names, which would have pulled in prior-art numbers.
 - The list is advice in the prompt, not a field in `review-request.json`: the archive gate keeps checking the base SHA, so no stored contract changed.
 - The issue number is matched only when the issue lives in the repository's own origin. Commit messages say `#N` for that repository's numbers, so a cross-repo issue would match unrelated commits.
+- The issue rule sees a slice only if its squash message carries the reference. None of HARNESS-142's five slices mention #1649, while #3221's squash kept `Closes #3220`, so a slice PR that does not touch the folder needs `Part of #N` in its body (as #3279 does).
+- #3221 changed HARNESS-142's reviewed feature after the closing review and before archive, without touching a contract file, so the digest gate stayed fresh. Not a gap: the fix carried its own PR review, and a review that predates a later fix is the expected order for a bug found after review.
 - A git failure while listing refuses the launch instead of launching with an empty list, which would read as a spec with no commits of its own.
 
 ## Promotion candidates

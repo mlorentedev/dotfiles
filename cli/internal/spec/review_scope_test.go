@@ -164,7 +164,7 @@ func TestInitialReviewPromptCarriesNoOwnCommitList(t *testing.T) {
 // only in a full clone of this repository, so a shallow checkout skips.
 func TestOwnCommitsRecoversHarness142(t *testing.T) {
 	const base, head = "adf49c93bb006b6322bb9bc6b20f1a44303e16e9", "c4d0e6c8b891159a2fb7267140d76a7fa9421689"
-	repoRoot := strings.TrimSpace(gitOut(t, ".", "rev-parse", "--show-toplevel"))
+	repoRoot := trim(git(t, ".", "rev-parse", "--show-toplevel"))
 	for _, c := range []string{base, head} {
 		if exec.Command("git", "-C", repoRoot, "cat-file", "-e", c+"^{commit}").Run() != nil {
 			t.Skipf("commit %s is not in this clone (shallow checkout)", c)
@@ -181,13 +181,4 @@ func TestOwnCommitsRecoversHarness142(t *testing.T) {
 	if want := []string{"(#3178)", "(#3195)", "(#3196)", "(#3205)", "(#3213)"}; !reflect.DeepEqual(prs, want) || got.RangeSize != 14 {
 		t.Errorf("HARNESS-142 own commits = %q of %d, want %q of 14", prs, got.RangeSize, want)
 	}
-}
-
-func gitOut(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
-	if err != nil {
-		t.Fatalf("git %v: %v", args, err)
-	}
-	return string(out)
 }
