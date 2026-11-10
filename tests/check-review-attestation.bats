@@ -12,7 +12,6 @@
 # the one thing it was built for.
 
 load 'lib/refute'
-load 'winpath'
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
@@ -252,35 +251,45 @@ EOF
 
 # --- AC7: the gate re-runs when a review lands, without a push ---
 
+# The workflow's triggers, read as keys rather than as substrings, and with no
+# YAML library: the Windows runner's python3 has no yaml module, so the tagged
+# version below died on the import before asserting anything. A substring match
+# would be worse — it passes on this workflow's own comments about the triggers
+# (#998). These two assert which keys exist, which is what awk reads.
+on_block() {
+    awk '/^on:[[:space:]]*$/ { f = 1; next } f && /^[^[:space:]#]/ { f = 0 } f' "$1"
+}
+
+trigger_block() {
+    awk -v k="$2" '
+        $0 ~ "^  " k ":[[:space:]]*$" { f = 1; next }
+        f && /^  [a-z_]+:/ { f = 0 }
+        f && /^[^[:space:]#]/ { f = 0 }
+        f
+    ' "$1"
+}
+
 # bats test_tags=windows
 @test "AC7: the workflow triggers on pull_request AND issue_comment" {
     # Without issue_comment the gate would only ever answer at the one moment
     # the answer is always "pending" — reviewers land after the checks settle.
     # That timing gap is half of the bug, not a detail.
     #
-    # The path arrives as argv, not interpolated into the source: on Windows the
-    # shell hands over an MSYS path (/c/...) that the native python3 resolves
-    # against the drive root and cannot open, and a native path pasted into the
-    # source would be mangled by its backslashes. `_winpath` converts; argv keeps
-    # it out of the string literal.
-    python3 -c '
-import sys, yaml
-d = yaml.safe_load(open(sys.argv[1]))
-on = d[True] if True in d else d["on"]
-sys.exit(0 if "pull_request" in on and "issue_comment" in on else 1)
-' "$(_winpath "$REPO/.github/workflows/review-attestation.yml")"
+    # Tagged windows because this is the test that proved the runner's python3
+    # has no yaml module. Keep it tagged: if a yaml import comes back, the
+    # Windows job is the only one that says so.
+    local wf="$REPO/.github/workflows/review-attestation.yml"
+    on_block "$wf" | grep -qE '^  pull_request:[[:space:]]*$'
+    on_block "$wf" | grep -qE '^  issue_comment:[[:space:]]*$'
 }
 
 @test "AC7: the workflow triggers on pull_request_review (#1115)" {
-    python3 -c '
-import sys, yaml
-d = yaml.safe_load(open(sys.argv[1]))
-on = d[True] if True in d else d["on"]
-pr_review = on.get("pull_request_review", {})
-types = set(pr_review.get("types", []))
-expected = {"submitted", "edited", "dismissed"}
-sys.exit(0 if expected.issubset(types) else 1)
-' "$(_winpath "$REPO/.github/workflows/review-attestation.yml")"
+    local wf="$REPO/.github/workflows/review-attestation.yml"
+    types="$(trigger_block "$wf" pull_request_review | grep -E '^[[:space:]]+types:')"
+    [[ -n "$types" ]] || false
+    for t in submitted edited dismissed; do
+        [[ "$types" == *"$t"* ]] || false
+    done
 }
 
 @test "AC7: the workflow does not swallow the gate's failure" {

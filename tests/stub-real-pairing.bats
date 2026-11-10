@@ -44,6 +44,11 @@ setup() {
 #                             have caught it. What the suite CAN pin is which call is made, and it
 #                             does; the API's verdict on that call only arrives from a real run.
 #   board-pickup              stubs `gh` — same; a real run self-assigns real issues
+#   check-review-attestation  shims `bash`/`jq`/`dirname`/`cat`/`tr`/`sed` to build a PATH holding
+#                             every tool the live path uses and no `gh`; that absence is the case
+#                             under test, and a real gh cannot be absent on demand on a runner that
+#                             ships one. It needs no sibling: the suite already runs the real script
+#                             over real jq against 31 committed payloads, which is the pairing.
 #   dotf-bin-helper           stubs `go` — the case it pins is a toolchain that is present and cannot
 #                             compile the tree, and a real `go` only produces that by breaking the
 #                             tree under test. The real build path is driven for real by every
@@ -91,7 +96,7 @@ setup() {
 #                             resolves a terraform, and against that path. A real terraform gives
 #                             the same answer, so a sibling would test nothing the stub does not
 #                             (#2055).
-EXEMPT_SUITES="add-to-project-script bashrc-guards bitacora-reconcile bitacora-rollout board-pickup dotf-bin-helper gh-auth-helper guard-memory-sink guard-no-gui
+EXEMPT_SUITES="add-to-project-script bashrc-guards bitacora-reconcile bitacora-rollout board-pickup check-review-attestation dotf-bin-helper gh-auth-helper guard-memory-sink guard-no-gui
 install model-canary release-pr-body-refs review-attestation-workflow setup-no-arch-downloads shell-profile skills-pipeline
 tmux vault-maintenance-weekly zshrc-guards"
 

@@ -19,7 +19,8 @@ correctly excluded: its 62 tests are shell and jq, nothing PowerShell. The scrip
 under test, though, reads jq output through `IFS=$'\t' read`. On Windows
 `jq.exe` terminates every line with CRLF, so the CR lands on the last field of
 each record — `marker` arrives as `## PR Reviewer Guide\r`, `advisory` as
-`true\r`. Neither ever matches. Nine of the 62 tests were red on a clean tree.
+`true\r`. Neither ever matches. Twelve of the 62 tests were red on a clean tree;
+nine of them for this reason.
 
 ## Problem
 
