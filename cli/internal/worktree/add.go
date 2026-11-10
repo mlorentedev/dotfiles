@@ -81,7 +81,7 @@ func (r *RealAddRunner) DefaultBase(repo string) (string, error) {
 // firstRef returns the first of refs that resolves in repo, or "".
 func firstRef(repo string, refs []string) string {
 	for _, ref := range refs {
-		if exec.Command("git", "-C", repo, "rev-parse", "--verify", "--quiet", ref).Run() == nil {
+		if gitIn(repo, "rev-parse", "--verify", "--quiet", ref).Run() == nil {
 			return ref
 		}
 	}

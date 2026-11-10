@@ -208,12 +208,18 @@ func landedInMergedPR(repoRoot, branch, tip string, landedHeads LandedHeads) (bo
 // credentials: `list` and `sweep` ask this too, and a listing must fail fast
 // rather than wait on a terminal nobody is watching.
 func fetchCommit(repoRoot, sha string) error {
-	cmd := gitIn(repoRoot, "fetch", "--quiet", "--no-tags", "origin", sha)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := fetchCommitCmd(repoRoot, sha).CombinedOutput(); err != nil {
 		return fmt.Errorf("fetch merged head %s from origin: %w: %s", shortSHA(sha), err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+// fetchCommitCmd adds the no-prompt setting to gitIn's scrubbed environment,
+// never to os.Environ(), which would bring an inherited GIT_DIR back.
+func fetchCommitCmd(repoRoot, sha string) *exec.Cmd {
+	cmd := gitIn(repoRoot, "fetch", "--quiet", "--no-tags", "origin", sha)
+	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0")
+	return cmd
 }
 
 func shortSHA(sha string) string {
