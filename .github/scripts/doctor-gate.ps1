@@ -89,9 +89,21 @@ if ($MyInvocation.InvocationName -ne '.') {
     $entries = @($env:PATH -split ';' | Where-Object { $_ })
     Write-Host ("doctor gate: PATH has {0} entries, {1} chars" -f $entries.Count, $env:PATH.Length)
     $entries | ForEach-Object { Write-Host "doctor gate:   $_" }
+    # Resolving is not running: a mise shim resolves on PATH while its target
+    # may still refuse to start, and doctor probes by executing. When the two
+    # disagree the FAIL reads "not on PATH" and points at the wrong layer, so
+    # the probe reports both -- the path it found, and what that path did.
     foreach ($probe in 'dotf', 'git', 'bash', 'node', 'bw', 'mise', 'python') {
         $cmd = Get-Command $probe -ErrorAction SilentlyContinue
-        Write-Host ("doctor gate: {0} -> {1}" -f $probe, ($(if ($cmd) { $cmd.Source } else { 'NOT FOUND' })))
+        if (-not $cmd) {
+            Write-Host ("doctor gate: {0} -> NOT FOUND" -f $probe)
+            continue
+        }
+        $exe = $cmd.Source
+        $ran = & $probe --version 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $first = ($ran -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)
+        Write-Host ("doctor gate: {0} -> {1} | --version exit={2} out={3}" -f $probe, $exe, $code, ($first ?? '<empty>'))
     }
 
     # The runner has no identity and must never hold one that resolves real
