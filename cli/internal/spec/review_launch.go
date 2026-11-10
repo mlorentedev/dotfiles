@@ -355,7 +355,30 @@ func writeReviewScope(b *strings.Builder, scope ReviewScope) {
 			"`git log --first-parent --no-merges %s..HEAD` lists the commits made on the branch\n"+
 			"itself, not those a merge brought in (a sub-branch merged into it is a merge too).\n"+
 			"Judge what the spec names first, and the rest only where it interacts.\n\n", scope.BaseSHA, scope.BaseSHA)
+		writeOwnCommits(b, scope)
 	}
+}
+
+// writeOwnCommits names the spec's own commits inside the range (HARNESS-158).
+// A spec whose slices merged to main one at a time has a range that also holds
+// everything merged in between; the list says which commits are the spec's.
+func writeOwnCommits(b *strings.Builder, scope ReviewScope) {
+	own := scope.Own
+	if len(own.Commits) == 0 {
+		return
+	}
+	rule := "touch the spec folder under any of its names"
+	if scope.OwnIssue > 0 {
+		rule += fmt.Sprintf(", or reference #%d", scope.OwnIssue)
+	}
+	fmt.Fprintf(b, "The spec's own commits in that range, %d of %d, derived by the launcher from git\n"+
+		"(they %s):\n\n", len(own.Commits), own.RangeSize, rule)
+	for _, c := range own.Commits {
+		fmt.Fprintf(b, "- %s %s\n", c.SHA[:min(12, len(c.SHA))], c.Subject)
+	}
+	fmt.Fprintf(b, "\nThe other commits in the range are other work that merged in between. Start from\n"+
+		"these; read another commit only where it interacts with them. A slice that neither\n"+
+		"touches the folder nor names the issue is not listed, so the range stays the whole change.\n\n")
 }
 
 // ReviewPromptIn is ReviewPrompt for one signer's slot. The second signer is
