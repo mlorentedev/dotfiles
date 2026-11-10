@@ -12,29 +12,41 @@
 | Base URL | `https://api.nan.builders/v1` |
 | Auth header | `Authorization: Bearer sk-...` |
 | API style | OpenAI-compatible (chat, embeddings, audio, completions, responses) |
-| Rate limit | 60 requests/minute per key · 1.5M tokens/minute per model · 7 simultaneous requests per base-plan key · per-model caps: 7 for glm5.3-flash/deepseek-v4-flash/qwen3.8-flash, 5 for mimo-v2.6-flash/qwen3.6/gemma4 |
-| Quota | Monthly tokens per model (see the catalog); a spent quota answers `402` until the month resets. Own usage: `GET /v1/usage` |
-| Pricing | Community subscription (fixed, not per-token PAYG) |
+| Rate limit | 60 requests/minute per key, shared by every model · 1.5M tokens/minute for deepseek-v4-flash, mimo-v2.6-flash, qwen3.6 and gemma4 · simultaneous requests per model: 7 on the base plan (10 on premium) for glm5.3, glm5.3-flash, deepseek-v4-flash and qwen3.8-flash, 5 for mimo-v2.6-flash, qwen3.6 and gemma4; the larger models are undocumented (kimi-k3.1-pro measured at 6 on 2026-11-10) |
+| Credits | One pool for every chat model, refilled each billing period: 7,000 credits on the inference plan, 20,000 on premium, then purchased credit packs. Out of credits answers `402`. Balance: the dashboard only. `GET /v1/usage` reports raw tokens per model over 30 rolling days, with no cached split and no credits |
+| Pricing | Subscription plus a per-model, per-token-type credit rate (input, cached input, output): https://cloud.nan.builders/tokens. Cached input is 5-50x cheaper than fresh input |
 
 ## Model catalog
 
 ### Chat models (visibles en opencode `/models`)
 
-| Model ID | Context | Quota / month | Use case |
-|---|---|---|---|
-| `glm5.3-flash` | 1M | 2B | **opencode default and `plan` agent** — NaN's recommendation for coding agents; PR-Agent review pool member since 2026-10-08 (AI-045 AC9), at `reasoning_effort: low` |
-| `deepseek-v4-flash` | 1M | 3B | pi default; long-context via `qf` |
-| `qwen3.6` | 262K | none (per-minute limits only) | `qq` quick questions; opencode titles (`small_model`); `model-map` low tier |
-| `gemma4` | 262K | none | A/B candidate vs qwen3.6 |
-| `qwen3.8-flash` | 1,048,576 | 500M | picker only since 2026-09-26: it reached 83% of its quota as the default (AI-044, #1762) |
-| `mimo-v2.6-flash` | 1M | 1B | PR-Agent review pool member (with deepseek-v4-flash, glm5.3-flash and Claude Haiku, drawn by the weight `harness/reviewer-pool.json` gives each); reviewer-pool fallback. Replaced `mimo-v2.5`, which NaN retired 2026-09-30 (AI-045, #1763) |
+Credit rates per 1M tokens (input / cached input / output) and NaN's "typical"
+blended rate, read from https://cloud.nan.builders/tokens on 2026-11-10. The
+typical rate assumes NaN's cache mix; an uncached single-shot call costs the
+input rate.
 
-Every chat model reads images. Source: https://nan.builders/docs/models (checked 2026-09-30).
+| Model ID | Context | Credits per 1M (in / cached / out) | Typical | Use case |
+|---|---|---|---|---|
+| `glm5.3-flash` | 1M | 5.25 / 1.05 / 17.5 | 1.4 | **opencode default and `plan` agent**, NaN's recommendation for coding agents; PR-Agent review pool member since 2026-10-08 (AI-045 AC9), at `reasoning_effort: low` |
+| `deepseek-v4-flash` | 1M | 10.5 / 0.21 / 42 | 1.1 | pi default; long-context via `qf`; PR-Agent review pool |
+| `mimo-v2.6-flash` | 1M | 7 / 0.14 / 14 | 0.6 | the cheapest flash; PR-Agent review pool member. Replaced `mimo-v2.5`, which NaN retired 2026-09-30 (AI-045, #1763) |
+| `qwen3.8-flash` | 1M | 7.5 / 0.8 / 23.5 | 1.9 | picker only: the priciest flash per token (AI-044, #1762 moved it off the default) |
+| `qwen3.6` | 262K | no credits | 0 | `qq` quick questions; opencode titles (`small_model`); `model-map` low tier. NaN calls it previous generation; it still answers |
+| `gemma4` | 262K | no credits | 0 | A/B candidate vs qwen3.6 |
+| `hy4` | 1M | 41.7 / 2.1 / 125 | 5.5 | larger model, picker only; 64K output |
+| `deepseek-v4-pro` | 1M | 66 / 2.2 / 198 | 7.7 | larger model, picker only; text only; reasons always (no disable alias) |
+| `glm5.3` | 1M | 49 / 1.05 / 154 | 11.5 | larger model, not configured: its own 400M-tokens-per-rolling-4h window answers `429`, and nothing can watch it |
+| `kimi-k3.1-pro` | 1M | 100 / 10 / 500 (+100 cache write) | 19.9 | larger model, picker only; NaN's pick for frontier agent reasoning; reasons always (no disable alias) |
+| `qwen3.8-max` | 1M | 100 / 12.5 / 300 | 20.2 | larger model, picker only |
 
-`GET /v1/models` lists what the cluster runs, not what this key can call. In
-particular, `glm5.3` requires the premium membership tier. So does
-`minimax-h3`: listed on 2026-10-08, it answers this key HTTP 401 ("This API key
-does not have access to the requested model").
+The larger models spend credits 5-20x faster than the flash ones: keep them off
+per-PR and unattended paths. pi and opencode cap their output below what NaN
+serves (131,072 tokens; 65,536 for hy4). Source: https://nan.builders/docs/models
+and https://nan.builders/docs/choose-a-model (checked 2026-11-10).
+
+`GET /v1/models` lists what the cluster runs, not what this key can call.
+`minimax-h3` is listed but undocumented, and answers this key HTTP 401 ("This
+API key does not have access to the requested model"; measured 2026-11-10).
 
 ### Non-chat models (NO en opencode picker — usar curl/SDK directos)
 
@@ -102,7 +114,7 @@ curl https://api.nan.builders/v1/chat/completions \
 | File | Role |
 |---|---|
 | `secrets/registry.yaml` | maps Bitwarden item `nan-api-key` to `NAN_API_KEY` (and `HIVE_WORKER_API_KEY`) |
-| `ai/opencode/opencode.jsonc` | provider block `nan` (default model + 6 chat models) |
+| `ai/opencode/opencode.jsonc` | provider block `nan` (default model + 10 chat models) |
 | `.zsh/aliases.zsh` + `.bashrc` + `powershell/profile.ps1` | `qqn` alias + `NAN_BASE_URL` export |
 
 ## Workflow — when to use which
@@ -126,14 +138,14 @@ Empirically measured with `scripts/nan-bench.sh` (2026-05-25):
 | **Thinking is controlled by `reasoning_effort`** | The accepted values are model-specific: glm5.3-flash accepts low/medium/high/max; qwen3.6 and gemma4 also accept none/minimal; deepseek-v4-flash, qwen3.8-flash and mimo-v2.6-flash accept the parameter but do not adjust depth | Use only variants the selected model can apply |
 | **DeepSeek reserves reasoning output** | `max_tokens` below 16,384 is raised to 16,384, so a prompt inside that final slice of the context window is rejected | Leave at least 16,384 tokens of output room |
 | **Reasoning-only stream ceiling** | A stream that emits no content or tool call is closed after 60,000 reasoning characters or 420 seconds with `finish_reason: length` and a `nan_truncation` marker. The closed reasoning-only turn is not billed. | Lower `reasoning_effort` where supported or restructure the prompt |
-| **Monthly quota per model** | 500M to 3B depending on the model; spent answers `402` until the month resets | Read `GET /v1/usage`; do not route a high-volume path to a 500M model (AI-047, #1766) |
-| **Rate limits per key and per model** | 60 RPM and 7 simultaneous requests per base-plan key, shared by `qq` / TUI / curl / Hermes; per-model concurrency is 5 or 7 | Parallel agentic loops hit 429: back off; another model is another lane only until the key-wide cap is reached |
+| **One credit pool** | Every chat model draws from the period's credits, then from credit packs; spent answers `402`. `GET /v1/usage` reports tokens, not credits, so `dotf doctor` reports usage without judging it | Read the balance on the dashboard; keep the larger models off high-volume paths |
+| **Rate limits per key and per model** | 60 RPM per key, shared by `qq` / TUI / curl / agents; concurrency is per model (7 or 5 on the base plan) | Parallel agentic loops hit 429: another model is another lane, up to the 60 RPM key-wide cap |
 | **`/v1/responses` streaming roto** | Emite solo `response.completed`, no deltas | Usar `/v1/chat/completions` (opencode default) |
 | **whisper file cap 25MB / 2min** | Audios largos → HTTP 524. NO WAV | OGG/Opus o MP3 |
 | **kokoro 15 RPM** | TTS batch se bloquea | Serializar |
 | **Embeddings 60 RPM / batch ≤ 32** | Indexar vault entero te rate-limit-ea | Throttle a 30 RPM, batch=32 |
 | **API key personal e intransferible** | No compartir entre máquinas/CI | Cada equipo encripta su propia |
-| **No SLA, no deprecation, no billing page** | Community-run, best-effort | OpenRouter como fallback frontier |
+| **No SLA, no deprecation notice, no billing API** | Community-run, best-effort; the credit balance is on the dashboard only | OpenRouter as the frontier fallback |
 
 ## NaN-recommended defaults (per /docs/models)
 
@@ -155,7 +167,7 @@ OpenCode no expone estos como provider-level config; los inyecta por agente. Par
 | `oc /models` shows no `nan/*` entries | `~/.config/opencode/opencode.jsonc` not deployed | Re-run `./setup-linux.sh` |
 | `401 Unauthorized` from `qqn` | `$NAN_API_KEY` not exported in current shell | Reload shell (`exec zsh`), or check with `dotf secrets verify` |
 | `429 rate limit` errors during agentic loops | NaN's 60 rpm per key / per-model concurrency cap | Switch to `openrouter/<model>` for the burst, or backoff |
-| `402 Payment Required` | That model's monthly quota is spent | Switch model until the month resets; check `GET /v1/usage` |
+| `402 Payment Required` | The period's credits and the credit packs are spent | Switch to `qwen3.6` or `gemma4` (no credits) until the period refills, or buy a pack |
 | `524 timeout` on `kokoro` TTS | Large audio request, NaN server timeout | Split input into shorter chunks |
 | `NAN_API_KEY` empty | Bitwarden item `nan-api-key` missing or the vault is locked | `dotf secrets verify`; see Setup §2 |
 
