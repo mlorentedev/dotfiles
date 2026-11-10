@@ -91,6 +91,7 @@ func TestSpecIssueNumberFallsBackToTheFolderAndSaysWhy(t *testing.T) {
 		{"mlorentedev/kubelab#5", "lives outside mlorentedev/dotfiles"},
 		{"", "names no issue"},
 		{"not a ref", "does not parse"},
+		{"#0", "not a positive integer"},
 	} {
 		repoRoot, specDir := issueRepo(t, tc.issue)
 		n, why := specIssueNumber(repoRoot, specDir)

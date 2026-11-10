@@ -13,7 +13,8 @@ type OwnCommit struct {
 	Subject string
 }
 
-// OwnCommitSet is the spec's own commits in a review range, oldest first, and
+// OwnCommitSet is the spec's own commits in a review range, parents before
+// children (topological, so commits sharing a timestamp keep one order), and
 // how many non-merge commits the whole range holds.
 type OwnCommitSet struct {
 	Commits   []OwnCommit
@@ -32,19 +33,20 @@ type OwnCommitSet struct {
 //
 // Merge commits are left out: what a merge brings in is judged by its own
 // commits, and a merge message naming the issue says nothing about its content.
-// --full-history keeps a slice that lived on a side branch merged --no-ff,
-// which history simplification would otherwise prune for the folder's path.
+// Default history simplification is kept on purpose: a slice on a side branch
+// merged --no-ff is listed, and one whose change the merge discarded is not,
+// since it is not part of what the diff shows.
 //
 // Any git failure is an error, never an empty set: a broken range must not
 // read as a spec with no commits of its own.
 func OwnCommits(repoRoot, base, head string, folders []string, issue int) (OwnCommitSet, error) {
 	rng := base + ".." + head
-	all, err := gitLines(repoRoot, "log", "--no-merges", "--reverse", "--format=%H%x00%s", rng)
+	all, err := gitLines(repoRoot, "log", "--no-merges", "--topo-order", "--reverse", "--format=%H%x00%s", rng)
 	if err != nil {
 		return OwnCommitSet{}, err
 	}
 	own := map[string]bool{}
-	byPath, err := gitLines(repoRoot, append([]string{"log", "--no-merges", "--full-history", "--format=%H", rng, "--"}, folders...)...)
+	byPath, err := gitLines(repoRoot, append([]string{"log", "--no-merges", "--format=%H", rng, "--"}, folders...)...)
 	if err != nil {
 		return OwnCommitSet{}, err
 	}

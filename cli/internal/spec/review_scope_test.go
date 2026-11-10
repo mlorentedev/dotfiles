@@ -182,3 +182,29 @@ func TestOwnCommitsRecoversHarness142(t *testing.T) {
 		t.Errorf("HARNESS-142 own commits = %q of %d, want %q of 14", prs, got.RangeSize, want)
 	}
 }
+
+// A slice that lived on a side branch merged --no-ff is listed; one whose change
+// the merge discarded (-s ours) is not part of the diff, so it is not listed.
+func TestOwnCommitsListsASideBranchSliceButNotADiscardedOne(t *testing.T) {
+	repoRoot := initQuietRepo(t)
+	commitMsg(t, repoRoot, "base", "README.md")
+	base := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	commitMsg(t, repoRoot, "slice on main", "specs/X-001-a/proposal.md")
+	git(t, repoRoot, "checkout", "-q", "-b", "kept")
+	commitMsg(t, repoRoot, "side slice kept", "specs/X-001-a/tasks.md")
+	git(t, repoRoot, "checkout", "-q", "main")
+	git(t, repoRoot, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "merge kept", "kept")
+	git(t, repoRoot, "checkout", "-q", "-b", "dropped")
+	commitMsg(t, repoRoot, "side slice discarded", "specs/X-001-a/notes.md")
+	git(t, repoRoot, "checkout", "-q", "main")
+	git(t, repoRoot, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-s", "ours", "-m", "merge dropped", "dropped")
+
+	got, err := OwnCommits(repoRoot, base, "HEAD", []string{"specs/X-001-a"}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"slice on main", "side slice kept"}
+	if !reflect.DeepEqual(subjects(got), want) {
+		t.Errorf("own commits = %q, want %q", subjects(got), want)
+	}
+}
