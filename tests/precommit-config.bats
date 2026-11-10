@@ -51,6 +51,9 @@ PY
     # 0.15 s for one file. Flipping either field back reinstates that cost.
     [[ "$(hook_field check-bats-names files)" == '\.bats$' ]] || false
     [[ "$(hook_field check-bats-names pass_filenames)" == "True" ]] || false
+    # No fixed path argument: `argv` prints each shlex token of `entry` on its
+    # own line, so re-adding `tests/` shows up here as a second line.
+    [[ "$(hook_field check-bats-names argv)" == "./scripts/check-bats-names.sh" ]] || false
 }
 
 @test "check-bats-names.sh exits 0 on this repo's own tests/ tree [#925]" {

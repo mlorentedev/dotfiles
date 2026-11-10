@@ -71,3 +71,14 @@ teardown() { rm -rf "$TMP"; }
     [ "$status" -eq 2 ]
     [[ "$output" == *"grep failed"* ]] || false
 }
+
+# The pre-commit hook checks only the staged .bats files (#3266), so CI's lint
+# job is the only thing that still scans the whole tree. Nothing else notices if
+# that invocation is dropped, renamed, or narrowed: the hook would skip every
+# file a commit does not touch and no gate would say the tree went unscanned.
+@test "check-bats-names: CI lints the whole tests/ tree" {
+    CI="$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
+    run grep -cE '^[[:space:]]*\./scripts/check-bats-names\.sh tests/$' "$CI"
+    [ "$status" -eq 0 ]
+    [ "$output" -ge 1 ]
+}
