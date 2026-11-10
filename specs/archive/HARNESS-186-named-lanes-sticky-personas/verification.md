@@ -92,7 +92,7 @@ decision flow, lane lifecycle, use cases, activation checklist, agnostic validat
 
 ## Review-fix evidence (Batch 6 — independent adversarial review)
 
-`specs/HARNESS-186-named-lanes-sticky-personas/review.md` (reviewer `agy/gemini-3.8-flash-high`, `reviewed_sha d6c552a6`, verdict PASS-WITH-GAPS) raised three findings. Disposition of each, applied or ticketed — none left silent:
+`specs/archive/HARNESS-186-named-lanes-sticky-personas/review.md` (reviewer `agy/gemini-3.8-flash-high`, `reviewed_sha d6c552a6`, verdict PASS-WITH-GAPS) raised three findings. Disposition of each, applied or ticketed — none left silent:
 
 | # | Severity | Finding | Disposition |
 |---|----------|---------|-------------|
