@@ -3,7 +3,7 @@ id: "BUG-165-doc-path-lint-engine"
 type: spec
 status: implementing # draft | implementing | verifying | archived
 created: "2026-11-05"
-issue: "mlorentedev/dotfiles#3199"   # repo#NNN — GitHub issue / Project item that tracks this spec
+issue: "mlorentedev/dotfiles#3266"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
 template_version: "1.0"
 owner: manu
