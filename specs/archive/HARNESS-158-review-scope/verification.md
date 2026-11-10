@@ -24,6 +24,17 @@ owner: manu
 - f5 (`TestOwnCommitsRecoversHarness142`) skips on a clone without the pinned commits, so its verification command requires `--- PASS` in `-v` output rather than trusting exit 0.
 - No regressions: the launcher tests that stub the base with fake SHAs now stub the own-commit listing through the same kind of seam (`ownCommitsOf`).
 
+## Archive review dispositions
+
+Review: `review.md`, PASS, nan/qwen3.8-flash on `150a02b0`.
+
+The verdict covers `150a02b0` only. The F1 change below (`OwnCommits` drops `--full-history`, gains `--topo-order`, one new test) and the F2 test row landed after it, in the archive PR #3280, and were not re-reviewed adversarially; PR-Agent reviewed that PR's diff. The delta is a narrowing of one git query, pinned by a test that fails with the old flag.
+
+- F1 (Minor, REAL), `--full-history` load-bearing for no test and its comment inaccurate: applied in the archive PR. The flag is dropped: default history simplification already lists a slice on a side branch merged `--no-ff`, and leaves out one whose change the merge discarded (`-s ours`), which is not part of the diff. `TestOwnCommitsListsASideBranchSliceButNotADiscardedOne` pins both, and with the flag it fails (the discarded slice is listed). The comment now says why default simplification is kept. The all-commits query gained `--topo-order`, since commits sharing a timestamp came back in either order.
+- F2 (Minor, THEORETICAL), `issue: "#0"` disables the issue rule without a reason: declined, the claim does not hold. `refFromMatch` rejects a number that is not positive, so `ResolveIssueLink` errors and the launch line prints `folder rule only: the issue link does not parse: issue number "0" is not a positive integer`. A `#0` row in `TestSpecIssueNumberFallsBackToTheFolderAndSaysWhy` now pins that disclosure.
+- Question, `N of M` counts non-merge commits only: no change; the proposal's format and the prompt both say so.
+- `tasks.md` closing boxes unticked: declined. `tasks.md` is in the contract set the review signed; the evidence those boxes name is recorded in this file and in #3279.
+
 ## Decisions made during implementation
 
 - HARNESS-142 measured before writing the rule: its closing review (`review-request.json`: base `adf49c93`, reviewed `c4d0e6c8`) ran over 14 commits, of which 5 were its own, and the folder rule alone recovers all five. #3221 fixed HARNESS-142's feature without touching the folder or naming #1649, but it merged after that review, so a correct scope excludes it; the rule was not widened to every issue the spec names, which would have pulled in prior-art numbers.
@@ -37,13 +48,13 @@ owner: manu
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-571-a-negated-closing-keyword-still-closes-the-issue.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the review contract and the archive gate are unchanged; the decisions are local to the launcher and logged above
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the review launcher exists in this repository only
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-158-review-scope/` -> `specs/archive/HARNESS-158-review-scope/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-158-review-scope/` -> `specs/archive/HARNESS-158-review-scope/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3280 carries `Closes #1727`, and the merge moves the board item to Done
+- [x] Promotions above executed (if any)
