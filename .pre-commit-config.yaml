@@ -36,11 +36,22 @@ repos:
       # local commit ("dotfiles-test: Passed") and was only caught by a
       # fresh adversarial-review subagent running check-bats-names.sh
       # directly — a full review round burned on a one-character defect.
+      #
+      # #3266: both defects are per-file — a non-ASCII character, and a name
+      # repeated within one file — so checking only the staged .bats files is
+      # complete, not an approximation. The script scans every file it is given
+      # and auto-discovers only when given none, so the entry drops the
+      # hardcoded `tests/` argument and takes what pre-commit passes. CI's lint
+      # job still runs it over all of tests/ (.github/workflows/ci.yml), which
+      # is where the whole tree stays covered; this hook only decides what a
+      # local commit pays, and a full rescan per commit cost 136 s on Windows
+      # against 0.15 s for one file.
       - id: check-bats-names
         name: Check bats @test names (non-ASCII / duplicates)
-        entry: ./scripts/check-bats-names.sh tests/
+        entry: ./scripts/check-bats-names.sh
         language: script
-        pass_filenames: false
+        files: \.bats$
+        pass_filenames: true
         stages: [pre-commit]
 
       # BUG-088 (#1021): verify all repo paths referenced in backticks inside
