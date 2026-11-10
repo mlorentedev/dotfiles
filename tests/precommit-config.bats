@@ -10,6 +10,25 @@ setup() {
     export SCRIPTS_DIR="$DOTFILES_DIR/scripts"
 }
 
+# Reads a hook's field through pre-commit's own model (YAML, then shlex on
+# `entry`), so a test asserts what pre-commit will do rather than a copy of it.
+# The earlier shape was a `grep -A<n>` window, and it went red on a correct
+# config: adding one key to a hook pushed the asserted line out of the window
+# (#3266). A field is addressed by name now, so no key can move it.
+hook_field() {
+    python3 - "$DOTFILES_DIR/.pre-commit-config.yaml" "$1" "$2" <<'PY'
+import shlex, sys, yaml
+hooks = [h for r in yaml.safe_load(open(sys.argv[1]))["repos"] for h in r["hooks"]]
+h = next(h for h in hooks if h["id"] == sys.argv[2])
+field = sys.argv[3]
+if field == "argv":
+    for a in shlex.split(h["entry"]):
+        print(a)
+else:
+    print(h.get(field))
+PY
+}
+
 @test ".pre-commit-config.yaml declares sdd-spec-gate pre-push hook" {
     grep -q 'sdd-spec-gate' "$DOTFILES_DIR/.pre-commit-config.yaml"
     grep -A1 'sdd-spec-gate' "$DOTFILES_DIR/.pre-commit-config.yaml" | grep -q 'spec-gate'
@@ -20,9 +39,18 @@ setup() {
     # the retired dotfiles-test hook (scripts/test.sh, #1327) never ran bats or this script —
     # a non-ASCII @test name shipped past local pre-commit and was only
     # caught by a full adversarial-review round. This hook is the guard.
-    grep -q 'check-bats-names' "$DOTFILES_DIR/.pre-commit-config.yaml"
-    grep -A2 'id: check-bats-names' "$DOTFILES_DIR/.pre-commit-config.yaml" | grep -q 'check-bats-names.sh'
-    grep -A5 'id: check-bats-names' "$DOTFILES_DIR/.pre-commit-config.yaml" | grep -q 'pre-commit'
+    [[ "$(hook_field check-bats-names entry)" == *check-bats-names.sh* ]] || false
+    [[ "$(hook_field check-bats-names stages)" == "['pre-commit']" ]] || false
+}
+
+@test "check-bats-names is scoped to the staged .bats files [#3266]" {
+    # Both defects the script looks for -- a non-ASCII character, and a name
+    # repeated within one file -- are confined to a single file, so handing it
+    # only the staged ones is complete, not an approximation. It rescanned all
+    # 166 .bats files on every commit before this: 136 s on Windows against
+    # 0.15 s for one file. Flipping either field back reinstates that cost.
+    [[ "$(hook_field check-bats-names files)" == '\.bats$' ]] || false
+    [[ "$(hook_field check-bats-names pass_filenames)" == "True" ]] || false
 }
 
 @test "check-bats-names.sh exits 0 on this repo's own tests/ tree [#925]" {
@@ -35,21 +63,7 @@ setup() {
 
 # lint-powershell (#2678): the hook runs the pinned `dotf lint powershell`,
 # which exits 2 where pwsh is absent, so the skip lives in the hook's entry.
-# Read through pre-commit's own model (YAML, then shlex on `entry`), so the
-# test runs the command pre-commit would run, not a copy of it.
-lint_powershell_hook() {
-    python3 - "$DOTFILES_DIR/.pre-commit-config.yaml" "$1" <<'PY'
-import shlex, sys, yaml
-hooks = [h for r in yaml.safe_load(open(sys.argv[1]))["repos"] for h in r["hooks"]]
-h = next(h for h in hooks if h["id"] == "lint-powershell")
-field = sys.argv[2]
-if field == "argv":
-    for a in shlex.split(h["entry"]):
-        print(a)
-else:
-    print(h.get(field))
-PY
-}
+lint_powershell_hook() { hook_field lint-powershell "$1"; }
 
 # Runs the hook's entry with only $STUBS on PATH: a runner image that ships
 # pwsh in /usr/bin (GitHub's ubuntu does) cannot leak into the no-pwsh case.
