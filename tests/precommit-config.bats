@@ -21,11 +21,16 @@ import shlex, sys, yaml
 hooks = [h for r in yaml.safe_load(open(sys.argv[1]))["repos"] for h in r["hooks"]]
 h = next(h for h in hooks if h["id"] == sys.argv[2])
 field = sys.argv[3]
+# pre-commit's own defaults, so an omitted key reads as the behaviour it has
+# rather than as the string "None". Only `pass_filenames` matters here: it
+# defaults to true, so a config that drops the key is still a config that
+# passes filenames, and asserting the literal "True" would report it broken.
+DEFAULTS = {"pass_filenames": True}
 if field == "argv":
     for a in shlex.split(h["entry"]):
         print(a)
 else:
-    print(h.get(field))
+    print(h.get(field, DEFAULTS.get(field)))
 PY
 }
 
