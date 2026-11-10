@@ -22,15 +22,15 @@
   },
   {
     "id": "HARNESS-158-review-scope-f4",
-    "behavior": "The prompt names each own commit and the launch line prints N of M; an initial scope is unchanged; a listing failure refuses the launch",
-    "verification": "cd cli && go test ./internal/spec -run '^(TestReviewPromptNamesTheOwnCommits|TestReviewPromptSaysTheFolderAloneDecidedWithoutAnIssue|TestInitialReviewPromptCarriesNoOwnCommitList)$' && go test ./internal/cmd -run '^(TestDescribeScopeCountsTheOwnCommits|TestReviewRangeRefusesWhenTheOwnCommitsCannotBeListed)$' -count=1",
+    "behavior": "The prompt names each own commit and the launch line prints N of M; an initial scope is unchanged; a listing failure refuses the launch; the spec's own issue reaches the listing, and a folder-only fallback says why",
+    "verification": "cd cli && go test ./internal/spec -run '^(TestReviewPromptNamesTheOwnCommits|TestReviewPromptSaysTheFolderAloneDecidedWithoutAnIssue|TestInitialReviewPromptCarriesNoOwnCommitList)$' && go test ./internal/cmd -run '^(TestDescribeScopeCountsTheOwnCommits|TestReviewRangeRefusesWhenTheOwnCommitsCannotBeListed|TestReviewRangeMatchesTheSpecsOwnIssue|TestSpecIssueNumberFallsBackToTheFolderAndSaysWhy)$' -count=1",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-158-review-scope-f5",
     "behavior": "Against the real HARNESS-142 history the derivation returns #3178, #3195, #3196, #3205, #3213 of 14",
-    "verification": "cd cli && go test ./internal/spec -run '^TestOwnCommitsRecoversHarness142$' -count=1",
+    "verification": "cd cli && go test ./internal/spec -run '^TestOwnCommitsRecoversHarness142$' -count=1 -v | grep -q -- '--- PASS: TestOwnCommitsRecoversHarness142'",
     "state": "pending",
     "evidence": ""
   }

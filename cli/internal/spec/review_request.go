@@ -110,6 +110,8 @@ type ReviewScope struct {
 	// OwnIssue is the issue number Own was matched against, or 0 when the
 	// folder alone decided it.
 	OwnIssue int
+	// OwnFolderOnly is why no issue was matched, when OwnIssue is 0.
+	OwnFolderOnly string
 }
 
 // Initial reports whether the scope reviews from the empty tree.

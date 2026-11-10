@@ -394,7 +394,8 @@ func reviewRange(repoRoot, specDir, id string, initial bool) (scope spec.ReviewS
 		return spec.ReviewScope{}, "", fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
 			"There is nothing to review: the spec folder was added by HEAD itself", base.SHA[:min(12, len(base.SHA))])
 	}
-	scope = spec.ReviewScope{BaseSHA: base.SHA, OwnIssue: specIssueNumber(repoRoot, specDir)}
+	scope = spec.ReviewScope{BaseSHA: base.SHA}
+	scope.OwnIssue, scope.OwnFolderOnly = specIssueNumber(repoRoot, specDir)
 	scope.Own, err = ownCommitsOf(repoRoot, specDir, base.SHA, "HEAD", scope.OwnIssue)
 	if err != nil {
 		return spec.ReviewScope{}, "", fmt.Errorf("listing the spec's own commits in %s..HEAD: %w", base.SHA, err)
@@ -403,24 +404,34 @@ func reviewRange(repoRoot, specDir, id string, initial bool) (scope spec.ReviewS
 }
 
 // specIssueNumber is the number of the spec's tracking issue when that issue
-// lives in this repository's own origin, else 0. Commit messages here say #N
-// for this repository's numbers, so an issue held elsewhere (a kubelab spec
-// gated on a knowledge issue) must not be matched by number: the review then
-// finds its own commits by the folder alone, and the prompt says so.
-func specIssueNumber(repoRoot, specDir string) int {
+// lives in this repository's own origin, else 0 and why not. Commit messages
+// here say #N for this repository's numbers, so an issue held elsewhere (a
+// kubelab spec gated on a knowledge issue) must not be matched by number: the
+// review then finds its own commits by the folder alone, and the launch line
+// says why, so a missing origin or an odd link form does not disable the issue
+// rule invisibly.
+func specIssueNumber(repoRoot, specDir string) (int, string) {
 	data, err := os.ReadFile(filepath.Join(specDir, "proposal.md"))
 	if err != nil {
-		return 0
+		return 0, "proposal.md is unreadable"
 	}
 	homes, err := resolveSpecHomes(repoRoot, "", "")
-	if err != nil || homes.Archive == "" {
-		return 0
+	if err != nil {
+		return 0, "the issue home does not resolve: " + err.Error()
 	}
-	ref, _, err := spec.ResolveIssueLink(string(data), homes.Issues)
-	if err != nil || !strings.EqualFold(ref.Repo, homes.Archive) {
-		return 0
+	if homes.Archive == "" {
+		return 0, "origin is not a GitHub repository"
 	}
-	return ref.Number
+	ref, source, err := spec.ResolveIssueLink(string(data), homes.Issues)
+	switch {
+	case err != nil:
+		return 0, "the issue link does not parse: " + err.Error()
+	case source == spec.LinkNone:
+		return 0, "proposal.md names no issue"
+	case !strings.EqualFold(ref.Repo, homes.Archive):
+		return 0, fmt.Sprintf("issue %s lives outside %s", ref, homes.Archive)
+	}
+	return ref.Number, ""
 }
 
 // noReviewBaseError is the default refusal. It names --initial only when the
@@ -473,7 +484,11 @@ func describeScope(scope spec.ReviewScope) string {
 		return fmt.Sprintf("initial review, git diff %s HEAD (spec first added in root commit %s)", scope.BaseTree, scope.RootSHA)
 	}
 	if scope.Own.RangeSize > 0 {
-		return fmt.Sprintf("git diff %s...HEAD (%d of %d commits are the spec's own)", scope.BaseSHA, len(scope.Own.Commits), scope.Own.RangeSize)
+		d := fmt.Sprintf("git diff %s...HEAD (%d of %d commits are the spec's own", scope.BaseSHA, len(scope.Own.Commits), scope.Own.RangeSize)
+		if scope.OwnFolderOnly != "" {
+			d += "; folder rule only: " + scope.OwnFolderOnly
+		}
+		return d + ")"
 	}
 	return fmt.Sprintf("git diff %s...HEAD", scope.BaseSHA)
 }
