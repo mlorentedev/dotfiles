@@ -28,6 +28,8 @@ owner: manu
 
 Review: `review.md`, PASS, nan/qwen3.8-flash on `150a02b0`.
 
+The verdict covers `150a02b0` only. The F1 change below (`OwnCommits` drops `--full-history`, gains `--topo-order`, one new test) and the F2 test row landed after it, in the archive PR #3280, and were not re-reviewed adversarially; PR-Agent reviewed that PR's diff. The delta is a narrowing of one git query, pinned by a test that fails with the old flag.
+
 - F1 (Minor, REAL), `--full-history` load-bearing for no test and its comment inaccurate: applied in the archive PR. The flag is dropped: default history simplification already lists a slice on a side branch merged `--no-ff`, and leaves out one whose change the merge discarded (`-s ours`), which is not part of the diff. `TestOwnCommitsListsASideBranchSliceButNotADiscardedOne` pins both, and with the flag it fails (the discarded slice is listed). The comment now says why default simplification is kept. The all-commits query gained `--topo-order`, since commits sharing a timestamp came back in either order.
 - F2 (Minor, THEORETICAL), `issue: "#0"` disables the issue rule without a reason: declined, the claim does not hold. `refFromMatch` rejects a number that is not positive, so `ResolveIssueLink` errors and the launch line prints `folder rule only: the issue link does not parse: issue number "0" is not a positive integer`. A `#0` row in `TestSpecIssueNumberFallsBackToTheFolderAndSaysWhy` now pins that disclosure.
 - Question, `N of M` counts non-merge commits only: no change; the proposal's format and the prompt both say so.
@@ -54,5 +56,5 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/HARNESS-158-review-scope/` -> `specs/archive/HARNESS-158-review-scope/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3280 carries `Closes #1727`, and the merge moves the board item to Done
 - [x] Promotions above executed (if any)
