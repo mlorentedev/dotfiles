@@ -12,6 +12,7 @@
 # the one thing it was built for.
 
 load 'lib/refute'
+load 'winpath'
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
@@ -34,6 +35,7 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
 
 # --- AC1/AC3: classifies the three states, by content ---
 
+# bats test_tags=windows
 @test "AC1: the REAL #1009 rate-limit payload still refuses, now as advisory-pending" {
     # coderabbitai is ADVISORY as of 2026-08-22: its review attests, its decline
     # does not refuse. The PR is still NOT attested -- what changed is the reason
@@ -250,28 +252,35 @@ EOF
 
 # --- AC7: the gate re-runs when a review lands, without a push ---
 
+# bats test_tags=windows
 @test "AC7: the workflow triggers on pull_request AND issue_comment" {
     # Without issue_comment the gate would only ever answer at the one moment
     # the answer is always "pending" — reviewers land after the checks settle.
     # That timing gap is half of the bug, not a detail.
-    python3 -c "
+    #
+    # The path arrives as argv, not interpolated into the source: on Windows the
+    # shell hands over an MSYS path (/c/...) that the native python3 resolves
+    # against the drive root and cannot open, and a native path pasted into the
+    # source would be mangled by its backslashes. `_winpath` converts; argv keeps
+    # it out of the string literal.
+    python3 -c '
 import sys, yaml
-d = yaml.safe_load(open('$REPO/.github/workflows/review-attestation.yml'))
-on = d[True] if True in d else d['on']
-sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
-"
+d = yaml.safe_load(open(sys.argv[1]))
+on = d[True] if True in d else d["on"]
+sys.exit(0 if "pull_request" in on and "issue_comment" in on else 1)
+' "$(_winpath "$REPO/.github/workflows/review-attestation.yml")"
 }
 
 @test "AC7: the workflow triggers on pull_request_review (#1115)" {
-    python3 -c "
+    python3 -c '
 import sys, yaml
-d = yaml.safe_load(open('$REPO/.github/workflows/review-attestation.yml'))
-on = d[True] if True in d else d['on']
-pr_review = on.get('pull_request_review', {})
-types = set(pr_review.get('types', []))
-expected = {'submitted', 'edited', 'dismissed'}
+d = yaml.safe_load(open(sys.argv[1]))
+on = d[True] if True in d else d["on"]
+pr_review = on.get("pull_request_review", {})
+types = set(pr_review.get("types", []))
+expected = {"submitted", "edited", "dismissed"}
 sys.exit(0 if expected.issubset(types) else 1)
-"
+' "$(_winpath "$REPO/.github/workflows/review-attestation.yml")"
 }
 
 @test "AC7: the workflow does not swallow the gate's failure" {
@@ -365,19 +374,26 @@ sys.exit(0 if expected.issubset(types) else 1)
     [ "$status" -eq 2 ]
 }
 
+# bats test_tags=windows
 @test "AC6: an absent gh with no payload exits 2, never 0" {
     # The live path with no way to read the PR must fail closed like every other
     # unreadable case.
     #
     # A hermetic PATH rather than an empty one: emptying PATH also removes bash
     # and jq, so the script dies 127 before reaching the branch under test and
-    # the case passes for the wrong reason. gh, jq and bash all live in /usr/bin
-    # here, so the only honest way to remove one is to build a PATH containing
-    # exactly the others. Everything else this path touches is a shell builtin.
+    # the case passes for the wrong reason. So the directory holds exactly the
+    # tools this path uses, and nothing named gh.
+    #
+    # Shims, not symlinks: Git Bash's `ln -s` copies the target unless
+    # winsymlinks is enabled, and a copied MSYS executable cannot start without
+    # its DLLs beside it — the copy exits 127 and the case fails for a reason
+    # that has nothing to do with gh. A one-line shim execs the real path, which
+    # keeps its own runtime next to it. On Linux the shim is equivalent.
     mkdir -p "$TMP/bin"
     local b
-    for b in bash jq dirname cat; do
-        ln -s "$(command -v "$b")" "$TMP/bin/$b"
+    for b in bash jq dirname cat tr sed; do
+        printf '#!/bin/sh\nexec "%s" "$@"\n' "$(command -v "$b")" > "$TMP/bin/$b"
+        chmod +x "$TMP/bin/$b"
     done
     [ ! -e "$TMP/bin/gh" ]
 
@@ -582,6 +598,7 @@ EOF
     [[ "$output" != *"exempt"* ]] || false
 }
 
+# bats test_tags=windows
 @test "exempt: a real review outranks the exemption in the report" {
     # Both exit 0, so this is about what the record says. A release that WAS
     # reviewed should say attested, because that is the stronger fact and the

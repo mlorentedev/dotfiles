@@ -11,6 +11,11 @@
 # - in those files, every test that runs pwsh carries the tag;
 # - a file that tags a test is in the list, or its tagged tests never run there;
 # - bats selects at least the tests the comments tag.
+#
+# The tag marks one more thing than pwsh: a case whose behaviour is correct on
+# Linux and wrong on Windows for a reason Linux cannot exhibit — a jq-produced
+# field carrying a CRLF, a path handed to a native binary. Those read the
+# checkout and still belong here, because the checkout is not what differs.
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
