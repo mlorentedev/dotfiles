@@ -64,12 +64,32 @@ if ($MyInvocation.InvocationName -ne '.') {
     $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' +
         [Environment]::GetEnvironmentVariable('PATH', 'User') + ';' + $env:PATH
 
+    # The profile hook is the other half of "a fresh terminal", and `-NoProfile`
+    # is what drops it. On Windows a process PATH is the Machine entries then
+    # the User ones, and env-persist can only write the User PATH, so mise's
+    # shims -- and the pinned python they front -- can never precede a Machine
+    # copy of python. `mise activate` is what puts them first, and every
+    # terminal this product deploys runs it. Without it the gate measured a
+    # PATH the product never creates: it FAILed pyyaml and bats on a box whose
+    # own setup doctor had just passed both (#3174). Same idiom as
+    # setup-windows.ps1, so there is one way to activate mise in this repo.
+    #
+    # This models the terminal, and deliberately not the no-profile one: a
+    # scheduled task or GUI app still misses the pins, which is PLAT-001c's
+    # blocker 2 (register ~/.local/bin and the shims in the HKCU PATH from
+    # converge's env-persist) and is reported as the WARN from doctor's
+    # "Persisted environment (user scope)" section. The gate fails on FAILs
+    # only, so that WARN stays visible instead of being papered over here.
+    if (Get-Command mise -ErrorAction SilentlyContinue) {
+        . ([ScriptBlock]::Create((& mise activate pwsh --shims | Out-String)))
+    }
+
     # Name the PATH doctor ran with: a FAIL that reads "git missing" is a
     # statement about this step's environment before it is one about the box.
     $entries = @($env:PATH -split ';' | Where-Object { $_ })
     Write-Host ("doctor gate: PATH has {0} entries, {1} chars" -f $entries.Count, $env:PATH.Length)
     $entries | ForEach-Object { Write-Host "doctor gate:   $_" }
-    foreach ($probe in 'dotf', 'git', 'bash', 'node', 'bw') {
+    foreach ($probe in 'dotf', 'git', 'bash', 'node', 'bw', 'mise', 'python') {
         $cmd = Get-Command $probe -ErrorAction SilentlyContinue
         Write-Host ("doctor gate: {0} -> {1}" -f $probe, ($(if ($cmd) { $cmd.Source } else { 'NOT FOUND' })))
     }
