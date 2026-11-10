@@ -1,5 +1,5 @@
 ---
-id: "lesson-570-a-test-tag-that-selects-by-tool-hides-script-side-os-defects"
+id: "lesson-572-a-test-tag-that-selects-by-tool-hides-script-side-os-defects"
 type: lesson
 status: active
 title: "A CI tier that selects tests by tool cannot see a script that is wrong per OS"
