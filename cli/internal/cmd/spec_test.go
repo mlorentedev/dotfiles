@@ -29,6 +29,9 @@ func makeRepo(t *testing.T) string {
 	prevBase, prevHead, prevIgnored, prevDirt := resolveReviewBase, headSHAOf, requestIgnored, callerDirt
 	resolveReviewBase = func(string, string) spec.ReviewBase { return spec.ReviewBase{SHA: "basebasebase"} }
 	headSHAOf = func(string) string { return "headheadhead" }
+	prevOwn := ownCommitsOf
+	ownCommitsOf = func(string, string, string, string, int) (spec.OwnCommitSet, error) { return spec.OwnCommitSet{}, nil }
+	t.Cleanup(func() { ownCommitsOf = prevOwn })
 	requestIgnored = func(string, string, spec.ReviewSlot) bool { return false }
 	callerDirt = func(string) ([]string, error) { return nil, nil }
 	stubReviewTree(t)

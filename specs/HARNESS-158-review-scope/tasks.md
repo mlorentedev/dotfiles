@@ -23,12 +23,12 @@ owner: manu
 
 ## Implementation
 
-- [ ] [AC3] `ResolveReviewBaseDetail` also returns every folder name it followed (`ReviewBase.Paths`), with a test on a renamed fixture
-- [ ] [AC1] [AC2] [AC3] Failing tests for `spec.OwnCommits(repoRoot, base, head, paths, issue)` on a fixture history: two slices, interleaved and trailing unrelated commits, an issue-only slice, a `#17270` decoy, a merge commit
-- [ ] [AC1] [AC2] [AC3] Implement `OwnCommits` (`git log --no-merges` over the folder paths, union `--grep` on the issue)
-- [ ] [AC4] `ReviewScope` carries the list and the range size; `writeReviewScope` names the commits; `describeScope` prints `N of M`; test that an initial scope is unchanged
-- [ ] [AC4] `reviewRange` reads the spec's issue and fills the list
-- [ ] [AC5] Run the derivation against HARNESS-142's recorded base and head, record the output in `verification.md`
+- [x] [AC3] `SpecFolderNames` returns every folder name the base resolver followed (one trace, `traceSpecFolder`, so the two cannot disagree), with a test on a renamed fixture
+- [x] [AC1] [AC2] [AC3] Failing tests for `spec.OwnCommits(repoRoot, base, head, paths, issue)` on a fixture history: two slices, interleaved and trailing unrelated commits, an issue-only slice, a `#17270` decoy, a merge commit
+- [x] [AC1] [AC2] [AC3] Implement `OwnCommits` (`git log --no-merges` over the folder paths, union `--grep` on the issue)
+- [x] [AC4] `ReviewScope` carries the list and the range size; `writeReviewScope` names the commits; `describeScope` prints `N of M`; test that an initial scope is unchanged
+- [x] [AC4] `reviewRange` reads the spec's issue and fills the list
+- [x] [AC5] Run the derivation against HARNESS-142's recorded base and head, record the output in `verification.md`
 
 ## Closing
 

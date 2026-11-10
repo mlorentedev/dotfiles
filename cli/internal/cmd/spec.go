@@ -76,6 +76,13 @@ var reviewerDraw = rand.IntN
 // the answer, and only a real repository proves the answer is right.
 var resolveReviewBase = spec.ResolveReviewBaseDetail
 var headSHAOf = spec.HeadSHA
+
+// ownCommitsOf lists the spec's own commits in base..head (HARNESS-158). A seam
+// beside resolveReviewBase and headSHAOf, which the launcher tests stub with
+// SHAs no repository holds.
+var ownCommitsOf = func(repoRoot, specDir, base, head string, issue int) (spec.OwnCommitSet, error) {
+	return spec.OwnCommits(repoRoot, base, head, spec.SpecFolderNames(repoRoot, specDir), issue)
+}
 var emptyTreeOf = spec.EmptyTree
 
 // requestIgnored is a seam over spec.RequestIgnored, for the same reason.
@@ -388,7 +395,7 @@ func reviewRange(repoRoot, specDir, id string, initial bool) (scope spec.ReviewS
 			"There is nothing to review: the spec folder was added by HEAD itself", base.SHA[:min(12, len(base.SHA))])
 	}
 	scope = spec.ReviewScope{BaseSHA: base.SHA, OwnIssue: specIssueNumber(repoRoot, specDir)}
-	scope.Own, err = spec.OwnCommits(repoRoot, base.SHA, "HEAD", spec.SpecFolderNames(repoRoot, specDir), scope.OwnIssue)
+	scope.Own, err = ownCommitsOf(repoRoot, specDir, base.SHA, "HEAD", scope.OwnIssue)
 	if err != nil {
 		return spec.ReviewScope{}, "", fmt.Errorf("listing the spec's own commits in %s..HEAD: %w", base.SHA, err)
 	}

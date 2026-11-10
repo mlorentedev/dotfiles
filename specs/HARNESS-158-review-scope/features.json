@@ -1,8 +1,36 @@
 [
   {
     "id": "HARNESS-158-review-scope-f1",
-    "behavior": "Outcome 1",
-    "verification": "echo 'not implemented' && exit 1",
+    "behavior": "Two slices merged at different times with unrelated work between: the list holds exactly the slices' commits",
+    "verification": "cd cli && go test ./internal/spec -run '^TestOwnCommitsHoldsOnlyTheSlicesOfTheSpec$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-158-review-scope-f2",
+    "behavior": "An issue-only slice is listed; a #17270 decoy and a merge naming the issue are not; without an issue the folder alone decides",
+    "verification": "cd cli && go test ./internal/spec -run '^TestOwnCommits(HoldsOnlyTheSlicesOfTheSpec|WithoutAnIssueUsesTheFolderAlone)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-158-review-scope-f3",
+    "behavior": "A renamed spec folder still recovers the commits made under its earlier name",
+    "verification": "cd cli && go test ./internal/spec -run '^TestOwnCommitsFollowsARenamedSpecFolder$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-158-review-scope-f4",
+    "behavior": "The prompt names each own commit and the launch line prints N of M; an initial scope is unchanged; a listing failure refuses the launch",
+    "verification": "cd cli && go test ./internal/spec -run '^(TestReviewPromptNamesTheOwnCommits|TestReviewPromptSaysTheFolderAloneDecidedWithoutAnIssue|TestInitialReviewPromptCarriesNoOwnCommitList)$' && go test ./internal/cmd -run '^(TestDescribeScopeCountsTheOwnCommits|TestReviewRangeRefusesWhenTheOwnCommitsCannotBeListed)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-158-review-scope-f5",
+    "behavior": "Against the real HARNESS-142 history the derivation returns #3178, #3195, #3196, #3205, #3213 of 14",
+    "verification": "cd cli && go test ./internal/spec -run '^TestOwnCommitsRecoversHarness142$' -count=1",
     "state": "pending",
     "evidence": ""
   }

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
@@ -16,5 +18,21 @@ func TestDescribeScopeCountsTheOwnCommits(t *testing.T) {
 	initial := spec.ReviewScope{BaseTree: "tree", RootSHA: "root"}
 	if got, want := describeScope(initial), "initial review, git diff tree HEAD (spec first added in root commit root)"; got != want {
 		t.Errorf("describeScope(initial) = %q, want %q", got, want)
+	}
+}
+
+// A git failure while listing the own commits refuses the launch: an empty list
+// would read as a spec with no commits of its own.
+func TestReviewRangeRefusesWhenTheOwnCommitsCannotBeListed(t *testing.T) {
+	prevBase, prevHead, prevOwn := resolveReviewBase, headSHAOf, ownCommitsOf
+	t.Cleanup(func() { resolveReviewBase, headSHAOf, ownCommitsOf = prevBase, prevHead, prevOwn })
+	resolveReviewBase = func(string, string) spec.ReviewBase { return spec.ReviewBase{SHA: "basebasebase"} }
+	headSHAOf = func(string) string { return "headheadhead" }
+	ownCommitsOf = func(string, string, string, string, int) (spec.OwnCommitSet, error) {
+		return spec.OwnCommitSet{}, errors.New("git broke")
+	}
+	_, _, err := reviewRange(t.TempDir(), t.TempDir(), "X-001-a", false)
+	if err == nil || !strings.Contains(err.Error(), "git broke") {
+		t.Errorf("reviewRange err = %v, want the listing failure", err)
 	}
 }
