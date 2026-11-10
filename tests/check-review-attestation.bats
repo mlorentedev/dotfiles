@@ -34,6 +34,7 @@ teardown() { [ -z "${TMP:-}" ] || rm -rf "$TMP"; }
 
 # --- AC1/AC3: classifies the three states, by content ---
 
+# bats test_tags=windows
 @test "AC1: the REAL #1009 rate-limit payload still refuses, now as advisory-pending" {
     # coderabbitai is ADVISORY as of 2026-08-22: its review attests, its decline
     # does not refuse. The PR is still NOT attested -- what changed is the reason
@@ -250,28 +251,45 @@ EOF
 
 # --- AC7: the gate re-runs when a review lands, without a push ---
 
+# The workflow's triggers, read as keys rather than as substrings, and with no
+# YAML library: the Windows runner's python3 has no yaml module, so the tagged
+# version below died on the import before asserting anything. A substring match
+# would be worse — it passes on this workflow's own comments about the triggers
+# (#998). These two assert which keys exist, which is what awk reads.
+on_block() {
+    awk '/^on:[[:space:]]*$/ { f = 1; next } f && /^[^[:space:]#]/ { f = 0 } f' "$1"
+}
+
+trigger_block() {
+    awk -v k="$2" '
+        $0 ~ "^  " k ":[[:space:]]*$" { f = 1; next }
+        f && /^  [a-z_]+:/ { f = 0 }
+        f && /^[^[:space:]#]/ { f = 0 }
+        f
+    ' "$1"
+}
+
+# bats test_tags=windows
 @test "AC7: the workflow triggers on pull_request AND issue_comment" {
     # Without issue_comment the gate would only ever answer at the one moment
     # the answer is always "pending" — reviewers land after the checks settle.
     # That timing gap is half of the bug, not a detail.
-    python3 -c "
-import sys, yaml
-d = yaml.safe_load(open('$REPO/.github/workflows/review-attestation.yml'))
-on = d[True] if True in d else d['on']
-sys.exit(0 if 'pull_request' in on and 'issue_comment' in on else 1)
-"
+    #
+    # Tagged windows because this is the test that proved the runner's python3
+    # has no yaml module. Keep it tagged: if a yaml import comes back, the
+    # Windows job is the only one that says so.
+    local wf="$REPO/.github/workflows/review-attestation.yml"
+    on_block "$wf" | grep -qE '^  pull_request:[[:space:]]*$'
+    on_block "$wf" | grep -qE '^  issue_comment:[[:space:]]*$'
 }
 
 @test "AC7: the workflow triggers on pull_request_review (#1115)" {
-    python3 -c "
-import sys, yaml
-d = yaml.safe_load(open('$REPO/.github/workflows/review-attestation.yml'))
-on = d[True] if True in d else d['on']
-pr_review = on.get('pull_request_review', {})
-types = set(pr_review.get('types', []))
-expected = {'submitted', 'edited', 'dismissed'}
-sys.exit(0 if expected.issubset(types) else 1)
-"
+    local wf="$REPO/.github/workflows/review-attestation.yml"
+    types="$(trigger_block "$wf" pull_request_review | grep -E '^[[:space:]]+types:')"
+    [[ -n "$types" ]] || false
+    for t in submitted edited dismissed; do
+        [[ "$types" == *"$t"* ]] || false
+    done
 }
 
 @test "AC7: the workflow does not swallow the gate's failure" {
@@ -365,19 +383,26 @@ sys.exit(0 if expected.issubset(types) else 1)
     [ "$status" -eq 2 ]
 }
 
+# bats test_tags=windows
 @test "AC6: an absent gh with no payload exits 2, never 0" {
     # The live path with no way to read the PR must fail closed like every other
     # unreadable case.
     #
     # A hermetic PATH rather than an empty one: emptying PATH also removes bash
     # and jq, so the script dies 127 before reaching the branch under test and
-    # the case passes for the wrong reason. gh, jq and bash all live in /usr/bin
-    # here, so the only honest way to remove one is to build a PATH containing
-    # exactly the others. Everything else this path touches is a shell builtin.
+    # the case passes for the wrong reason. So the directory holds exactly the
+    # tools this path uses, and nothing named gh.
+    #
+    # Shims, not symlinks: Git Bash's `ln -s` copies the target unless
+    # winsymlinks is enabled, and a copied MSYS executable cannot start without
+    # its DLLs beside it — the copy exits 127 and the case fails for a reason
+    # that has nothing to do with gh. A one-line shim execs the real path, which
+    # keeps its own runtime next to it. On Linux the shim is equivalent.
     mkdir -p "$TMP/bin"
     local b
-    for b in bash jq dirname cat; do
-        ln -s "$(command -v "$b")" "$TMP/bin/$b"
+    for b in bash jq dirname cat tr sed; do
+        printf '#!/bin/sh\nexec "%s" "$@"\n' "$(command -v "$b")" > "$TMP/bin/$b"
+        chmod +x "$TMP/bin/$b"
     done
     [ ! -e "$TMP/bin/gh" ]
 
@@ -582,6 +607,7 @@ EOF
     [[ "$output" != *"exempt"* ]] || false
 }
 
+# bats test_tags=windows
 @test "exempt: a real review outranks the exemption in the report" {
     # Both exit 0, so this is about what the record says. A release that WAS
     # reviewed should say attested, because that is the stronger fact and the
