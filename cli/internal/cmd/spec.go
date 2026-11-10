@@ -387,7 +387,33 @@ func reviewRange(repoRoot, specDir, id string, initial bool) (scope spec.ReviewS
 		return spec.ReviewScope{}, "", fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
 			"There is nothing to review: the spec folder was added by HEAD itself", base.SHA[:min(12, len(base.SHA))])
 	}
-	return spec.ReviewScope{BaseSHA: base.SHA}, headSHA, nil
+	scope = spec.ReviewScope{BaseSHA: base.SHA, OwnIssue: specIssueNumber(repoRoot, specDir)}
+	scope.Own, err = spec.OwnCommits(repoRoot, base.SHA, "HEAD", spec.SpecFolderNames(repoRoot, specDir), scope.OwnIssue)
+	if err != nil {
+		return spec.ReviewScope{}, "", fmt.Errorf("listing the spec's own commits in %s..HEAD: %w", base.SHA, err)
+	}
+	return scope, headSHA, nil
+}
+
+// specIssueNumber is the number of the spec's tracking issue when that issue
+// lives in this repository's own origin, else 0. Commit messages here say #N
+// for this repository's numbers, so an issue held elsewhere (a kubelab spec
+// gated on a knowledge issue) must not be matched by number: the review then
+// finds its own commits by the folder alone, and the prompt says so.
+func specIssueNumber(repoRoot, specDir string) int {
+	data, err := os.ReadFile(filepath.Join(specDir, "proposal.md"))
+	if err != nil {
+		return 0
+	}
+	homes, err := resolveSpecHomes(repoRoot, "", "")
+	if err != nil || homes.Archive == "" {
+		return 0
+	}
+	ref, _, err := spec.ResolveIssueLink(string(data), homes.Issues)
+	if err != nil || !strings.EqualFold(ref.Repo, homes.Archive) {
+		return 0
+	}
+	return ref.Number
 }
 
 // noReviewBaseError is the default refusal. It names --initial only when the
@@ -438,6 +464,9 @@ func initialScope(repoRoot, id string, base spec.ReviewBase) (spec.ReviewScope, 
 func describeScope(scope spec.ReviewScope) string {
 	if scope.Initial() {
 		return fmt.Sprintf("initial review, git diff %s HEAD (spec first added in root commit %s)", scope.BaseTree, scope.RootSHA)
+	}
+	if scope.Own.RangeSize > 0 {
+		return fmt.Sprintf("git diff %s...HEAD (%d of %d commits are the spec's own)", scope.BaseSHA, len(scope.Own.Commits), scope.Own.RangeSize)
 	}
 	return fmt.Sprintf("git diff %s...HEAD", scope.BaseSHA)
 }
