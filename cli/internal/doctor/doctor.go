@@ -300,7 +300,7 @@ func (e sweepEnv) agents() []check {
 		{kind: kindMachine, run: func() { checkModelMap(e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkModelPins(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkModelLimits(e.sys, e.cfg, e.rep, e.opts.Fix) }},
-		{kind: kindIdentity, section: "NaN quota", restore: restoreBW, run: func() { checkNaNQuota(e.sys, e.cfg, e.rep) }},
+		{kind: kindIdentity, section: "NaN models", restore: restoreBW, run: func() { checkNaNQuota(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkPiExtensions(e.sys, e.cfg, e.rep, e.opts.Fix) }},
 		{kind: kindMachine, run: func() { checkPiPackageRequirements(e.sys, e.cfg, e.rep) }},
 	}
