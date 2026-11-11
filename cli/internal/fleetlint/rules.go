@@ -19,7 +19,7 @@ const (
 var shaRef = regexp.MustCompile(`@[0-9a-f]{40}$`)
 
 // lintWorkflow applies every rule to one workflow file.
-func lintWorkflow(path string, data []byte) ([]Finding, error) {
+func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, error) {
 	docs, err := decodeDocs(data)
 	if err != nil {
 		return nil, err
@@ -29,12 +29,26 @@ func lintWorkflow(path string, data []byte) ([]Finding, error) {
 		if len(d.Content) == 0 {
 			continue
 		}
-		jobs := mapValue(d.Content[0], "jobs")
+		root := d.Content[0]
+		onKey, on := mapEntry(root, "on")
+		pr := triggersPR(on)
+		if pr {
+			out = append(out, cancelFinding(path, root, onKey)...)
+		}
+		bf, err := branchFindings(path, on, defaultBranch)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, bf...)
+		jobs := mapValue(root, "jobs")
 		if jobs == nil || jobs.Kind != yaml.MappingNode {
 			continue
 		}
 		for i := 0; i+1 < len(jobs.Content); i += 2 {
 			out = append(out, lintJob(path, jobs.Content[i], jobs.Content[i+1])...)
+			if pr {
+				out = append(out, osFinding(path, jobs.Content[i], jobs.Content[i+1])...)
+			}
 		}
 	}
 	return out, nil
@@ -66,6 +80,7 @@ func lintJob(path string, key, job *yaml.Node) []Finding {
 		if su == nil {
 			continue
 		}
+		out = append(out, cacheFinding(path, su, st)...)
 		if !pinned(su.Value) {
 			add(RuleSHAPin, su.Line, su.Value+" is not pinned by a full commit SHA")
 		}

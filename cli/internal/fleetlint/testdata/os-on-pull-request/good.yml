@@ -1,0 +1,29 @@
+on: pull_request
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      os: ${{ steps.f.outputs.os }}
+    steps:
+      - id: f
+        run: echo 'os=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"
+  # The matrix is computed, so change detection decides.
+  test:
+    needs: changes
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: ${{ fromJSON(needs.changes.outputs.os) }}
+    steps:
+      - run: make
+  windows:
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - run: make

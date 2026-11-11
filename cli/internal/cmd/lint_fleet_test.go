@@ -58,3 +58,18 @@ func TestLintFleetExitCodes(t *testing.T) {
 		t.Errorf("stray argument: exit %d, want 2", code)
 	}
 }
+
+func TestLintFleetDefaultBranch(t *testing.T) {
+	dir := t.TempDir()
+	writeWorkflow(t, dir, "on:\n  push:\n    branches: [master]\njobs: {}\n")
+	out, code := runLintFleetCmd(t, "--dir", dir)
+	if code != 2 || !strings.Contains(out, "--default-branch") {
+		t.Errorf("unknown default branch: exit %d, %q", code, out)
+	}
+	if out, code := runLintFleetCmd(t, "--dir", dir, "--default-branch", "master"); code != 0 {
+		t.Errorf("filter names it: exit %d, %q", code, out)
+	}
+	if out, code := runLintFleetCmd(t, "--dir", dir, "--default-branch", "main"); code != 1 || !strings.Contains(out, "fleet/branch-filter") {
+		t.Errorf("filter misses it: exit %d, %q", code, out)
+	}
+}

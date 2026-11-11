@@ -1,0 +1,15 @@
+on:
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: make
+---
+# Not a pull-request workflow: nothing to cancel.
+on: push
+jobs: {}
