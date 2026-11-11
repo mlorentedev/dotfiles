@@ -40,6 +40,18 @@
       }
     },
     {
+      "name": "vcredist",
+      "profile": "full",
+      "source": {
+        "type": "system",
+        "winget_arch": {
+          "amd64": "Microsoft.VCRedist.2015+.x64",
+          "arm64": "Microsoft.VCRedist.2015+.arm64"
+        },
+        "platforms": ["windows"]
+      }
+    },
+    {
       "name": "mise",
       "version": "2026.9.13",
       "profile": "full",
