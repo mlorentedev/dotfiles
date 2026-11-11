@@ -29,6 +29,9 @@ created: "2026-11-11"
 Workflows are read under `.github/workflows` and `.gitea/workflows`. The default branch is `--default-branch`,
 else what `origin/HEAD` names. A branch filter with neither is an error (exit 2), never a pass.
 
+A clone made by `actions/checkout` has no `origin/HEAD`, so a workflow passes the branch from the event:
+`dotf lint fleet --dir . --default-branch "${{ github.event.repository.default_branch }}"`.
+
 ## Running it
 
 ```bash
