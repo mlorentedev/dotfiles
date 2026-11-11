@@ -110,6 +110,9 @@ func TestAuditLanes_ReportsACorruptedMarkerByField(t *testing.T) {
 		{"drive prefix in an entry", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":["C:\\hosts"]}`, []string{"third_party_roots", "C:", "drive"}},
 		{"duplicate entry", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":["x","x"]}`, []string{"third_party_roots", "x", "duplicate"}},
 		{"lane set differs from what dotf provisions", `{"version":1,"canonical_lanes":["feat-lane-primary"],"third_party_roots":["x"]}`, []string{"canonical_lanes", "differs", "dotf lane init"}},
+		{"dot entry", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":[".."]}`, []string{"third_party_roots", `".."`, "not a directory name"}},
+		{"padded entry", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":[" x "]}`, []string{"third_party_roots", `" x "`, "whitespace"}},
+		{"trailing data after the object", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":["x"]} {"version":2}`, []string{LanesMarkerFile, "trailing"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -257,6 +260,25 @@ func TestAuditLanes_ReportsABrokenLane(t *testing.T) {
 		if err := os.MkdirAll(lanePath, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		wantFindings(t, audit(t, repoDir, wtRoot), 1, LaneFeatSecondary, "not a git worktree")
+		wantFindings(t, audit(t, repoDir, wtRoot), 1, LaneFeatSecondary, "not a git worktree", "git worktree prune")
+	})
+	// Wiped and recreated by hand: git still registers it, the record is
+	// intact, and the directory has no .git file. Measured: dotf lane init
+	// refuses the directory, and once it is moved aside git worktree add
+	// refuses the registered path too, so the FIX needs git worktree prune.
+	t.Run("a plain directory at a lane path git still registers", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatSecondary)
+		if err := os.RemoveAll(lanePath); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(lanePath, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		a := audit(t, repoDir, wtRoot)
+		wantFindings(t, a, 1, LaneFeatSecondary, "not a git worktree", "git worktree prune")
+		if strings.Contains(joined(a), "lease") {
+			t.Errorf("a plain directory is reported as such, not as a missing lease:\n%s", joined(a))
+		}
 	})
 }
