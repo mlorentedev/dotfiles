@@ -61,12 +61,23 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
   the 88-byte clip, the closed-issue exclusion
 - [x] A feed whose last line has no newline: the script's `read` drops it, `dotf` reads it. Kept as a fix,
   since the workflow writes every line terminated and no parity case can tell them apart
-- [x] `--summary` is `gate spec`'s only: the knowledge script writes no step summary, so `gate knowledge`
-  has nothing to port
+- [x] `--summary` on both gates: `gate knowledge` has had it since PR 1 (the script writes none, so it has no
+  parity case); `gate spec` writes the adjacency table. Every `--summary` writes through one helper
 
 ## PR 4: `dotf lint fleet`
 
-- [ ] [AC4] Reader, first four rules, `.github/lint-exceptions.yml` with rule, path, reason and issue
+- [x] [AC4] Reader over `.github/workflows` and `.gitea/workflows` (every YAML document of a file), first four
+  rules (`fleet/timeout`, `fleet/sha-pin`, `fleet/persist-credentials`, `fleet/no-secrets-inherit`), each with a
+  good and a bad fixture; the bad one trips its rule once and no other
+- [x] [AC4] Exceptions in `.github/lint-exceptions.yml`: rule, path, reason and issue required; an incomplete entry
+  is `fleet/exception` and silences nothing; an exception silences its rule on its path only
+- [x] Decided: a job calling a reusable workflow is exempt from `fleet/timeout` (GitHub rejects the key there);
+  `./` and `docker://` are exempt from `fleet/sha-pin` (a digest pin is a registry rule, not a git one)
+- [x] Mutations caught: the caller exemption, the `./` exemption, an explicit `persist-credentials: true`, an
+  exception that ignores its path, one that ignores its rule, the `inherit` match
+- [ ] PR 5: stale exceptions (matching nothing) and unknown rule ids as findings. dotfiles' own
+  `.github/lint-exceptions.yml` lands with the adoption, by the owner: `.github/**` is not an agent's to merge.
+  Run on dotfiles today: 21 findings, all `fleet/persist-credentials`
 
 ## PR 5: remaining rules, `--fleet`
 

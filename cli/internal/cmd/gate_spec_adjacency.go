@@ -58,16 +58,11 @@ func (g *specGate) summarizeAdjacency(rows []gate.Adjacent) {
 	if g.o.summary == "" {
 		return
 	}
-	f, err := os.OpenFile(g.o.summary, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return
-	}
-	defer func() { _ = f.Close() }()
 	esc := func(s string) string { return strings.ReplaceAll(s, "|", `\|`) }
 	var b strings.Builder
 	b.WriteString("\n### Adjacent open issues (advisory)\n\n| Issue | Names | Title |\n|---|---|---|\n")
 	for _, r := range rows {
 		fmt.Fprintf(&b, "| #%s | `%s` | %s |\n", r.Issue, esc(r.Match), gate.Clip(esc(r.Text), 88))
 	}
-	_, _ = f.WriteString(b.String())
+	_ = appendText(g.o.summary, b.String()) // advisory: a summary it cannot write is silence
 }
