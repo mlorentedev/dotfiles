@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -10,7 +11,7 @@ import (
 )
 
 func newLintFleetCmd() *cobra.Command {
-	var dir, summary string
+	var dir, summary, defaultBranch string
 	cmd := &cobra.Command{
 		Use:   "fleet",
 		Short: "Check a repository's CI workflows against the fleet's CI standard",
@@ -20,6 +21,13 @@ func newLintFleetCmd() *cobra.Command {
   fleet/sha-pin              every remote uses: is pinned by a full commit SHA
   fleet/persist-credentials  every actions/checkout sets persist-credentials: false
   fleet/no-secrets-inherit   no job passes secrets: inherit
+  fleet/cancel-in-progress   a pull-request workflow cancels its stale runs
+  fleet/os-on-pull-request  no Windows or macOS job runs on a pull request
+                             without an if:
+  fleet/skip-cache           no setup action or linter switches its cache off
+  fleet/branch-filter        a push or pull_request branch filter includes
+                             the default branch (--default-branch, else what
+                             origin/HEAD names; unknown is an error)
 
 A repository silences one rule on one file in .github/lint-exceptions.yml:
 
@@ -41,16 +49,29 @@ An exception missing any of the four fields is itself a finding
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runLintFleet(c.OutOrStdout(), c.ErrOrStderr(), dir, summary)
+			return runLintFleet(c.OutOrStdout(), c.ErrOrStderr(), lintFleetDeps{branchOf: fleetlint.DefaultBranch}, dir, defaultBranch, summary)
 		},
 	}
 	cmd.Flags().StringVar(&dir, "dir", ".", "repository root to check")
+	cmd.Flags().StringVar(&defaultBranch, "default-branch", "", "the branch every branch filter must include (default: what origin/HEAD names)")
 	cmd.Flags().StringVar(&summary, "summary", "", "Markdown file to append the findings table to, e.g. $GITHUB_STEP_SUMMARY")
 	return cmd
 }
 
-func runLintFleet(stdout, stderr io.Writer, dir, summary string) error {
-	findings, err := fleetlint.Lint(dir)
+// lintFleetDeps is the command's one external surface: what a checkout's
+// origin/HEAD names, which reads git.
+type lintFleetDeps struct {
+	branchOf func(dir string) string
+}
+
+func runLintFleet(stdout, stderr io.Writer, deps lintFleetDeps, dir, defaultBranch, summary string) error {
+	if defaultBranch == "" {
+		defaultBranch = deps.branchOf(dir)
+	}
+	findings, err := fleetlint.Lint(dir, defaultBranch)
+	if errors.Is(err, fleetlint.ErrNoDefaultBranch) {
+		err = fmt.Errorf("%w: pass --default-branch", err)
+	}
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "[ERROR] %v\n", err)
 		return withExitCode(2, err)

@@ -35,7 +35,7 @@ var workflowDirs = []string{".github/workflows", ".gitea/workflows"}
 // Lint returns the findings in dir's workflows that no exception covers, and
 // the exceptions file's own, sorted by file, line and rule. An unreadable file
 // is an error, never an empty result.
-func Lint(dir string) ([]Finding, error) {
+func Lint(dir, defaultBranch string) ([]Finding, error) {
 	var all []Finding
 	for _, wd := range workflowDirs {
 		files, err := workflowFiles(filepath.Join(dir, wd))
@@ -48,7 +48,7 @@ func Lint(dir string) ([]Finding, error) {
 				return nil, err
 			}
 			rel, _ := filepath.Rel(dir, f)
-			found, err := lintWorkflow(filepath.ToSlash(rel), data)
+			found, err := lintWorkflow(filepath.ToSlash(rel), data, defaultBranch)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", filepath.ToSlash(rel), err)
 			}
@@ -104,13 +104,19 @@ func decodeDocs(data []byte) ([]*yaml.Node, error) {
 
 // mapValue is the value under key in a mapping node, or nil.
 func mapValue(m *yaml.Node, key string) *yaml.Node {
+	_, v := mapEntry(m, key)
+	return v
+}
+
+// mapEntry is the key node and the value under key in a mapping node, or nils.
+func mapEntry(m *yaml.Node, key string) (*yaml.Node, *yaml.Node) {
 	if m == nil || m.Kind != yaml.MappingNode {
-		return nil
+		return nil, nil
 	}
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		if m.Content[i].Value == key {
-			return m.Content[i+1]
+			return m.Content[i], m.Content[i+1]
 		}
 	}
-	return nil
+	return nil, nil
 }

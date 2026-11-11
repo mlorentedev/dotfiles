@@ -58,3 +58,37 @@ func TestLintFleetExitCodes(t *testing.T) {
 		t.Errorf("stray argument: exit %d, want 2", code)
 	}
 }
+
+func TestLintFleetDefaultBranch(t *testing.T) {
+	dir := t.TempDir()
+	writeWorkflow(t, dir, "on:\n  push:\n    branches: [master]\njobs: {}\n")
+	out, code := runLintFleetCmd(t, "--dir", dir)
+	if code != 2 || !strings.Contains(out, "--default-branch") {
+		t.Errorf("unknown default branch: exit %d, %q", code, out)
+	}
+	if out, code := runLintFleetCmd(t, "--dir", dir, "--default-branch", "master"); code != 0 {
+		t.Errorf("filter names it: exit %d, %q", code, out)
+	}
+	if out, code := runLintFleetCmd(t, "--dir", dir, "--default-branch", "main"); code != 1 || !strings.Contains(out, "fleet/branch-filter") {
+		t.Errorf("filter misses it: exit %d, %q", code, out)
+	}
+}
+
+// The default branch comes from the injected lookup when no flag names it,
+// and an unknown one is exit 2, not a pass: no git process runs here.
+func TestLintFleetAsksForTheDefaultBranch(t *testing.T) {
+	dir := t.TempDir()
+	writeWorkflow(t, dir, "on:\n  push:\n    branches: [master]\njobs: {}\n")
+	for branch, want := range map[string]int{"master": 0, "main": 1, "": 2} {
+		var out bytes.Buffer
+		var asked string
+		deps := lintFleetDeps{branchOf: func(d string) string { asked = d; return branch }}
+		if code := ExitCode(runLintFleet(&out, &out, deps, dir, "", "")); code != want || asked != dir {
+			t.Errorf("origin/HEAD %q: exit %d (asked %q), want %d: %s", branch, code, asked, want, out.String())
+		}
+	}
+	deps := lintFleetDeps{branchOf: func(string) string { t.Error("a flag was given; the lookup ran"); return "" }}
+	if code := ExitCode(runLintFleet(&bytes.Buffer{}, &bytes.Buffer{}, deps, dir, "master", "")); code != 0 {
+		t.Errorf("--default-branch master: exit %d", code)
+	}
+}

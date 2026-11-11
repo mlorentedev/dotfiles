@@ -75,14 +75,34 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
   `./` and `docker://` are exempt from `fleet/sha-pin` (a digest pin is a registry rule, not a git one)
 - [x] Mutations caught: the caller exemption, the `./` exemption, an explicit `persist-credentials: true`, an
   exception that ignores its path, one that ignores its rule, the `inherit` match
-- [ ] PR 5: stale exceptions (matching nothing) and unknown rule ids as findings. dotfiles' own
-  `.github/lint-exceptions.yml` lands with the adoption, by the owner: `.github/**` is not an agent's to merge.
-  Run on dotfiles today: 21 findings, all `fleet/persist-credentials`
+- [x] dotfiles' own `.github/lint-exceptions.yml` lands with the adoption, by the owner (#3336): `.github/**` is
+  not an agent's to merge. Run on dotfiles at PR 4: 21 findings, all `fleet/persist-credentials`
 
-## PR 5: remaining rules, `--fleet`
+## PR 5a: the remaining four rules
 
-- [ ] [AC4] Remaining rules
-- [ ] [AC5] `--fleet` report and the runbook section
+- [x] [AC4] `fleet/cancel-in-progress` (workflow-level `concurrency` only; an expression counts as set, `false` does
+  not; only where a push to the pull request starts the workflow again, so `types:` without `synchronize` is exempt), `fleet/os-on-pull-request` (no `if:`, and `runs-on` names Windows or macOS literally or through a literal
+  matrix, its `include:`, a nested `matrix.a.b` path, less an `exclude:` on that axis alone; a computed matrix is conditional), `fleet/skip-cache` (an explicit switch-off only:
+  `cache: false` on a `*/setup-*` step, `skip-cache: true` on golangci-lint-action), `fleet/branch-filter` (push and
+  pull_request `branches:` read as GitHub does, in order, last match wins, `**` crossing a slash, `?` and `+`
+  quantifying the preceding character, `[...]` a class, `\` escaping; `branches-ignore`
+  not read)
+- [x] Default branch: `--default-branch`, else what origin/HEAD names. A branch filter with neither is exit 2,
+  never a pass
+- [x] Pull-request triggers read in all three shapes of `on:` (scalar, sequence, mapping)
+- [x] Mutations caught: `cancel-in-progress: false`, the sequence form of `on:`, the `if:` exemption, `include:`,
+  the setup-action scope of `cache:`, the `skip-cache` value, `!` patterns, `**`, regexp metacharacters, the missing
+  default branch, the pull-request scope of the cancel rule
+- [x] Run on dotfiles: 29 findings (26 once #3305 gated two Windows legs and added a checkout). 21 persist-credentials (#3335), 3 os-on-pull-request (`ci.yml` test-windows,
+  `cli.yml` test, `cli-smoke.yml` smoke), 1 cancel-in-progress (`repo-hygiene.yml`), 2 skip-cache (`cli.yml`, the
+  exception the proposal names with #2834). `add-to-project.yml` runs on `opened` and `reopened` only: it was a
+  finding until the rule read `types:`
+
+## PR 5b: `--fleet`, exception hygiene, runbook
+
+- [ ] [AC5] `--fleet <dir>` over the checkouts under a directory, findings per repository
+- [ ] Stale exceptions (matching nothing) and unknown rule ids as findings
+- [ ] [AC5] The runbook section, linked from ci-workflows ADR-001
 
 ## Closing
 
