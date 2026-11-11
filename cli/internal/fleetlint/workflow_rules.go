@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -52,6 +53,26 @@ func triggersPR(on *yaml.Node) bool {
 			if isPR(on.Content[i].Value) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// rerunsOnPush reports whether a push to a pull request starts the workflow
+// again: a pull-request trigger with no types: (the default set holds
+// synchronize) or whose types: name synchronize. Only then can a run go stale.
+func rerunsOnPush(on *yaml.Node) bool {
+	if on == nil || on.Kind != yaml.MappingNode {
+		return triggersPR(on)
+	}
+	for _, event := range []string{"pull_request", "pull_request_target"} {
+		k, v := mapEntry(on, event)
+		if k == nil {
+			continue
+		}
+		types := scalars(mapValue(v, "types"))
+		if types == nil || slices.Contains(types, "synchronize") {
+			return true
 		}
 	}
 	return false

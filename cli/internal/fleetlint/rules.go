@@ -32,7 +32,7 @@ func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, er
 		root := d.Content[0]
 		onKey, on := mapEntry(root, "on")
 		pr := triggersPR(on)
-		if pr {
+		if rerunsOnPush(on) {
 			out = append(out, cancelFinding(path, root, onKey)...)
 		}
 		bf, err := branchFindings(path, on, defaultBranch)

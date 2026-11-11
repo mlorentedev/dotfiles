@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // repo lays files out under a temporary repository root.
@@ -235,5 +237,27 @@ func TestCancelInProgressFalseIsAFinding(t *testing.T) {
 	got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": wf})
 	if err != nil || len(got) != 1 || got[0].Rule != RuleCancelInProgress || got[0].Line != 2 {
 		t.Errorf("got %v, %v", got, err)
+	}
+}
+
+// A pull-request trigger reruns on a push unless its types: leave out
+// synchronize; the default set holds it.
+func TestRerunsOnPush(t *testing.T) {
+	for on, want := range map[string]bool{
+		"pull_request":                                  true,
+		"[push, pull_request]":                          true,
+		"{pull_request: }":                              true,
+		"{pull_request: {branches: [main]}}":            true,
+		"{pull_request_target: {types: [synchronize]}}": true,
+		"{pull_request: {types: [opened, reopened]}}":   false,
+		"{push: {branches: [main]}}":                    false,
+	} {
+		var n yaml.Node
+		if err := yaml.Unmarshal([]byte(on), &n); err != nil {
+			t.Fatal(err)
+		}
+		if got := rerunsOnPush(n.Content[0]); got != want {
+			t.Errorf("on: %s: got %v, want %v", on, got, want)
+		}
 	}
 }

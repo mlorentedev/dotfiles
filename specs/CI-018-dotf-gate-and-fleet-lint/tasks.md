@@ -82,7 +82,7 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 ## PR 5a: the remaining four rules
 
 - [x] [AC4] `fleet/cancel-in-progress` (workflow-level `concurrency` only; an expression counts as set, `false` does
-  not), `fleet/os-on-pull-request` (no `if:`, and `runs-on` names Windows or macOS literally or through a literal
+  not; only where a push to the pull request starts the workflow again, so `types:` without `synchronize` is exempt), `fleet/os-on-pull-request` (no `if:`, and `runs-on` names Windows or macOS literally or through a literal
   matrix or its `include:`; a computed matrix is conditional), `fleet/skip-cache` (an explicit switch-off only:
   `cache: false` on a `*/setup-*` step, `skip-cache: true` on golangci-lint-action), `fleet/branch-filter` (push and
   pull_request `branches:` read as GitHub does, in order, last match wins, `**` crossing a slash; `branches-ignore`
@@ -93,9 +93,10 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 - [x] Mutations caught: `cancel-in-progress: false`, the sequence form of `on:`, the `if:` exemption, `include:`,
   the setup-action scope of `cache:`, the `skip-cache` value, `!` patterns, `**`, regexp metacharacters, the missing
   default branch, the pull-request scope of the cancel rule
-- [x] Run on dotfiles: 30 findings. 21 persist-credentials (#3335), 3 os-on-pull-request (`ci.yml` test-windows,
-  `cli.yml` test, `cli-smoke.yml` smoke), 2 cancel-in-progress (`add-to-project.yml`, `repo-hygiene.yml`), 2
-  skip-cache (`cli.yml`, the exception the proposal names with #2834)
+- [x] Run on dotfiles: 29 findings. 21 persist-credentials (#3335), 3 os-on-pull-request (`ci.yml` test-windows,
+  `cli.yml` test, `cli-smoke.yml` smoke), 1 cancel-in-progress (`repo-hygiene.yml`), 2 skip-cache (`cli.yml`, the
+  exception the proposal names with #2834). `add-to-project.yml` runs on `opened` and `reopened` only: it was a
+  finding until the rule read `types:`
 
 ## PR 5b: `--fleet`, exception hygiene, runbook
 

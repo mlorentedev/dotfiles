@@ -13,3 +13,9 @@ jobs:
 # Not a pull-request workflow: nothing to cancel.
 on: push
 jobs: {}
+---
+# A push to the pull request does not start it again: no run goes stale.
+on:
+  pull_request:
+    types: [opened, reopened]
+jobs: {}
