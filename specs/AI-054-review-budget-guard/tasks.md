@@ -43,7 +43,7 @@ owner: manu
 ## Wire it in
 
 - [x] `[AC1]` `checkReviewBudget` is called from `CheckDrift`, so `dotf harness check` runs it on every CI platform.
-- [x] The guard is red on the pre-fix configuration: six findings, and `harness check` exits non-zero.
+- [x] The guard is red on the pre-fix configuration: seven findings (four clips once a step is measured against its own window, two ceilings, one undeclared `ai_timeout`), and `harness check` exits non-zero.
 
 ## Fix the configuration
 

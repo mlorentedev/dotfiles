@@ -37,13 +37,15 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [x] AC4 (fail closed) -> `TestCheckReviewBudget_AWorkflowWithoutAReviewStepFailsClosed`,
   `TestCheckReviewBudget_HalfAReviewerFailsClosed` (a workflow with the toml
   missing, or the workflow missing, is an `[ERROR]`, not silence) and
+  `TestCheckReviewBudget_AnUnparseableFileFailsClosed` (garbage in either
+  file names that file),
   `TestCheckReviewBudget_ACheckoutWithoutAReviewerSaysNothing` (neither file,
   no lines — the behaviour `TestCheckDrift_ACleanCheckoutPasses` already relied
   on).
 - [x] AC5 (runbook) -> `docs/runbooks/guide-pr-agent-reviewer.md`: the clip and
   the window are now separate rows (`150000` / `200000` with the room stated),
   `CONFIG__AI_TIMEOUT` is `360` and `120` with the streaming difference named,
-  and the step/job rows are `13` and `37` with the sum. No `31-minute`,
+  and the step/job rows are `13` and `38` with the sum. No `31-minute`,
   `200000`-as-clip or `8-minute` figure remains in the file.
 - [x] AC6 (surfaces agree) -> the bats parity test prints `True True True` for
   cap-for-cap across providers plus `cap + output cap < window`; the routing
@@ -53,18 +55,19 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 ## Test status
 
 - `go test ./internal/harness/` -> `ok github.com/mlorentedev/dotfiles/cli/internal/harness 10.643s`
-- `go test ./internal/harness/ -run Review -v` -> 12/12 pass, including
+- `go test ./internal/harness/ -run Review -v` -> 16/16 pass, including
   `TestCheckReviewBudget_TheRepositoryPassesItsOwnGuard`, which runs the guard
   against the real `.pr_agent.toml` and `pr-agent.yml` rather than fixtures.
 - `go build ./...` clean, `go vet ./internal/harness/` clean, `gofmt -l` clean on
   both new files (the package's pre-existing CRLF noise aside).
 - `go run ./cmd/dotf harness check --repo-root ..` -> exit 0, `[check] OK: no
-  harness drift`, with the six review-budget lines quoted above.
-- **Red before the fix**, observed on the real configuration: six findings —
-  the toml clip, the two `CONFIG__MAX_MODEL_TOKENS` step overrides, the two
-  Anthropic step ceilings and the undeclared NaN `ai_timeout`. Exit non-zero.
+  harness drift`, with the seven review-budget lines quoted above.
+- **Red before the fix**, observed on the real configuration: seven findings —
+  the toml clip, the two `CONFIG__MAX_MODEL_TOKENS` step overrides, the NaN
+  step measured against its own window, the two Anthropic step ceilings and
+  the undeclared NaN `ai_timeout`. Exit non-zero.
   The shape is pinned by `TestCheckReviewBudget_TheCurrentConfigurationFails`,
-  which asserts four findings on a three-step fixture (no step overrides there).
+  which asserts five findings on a three-step fixture (no step overrides there).
 - bats: the file cannot run on this Windows box (`bats.cmd` produces no output
   for minutes and was killed), so every `run python3 -c` block in
   `tests/pr-agent-config.bats` was extracted and executed directly, comparing
@@ -121,6 +124,21 @@ copies of the tree) came back before `dotf spec review` ran. Dispositions:
 Verification after the fixes, on macOS: `go test ./internal/harness/` ok, `go vet` and
 `GOOS=windows go vet` clean, `golangci-lint run ./internal/harness/...` 0 issues,
 `bats tests/pr-agent-config.bats` 72/72, `dotf harness check --repo-root .` exit 0.
+
+## Pooled review, round 1 (2026-11-11, nan/mimo-v2.6-flash): FAIL
+
+`review.md` at `937f92aa`. Every finding was REAL except two Minors; dispositions:
+
+| Finding | Disposition |
+|---|---|
+| AC4's unparseable clause had no committed test, though `tasks.md` ticked one (Major) | **applied**: `TestCheckReviewBudget_AnUnparseableFileFailsClosed` (garbage toml beside a good workflow, garbage workflow beside a good toml; each names its file). `-run Review` is 16/16. |
+| AC5 and the Risks paragraph still said 37 while the runbook says 38 (Major) | **applied** in `proposal.md`; the bare "AC7" now reads "AI-045's AC7". |
+| Recorded counts stale after the late fix: six/seven findings, four/five asserted, 12/15 tests (Minor) | **applied** in `tasks.md` and this file. |
+| `da794f16` cited, a dangling pre-amend commit (Minor) | **applied** at `6b1ff969`: the fix on the branch is `f4cc8828`. |
+| `features.json` was the untouched scaffold (Minor) | **applied**: three features, each verified by a named Go test or bats case. |
+| A step-level expression in a clip/window variable reads as 0 and is skipped, fail-open (Minor, THEORETICAL) | **deferred** to #3299, which already covers overrides the guard cannot read; noted there. |
+
+The contract digests changed, so a second round follows.
 
 ## Promotion candidates
 

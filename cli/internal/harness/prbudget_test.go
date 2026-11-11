@@ -309,3 +309,19 @@ func TestCheckReviewBudget_TheRepositoryPassesItsOwnGuard(t *testing.T) {
 		t.Fatalf("this repository's own reviewer budget does not hold, got %d:\n%s", n, text)
 	}
 }
+
+func TestCheckReviewBudget_AnUnparseableFileFailsClosed(t *testing.T) {
+	// A reviewer whose configuration cannot be read has a budget nobody can
+	// vouch for, so garbage in either file is a finding naming that file, not
+	// a silent pass over the half that still parses.
+	brokenToml := budgetRepo(t, "[config\nmax_model_tokens = ", budgetStepFirstFixed)
+	if n, text := budgetProblemText(t, brokenToml); n == 0 || !strings.Contains(text, prAgentTomlFile) {
+		t.Fatalf("want a problem naming the unparseable toml, got %d:\n%s", n, text)
+	}
+	brokenWorkflow := t.TempDir()
+	writeFile(t, filepath.Join(brokenWorkflow, prAgentTomlFile), budgetTomlFixed)
+	writeFile(t, filepath.Join(brokenWorkflow, filepath.FromSlash(prAgentWorkflowFile)), "jobs:\n  review: [\n")
+	if n, text := budgetProblemText(t, brokenWorkflow); n == 0 || !strings.Contains(text, prAgentWorkflowFile) {
+		t.Fatalf("want a problem naming the unparseable workflow, got %d:\n%s", n, text)
+	}
+}
