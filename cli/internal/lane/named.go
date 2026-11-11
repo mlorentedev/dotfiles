@@ -102,6 +102,17 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// Refuse before writing anything: a marker left behind by a refused init
+	// would arm the guard in a repository that has no lanes to switch to.
+	for _, name := range CanonicalLanes {
+		lanePath := filepath.Join(repoWTRoot, name)
+		if _, statErr := os.Stat(lanePath); statErr != nil {
+			continue
+		}
+		if err := assertWorktreeOf(absRepo, gitCommonDir, lanePath); err != nil {
+			return 0, fmt.Errorf("lane init: %w", err)
+		}
+	}
 	for _, name := range []string{worktree.MetadataFileName, PromptFile} {
 		if err := excludeFile(gitCommonDir, name); err != nil {
 			return 0, err
@@ -170,7 +181,7 @@ func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool
 	}
 
 	if err := assertWorktreeOf(absRepo, repoCommonDir, lanePath); err != nil {
-		return false, err
+		return false, fmt.Errorf("lane init: %w", err)
 	}
 
 	meta, merr := worktree.LoadMetadata(lanePath)
@@ -211,20 +222,20 @@ func assertWorktreeOf(absRepo, repoCommonDir, lanePath string) error {
 		return err
 	}
 	if gitDir == "" {
-		return fmt.Errorf("lane init: %s exists but is not a git worktree; move it aside or remove it", lanePath)
+		return fmt.Errorf("%s exists but is not a git worktree; move it aside, or run `git worktree repair` if it was one", lanePath)
 	}
 	if !samePath(commonDir, repoCommonDir) {
-		return fmt.Errorf("lane init: %s is a worktree of %s, not of %s; two repositories share a basename under this WORKTREE_ROOT", lanePath, repoOf(commonDir), absRepo)
+		return fmt.Errorf("%s is a worktree of %s, not of %s; two repositories share a basename under this WORKTREE_ROOT", lanePath, repoOf(commonDir), absRepo)
 	}
 	if samePath(gitDir, commonDir) {
-		return fmt.Errorf("lane init: %s is the main checkout of %s, not a linked worktree", lanePath, absRepo)
+		return fmt.Errorf("%s is the main checkout of %s, not a linked worktree", lanePath, absRepo)
 	}
 	top, err := exec.Command("git", "-C", lanePath, "rev-parse", "--show-toplevel").Output()
 	if err != nil {
-		return fmt.Errorf("lane init: resolving the worktree root of %s: %w", lanePath, err)
+		return fmt.Errorf("resolving the worktree root of %s: %w", lanePath, err)
 	}
 	if !samePath(strings.TrimSpace(string(top)), lanePath) {
-		return fmt.Errorf("lane init: %s is inside the worktree %s, not a worktree itself", lanePath, strings.TrimSpace(string(top)))
+		return fmt.Errorf("%s is inside the worktree %s, not a worktree itself", lanePath, strings.TrimSpace(string(top)))
 	}
 	return nil
 }
@@ -400,6 +411,15 @@ func switchLaneLocked(absRepo, absWTRoot, branch, explicitLane string) (string, 
 		}
 	}
 
+	// The lane path is a convention; the lane must be this repository's.
+	repoCommonDir, err := resolveGitCommonDir(absRepo)
+	if err != nil {
+		return "", "", err
+	}
+	if err := assertWorktreeOf(absRepo, repoCommonDir, lanePath); err != nil {
+		return "", "", fmt.Errorf("lane switch: %w", err)
+	}
+
 	dirt, err := (&worktree.RealGitRunner{}).Dirt(lanePath)
 	if err != nil {
 		return "", "", fmt.Errorf("lane switch: checking %s status: %w", laneName, err)
@@ -494,6 +514,11 @@ func ParkLane(repoRoot, lanePath, vaultPath string, force bool) (worktree.DoneRe
 	meta, err := worktree.LoadMetadata(lanePath)
 	if err != nil || meta == nil || meta.Lane == "" {
 		return worktree.DoneResult{}, fmt.Errorf("lane park: %s is not a persistent named lane", lanePath)
+	}
+	if repoCommonDir, cerr := resolveGitCommonDir(repoRoot); cerr != nil {
+		return worktree.DoneResult{}, cerr
+	} else if err := assertWorktreeOf(repoRoot, repoCommonDir, lanePath); err != nil {
+		return worktree.DoneResult{}, fmt.Errorf("lane park: %w", err)
 	}
 	branchOut, _ := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 	oldBranch := strings.TrimSpace(string(branchOut))

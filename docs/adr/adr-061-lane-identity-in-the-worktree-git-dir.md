@@ -73,8 +73,12 @@ was this ambiguity, not a missing feature.
    worktree of the repository being initialised**, compared by common dir and
    top level with symlinks resolved. A plain directory, a main checkout, a
    directory inside some worktree and a worktree of another repository are
-   refused, naming the path and its owner. `HasNamedLanes` applies the same
-   membership check before routing a handoff.
+   refused, naming the path and its owner. The check runs before `lane init`
+   writes anything, so a refused init leaves no marker behind: a marker without
+   lanes would arm the guard in a repository whose only FIX is a `lane switch`
+   that cannot succeed. `lane switch`, `lane park` and `HasNamedLanes` resolve
+   lanes by the same path convention and apply the same check, so no command
+   reaches another repository's lane through a shared basename.
 4. **The guard's rule 5b reads `$git_dir/dotf-lane` and nothing else.** A
    registered lane without a lease is blocked whatever its directory is called;
    an unregistered directory is never blocked by its name. The guard no longer

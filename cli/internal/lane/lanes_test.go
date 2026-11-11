@@ -255,6 +255,9 @@ func TestLaneInitRecordsTheIdentityInEachLanesGitDir(t *testing.T) {
 			t.Errorf("Identity(%s) = %q, %v, %v; want %q, true, nil", name, got, ok, err, name)
 		}
 	}
+	if changed, err := InitLanes(repoDir, wtRoot); err != nil || changed != 0 {
+		t.Fatalf("second InitLanes = %d, %v; want 0, nil (the records are already there)", changed, err)
+	}
 
 	// The record is git-owned: it follows the worktree, not the leaf.
 	moved := filepath.Join(wtRoot, "dotfiles", "renamed-by-hand")
@@ -312,10 +315,29 @@ func TestLaneInitRefusesALaneDirectoryOfAnotherRepository(t *testing.T) {
 	if err == nil {
 		t.Fatal("InitLanes for the second repository succeeded; want a refusal")
 	}
-	for _, want := range []string{lanePath, firstRepo} {
+	// git answers physical paths; the fixture path may be the logical one.
+	physicalFirstRepo, err2 := filepath.EvalSymlinks(firstRepo)
+	if err2 != nil {
+		t.Fatal(err2)
+	}
+	for _, want := range []string{lanePath, physicalFirstRepo} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not name %q", err, want)
 		}
+	}
+	// A refused init leaves the second repository unarmed: no marker, no lanes.
+	if _, serr := os.Stat(filepath.Join(secondRepo, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s into the second repository; the guard would be armed with no lanes", LanesMarkerFile)
+	}
+	// Nor can the second repository claim or park the first's lanes by path.
+	if _, _, serr := SwitchLane(secondRepo, wtRoot, "feat/1-stranger", ""); serr == nil || !strings.Contains(serr.Error(), physicalFirstRepo) {
+		t.Errorf("SwitchLane from the second repository = %v; want a refusal naming the owner", serr)
+	}
+	if _, perr := ParkLane(secondRepo, lanePath, "", false); perr == nil || !strings.Contains(perr.Error(), physicalFirstRepo) {
+		t.Errorf("ParkLane from the second repository = %v; want a refusal naming the owner", perr)
+	}
+	if head := runGitLaneTest(t, lanePath, "rev-parse", "--abbrev-ref", "HEAD"); head != "HEAD" {
+		t.Errorf("the first repository's lane is no longer detached (HEAD=%s); the stranger checked a branch out in it", head)
 	}
 	after, err := os.ReadFile(filepath.Join(lanePath, worktree.MetadataFileName))
 	if err != nil || !bytes.Equal(before, after) {

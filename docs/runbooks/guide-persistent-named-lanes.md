@@ -185,10 +185,10 @@ Lanes provisioned by a `dotf` older than the identity record (ADR-061) carry no
 `dotf-lane` file. Re-run `dotf lane init` once after updating: it is idempotent
 and reports `changed=3` for the three restored records, then `changed=0`. Until
 then the guard treats those lanes as unregistered, which only means rule 5b does
-not fire for them. `dotf lane init` refuses a directory at a lane path that is not
-a worktree of the repository being initialised, naming the path and its owner;
-the common cause is two repositories sharing a basename under one
-`WORKTREE_ROOT`.
+not fire for them. `dotf lane init`, `lane switch` and `lane park` refuse a
+directory at a lane path that is not a worktree of the repository they run in,
+naming the path and its owner, and a refused init writes no marker; the common
+cause is two repositories sharing a basename under one `WORKTREE_ROOT` (#3318).
 
 ## 7. Validation runbook
 

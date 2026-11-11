@@ -22,7 +22,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 ## Test status
 
 - Test suite: `cd cli && go test ./internal/hooks/ ./internal/lane/ -count=1` -> `ok` both packages (hooks 4.9s, lane 30.3s, 2026-11-11).
-- `features.json`: f1..f5 all PASS, run one by one from `cli/` on `437eb1ed`.
+- `features.json`: f1..f5 all PASS, run one by one from `cli/` on `437eb1ed` and again on the final head; f1's test now also asserts the second `InitLanes` returns `0`.
 - Static: `go build ./... && go vet ./... && GOOS=windows go vet ./...` clean; `golangci-lint run ./...` and `GOOS=windows golangci-lint run ./...` at the pinned 2.12.2 report `0 issues` (cache clean refused, another session held the cache; no finding to dismiss); `shellcheck -s sh` and `sh -n` on the guard clean; `dotf lessons fmt` formatted 0 files.
 - Manual smoke test: the record's lifecycle (`worktree move`, `gc`, `repair`, `remove`, `rm -rf` + `prune`, re-create, `clean -fdx`) was measured on a scratch repository before the spec was written; the Go tests repeat the `move` leg. Not re-run on a live lane: this box's lanes are provisioned by the release binary and get their record when `dotf lane init` runs after the release.
 - No regressions in existing test suite: yes. Case 10 of the guard test changed meaning by design (proposal, Risks).
@@ -31,7 +31,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - `HasNamedLanes` gained the same membership check as `provisionLane`. The AC3 test asserted the second repository must not believe it has lanes, and the only caller (`handoff.go`) routes work into the primary lane on a true answer, so a path-only answer there was the same defect one call later. Cost: two git invocations on the handoff path.
 - `Identity` treats a git exit error as "not a repository" and only a failure to run git as an error. `rev-parse` exits 128 both for a path outside any repository and for a nonexistent one; the spec wants `("", false, nil)` for the first, and a nonexistent path is not a lane either.
-- The guard absolutises `git_dir` with the same `case` the script already used for `common_dir`, rather than switching to `--absolute-git-dir`: one idiom in the file, and `--path-format` needs git 2.31 while the existing pattern needs nothing.
+- The guard absolutises `git_dir` with the same `case` the script already used for `common_dir`, rather than switching to `--absolute-git-dir`: one idiom in the file, and `--path-format` needs git 2.31 while the existing pattern needs nothing. On the Go side `identity.go` uses `rev-parse --path-format=absolute --git-dir --git-common-dir` (one call answers both), the form `resolveGitCommonDir` already required, so no new git floor; `tasks.md` names `--absolute-git-dir` for both and was not rewritten.
+- The membership check runs as a preflight over the three lane paths before `lane init` writes the exclude entries or the marker (second advisory pass): a refusal that came after the marker would leave the guard armed in a repository with no lanes, and the guard's own FIX line would send the user to `dotf lane switch`. `lane switch` and `lane park` resolve the lane by the same path convention, so both now run the same check and refuse a lane of another repository; the AC3 test asserts the refused repository has no marker, that switch and park from it are refused naming the owner, and that the first repository's lane stays detached.
+- The AC3 test compares against `filepath.EvalSymlinks(firstRepo)`: git answers physical paths, and the macOS temp dir is a symlink (the logical form matched only as a substring; a Windows 8.3 temp path would not).
 
 ## Promotion candidates
 
