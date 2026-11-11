@@ -62,16 +62,14 @@ _gate() {
 # author, or no pull_request at all when SDD_PR_BODY is unset.
 _dotf_gate() {
     local event="$BATS_TEST_TMPDIR/event.json"
-    python3 - "$event" <<'PY'
-import json, os, sys
-pr = None
-if "SDD_PR_BODY" in os.environ:
-    labels = [l for l in os.environ.get("SDD_LABELS", "").split(",") if l]
-    pr = {"number": 1, "body": os.environ["SDD_PR_BODY"],
-          "labels": [{"name": l} for l in labels],
-          "user": {"login": os.environ.get("SDD_PR_AUTHOR", "")}}
-json.dump({"pull_request": pr} if pr else {}, open(sys.argv[1], "w"))
-PY
+    if [ -z "${SDD_PR_BODY+set}" ]; then
+        printf '{}' >"$event"
+    else
+        jq -n --arg body "$SDD_PR_BODY" --arg labels "${SDD_LABELS:-}" --arg author "${SDD_PR_AUTHOR:-}" \
+            '{pull_request: {number: 1, body: $body,
+              labels: ($labels | split(",") | map(select(. != "")) | map({name: .})),
+              user: {login: $author}}}' >"$event"
+    fi
     # No network (AC3): no token, and a PATH holding git alone, so a gh call
     # cannot succeed and would surface as a verdict that differs from the
     # shell gate's. A link, not a stub: nothing stands in for a real tool.

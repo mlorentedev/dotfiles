@@ -11,9 +11,9 @@ owner: manu
 
 ## Evidence
 
-- [ ] AC1 (knowledge half) -> PR 1, `tests/check-knowledge-gate.bats` (45 cases through both gates)
+- [x] AC1 (knowledge half) -> PR 1, `tests/check-knowledge-gate.bats` (45 cases through both gates)
 - [ ] AC2 -> PR 2 and PR 3
-- [ ] AC3 (knowledge half) -> PR 1, the no-network trap in `_dotf_gate`
+- [x] AC3 (knowledge half) -> PR 1, the no-network trap in `_dotf_gate`
 - [ ] AC4 -> PR 4 and PR 5
 - [ ] AC5 -> PR 5
 

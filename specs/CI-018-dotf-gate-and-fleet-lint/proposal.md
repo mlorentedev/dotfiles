@@ -36,8 +36,9 @@ dotf lint fleet     --dir <repo> [--summary <file>]
   call; the composite refreshes the file first (BUG-066 is handled there, CI-008 AC3). An event with no
   `pull_request` is no PR context: exit 2, as the scripts refuse an unset body today. A `null` body is
   an empty body, as GitHub sends it.
-- Exit 0 passes, 1 fails, 2 is a usage or environment error; failures name the file and line or the
-  missing section on stderr. `--summary` appends a Markdown section.
+- Exit 0 passes, 1 fails, 2 is a usage or environment error. Each gate writes its verdict and problems
+  to the stream its script uses today (the knowledge gate: stdout; wiring errors: stderr), so a caller
+  switching from the script reads the same lines. `--summary` appends a Markdown section.
 - **Same semantics as the scripts, proven by their own tests.** Each existing bats suite
   (`tests/check-knowledge-gate.bats`, then the spec-gate suites) gains a second run through a shim that
   turns its `SDD_*` environment into an event file and calls the Go command. Both implementations pass
