@@ -29,10 +29,26 @@ owner: manu
 - [x] [AC1] `gate.JudgeKnowledge` and `dotf gate knowledge`, with `--summary` and `--explain`
 - [x] [AC3] The shim runs dotf with no token and a PATH holding git alone
 
-## PR 2: `dotf gate spec` core
+## PR 2a: the spec gate's parsers
 
-- [ ] [AC2] Parity harness over the spec-gate suites
-- [ ] [AC2] Tier, escape label and rationale, archive rules
+The script does not fit one PR under the 300-line cap, so PR 2 splits along the pure/impure line.
+
+- [x] [AC2] `StripCode`: the spec gate's own stripper (closes a fence on any long-enough marker, removes
+  inline spans), kept apart from `StripMarkup` until both scripts retire (#2407)
+- [x] [AC2] `ClosingIssueNumbers`: closing verbs, a qualified reference only for this repository, URL folding,
+  line by line
+- [x] [AC2] `FrontmatterIssue`, `ExcludedFromLOC`, `IsActiveSpecPath`, `NormalizeRenamePath`, `ParseNumstat`
+- [x] [AC2] Table tests; a one-off differential run against the shell functions agreed on every case and went
+  red on two planted mutations
+
+## PR 2b: `dotf gate spec` core
+
+- [ ] [AC2] Parity harness over `check-spec-gate.bats` and `spec-gate-archive.bats`, PATH holding git alone
+- [ ] [AC2] Archive-on-merge, dependency and `skip-sdd` escapes, the LOC walk and `--explain`
+- [ ] [AC2] Repository slug: `GITHUB_REPOSITORY`, then the event's `repository.full_name`, then origin; empty
+  ignores qualified references, as the script does
+- Out of scope: `spec-gate-pr.bats` and `spec-gate-prepush.bats` test the `gh` wrappers that resolve the PR
+  live; the shared composite replaces them with the event file.
 
 ## PR 3: `--adjacency`, `--summary` for `gate spec`
 
