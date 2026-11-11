@@ -19,13 +19,16 @@ jobs:
       T: ${{ secrets.GITHUB_TOKEN }}
       D: ${{ secrets.ALPHA }}
       E: ${{ inputs.secrets }}
+    if: >-
+      ${{ github.event_name == 'push' &&
+          secrets.DELTA != '' }}
   call:
     uses: owner/ci/.github/workflows/w.yml@abc
     secrets:
       THEIR_NAME: ${{ secrets.MINE }}
 `)
 	names, unknown := workflowReads(wf)
-	want := []string{"ALPHA", "BRAVO", "CHARLIE", "MINE"}
+	want := []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "MINE"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("names = %v, want %v", names, want)
 	}
@@ -204,5 +207,23 @@ func TestCheckRepoCalleeUnreadable(t *testing.T) {
 	_, err := NewCIChecker(fw, &Registry{}).CheckRepo("o/a")
 	if err == nil || !strings.Contains(err.Error(), "gone.yml@v9") {
 		t.Fatalf("an unreadable callee must fail loudly, naming it; got %v", err)
+	}
+}
+
+func TestDiffReadsPrecedence(t *testing.T) {
+	r := ciReads{
+		required: map[string]bool{"BOTH": true, "REQ": true},
+		optional: map[string]string{"BOTH": "o/ci/w.yml@a", "OPT_HELD": "o/ci/w.yml@a", "OPT_ABSENT": "o/ci/w.yml@a"},
+	}
+	declared := map[string]bool{"REQ": true, "OPT_HELD": true, "STALE": true}
+	got := diffReads(r, declared)
+	// Read unconditionally anywhere beats optional in a callee; an optional name
+	// that is declared is neither missing nor excess.
+	wantMissing := []CIMissing{{Name: "BOTH"}, {Name: "OPT_ABSENT", OptionalIn: "o/ci/w.yml@a"}}
+	if !reflect.DeepEqual(got.Missing, wantMissing) {
+		t.Errorf("missing = %+v, want %+v", got.Missing, wantMissing)
+	}
+	if !reflect.DeepEqual(got.Excess, []string{"STALE"}) {
+		t.Errorf("excess = %v, want [STALE]", got.Excess)
 	}
 }

@@ -48,7 +48,7 @@ type CIReport struct {
 func (r CIReport) Failing() bool { return len(r.Missing) > 0 || len(r.Excess) > 0 }
 
 var (
-	exprRe = regexp.MustCompile(`\$\{\{(.*?)\}\}`)
+	exprRe = regexp.MustCompile(`(?s)\$\{\{(.*?)\}\}`)
 	// secrets.NAME, secrets['NAME'] or secrets["NAME"]; anything else after
 	// `secrets` is a whole-context or computed read.
 	secretsRe  = regexp.MustCompile(`\bsecrets\b`)
@@ -164,73 +164,110 @@ func NewCIChecker(src WorkflowSource, reg *Registry) *CIChecker {
 	return &CIChecker{src: src, reg: reg, callees: map[workflowRef]map[string]bool{}}
 }
 
+// ciReads is what a repository's workflows read: names read unconditionally,
+// names read only where a callee marks them optional (mapped to that callee),
+// and reads whose name cannot be known.
+type ciReads struct {
+	required map[string]bool
+	optional map[string]string
+	unknown  []CIUnknown
+}
+
 // CheckRepo reads repo's workflows and diffs what they read with what
 // Registry.SelectCI declares for it, the same selection `secrets sync ci`
 // uploads, so the check and the sync cannot disagree.
 func (c *CIChecker) CheckRepo(repo string) (CIReport, error) {
-	rep := CIReport{Repo: repo}
-	files, err := c.src.List(repo)
+	reads, err := c.collectReads(repo)
 	if err != nil {
-		return rep, fmt.Errorf("%s: list workflows: %w", repo, err)
-	}
-	sort.Strings(files)
-	required := map[string]bool{}   // read unconditionally
-	optional := map[string]string{} // read only where a callee marks it optional
-	for _, f := range files {
-		if ext := path.Ext(f); ext != ".yml" && ext != ".yaml" {
-			continue
-		}
-		wf, err := c.src.Read(repo, f, "")
-		if err != nil {
-			return rep, fmt.Errorf("%s: read %s: %w", repo, f, err)
-		}
-		names, unknown := workflowReads(wf)
-		for _, n := range names {
-			required[n] = true
-		}
-		for _, u := range unknown {
-			rep.Unknown = append(rep.Unknown, CIUnknown{File: f, Expr: u})
-		}
-		calls, err := inheritedCalls(wf)
-		if err != nil {
-			return rep, fmt.Errorf("%s: parse %s: %w", repo, f, err)
-		}
-		for _, call := range calls {
-			sec, err := c.callee(call)
-			if err != nil {
-				return rep, err
-			}
-			for n, req := range sec {
-				if req {
-					required[n] = true
-				} else if _, seen := optional[n]; !seen {
-					optional[n] = call.String()
-				}
-			}
-		}
+		return CIReport{Repo: repo}, err
 	}
 	declared := map[string]bool{}
 	for _, e := range c.reg.SelectCI(repo).Upload {
 		declared[e.Var] = true
 	}
-	for n := range required {
+	rep := diffReads(reads, declared)
+	rep.Repo = repo
+	return rep, nil
+}
+
+func (c *CIChecker) collectReads(repo string) (ciReads, error) {
+	r := ciReads{required: map[string]bool{}, optional: map[string]string{}}
+	files, err := c.src.List(repo)
+	if err != nil {
+		return r, fmt.Errorf("%s: list workflows: %w", repo, err)
+	}
+	sort.Strings(files)
+	for _, f := range files {
+		if ext := path.Ext(f); ext != ".yml" && ext != ".yaml" {
+			continue
+		}
+		if err := c.addFile(repo, f, &r); err != nil {
+			return r, err
+		}
+	}
+	return r, nil
+}
+
+func (c *CIChecker) addFile(repo, f string, r *ciReads) error {
+	wf, err := c.src.Read(repo, f, "")
+	if err != nil {
+		return fmt.Errorf("%s: read %s: %w", repo, f, err)
+	}
+	names, unknown := workflowReads(wf)
+	for _, n := range names {
+		r.required[n] = true
+	}
+	for _, u := range unknown {
+		r.unknown = append(r.unknown, CIUnknown{File: f, Expr: u})
+	}
+	calls, err := inheritedCalls(wf)
+	if err != nil {
+		return fmt.Errorf("%s: parse %s: %w", repo, f, err)
+	}
+	for _, call := range calls {
+		sec, err := c.callee(call)
+		if err != nil {
+			return err
+		}
+		for n, req := range sec {
+			r.addCallee(n, req, call.String())
+		}
+	}
+	return nil
+}
+
+func (r *ciReads) addCallee(name string, required bool, callee string) {
+	if required {
+		r.required[name] = true
+		return
+	}
+	if _, seen := r.optional[name]; !seen {
+		r.optional[name] = callee
+	}
+}
+
+// diffReads compares the reads with the declared names. A name read anywhere
+// unconditionally is required even if a callee also marks it optional.
+func diffReads(r ciReads, declared map[string]bool) CIReport {
+	rep := CIReport{Unknown: r.unknown}
+	for n := range r.required {
 		if !declared[n] {
 			rep.Missing = append(rep.Missing, CIMissing{Name: n})
 		}
 	}
-	for n, in := range optional {
-		if !required[n] && !declared[n] {
+	for n, in := range r.optional {
+		if !r.required[n] && !declared[n] {
 			rep.Missing = append(rep.Missing, CIMissing{Name: n, OptionalIn: in})
 		}
 	}
 	for n := range declared {
-		if _, opt := optional[n]; !required[n] && !opt {
+		if _, opt := r.optional[n]; !r.required[n] && !opt {
 			rep.Excess = append(rep.Excess, n)
 		}
 	}
 	sort.Slice(rep.Missing, func(a, b int) bool { return rep.Missing[a].Name < rep.Missing[b].Name })
 	sort.Strings(rep.Excess)
-	return rep, nil
+	return rep
 }
 
 func (c *CIChecker) callee(w workflowRef) (map[string]bool, error) {

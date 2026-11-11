@@ -24,76 +24,17 @@ Mutation check (2026-11-10). Each change was applied on its own and the new test
 - the callee cache bypassed -> killed
 - the `inputs.secrets` guard removed -> survived at first; `TestWorkflowReads` gained an `inputs.secrets` row, then killed
 
-Live run over the fleet (2026-11-10, `go run ./cmd/dotf secrets ci-check`, 2m26s, REST only):
+Live run over the fleet (2026-11-10, `go run ./cmd/dotf secrets ci-check`, 2m26s, REST only): exit 1, `16 of 25 repositories disagree with the registry or could not be read`. This repository is public and most of the fleet is not, so the full output (secret names of private repositories) stays out of the record; per repository it gave:
 
-```
-mlorentedev/boilerplates: ok
-mlorentedev/ci-workflows: FAIL
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/cloud-architecture-coursework: ok
-mlorentedev/dotfiles: FAIL
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/embedded-systems-coursework: ok
-mlorentedev/emva1288-sensor-characterization: ok
-mlorentedev/garsync: FAIL
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/hive: FAIL
-  missing  RELEASE_PLEASE_TOKEN
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/iris: FAIL
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/kasa-provisioner: ok
-mlorentedev/knowledge: ok
-mlorentedev/kubelab: FAIL
-  missing  BRANCH_PROTECTION_TOKEN
-  missing  DOCKERHUB_TOKEN
-  missing  DOCKERHUB_USERNAME
-  missing  N8N_DEPLOY_TOKEN
-  missing  N8N_WEBHOOK_URL
-  missing  NOTIFY_WEBHOOK_SECRET
-  missing  RELEASE_PLEASE_TOKEN
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/kubelab-devnode-fixture: FAIL
-  missing  BITACORA_PAT
-mlorentedev/leaving-denver: FAIL
-  missing  BITACORA_PAT
-  missing  CLOUDFLARE_API_TOKEN
-  missing  SELLER_PHONE
-  missing  SELLER_SEALED
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/mail2markdown: FAIL
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/mlorentedev: ok
-mlorentedev/nan-video-pipeline: FAIL
-  missing  BITACORA_PAT
-mlorentedev/pdf-modifier: FAIL
-  missing  DOCKERHUB_TOKEN
-  missing  DOCKERHUB_USERNAME
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/pollex: FAIL
-  missing  RELEASE_TOKEN
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/svqtriana.github.io: FAIL
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/telecom-engineering: ok
-mlorentedev/ts-bridge: FAIL
-  missing  RELEASE_PLEASE_PAT
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/vicon-fpga-face-detection: ok
-mlorentedev/web: FAIL
-  missing  DOCKERHUB_TOKEN
-  missing  DOCKERHUB_USERNAME
-  missing  KUBELAB_DISPATCH_TOKEN
-  missing  PR_AGENT_ANTHROPIC_API_KEY
-  missing  RELEASE_PLEASE_PAT
-  excess   HIVE_WORKER_API_KEY
-mlorentedev/yt-metrics-cli: FAIL
-  missing  RELEASE_TOKEN
-  excess   HIVE_WORKER_API_KEY
-Error: 16 of 25 repositories disagree with the registry or could not be read
-```
+| Result | Repositories |
+|---|---|
+| ok | 9 (boilerplates, cloud-architecture-coursework, embedded-systems-coursework, emva1288-sensor-characterization, kasa-provisioner, knowledge, mlorentedev, telecom-engineering, vicon-fpga-face-detection) |
+| excess `HIVE_WORKER_API_KEY` only | 6 (ci-workflows, dotfiles, garsync, iris, mail2markdown, svqtriana.github.io) |
+| missing names, 1 to 7 per repository | 10 (hive, kubelab, kubelab-devnode-fixture, leaving-denver, nan-video-pipeline, pdf-modifier, pollex, ts-bridge, web, yt-metrics-cli) |
+| unknown reads | 0 |
+| read errors | 0 |
 
-Spot check against the repositories' own secret names (`gh secret list`, names only): `kubelab` holds `DOCKERHUB_TOKEN`, `DOCKERHUB_USERNAME`, `N8N_DEPLOY_TOKEN`, `RELEASE_PLEASE_TOKEN` set outside the registry, and has no `BRANCH_PROTECTION_TOKEN`, `N8N_WEBHOOK_URL` or `NOTIFY_WEBHOOK_SECRET`. `web` has no `PR_AGENT_ANTHROPIC_API_KEY`.
+`HIVE_WORKER_API_KEY` was excess in 14 of the 16 (#2306). In `mlorentedev/web`, `missing PR_AGENT_ANTHROPIC_API_KEY` is the #3188 case: its pr-agent caller maps the key explicitly and the repository has no such secret (`gh secret list`, names only). A spot check of `mlorentedev/kubelab` found 4 of its 7 missing names set by hand outside the registry, and the other 3 absent from the repository too.
 
 ## Test status
 
