@@ -1028,19 +1028,32 @@ jobs:
             echo "GO_VERSION=$(sed -n 's/^go //p' cli/go.mod)"
           } >> "$GITHUB_OUTPUT"
 
+      # Buildx with a GitHub Actions layer cache (CI-013, #3149): the layers
+      # before the COPY of the tree (apt, Node, Go, age, bats; about 53 s cold)
+      # come from cache. What follows the COPY, the dotf build and setup-linux.sh,
+      # is the subject under test and rebuilds on every commit.
+      - name: Set up Docker Buildx
+        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
       - name: Build integration test container
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        env:
-          BATS_VERSION: ${{ steps.versions.outputs.BATS_VERSION }}
-          AGE_VERSION: ${{ steps.versions.outputs.AGE_VERSION }}
-          GO_VERSION: ${{ steps.versions.outputs.GO_VERSION }}
-        run: |
-          docker build \
-            --build-arg BATS_VERSION="$BATS_VERSION" \
-            --build-arg AGE_VERSION="$AGE_VERSION" \
-            --build-arg GO_VERSION="$GO_VERSION" \
-            -f tests/Dockerfile.integration \
-            -t dotfiles-integration-test .
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: tests/Dockerfile.integration
+          tags: dotfiles-integration-test
+          load: true
+          build-args: |
+            BATS_VERSION=${{ steps.versions.outputs.BATS_VERSION }}
+            AGE_VERSION=${{ steps.versions.outputs.AGE_VERSION }}
+            GO_VERSION=${{ steps.versions.outputs.GO_VERSION }}
+          # Read on every run; written by the push to main only. A pull request
+          # reads its base branch's cache. The layers after the COPY change on
+          # every commit, so a write per PR run would store layers no other run
+          # reuses and evict the setup-go caches from the repository's budget.
+          cache-from: type=gha,scope=integration
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=integration,mode=max' || '' }}
 
       - name: Run integration tests
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'

@@ -12,7 +12,9 @@ name: cli-smoke
 # failure as green. Making it required is a line in forge/branch-protection.json.
 #
 # No paths filter: a filtered workflow never reports on an unlisted diff, so once
-# required its check would stay pending there (CI-004, #1739).
+# required its check would stay pending there (CI-004, #1739). The Windows leg
+# drops on a documentation-only pull request instead, through the OS list the
+# changes job computes (CI-013, #3149).
 on:
   pull_request:
   push:
@@ -30,12 +32,34 @@ defaults:
     working-directory: cli
 
 jobs:
+  changes:
+    name: cli-smoke-changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      # Linux on every diff; Windows too unless a pull request changes
+      # documentation only. A push takes both without consulting the filter.
+      smoke_os: ${{ (github.event_name != 'pull_request' || steps.os.outputs.code == 'true') && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest"]' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: github.event_name == 'pull_request'
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        if: github.event_name == 'pull_request'
+        id: os
+        with:
+          filters: .github/filters/code.yml
+          predicate-quantifier: some-with-excludes
+
   smoke:
     name: cli-smoke (${{ matrix.os }})
+    needs: changes
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: ${{ fromJSON(needs.changes.outputs.smoke_os) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:

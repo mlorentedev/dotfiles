@@ -73,24 +73,19 @@ EOF
 # the failure lands on the push to main (#1879).
 @test "HARNESS-041: every top-level entry is in the code filter or declared docs-only" {
     command -v git >/dev/null 2>&1 || skip "git required to list tracked files"
-    run python3 - "$CI_YML" "$DOTFILES_DIR" <<'EOF'
+    run python3 - "$CI_YML" "$DOTFILES_DIR" "$DOTFILES_DIR/.github/filters/code.yml" <<'EOF'
 import subprocess, sys, yaml
 jobs = yaml.safe_load(open(sys.argv[1]))["jobs"]
 steps = jobs["changes"]["steps"]
 filters = next(s["with"]["filters"] for s in steps if s.get("id") == "filter")
 code = set(yaml.safe_load(filters)["code"])
 
-docs_only = {
-    "docs/":    "prose; check-doc-paths and lessons-fmt run in pre-commit, docs-drift on the push to main",
-    "specs/":   "spec records; archive PRs are the common case, and the spec-id guard runs on the push to main",
-    "README.md": "prose",
-    "CHANGELOG.md": "written by release-please",
-    "LICENSE": "legal text",
-    "SECURITY.md": "prose",
-    ".coderabbit.yaml": "reviewer config, read by no test",
-    "release-please-config.json": "release tooling; a release PR's content was tested on main",
-    ".release-please-manifest.json": "release tooling; a release PR's content was tested on main",
-}
+# The docs-only set is the exclusion list of the shared filter file the OS jobs
+# read (CI-013), so this test and those jobs cannot disagree about it.
+shared = yaml.safe_load(open(sys.argv[3]))["code"]
+docs_only = {p[1:].removesuffix("**") for p in shared if p.startswith("!")}
+if not docs_only:
+    print("no exclusions read from", sys.argv[3]); sys.exit(1)
 
 tracked = subprocess.run(["git", "-C", sys.argv[2], "ls-files"],
                          capture_output=True, text=True, check=True).stdout.split()

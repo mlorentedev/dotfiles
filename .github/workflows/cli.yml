@@ -39,6 +39,10 @@ jobs:
       # (#1888). A tag always builds. On a push to main the filter compares the
       # push against the commit before it.
       go: ${{ startsWith(github.ref, 'refs/tags/') || steps.filter.outputs.go == 'true' }}
+      # The OS list of the Go tests (CI-013, #3149). Linux on every diff (#1888);
+      # Windows too unless a pull request changes documentation only. A push or
+      # a tag takes both without consulting the filter.
+      test_os: ${{ (github.event_name != 'pull_request' || steps.os.outputs.code == 'true') && '["ubuntu-latest","windows-latest"]' || '["ubuntu-latest"]' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: "!startsWith(github.ref, 'refs/tags/')"
@@ -51,19 +55,29 @@ jobs:
               - 'cli/**'
               - 'versions.conf'
               - '.github/workflows/cli.yml'
+      # Its own step: predicate-quantifier applies to every filter of a step,
+      # and the `go` filter above needs the default.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        if: github.event_name == 'pull_request'
+        id: os
+        with:
+          filters: .github/filters/code.yml
+          predicate-quantifier: some-with-excludes
 
   # Not gated on the path filter. Go tests guard files outside cli/ (#1888): an
   # allow-list filter treats every unlisted path as safe to skip (lesson 322), and
   # the guard written for a file never ran on the diff that changed it. setup-go
   # restores GOCACHE, so `go test` reruns only the packages whose inputs changed,
   # files read at test time included: on a diff outside cli/ this costs about 30 s
-  # on Linux and 95 s on Windows, in parallel with ci.yml's longer legs.
+  # on Linux and 95 s on Windows, in parallel with ci.yml's longer legs. Only the
+  # Windows leg drops, on a documentation-only pull request (CI-013).
   test:
     name: test (${{ matrix.os }})
+    needs: changes
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: ${{ fromJSON(needs.changes.outputs.test_os) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
