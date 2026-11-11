@@ -38,8 +38,13 @@ pull request, and every push, runs the full matrix as today.
   (`tests/lib/check-workflow-contexts.py`) forbids a job-level `if` on one: a skipped
   required check passes without running. Its steps already skip on a
   documentation-only diff (HARNESS-041), so what remains is the runner start and the
-  checkout. Skipping the job itself belongs to the single `gate` check
-  (mlorentedev/ci-workflows#12, ADR-001 practice 3), which stops it being required.
+  checkout. The path to skipping the job is the released `gate` composite
+  (mlorentedev/ci-workflows `.github/actions/gate`, #9; ADR-001 practice 3), in the
+  two steps its README gives: a PR adds a `gate` job (`if: always()`, needing every
+  blocking job, test-windows included) beside the current required checks; once it
+  has reported on main, the owner makes `gate` the only required CI check, keeping
+  review-attestation. test-windows can then carry a job-level `if`, since a skipped
+  need passes the gate and the required check always runs. Follow-up, not this spec.
   The new structural test exempts required checks for this reason.
 - **`cli/test`**: the OS list becomes an output of `cli-changes`, `ubuntu-latest` on a
   documentation-only pull request and both OSes otherwise. Every push and tag gets both
@@ -65,7 +70,7 @@ unchanged.
   SA5011 findings that a clean run does not. The job takes about 15 s uncached, below
   the noise of the jobs this spec is about. Declined, not deferred.
 - **The nightly schedule** the issue names. It belongs to the gate restructure
-  (mlorentedev/ci-workflows#9, #12); today push to main is the full run.
+  (mlorentedev/ci-workflows#8); today push to main is the full run.
 - **A narrower OS-sensitive set** than "not documentation only" (for example, leaving
   `cli/**` changes off the Windows runtime tests because the `GOOS=windows` lint runs
   on Linux). That is a policy decision for the owner, listed below.

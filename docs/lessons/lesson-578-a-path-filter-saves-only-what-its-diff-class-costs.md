@@ -31,8 +31,8 @@ skipped at all without changing what branch protection requires.
 
 The spec states the measured saving and scopes the work to what the filter reaches: a shared docs-only filter
 file, dynamic OS lists for the two matrix jobs, and the integration layer cache. The narrower OS-sensitive set
-that would reach code pull requests is an owner question in the proposal. Skipping `test-windows` belongs to the
-single `gate` check (ci-workflows#12), where it stops being required.
+that would reach code pull requests is an owner question in the proposal. Skipping `test-windows` goes through the
+`gate` composite (ci-workflows#9): once `gate` is the only required CI check, it can skip at job level.
 
 ## Takeaway
 
