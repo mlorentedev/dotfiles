@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // piTranscript writes a pi --mode json transcript of the given number of turns
@@ -222,6 +223,16 @@ func TestReviewerLastWordsQuotesTheEnd(t *testing.T) {
 	words, ok := ReviewerLastWords(transcript)
 	if !ok || !strings.Contains(words, "the end") {
 		t.Errorf("want the transcript's end quoted, got ok=%v %q", ok, words)
+	}
+	// A startup failure names its cause first, before any usage text.
+	stderr := filepath.Join(t.TempDir(), "s.jsonl")
+	cause := "error: missing API key ñ\n" + strings.Repeat("usage: é\n", 300)
+	if err := os.WriteFile(StderrPath(stderr), []byte(cause), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	words, _ = ReviewerLastWords(stderr)
+	if !strings.Contains(words, "missing API key") || !utf8.ValidString(words) {
+		t.Errorf("want the head kept and valid UTF-8, got %q", words)
 	}
 	if _, ok := ReviewerLastWords(filepath.Join(t.TempDir(), "absent.jsonl")); ok {
 		t.Error("no transcript and no stderr must report nothing to quote")

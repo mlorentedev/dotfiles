@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 // TurnCapHint names the cause when a review failed because the runner stopped
@@ -84,13 +85,27 @@ func ReviewerLastWords(transcript string) (string, bool) {
 		if out == "" {
 			continue
 		}
-		const max = 800
-		if len(out) > max {
-			out = fmt.Sprintf("… (truncated; full %s at %s)\n", src.label, src.path) + out[len(out)-max:]
-		}
-		return "It wrote, on " + src.label + ":\n" + out, true
+		return "It wrote, on " + src.label + ":\n" + headAndTail(out, src.label, src.path), true
 	}
 	return "", false
+}
+
+// headAndTail keeps the start of a long output, where a startup failure names
+// its cause, and its end, where a run writes how it finished, cut on rune
+// boundaries so a multi-byte character is never split.
+func headAndTail(out, label, path string) string {
+	const half = 400
+	if len(out) <= 2*half {
+		return out
+	}
+	head, tail := half, len(out)-half
+	for head > 0 && !utf8.RuneStart(out[head]) {
+		head--
+	}
+	for tail < len(out) && !utf8.RuneStart(out[tail]) {
+		tail++
+	}
+	return out[:head] + fmt.Sprintf("\n… (truncated; full %s at %s)\n", label, path) + out[tail:]
 }
 
 // piTurnCap reads a pi --mode json transcript and reports how many turns ran
