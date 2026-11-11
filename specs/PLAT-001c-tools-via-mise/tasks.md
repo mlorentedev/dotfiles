@@ -399,6 +399,16 @@ The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows
   - Measured ahead of the release on 2026-11-06. The guest was a clean Arm64 with no runtime. The dev dotf merged #3174, #3222 and this reader, plus a local `vcredist` entry ahead of `mise`, and ran with `MISE_HTTP_DOWNLOAD_TIMEOUT=3h`. The tools step installed `vcredist`, then mise and every mise pin, in 1h07m. The blocker is closed, but the row stays open until the entry ships
   - AC4 is still not met. The same run exits 1 on the four npm CLIs (#2438: under a mise Node, npm's global prefix is the Node install directory, which no PATH holds) and on bats not running at its pin (#2346)
 
+### AC4 blocker #2438: the npm CLIs under mise (owner chose option 2, 2026-11-10)
+
+- [x] Reader: `npmBackend` in `cli/internal/tools/mise.go` aliases bw, copilot, opencode and yarn to mise's `npm:` backend on every OS, so the short name stays the key. Measured on darwin-arm64 with mise 2026.10.3 in an isolated config: one `mise install` placed node, yarn and copilot, `mise ls` and `mise which` answered to the short names, and both ran. Node-first plus the scoped npm installer on Windows is `installNpmFirst`, the generalisation of the bats path; a pin without `NODE_VERSION` is refused
+- [x] Guard: `tests/versions-conf.bats` refuses to mark any of the four while `DOTF_VERSION` is at or below 0.79.0, the newest release without the reader (mutation-checked by marking `COPILOT_VERSION`)
+- [ ] Pins (after a release carrying the reader is the `DOTF_VERSION` pin, raise the guard's `last` first if 0.80.0 ships before the reader merges): `BW_VERSION`, `COPILOT_VERSION`, `OPENCODE_VERSION`, `YARN_VERSION` under `# mise: cli` at the floors packages.json holds today (2026.5.0, 1.0.81, 1.16.2, 1.22.22); delete the four `npm` entries from `packages.json` and the npm installer in `install.go` with its `~/.local` test in the same change
+- [ ] Windows: a clean Arm64 guest places all four through the tools step, `copilot --version` runs from the mise shim, and a second converge reports `changed=0`. Hosted-runner green is not this evidence (lesson 561)
+- Verification of the reader, on darwin-arm64: `go test ./internal/{tools,doctor,converge}` passes, `GOOS=windows go vet ./...` is clean and `golangci-lint run ./internal/tools/...` reports 0 issues. The Windows-only tests (`TestSync_WindowsInstallsNpmCLIsWithNodeFirst`, the `copilot` row of the install-env test) compile there and run on the Windows job, not on the Mac
+- Scope: this change marks nothing in `versions.conf` and touches no catalog entry, so no machine changes until the pins row ships
+- Open: copilot has its own `copilot update`; no environment switch for it is known yet, so it is not in `ownUpdaterOff`. The catalog's npm install had the same exposure
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

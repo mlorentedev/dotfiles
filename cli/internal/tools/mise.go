@@ -216,7 +216,7 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 	b.WriteString("http_download_timeout = \"2h\"\n")
 	var alias []string
 	for _, t := range tools {
-		if backend, ok := attestedBackend[t.Name]; ok && runtime.GOOS != "windows" {
+		if backend, ok := aliasBackend(t.Name); ok {
 			alias = append(alias, fmt.Sprintf("%s = %q", t.Name, backend))
 		}
 	}
@@ -245,6 +245,29 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 // refuses an asset whose attestation it cannot find.
 var attestedBackend = map[string]string{
 	"herdr": "github:herdrdev/herdr",
+}
+
+// npmBackend routes the CLIs that are npm packages to mise's npm backend, which
+// aqua has no recipe for (#2438). The catalog installed them with `npm install
+// -g`, which on a Windows box whose Node comes from mise leaves the launchers
+// in the Node install directory, a path nothing puts on PATH; mise's shims do
+// not depend on where npm writes. An alias for the same reason as herdr's: the
+// short name stays the key everywhere else. Node must be pinned in the same
+// file, since the package runs on it.
+var npmBackend = map[string]string{
+	"bw":       "npm:@bitwarden/cli",
+	"copilot":  "npm:@github/copilot",
+	"opencode": "npm:opencode-ai",
+	"yarn":     "npm:yarn",
+}
+
+// aliasBackend is the backend a tool's short name is routed to, if any.
+func aliasBackend(name string) (string, bool) {
+	if backend, ok := npmBackend[name]; ok {
+		return backend, true
+	}
+	backend, ok := attestedBackend[name]
+	return backend, ok && runtime.GOOS != "windows"
 }
 
 // ownUpdaterOff turns off the self-updater of a tool mise installs: mise keeps
@@ -583,6 +606,9 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 	if runtime.GOOS == "windows" && hasTool(tools, "bats") && !hasTool(tools, "node") {
 		return SyncPlan{}, errors.New("windows bats requires node: mark NODE_VERSION for mise before using the npm installer")
 	}
+	if npm := npmTools(tools); len(npm) > 0 && !hasTool(tools, "node") {
+		return SyncPlan{}, fmt.Errorf("%s run on node: mark NODE_VERSION for mise before pinning them", strings.Join(npm, ", "))
+	}
 	p, unlisted, err := s.plan(tools)
 	if err != nil {
 		return p, err
@@ -617,12 +643,9 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 		return p, nil
 	}
 	if p.ConfigChanged || len(p.Missing) > 0 {
-		if runtime.GOOS == "windows" && contains(p.Missing, "bats") {
-			if out, err := s.Run("mise", "install", "node"); err != nil {
-				return p, fmt.Errorf("mise install node (required by bats): %w\n%s", err, strings.TrimSpace(string(out)))
-			}
-			if out, err := s.Run("mise", batsInstallArgs...); err != nil {
-				return p, fmt.Errorf("mise install npm:bats: %w\n%s", err, strings.TrimSpace(string(out)))
+		if runtime.GOOS == "windows" {
+			if err := s.installNpmFirst(p.Missing); err != nil {
+				return p, err
 			}
 		}
 		if out, err := s.Run("mise", "install"); err != nil {
@@ -913,6 +936,63 @@ func batsRuntimeNote(goos string, missing []string, execPath func() ([]byte, err
 	return ""
 }
 
+// npmTools names the marked tools that mise installs through its npm backend.
+func npmTools(tools []MiseTool) []string {
+	var out []string
+	for _, t := range tools {
+		if _, ok := npmBackend[t.Name]; ok {
+			out = append(out, t.Name)
+		}
+	}
+	return out
+}
+
+// installNpmFirst installs, one by one, the missing tools that need npm to
+// create a Windows launcher, after Node is in place: bats, which the config
+// keys as npm:bats, and the npmBackend CLIs, keyed by their short name. A bare
+// `mise install` reports such a tool installed and creates no launcher (the
+// aube installer), so each goes through the npm installer the runner scopes to
+// exactly these calls (miseInstallEnv).
+func (s MiseSync) installNpmFirst(missing []string) error {
+	var targets [][]string
+	if contains(missing, "bats") {
+		targets = append(targets, batsInstallArgs)
+	}
+	for _, name := range missing {
+		if _, ok := npmBackend[name]; ok {
+			targets = append(targets, []string{"install", "--force", name})
+		}
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+	if out, err := s.Run("mise", "install", "node"); err != nil {
+		return fmt.Errorf("mise install node (required by the npm tools): %w\n%s", err, strings.TrimSpace(string(out)))
+	}
+	for _, args := range targets {
+		if out, err := s.Run("mise", args...); err != nil {
+			return fmt.Errorf("mise %s: %w\n%s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		}
+	}
+	return nil
+}
+
+// npmInstallTarget names the tool a `mise install --force <target>` call
+// installs through npm, or "" for any other call: the one shape installNpmFirst
+// issues, matched so the npm installer is scoped to it and nothing else.
+func npmInstallTarget(name string, args ...string) string {
+	if name != "mise" || len(args) != 3 || args[0] != "install" || args[1] != "--force" {
+		return ""
+	}
+	if slices.Equal(args, batsInstallArgs) {
+		return "bats"
+	}
+	if _, ok := npmBackend[args[2]]; ok {
+		return args[2]
+	}
+	return ""
+}
+
 // gitBashScope reports whether a sync child needs Git Bash on its PATH: the
 // bats launcher, and the npm:bats install, which is not shown to run without
 // it. Every other child (mise itself, every other tool's probe) keeps the
@@ -933,7 +1013,7 @@ func isBatsInstall(name string, args ...string) bool {
 }
 
 func miseInstallEnv(name string, args ...string) string {
-	if runtime.GOOS == "windows" && isBatsInstall(name, args...) {
+	if runtime.GOOS == "windows" && npmInstallTarget(name, args...) != "" {
 		return "MISE_NPM_PACKAGE_MANAGER=npm"
 	}
 	return ""
