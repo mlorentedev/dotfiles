@@ -51,7 +51,7 @@ owner: manu
 - [x] `[AC1]` Both workflow `CONFIG__MAX_MODEL_TOKENS` overrides 200000 → 150000, so the env does not restore the inert clip the file just fixed.
 - [x] `[AC2]` The two Anthropic review steps: `timeout-minutes` 8 → 13.
 - [x] `[AC2]` The NaN review step: state `CONFIG__AI_TIMEOUT: "120"`, the value it already runs with.
-- [x] `[AC3]` The job ceiling 34 → 37, with the sum `25 + 5 + 3 + 3 = 36` recorded in the comment; 37 is the smallest bound that exceeds it.
+- [x] `[AC3]` The job ceiling 34 → 38, with the sum `25 + 6 + 3 + 3 = 37` recorded in the comment; 38 is the smallest bound that exceeds it.
 
 ## Tests that pinned the old numbers
 

@@ -37,6 +37,10 @@ which any test or reviewer had asked about:
    25 min, plus 5 min of preflight probes, 3 of setup and 3 of publication calls
    = 36, against `timeout-minutes: 34`. The ANTHROPIC ceiling growing from 8 to
    13 is what pushed it over — the step fix and the job fix are the same fix.
+   An independent audit of the change then found the 5 one probe short: the
+   route probes the drawn Anthropic model and, on a risky PR, the risk model
+   too (`route.go`), 60 s where the test counted 30, so the sum is 37 and the
+   job is 38. The bats test now reads the probed models from the pool.
 
 ## Problem
 

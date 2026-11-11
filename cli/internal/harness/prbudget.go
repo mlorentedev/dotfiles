@@ -37,6 +37,7 @@ const (
 	envRetrySameModel = "CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT"
 	envMaxOutput      = "CONFIG__MAX_OUTPUT_TOKENS"
 	envMaxModelTokens = "CONFIG__MAX_MODEL_TOKENS"
+	envModelWindow    = "CONFIG__CUSTOM_MODEL_MAX_TOKENS"
 )
 
 // reviewConfig is everything the invariants are computed from.
@@ -60,6 +61,9 @@ type reviewStep struct {
 	// .pr_agent.toml, so a step that declares it is checked against its own
 	// number rather than the file's.
 	maxTokens int
+	// window is the step's own custom_model_max_tokens, overriding the toml
+	// the same way; a step that lowers it shrinks the room the clip must leave.
+	window int
 }
 
 // workflowStep is the part of a workflow step the budget reads.
@@ -198,6 +202,7 @@ func newReviewStep(s workflowStep, cfg *reviewConfig) reviewStep {
 		aiTimeout: envInt(s.Env[envAITimeout]),
 		outputCap: envInt(s.Env[envMaxOutput]),
 		maxTokens: envInt(s.Env[envMaxModelTokens]),
+		window:    envInt(s.Env[envModelWindow]),
 	}
 	if list, ok := literalList(s.Env[envFallbackModels]); ok {
 		st.chain = len(list) + 1
@@ -212,7 +217,9 @@ func newReviewStep(s workflowStep, cfg *reviewConfig) reviewStep {
 // stays under the model window. Equal numbers are the failure this exists for:
 // the cap then has no reachable subject. A step that declares its own clip is
 // checked too, because the workflow's env overrides the toml and lowering only
-// the file would leave the run clipped by a number nobody changed.
+// the file would leave the run clipped by a number nobody changed. The same
+// goes for a step's own window: the env wins there as well, and a step that
+// lowers it is measured against its own, not the file's.
 func checkTokenClip(cfg *reviewConfig) []CheckLine {
 	if cfg.maxModelTokens <= 0 {
 		return []CheckLine{prBudgetProblem(prAgentTomlFile,
@@ -221,12 +228,20 @@ func checkTokenClip(cfg *reviewConfig) []CheckLine {
 	reserve := largestOutputCap(cfg.steps)
 	out := clipLine(prAgentTomlFile, cfg.maxModelTokens, reserve, cfg.customModelMaxTokens)
 	for _, s := range cfg.steps {
-		if s.maxTokens <= 0 {
+		if s.maxTokens <= 0 && s.window <= 0 {
 			continue
 		}
-		out = append(out, clipLine(s.name, s.maxTokens, reserve, cfg.customModelMaxTokens)...)
+		out = append(out, clipLine(s.name, orInt(s.maxTokens, cfg.maxModelTokens), reserve, orInt(s.window, cfg.customModelMaxTokens))...)
 	}
 	return out
+}
+
+// orInt is a step's own number when it declares one, else the file's.
+func orInt(own, file int) int {
+	if own > 0 {
+		return own
+	}
+	return file
 }
 
 // clipLine is the invariant for one clip: prompt plus answer, under the window.

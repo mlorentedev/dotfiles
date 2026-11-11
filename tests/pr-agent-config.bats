@@ -1189,13 +1189,15 @@ print(all(any(c == x or c.endswith('/' + x) for c in chain) for x in listed))
 @test "pr-agent: the job outlives both bounded Actions and the probes before them" {
     # At most two attempts run, one per provider. The worst pair, plus the
     # preflight's probes (PREFLIGHT_TIMEOUT per NaN model) and the draw's
-    # (ROUTE_PROBE_TIMEOUT), three minutes of setup (31 s measured, run
-    # 37879933613), and a minute for each step after the attempts that calls the
-    # GitHub API (two publication measurements and the final guard: up to three
-    # calls each, with 5 s and 10 s retry sleeps), must stay under the job's
-    # bound: AC7 asks the job to exceed the sum, so equal fails. The probe
-    # seconds are read where they are set, a step's env over the script's
-    # default, never restated here.
+    # (ROUTE_PROBE_TIMEOUT per Anthropic model the route may probe: the drawn
+    # member and, on a risky PR, the risk member as well, route.go), three
+    # minutes of setup (31 s measured, run 37879933613), and a minute for each
+    # step after the attempts that calls the GitHub API (two publication
+    # measurements and the final guard: up to three calls each, with 5 s and
+    # 10 s retry sleeps), must stay under the job's bound: AC7 asks the job to
+    # exceed the sum, so equal fails. The probe seconds are read where they are
+    # set, a step's env over the script's default, never restated here, and the
+    # probed models come from the pool, not from a count written here.
     run python3 -c "
 import json, math, re, yaml
 job = yaml.safe_load(open('$WF'))['jobs']['review']
@@ -1208,8 +1210,12 @@ def knob(name, source, const):
     return int(m.group(1))
 pair = by['pr_agent']['timeout-minutes'] + max(by[i]['timeout-minutes'] for i in ('pr_agent_anthropic_first', 'pr_agent_anthropic_second'))
 chain = 1 + len(json.loads(by['models']['env']['DECLARED_FALLBACK_MODELS']))
+pool = [m.get('pr_agent') or {} for m in json.load(open('$REPO/harness/reviewer-pool.json'))['pool']]
+drawn = next((m['model'] for m in pool if m.get('model', '').startswith('anthropic/') and m.get('weight', 0) > 0), None)
+risk = next((m['model'] for m in pool if m.get('route') == 'risk'), None)
+probed = len({m for m in (drawn, risk) if m})
 probes = math.ceil((knob('PREFLIGHT_TIMEOUT', 'preflight.go', 'defaultPreflightSecond') * chain
-                    + knob('ROUTE_PROBE_TIMEOUT', 'probe.go', 'defaultProbeTimeout')) / 60)
+                    + knob('ROUTE_PROBE_TIMEOUT', 'probe.go', 'defaultProbeTimeout') * probed) / 60)
 after = len([s for s in job['steps'] if s.get('id') in ('published_after_anthropic', 'published_after_nan')
              or s.get('name') == 'Fail if no review was published'])
 print(after == 3 and job['timeout-minutes'] > pair + probes + 3 + after, job['timeout-minutes'], pair, probes, after)

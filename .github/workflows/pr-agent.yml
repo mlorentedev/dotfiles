@@ -177,15 +177,17 @@ jobs:
     # measurements and the final guard after them (each up to three API calls with
     # retry sleeps). The second attempt runs only when the first published nothing
     # (AI-045 AC9), so a day without trouble holds the one-at-a-time lane no
-    # longer than before. The sum is 36 minutes, and the bound exceeds it rather
-    # than equals it (AC7), so a probe that runs to its last second still leaves
-    # the final guard time to report.
+    # longer than before. The sum is 37 minutes (the route may probe two
+    # Anthropic models on a risky PR, the drawn one and the risk one, so the
+    # probes are 6, not 5), and the bound exceeds it rather than equals it
+    # (AC7), so a probe that runs to its last second still leaves the final
+    # guard time to report.
     #
-    # 37, not 34: the Anthropic attempt's own ceiling is 13 so that it can afford
+    # 38, not 34: the Anthropic attempt's own ceiling is 13 so that it can afford
     # the two calls `ai_timeout = 360` allows (AI-054), and a step ceiling that
     # grows past the job's slack is the ceiling-that-covers-nothing defect one
     # level up. tests/pr-agent-config.bats computes this sum and is what caught it.
-    timeout-minutes: 37
+    timeout-minutes: 38
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag

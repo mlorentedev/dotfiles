@@ -32,7 +32,8 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   `checkReviewBudget`'s doc comment and pinned by
   `TestCheckReviewBudget_TheGuardLeavesTheJobCeilingToTheBatsTest`; the number
   itself is `tests/pr-agent-config.bats:1189`, red at `False 34 25 5 3` when the
-  step ceiling grew and green at `True 37 25 5 3` after the job moved to 37.
+  step ceiling grew and green at `True 37 25 5 3` after the job moved to 37;
+  after the audit it counts the two Anthropic probes: `True 38 25 6 3`.
 - [x] AC4 (fail closed) -> `TestCheckReviewBudget_AWorkflowWithoutAReviewStepFailsClosed`,
   `TestCheckReviewBudget_HalfAReviewerFailsClosed` (a workflow with the toml
   missing, or the workflow missing, is an `[ERROR]`, not silence) and
@@ -89,7 +90,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   120000 clips 30000 earlier for no benefit, because the answer cap is reserved
   above the clip rather than out of it. Measured prompts here peak near 97000
   tokens (AI-045 AC9), so nothing that runs today gets clipped.
-- **The job ceiling moved to 37 in the same change as the step ceilings.** The
+- **The job ceiling moved to 38 in the same change as the step ceilings.** The
   pair needs 25 of the 34 available minutes and the probes, setup and publication
   calls take the other 11; growing a step ceiling spends slack that was already
   gone. The step fix and the job fix are one fix.

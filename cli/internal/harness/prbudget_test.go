@@ -103,9 +103,11 @@ func TestCheckReviewBudget_TheCurrentConfigurationFails(t *testing.T) {
 	repo := budgetRepo(t, budgetTomlPreFix,
 		budgetStepFirstPreFix+budgetStepNaNPreFix+budgetStepSecondPreFix)
 
+	// Five: the file's clip, the NaN step's clip (it declares the window, so
+	// it is measured on its own), two step ceilings and the undeclared ai_timeout.
 	n, text := budgetProblemText(t, repo)
-	if n != 4 {
-		t.Fatalf("want 4 problems (clip, two step ceilings, undeclared ai_timeout), got %d:\n%s", n, text)
+	if n != 5 {
+		t.Fatalf("want 5 problems (two clips, two step ceilings, undeclared ai_timeout), got %d:\n%s", n, text)
 	}
 	for _, want := range []string{
 		"the prompt clip in",
@@ -230,6 +232,46 @@ func TestCheckReviewBudget_AStepThatDeclaresItsOwnClipIsCheckedToo(t *testing.T)
 	}
 }
 
+func TestCheckReviewBudget_AStepThatLowersItsOwnWindowIsMeasuredAgainstIt(t *testing.T) {
+	// Reviewed on #3289: CONFIG__CUSTOM_MODEL_MAX_TOKENS overrides the toml
+	// like the clip does, so a step window of 160000 under a 150000 clip and
+	// a 40000 answer leaves no room, while the file's 200000 would say it does.
+	step := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 13
+        env:
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "160000"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+          CONFIG__AI_TIMEOUT: "360"
+`
+	toml := "max_model_tokens = 150000\ncustom_model_max_tokens = 200000\n"
+	n, text := budgetProblemText(t, budgetRepo(t, toml, step))
+	if n == 0 || !strings.Contains(text, "the prompt clip in PR-Agent never fires: max_model_tokens 150000 + answer cap 40000 = 190000, not under custom_model_max_tokens 160000") {
+		t.Fatalf("want the step's own window used, got %d:\n%s", n, text)
+	}
+	if n, text := budgetProblemText(t, budgetRepo(t, toml, strings.Replace(step, `"160000"`, `"200000"`, 1))); n != 0 {
+		t.Fatalf("a step window equal to the file's changes nothing, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_TheReserveIsTheLargestCapNotTheFirst(t *testing.T) {
+	// 150000 + 40000 fits under 200000; 150000 + 60000 does not. A guard that
+	// stopped at the first declared cap would pass on the step order alone.
+	small := strings.Replace(budgetStepFirstFixed, `"40000"`, `"40000"`, 1)
+	large := strings.Replace(budgetStepSecondFixed, `"40000"`, `"60000"`, 1)
+	toml := "max_model_tokens = 150000\ncustom_model_max_tokens = 200000\n"
+	if n, text := budgetProblemText(t, budgetRepo(t, toml, small+large)); n == 0 || !strings.Contains(text, "answer cap 60000") {
+		t.Fatalf("want the 60000 cap to be the reserve, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_AFileWithoutAClipFailsClosed(t *testing.T) {
+	toml := "custom_model_max_tokens = 200000\n"
+	if n, text := budgetProblemText(t, budgetRepo(t, toml, budgetStepFirstFixed)); n == 0 || !strings.Contains(text, "max_model_tokens is absent") {
+		t.Fatalf("want a missing clip reported, got %d:\n%s", n, text)
+	}
+}
+
 func TestCheckReviewBudget_AWorkflowWithoutAReviewStepFailsClosed(t *testing.T) {
 	repo := budgetRepo(t, budgetTomlFixed, `      - uses: actions/checkout@0000
         timeout-minutes: 1
@@ -245,6 +287,11 @@ func TestCheckReviewBudget_HalfAReviewerFailsClosed(t *testing.T) {
 	writeFile(t, filepath.Join(repo, prAgentTomlFile), budgetTomlFixed)
 	if n, text := budgetProblemText(t, repo); n == 0 || !strings.Contains(text, prAgentWorkflowFile) {
 		t.Fatalf("want an error naming the missing workflow, got %d:\n%s", n, text)
+	}
+	other := t.TempDir()
+	writeFile(t, filepath.Join(other, filepath.FromSlash(prAgentWorkflowFile)), budgetWorkflow(34, budgetStepFirstFixed))
+	if n, text := budgetProblemText(t, other); n == 0 || !strings.Contains(text, prAgentTomlFile) {
+		t.Fatalf("want an error naming the missing toml, got %d:\n%s", n, text)
 	}
 }
 
