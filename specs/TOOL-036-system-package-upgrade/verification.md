@@ -15,7 +15,7 @@ owner: manu
 - [x] AC2 -> `TestSystemUpgrade*Darwin*Apply` (74192f21), second run asserted changed=0 with no upgrade or housekeeping argv; on the Mac: apply -> `0 changed, 1 ok`, then plan -> `0 to change`
 - [x] AC3 -> `TestSystemUpgrade*OutsideCatalog` (table over darwin/linux/windows). Mutation `isBehind(t) || true` failed 9 tests, reverted
 - [x] AC4 -> `TestSystemUpgrade*Linux*` (no sudo: skip with reason; sudo: `--only-upgrade` on catalog packages; root: bare)
-- [x] AC5 -> `TestSystemUpgrade*Windows*` (per-id upgrade, one failure isolated, Probe names it)
+- [x] AC5 -> `TestSystemUpgrade*Windows*` (per-id upgrade, one failure isolated and named in the step error, detail names only the upgraded; `TestSystemUpgradeWindowsMatchesOnlyTheIdColumn` reads the Id column by header position)
 - [x] AC6 -> `TestSystemUpgrade*Refresh*` on all three OSes
 - [x] AC7 -> af71fcc7: `packages.json` `$comment`, ADR-036 amendment 2026-11-10; 02586d37: `catalog.go`, `system.go`, runbook
 

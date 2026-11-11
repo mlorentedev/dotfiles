@@ -31,6 +31,8 @@ type pkgFake struct {
 	pinned   map[string]bool     // brew formulae the manager lists but will not upgrade
 	sudoOK   bool
 	fail     map[string]error // a command, as joined argv, that fails
+	// wingetOverride, when set, is the `winget upgrade` listing verbatim.
+	wingetOverride []byte
 }
 
 func newPkgFake(outdated map[string][]string) *pkgFake {
@@ -108,6 +110,9 @@ func (f *pkgFake) aptList() []byte {
 }
 
 func (f *pkgFake) wingetTable() []byte {
+	if f.wingetOverride != nil {
+		return f.wingetOverride
+	}
 	lines := []string{
 		"Name           Id                 Version Available Source",
 		"-----------------------------------------------------------",
@@ -492,5 +497,35 @@ func TestSystemUpgradeNameAndPlatforms(t *testing.T) {
 	step := systemUpgrade{}
 	if step.Name() != "system-upgrade" || step.Platforms() != nil {
 		t.Errorf("Name %q, Platforms %v", step.Name(), step.Platforms())
+	}
+}
+
+func TestSystemUpgradeWindowsMatchesOnlyTheIdColumn(t *testing.T) {
+	listing := strings.Join([]string{
+		"Name                      Id                  Version Available Source",
+		"----------------------------------------------------------------------",
+		"Example application Git…  Some.Other.Id       1.0     2.0       winget",
+		"Eza with a long name      eza-community.e…    0.1     0.2       winget",
+		"Café Ñandú                Git.Git.Extra       1.0     2.0       winget",
+		"2 upgrades available.",
+	}, "\r\n")
+	ids := wingetIDs(listing)
+	want := []string{"some.other.id", "eza-community.e…", "git.git.extra"}
+	if strings.Join(ids, ",") != strings.Join(want, ",") {
+		t.Fatalf("ids = %q, want %q", ids, want)
+	}
+	f := newPkgFake(nil)
+	f.wingetOverride = []byte(listing)
+	behind, err := upgradeStep(f).wingetBehind(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, wantBehind := range map[string]bool{"Git.Git": false, "eza-community.eza": true, "Some.Other.Id": true} {
+		if got := behind(sysTarget{pkg: id}); got != wantBehind {
+			t.Errorf("behind(%s) = %v, want %v", id, got, wantBehind)
+		}
+	}
+	if len(wingetIDs("No installed package found matching input criteria.")) != 0 {
+		t.Error("a listing with no header matches nothing")
 	}
 }

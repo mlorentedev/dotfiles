@@ -28,7 +28,7 @@ owner: manu
 - [x] [AC2] [AC3] Failing test: apply upgrades only catalog formulae/casks, then cleanup + autoremove; second plan is `changed=0`
 - [x] [AC2] [AC3] Implement darwin apply + housekeeping
 - [x] [P] [AC4] Failing test + implement linux: `sudo -n true` gate, skip reason, `--only-upgrade` on outdated catalog packages
-- [x] [P] [AC5] Failing test + implement windows: per-id `winget upgrade`, one failure isolated, probe fails on it
+- [x] [P] [AC5] Failing test + implement windows: per-id `winget upgrade`, one failure isolated and named in the step error
 - [x] [AC6] Failing test + implement: refresh failure is a skip with the manager's error
 - [x] Register the step after `tools` in `Registry` and in every test that enumerates steps
 - [x] [AC7] `packages.json` `$comment` and ADR-036 amendment
