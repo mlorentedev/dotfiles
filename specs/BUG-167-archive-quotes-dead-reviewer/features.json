@@ -1,0 +1,5 @@
+[
+  {"id": "BUG-167-archive-quotes-dead-reviewer-f1", "behavior": "The archive refusal quotes a dead reviewer and names it", "verification": "cd cli && go test ./internal/spec -run TestArchiveGateQuotesWhatADeadReviewerSaid -count=1", "state": "pending", "evidence": ""},
+  {"id": "BUG-167-archive-quotes-dead-reviewer-f2", "behavior": "A long output keeps both ends as valid UTF-8", "verification": "cd cli && go test ./internal/spec -run TestReviewerLastWordsQuotesTheEnd -count=1", "state": "pending", "evidence": ""},
+  {"id": "BUG-167-archive-quotes-dead-reviewer-f3", "behavior": "Turn-cap hints are unchanged", "verification": "cd cli && go test ./internal/spec -run 'TestArchiveGate.*Cap' -count=1", "state": "pending", "evidence": ""}
+]
