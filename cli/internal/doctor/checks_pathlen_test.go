@@ -35,6 +35,15 @@ func TestCheckCmdPathLength(t *testing.T) {
 		{"over, no duplicates", "windows", windowsPath(250, 1), "PATH is 9749 chars, past cmd.exe's 8191", "repeat an earlier one", true},
 		{"same spelling differs only in case and a trailing slash", "windows",
 			windowsPath(220, 1) + `;C:\HOSTEDTOOLCACHE\windows\tool000\bin\`, "1 of its 221 entries repeat an earlier one", "", true},
+		{"names the repeated entries, first spelling, capped at five", "windows",
+			windowsPath(220, 1) + `;C:\HOSTEDTOOLCACHE\windows\tool000\bin\;c:\hostedtoolcache\windows\tool000\bin`,
+			`2 of its 222 entries repeat an earlier one (C:\hostedtoolcache\windows\tool000\bin); remove`, "", true},
+		{"tripled PATH names five and counts the rest", "windows", windowsPath(100, 3),
+			`(C:\hostedtoolcache\windows\tool000\bin, C:\hostedtoolcache\windows\tool001\bin, C:\hostedtoolcache\windows\tool002\bin, C:\hostedtoolcache\windows\tool003\bin, C:\hostedtoolcache\windows\tool004\bin, and 95 more)`, "", true},
+		// cmd.exe's limit is in UTF-16 units; len() counts UTF-8 bytes, which
+		// a non-ASCII directory inflates: 8190 units here are 16377 bytes.
+		{"length is counted in UTF-16 units, not bytes", "windows", `C:\` + strings.Repeat("é", 8187),
+			"[ OK ] PATH is 8190 chars, under cmd.exe's 8191", "", false},
 		{"not Windows", "linux", strings.Repeat("/x", 6000), "", "PATH is", false},
 	}
 	for _, tc := range cases {
