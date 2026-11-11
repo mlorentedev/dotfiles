@@ -24,14 +24,14 @@ owner: manu
 
 ## Implementation
 
-- [ ] [AC1] Write failing tests in `cli/internal/lane/audit_test.go`: `AuditLanes` on a coherent repository (no findings), an unmanaged one, a marker with no lane present, and each corrupted-marker shape naming its field
-- [ ] [AC1] Implement `AuditLanes`, `Finding` and the marker validation in `cli/internal/lane/audit.go` to make them pass
-- [ ] [AC2] [AC3] Write failing tests: `mv`'d lane, `git worktree move`'d lane, undeclared record, deleted lease, deleted record, lease naming another lane, plain directory at a lane path
-- [ ] [AC2] [AC3] Implement the admin-dir enumeration and the per-lane checks to make them pass
-- [ ] [AC4] Write failing tests in `cli/internal/cmd/lane_doctor_test.go`: silent exit 0 on a coherent repository, one line on an unmanaged one, exit 1 with ERROR/FIX pairs and no `Error:` line on a finding
-- [ ] [AC4] Implement `dotf lane doctor` in `cli/internal/cmd/lane_doctor.go` (SilenceErrors, `withExitCode(1, …)`)
-- [ ] Runbook: `dotf lane doctor` section and the known limit on the lane-local marker copy; lesson on enumerating git's own records rather than paths
-- [ ] File the follow-up ticket for the `dotf doctor` sweep entry (two options) and reference it from the PR
+- [x] [AC1] Write failing tests in `cli/internal/lane/audit_test.go`: `AuditLanes` on a coherent repository (no findings), an unmanaged one, a marker with no lane present, and each corrupted-marker shape naming its field (396b590a)
+- [x] [AC1] Implement `AuditLanes`, `Finding` and the marker validation in `cli/internal/lane/audit.go` to make them pass (ec8d58a7)
+- [x] [AC2] [AC3] Write failing tests: `mv`'d lane, `git worktree move`'d lane, undeclared record, deleted lease, deleted record, lease naming another lane, plain directory at a lane path (396b590a, one red commit for the three criteria)
+- [x] [AC2] [AC3] Implement the admin-dir enumeration and the per-lane checks to make them pass (ec8d58a7)
+- [x] [AC4] Write failing tests in `cli/internal/cmd/lane_doctor_test.go`: silent exit 0 on a coherent repository, one line on an unmanaged one, exit 1 with ERROR/FIX pairs and no `Error:` line on a finding (48ad8029)
+- [x] [AC4] Implement `dotf lane doctor` in `cli/internal/cmd/lane_doctor.go` (SilenceErrors, `withExitCode(1, …)`) (e2bcd9d7)
+- [x] Runbook: `dotf lane doctor` section 7.6 and the known limit on the lane-local marker copy; lesson 581 on enumerating git's own registry rather than paths
+- [x] File the follow-up ticket for the `dotf doctor` sweep entry (two options): #3327
 
 ## Closing
 
