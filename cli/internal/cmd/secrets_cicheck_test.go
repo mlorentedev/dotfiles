@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -39,5 +40,21 @@ func TestRunCICheckReportsNamesAndFails(t *testing.T) {
 	want := "o/bad: FAIL\n  missing  NEEDED\no/ok: ok\n"
 	if out.String() != want {
 		t.Fatalf("output:\n%s\nwant:\n%s", out.String(), want)
+	}
+}
+
+type ciFailing struct{}
+
+func (ciFailing) List(string) ([]string, error)               { return nil, errors.New("boom") }
+func (ciFailing) Read(string, string, string) ([]byte, error) { return nil, errors.New("boom") }
+
+func TestRunCICheckNamesTheRepositoryOnce(t *testing.T) {
+	var out bytes.Buffer
+	err := runCICheck(&out, secrets.NewCIChecker(ciFailing{}, &secrets.Registry{}), []string{"o/broken"})
+	if err == nil {
+		t.Fatal("an unreadable repository must fail")
+	}
+	if want := "o/broken: ERROR list workflows: boom\n"; out.String() != want {
+		t.Fatalf("output = %q, want %q", out.String(), want)
 	}
 }

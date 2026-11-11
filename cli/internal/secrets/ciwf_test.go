@@ -19,6 +19,8 @@ jobs:
       T: ${{ secrets.GITHUB_TOKEN }}
       D: ${{ secrets.ALPHA }}
       E: ${{ inputs.secrets }}
+      # F: ${{ secrets.IN_A_COMMENT }}
+      G: ${{ secrets.lower_case }} # ${{ secrets.TRAILING_COMMENT }}
     if: >-
       ${{ github.event_name == 'push' &&
           secrets.DELTA != '' }}
@@ -27,8 +29,11 @@ jobs:
     secrets:
       THEIR_NAME: ${{ secrets.MINE }}
 `)
-	names, unknown := workflowReads(wf)
-	want := []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "MINE"}
+	names, unknown, err := workflowReads(wf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"ALPHA", "BRAVO", "CHARLIE", "DELTA", "LOWER_CASE", "MINE"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("names = %v, want %v", names, want)
 	}
@@ -45,7 +50,10 @@ func TestWorkflowReadsUnknown(t *testing.T) {
       ONE: ${{ secrets[matrix.key] }}
       OK: ${{ secrets.FINE }}
 `)
-	names, unknown := workflowReads(wf)
+	names, unknown, err := workflowReads(wf)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(names, []string{"FINE"}) {
 		t.Fatalf("names = %v, want [FINE]", names)
 	}
@@ -225,5 +233,46 @@ func TestDiffReadsPrecedence(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Excess, []string{"STALE"}) {
 		t.Errorf("excess = %v, want [STALE]", got.Excess)
+	}
+}
+
+// A file may hold several YAML documents; every one is read, not only the first.
+func TestWorkflowFilesReadEveryDocument(t *testing.T) {
+	wf := []byte("jobs:\n  a:\n    env:\n      K: ${{ secrets.FIRST }}\n---\njobs:\n  b:\n    uses: o/ci/.github/workflows/w.yml@v2\n    secrets: inherit\n    env:\n      K: ${{ secrets.SECOND }}\n")
+	names, _, err := workflowReads(wf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(names, []string{"FIRST", "SECOND"}) {
+		t.Errorf("names = %v, want [FIRST SECOND]", names)
+	}
+	calls, err := inheritedCalls(wf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 1 || calls[0].Ref != "v2" {
+		t.Errorf("calls = %+v, want the second document's call", calls)
+	}
+}
+
+// Actions secret names are case-insensitive: one credential spelled two ways
+// must not read as missing and excess at once.
+func TestCheckRepoNamesAreCaseInsensitive(t *testing.T) {
+	fw := &fakeWorkflows{files: map[string]map[string][]byte{"o/a": {
+		".github/workflows/x.yml": []byte("jobs:\n  a:\n    env:\n      K: ${{ secrets.nan_api_key }}\n"),
+	}}}
+	reg := &Registry{Secrets: []Secret{{ID: "nan", Consumers: []string{"ci:o/a"}, Expose: Expose{Env: EnvExpose{Vars: []EnvVar{{Name: "NAN_API_KEY"}}}}}}}
+	got, err := NewCIChecker(fw, reg).CheckRepo("o/a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Failing() {
+		t.Errorf("same name in two cases must match: %+v", got)
+	}
+	// And the other way round: a declared var spelled in lower case.
+	reg.Secrets[0].Expose.Env.Vars[0].Name = "nan_api_key"
+	fw.files["o/a"][".github/workflows/x.yml"] = []byte("jobs:\n  a:\n    env:\n      K: ${{ secrets.NAN_API_KEY }}\n")
+	if got, err = NewCIChecker(fw, reg).CheckRepo("o/a"); err != nil || got.Failing() {
+		t.Errorf("declared lower case must match: %+v, %v", got, err)
 	}
 }

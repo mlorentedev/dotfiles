@@ -23,6 +23,8 @@ Mutation check (2026-11-10). Each change was applied on its own and the new test
 - the optional-missing branch disabled -> killed
 - the callee cache bypassed -> killed
 - the `inputs.secrets` guard removed -> survived at first; `TestWorkflowReads` gained an `inputs.secrets` row, then killed
+- the multi-line `(?s)` removed -> killed; required-over-optional precedence in `diffReads` broken -> killed
+- after review round 1: comments fed back into the scanned value -> killed; only the first YAML document decoded -> killed; the registry's vars not upper-cased -> survived at first, the test gained a lower-case declared var, then killed
 
 Live run over the fleet (2026-11-10, `go run ./cmd/dotf secrets ci-check`, 2m26s, REST only): exit 1, `16 of 25 repositories disagree with the registry or could not be read`. This repository is public and most of the fleet is not, so the full output (secret names of private repositories) stays out of the record; per repository it gave:
 
@@ -49,15 +51,21 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 - **`HIVE_WORKER_API_KEY` is excess in 14 repositories, and that is correct.** The registry's `NAN_API_KEY` entry exposes two vars (one credential, two consumer names), and `SelectCI` uploads both to every `ci:` consumer, while no workflow reads the hive alias. The check reports it rather than special-casing it; narrowing the upload is #2306 (CLI-103), already open.
 - **"Missing" means not declared in the registry**, not absent from the repository: most kubelab names exist as hand-set secrets. Whether a declared secret was synced stays #1596.
-- Only `${{ }}` expressions are scanned, so a comment or a YAML key named `secrets:` is never read as a secret reference.
+- **Reads come from the decoded YAML, not the bytes.** The first round matched `${{ }}` in the raw file, so an expression inside a comment counted as a read, which contradicted what this log said then (review F1). `workflowReads` now walks the scalar values of every YAML document. Comments live in the nodes' comment fields, so they are never read, and a multi-document file is read whole (F5). A YAML key named `secrets:` is not an expression and is never a read.
+- **Names compare case-insensitively** (F3): Actions secret names are case-insensitive, so reads, callee declarations and the registry's vars are upper-cased before the diff. Without that, one credential spelled two ways read as missing and excess at once.
+- **Review round 1 (FAIL, nan/deepseek-v4-flash, at 6d0a0a6a), dispositions:** F1, F2, F3 and F5 were applied, each with a test. F8 was applied (promotion candidates below).
+  - **F4 is declined.** `yes` is a boolean only in YAML 1.1. In YAML 1.2, which go.yaml.in/yaml/v3 implements, it is a string. Every callee in the fleet spells the flag `true` or `false`, and ci-workflows#65 holds the shared callees to that declaration. The name is reported either way; only the `(optional in …)` marking would differ.
+  - **F6 is acknowledged, and tasks.md is not edited.** `tasks.md` still says `gh repo list`. The proposal and the code use REST `user/repos` (#3228), and tasks.md is part of the reviewed contract set.
+  - **F7 is confirmed.** A repository whose only signal is an unknown read exits 0 and prints `UNKNOWN`, as AC4 and `features.json` f4 specify: nothing can be concluded about it, so it neither passes nor fails. If a gate later needs unknown to block, that is a flag on the command, not this default.
+- After the round-1 fixes, the live fleet run gave output identical to the first run.
 
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-577-an-optional-secret-on-a-reusable-workflow-is-the-one-that-goes-missing-silently.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: applies ADR-029's per-repository routing; the check adds a reader, not a decision
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the fleet already runs it across every repository from one command; nothing for another project to copy
 
 ## Archive checklist
 

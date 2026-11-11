@@ -1,7 +1,10 @@
 package secrets
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"path"
 	"regexp"
 	"slices"
@@ -56,29 +59,72 @@ var (
 	reusableRe = regexp.MustCompile(`^([^/\s]+/[^/\s]+)/(.+)@([^@\s]+)$`)
 )
 
-// workflowReads returns the secret names a workflow reads, sorted and unique,
-// excluding GITHUB_TOKEN (Actions provides it), and the expressions whose name
-// cannot be known. An explicit mapping to a reusable workflow
+// workflowReads returns the secret names a workflow reads, sorted, unique and
+// upper-cased (Actions secret names are case-insensitive), excluding
+// GITHUB_TOKEN (Actions provides it), and the expressions whose name cannot be
+// known. It reads the decoded YAML's scalar values, so an expression in a
+// comment is never a read. An explicit mapping to a reusable workflow
 // (`THEIR: ${{ secrets.MINE }}`) yields MINE, the name the caller must hold.
-func workflowReads(wf []byte) (names, unknown []string) {
-	for _, m := range exprRe.FindAllSubmatch(wf, -1) {
-		expr := string(m[1])
-		for _, loc := range secretsRe.FindAllStringIndex(expr, -1) {
-			if loc[0] > 0 && expr[loc[0]-1] == '.' {
-				continue // inputs.secrets, github.secrets: another context's field
+func workflowReads(wf []byte) (names, unknown []string, err error) {
+	docs, err := decodeDocs(wf)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, d := range docs {
+		eachScalar(d, func(v string) {
+			for _, m := range exprRe.FindAllStringSubmatch(v, -1) {
+				names, unknown = exprReads(m[1], names, unknown)
 			}
-			lit := literalRe.FindStringSubmatch(expr[loc[1]:])
-			if lit == nil {
-				unknown = append(unknown, strings.TrimSpace(expr))
-				continue
-			}
-			name := lit[1] + lit[2] + lit[3]
-			if name != "GITHUB_TOKEN" {
-				names = append(names, name)
-			}
+		})
+	}
+	return sortedUnique(names), sortedUnique(unknown), nil
+}
+
+// exprReads appends the secret reads of one ${{ }} expression's body.
+func exprReads(expr string, names, unknown []string) ([]string, []string) {
+	for _, loc := range secretsRe.FindAllStringIndex(expr, -1) {
+		if loc[0] > 0 && expr[loc[0]-1] == '.' {
+			continue // inputs.secrets, github.secrets: another context's field
+		}
+		lit := literalRe.FindStringSubmatch(expr[loc[1]:])
+		if lit == nil {
+			unknown = append(unknown, strings.TrimSpace(expr))
+			continue
+		}
+		if name := strings.ToUpper(lit[1] + lit[2] + lit[3]); name != "GITHUB_TOKEN" {
+			names = append(names, name)
 		}
 	}
-	return sortedUnique(names), sortedUnique(unknown)
+	return names, unknown
+}
+
+// decodeDocs decodes every YAML document in wf: a file may hold more than one,
+// and yaml.Unmarshal would silently read only the first.
+func decodeDocs(wf []byte) ([]*yaml.Node, error) {
+	dec := yaml.NewDecoder(bytes.NewReader(wf))
+	var docs []*yaml.Node
+	for {
+		var n yaml.Node
+		err := dec.Decode(&n)
+		if errors.Is(err, io.EOF) {
+			return docs, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		docs = append(docs, &n)
+	}
+}
+
+// eachScalar calls fn with every scalar value under n. Comments live in the
+// nodes' comment fields, never in Value.
+func eachScalar(n *yaml.Node, fn func(string)) {
+	if n.Kind == yaml.ScalarNode {
+		fn(n.Value)
+	}
+	for _, c := range n.Content {
+		eachScalar(c, fn)
+	}
 }
 
 // workflowRef addresses a reusable workflow in another repository.
@@ -92,25 +138,28 @@ func (w workflowRef) String() string { return w.Repo + "/" + w.Path + "@" + w.Re
 // `secrets: inherit`, sorted. A local call (./...) is skipped: its file is one of
 // the repository's own workflows, whose reads are scanned directly.
 func inheritedCalls(wf []byte) ([]workflowRef, error) {
-	var doc struct {
-		Jobs map[string]struct {
-			Uses    string    `yaml:"uses"`
-			Secrets yaml.Node `yaml:"secrets"`
-		} `yaml:"jobs"`
-	}
-	if err := yaml.Unmarshal(wf, &doc); err != nil {
+	docs, err := decodeDocs(wf)
+	if err != nil {
 		return nil, err
 	}
 	var out []workflowRef
-	for _, j := range doc.Jobs {
-		if j.Secrets.Kind != yaml.ScalarNode || j.Secrets.Value != "inherit" {
-			continue
+	for _, d := range docs {
+		var doc struct {
+			Jobs map[string]struct {
+				Uses    string    `yaml:"uses"`
+				Secrets yaml.Node `yaml:"secrets"`
+			} `yaml:"jobs"`
 		}
-		m := reusableRe.FindStringSubmatch(j.Uses)
-		if m == nil {
-			continue
+		if err := d.Decode(&doc); err != nil {
+			return nil, err
 		}
-		out = append(out, workflowRef{Repo: m[1], Path: m[2], Ref: m[3]})
+		for _, j := range doc.Jobs {
+			m := reusableRe.FindStringSubmatch(j.Uses)
+			if m == nil || j.Secrets.Kind != yaml.ScalarNode || j.Secrets.Value != "inherit" {
+				continue
+			}
+			out = append(out, workflowRef{Repo: m[1], Path: m[2], Ref: m[3]})
+		}
 	}
 	sort.Slice(out, func(a, b int) bool { return out[a].String() < out[b].String() })
 	return slices.Compact(out), nil
@@ -121,21 +170,23 @@ func inheritedCalls(wf []byte) ([]workflowRef, error) {
 // a map, so the `on` key is found by its text whatever a YAML 1.1 reader would
 // make of it.
 func calleeSecrets(wf []byte) (map[string]bool, error) {
-	var root yaml.Node
-	if err := yaml.Unmarshal(wf, &root); err != nil {
+	docs, err := decodeDocs(wf)
+	if err != nil {
 		return nil, err
 	}
-	if len(root.Content) == 0 {
-		return map[string]bool{}, nil
-	}
-	secrets := mappingValue(mappingValue(mappingValue(root.Content[0], "on"), "workflow_call"), "secrets")
 	out := map[string]bool{}
-	if secrets == nil || secrets.Kind != yaml.MappingNode {
-		return out, nil
-	}
-	for i := 0; i+1 < len(secrets.Content); i += 2 {
-		req := mappingValue(secrets.Content[i+1], "required")
-		out[secrets.Content[i].Value] = req != nil && req.Value == "true"
+	for _, d := range docs {
+		if len(d.Content) == 0 {
+			continue
+		}
+		secrets := mappingValue(mappingValue(mappingValue(d.Content[0], "on"), "workflow_call"), "secrets")
+		if secrets == nil || secrets.Kind != yaml.MappingNode {
+			continue
+		}
+		for i := 0; i+1 < len(secrets.Content); i += 2 {
+			req := mappingValue(secrets.Content[i+1], "required")
+			out[strings.ToUpper(secrets.Content[i].Value)] = req != nil && req.Value == "true"
+		}
 	}
 	return out, nil
 }
@@ -183,7 +234,7 @@ func (c *CIChecker) CheckRepo(repo string) (CIReport, error) {
 	}
 	declared := map[string]bool{}
 	for _, e := range c.reg.SelectCI(repo).Upload {
-		declared[e.Var] = true
+		declared[strings.ToUpper(e.Var)] = true
 	}
 	rep := diffReads(reads, declared)
 	rep.Repo = repo
@@ -194,7 +245,7 @@ func (c *CIChecker) collectReads(repo string) (ciReads, error) {
 	r := ciReads{required: map[string]bool{}, optional: map[string]string{}}
 	files, err := c.src.List(repo)
 	if err != nil {
-		return r, fmt.Errorf("%s: list workflows: %w", repo, err)
+		return r, fmt.Errorf("list workflows: %w", err)
 	}
 	sort.Strings(files)
 	for _, f := range files {
@@ -211,9 +262,12 @@ func (c *CIChecker) collectReads(repo string) (ciReads, error) {
 func (c *CIChecker) addFile(repo, f string, r *ciReads) error {
 	wf, err := c.src.Read(repo, f, "")
 	if err != nil {
-		return fmt.Errorf("%s: read %s: %w", repo, f, err)
+		return fmt.Errorf("read %s: %w", f, err)
 	}
-	names, unknown := workflowReads(wf)
+	names, unknown, err := workflowReads(wf)
+	if err != nil {
+		return fmt.Errorf("parse %s: %w", f, err)
+	}
 	for _, n := range names {
 		r.required[n] = true
 	}
@@ -222,7 +276,7 @@ func (c *CIChecker) addFile(repo, f string, r *ciReads) error {
 	}
 	calls, err := inheritedCalls(wf)
 	if err != nil {
-		return fmt.Errorf("%s: parse %s: %w", repo, f, err)
+		return fmt.Errorf("parse %s: %w", f, err)
 	}
 	for _, call := range calls {
 		sec, err := c.callee(call)
