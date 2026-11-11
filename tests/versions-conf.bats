@@ -243,3 +243,30 @@ setup() {
         }' "$VERSIONS_CONF"
     [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
 }
+
+# The four CLIs that are npm packages (bw, copilot, opencode, yarn) install
+# through mise's npm backend, which only a dotf carrying the npmBackend table
+# (cli/internal/tools/mise.go) aliases. Up to v0.79.0 no release knows them, so
+# marking one makes `dotf tools sync` look up an aqua recipe that does not exist
+# and fail on every machine, while CI, which builds dotf from the tree, stays
+# green (lesson 373). `last` is the newest release without the table: if a
+# release ships before npmBackend merges, raise it to that release, and mark the
+# pins only once DOTF_VERSION is past it (#2438).
+@test "versions.conf marks no npm CLI while DOTF_VERSION predates the npmBackend table" {
+    run awk -v last="0.79.0" '
+        function gt(a, b,   x, y, i) {
+            split(a, x, "."); split(b, y, ".")
+            for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) return x[i] + 0 > y[i] + 0
+            return 0
+        }
+        marked && /^[[:space:]]*(BW|COPILOT|OPENCODE|YARN)_VERSION[[:space:]]*=/ {
+            n = $0; sub(/^[[:space:]]*/, "", n); sub(/_VERSION.*/, "", n); uses = uses " " n
+        }
+        { t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t); marked = (t == "# mise: cli" || t == "# mise: latest") }
+        /^DOTF_VERSION=/ { dotf = $0; sub(/^DOTF_VERSION=/, "", dotf) }
+        END {
+            if (dotf == "") { print "no DOTF_VERSION"; exit 1 }
+            if (uses != "" && !gt(dotf, last)) { print "marked for mise:" uses ", but DOTF_VERSION=" dotf " does not alias npm CLIs"; exit 1 }
+        }' "$VERSIONS_CONF"
+    [[ "$status" -eq 0 ]] || { printf '%s\n' "$output"; false; }
+}

@@ -97,6 +97,81 @@ func TestRenderMiseConfig_WindowsDirenvNamesTheReleaseBinaryAsExe(t *testing.T) 
 	}
 }
 
+// #2438: a catalog npm CLI moves under mise, so one owner holds it on every OS.
+// Aqua has no recipe for these four, so each short name is aliased to mise's npm
+// backend, and every other reader (mise which, ls, bin-paths, the doctor) keeps
+// asking for copilot. Scoped packages (@github/copilot) and a name that is not
+// the package (opencode-ai) are why this is a table and not a rule.
+func TestRenderMiseConfig_RoutesNpmCLIsToTheNpmBackend(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{
+		{"bw", "2026.5.0"}, {"copilot", "1.0.81"}, {"jq", "1.8.2"}, {"opencode", "1.16.2"}, {"yarn", "1.22.22"},
+	}, ""))
+	for _, want := range []string{
+		"bw = \"2026.5.0\"\n", "copilot = \"1.0.81\"\n", "opencode = \"1.16.2\"\n", "yarn = \"1.22.22\"\n",
+		"bw = \"npm:@bitwarden/cli\"\n", "copilot = \"npm:@github/copilot\"\n",
+		"opencode = \"npm:opencode-ai\"\n", "yarn = \"npm:yarn\"\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("want %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "jq = \"npm:") || strings.Count(out, "[tool_alias]") != 1 {
+		t.Errorf("only the npm CLIs are aliased, under one section:\n%s", out)
+	}
+	if out := string(RenderMiseConfig([]MiseTool{{"jq", "1.8.2"}}, "")); strings.Contains(out, "npm:") {
+		t.Errorf("no npm alias without an npm CLI:\n%s", out)
+	}
+}
+
+// An alias section holds both kinds: herdr's attested backend and the npm CLIs.
+func TestRenderMiseConfig_NpmAliasesShareTheSectionWithHerdr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no herdr alias on Windows")
+	}
+	out := string(RenderMiseConfig([]MiseTool{{"herdr", "0.9.3"}, {"yarn", "1.22.22"}}, ""))
+	if strings.Count(out, "[tool_alias]") != 1 || !strings.Contains(out, "herdr = \"github:herdrdev/herdr\"") || !strings.Contains(out, "yarn = \"npm:yarn\"") {
+		t.Errorf("one [tool_alias] with both:\n%s", out)
+	}
+}
+
+// The npm backend runs the package on Node, and mise does not order Node for a
+// tool whose pin it cannot see: refuse before writing a config nothing can fill.
+func TestSync_RefusesAnNpmCLIWithoutPinnedNode(t *testing.T) {
+	s := MiseSync{ConfigDir: t.TempDir(), Run: func(string, ...string) ([]byte, error) {
+		return nil, errors.New("not installed")
+	}}
+	_, err := s.Apply([]MiseTool{{"copilot", "1.0.81"}})
+	if err == nil || !strings.Contains(err.Error(), "node") || !strings.Contains(err.Error(), "copilot") {
+		t.Fatalf("want the missing Node pin and the tool named, got %v", err)
+	}
+	if _, err := os.Stat(s.ConfigPath()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a refused sync must not write an unfulfillable config: %v", err)
+	}
+}
+
+func TestNpmInstallTarget(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"install", "--force", "npm:bats"}, "bats"},
+		{[]string{"install", "--force", "copilot"}, "copilot"},
+		{[]string{"install", "--force", "yarn"}, "yarn"},
+		{[]string{"install", "--force", "jq"}, ""},
+		{[]string{"install", "--force", "npm:prettier"}, ""},
+		{[]string{"install", "node"}, ""},
+		{[]string{"install"}, ""},
+		{[]string{"which", "copilot"}, ""},
+	} {
+		if got := npmInstallTarget("mise", tc.args...); got != tc.want {
+			t.Errorf("npmInstallTarget(%q) = %q, want %q", tc.args, got, tc.want)
+		}
+	}
+	if got := npmInstallTarget("jq", "install", "--force", "yarn"); got != "" {
+		t.Errorf("only mise installs: %q", got)
+	}
+}
+
 // #2013 H3: aqua's registry entry for herdr checks the release digest only,
 // while mise's github backend checks it and the GitHub artifact attestations
 // upstream publishes for the linux and macOS assets. A [tool_alias] routes
@@ -421,6 +496,59 @@ func TestSync_WindowsInstallsBatsWithNodeBeforeTheRest(t *testing.T) {
 	}
 }
 
+// #2438: the npm CLIs get the same treatment as bats on Windows: Node first,
+// then each through the npm installer, then the bare install for the rest.
+func TestSync_WindowsInstallsNpmCLIsWithNodeFirst(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows needs npm to create the .cmd launchers")
+	}
+	pins := []MiseTool{{"copilot", "1.0.81"}, {"jq", "1.8.2"}, {"node", "24.11.1"}, {"yarn", "1.22.22"}}
+	installed := map[string]bool{}
+	var calls []string
+	run := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" {
+			switch {
+			case len(args) == 2 && args[0] == "which":
+				if installed[args[1]] {
+					return []byte(args[1]), nil
+				}
+				return nil, errors.New("not installed")
+			case len(args) >= 1 && args[0] == "install":
+				calls = append(calls, strings.Join(args, " "))
+				switch {
+				case len(args) == 2 && args[1] == "node":
+					installed["node"] = true
+				case len(args) == 3 && args[1] == "--force" && (args[2] == "copilot" || args[2] == "yarn"):
+					if !installed["node"] {
+						return nil, errors.New(args[2] + " installed before node")
+					}
+					installed[args[2]] = true
+				case len(args) == 1:
+					installed["jq"] = true
+				default:
+					return nil, errors.New("unexpected install")
+				}
+				return nil, nil
+			}
+		}
+		if installed[name] && len(args) == 1 && args[0] == "--version" {
+			for _, pin := range pins {
+				if pin.Name == name {
+					return []byte(pin.Version), nil
+				}
+			}
+		}
+		return nil, errors.New("unexpected command")
+	}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: run}
+	if _, err := s.Apply(pins); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(calls, ", "); got != "install node, install --force copilot, install --force yarn, install" {
+		t.Errorf("install sequence = %q", got)
+	}
+}
+
 func TestSync_WindowsRepairsAnAubeBatsWithoutLauncher(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("mise's aube reports bats installed but creates no Windows launcher")
@@ -474,6 +602,9 @@ func TestHomeRunners_WindowsScopesNpmToBatsInstall(t *testing.T) {
 	}
 	if got := miseInstallEnv("mise", "install", "--force", "npm:bats"); got != "MISE_NPM_PACKAGE_MANAGER=npm" {
 		t.Errorf("bats install env = %q", got)
+	}
+	if got := miseInstallEnv("mise", "install", "--force", "copilot"); got != "MISE_NPM_PACKAGE_MANAGER=npm" {
+		t.Errorf("copilot install env = %q", got)
 	}
 	for _, args := range [][]string{{"mise", "install"}, {"mise", "install", "node"}, {"mise", "which", "bats.cmd"}, {"mise", "install", "npm:prettier"}} {
 		if got := miseInstallEnv(args[0], args[1:]...); got != "" {
