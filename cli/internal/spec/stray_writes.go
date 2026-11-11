@@ -18,9 +18,10 @@ type TreeSnapshot struct {
 	entries map[string]string
 	// movedIn holds the sources, outside the spec folder, of renames into it:
 	// the entries name only the destination, which the folder filter drops.
-	// A copy's source is not recorded: a copy leaves it as committed, so the
-	// reviewer's checkout at HEAD holds the same file and nothing is hidden
-	// from it (#3223). Only a rename deletes its source.
+	// A copy's source is not recorded here: a copy does not change it, and an
+	// edit to it is reported as that path's own entry ("M  docs/guide.md"
+	// beside "C  specs/x/g.md"), which the entries keep (#3223). Only a rename
+	// deletes its source without an entry of its own.
 	movedIn []string
 }
 
