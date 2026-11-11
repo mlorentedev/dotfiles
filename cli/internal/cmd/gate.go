@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -149,12 +148,7 @@ func appendSummary(file, name, verdict string, problems []string) error {
 	for _, p := range problems {
 		fmt.Fprintf(&b, "- %s\n", p)
 	}
-	f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return withExitCode(2, fmt.Errorf("summary: %w", err))
-	}
-	defer func() { _ = f.Close() }()
-	if _, err := io.WriteString(f, b.String()+"\n"); err != nil {
+	if err := appendText(file, b.String()+"\n"); err != nil {
 		return withExitCode(2, fmt.Errorf("summary: %w", err))
 	}
 	return nil

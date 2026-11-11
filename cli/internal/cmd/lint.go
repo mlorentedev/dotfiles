@@ -25,6 +25,7 @@ func newLintCmd() *cobra.Command {
 	}
 	lint.AddCommand(newLintPowerShellCmd())
 	lint.AddCommand(newLintDocPathsCmd())
+	lint.AddCommand(newLintFleetCmd())
 	return lint
 }
 
