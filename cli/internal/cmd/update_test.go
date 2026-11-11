@@ -109,11 +109,16 @@ func TestUpdate_ConvergesAfterAFastForward(t *testing.T) {
 		return o
 	}
 
+	// A quiet day runs the system-upgrade step alone (TOOL-036): no setup
+	// script and no other step: the report counts one step. The fixture wires
+	// no package manager, so the step skips, and the record must say so
+	// rather than claim it converged.
 	stdout, _, err := execute(t, "update")
-	if err != nil || setups != 0 || strings.Contains(stdout, "converge on") {
-		t.Fatalf("nothing to pull must converge nothing: err=%v setups=%d\n%s", err, setups, stdout)
+	if err != nil || setups != 0 || !strings.Contains(stdout, "0 changed, 0 ok, 0 opaque, 1 skipped, 0 failed") ||
+		!strings.Contains(stdout, "the system-upgrade step skipped: no package-manager runner") || strings.Contains(stdout, "step converged") {
+		t.Fatalf("nothing to pull must run only system-upgrade and report its skip: err=%v setups=%d\n%s", err, setups, stdout)
 	}
-	assertUpdateRecord(t, filepath.Join(state, "dotfiles"), "current")
+	assertUpdateRecord(t, filepath.Join(state, "dotfiles"), "upgrade-skipped")
 
 	writeCommit(t, writer, "README.md", "new\n")
 	gitIn(t, writer, "push", "-q", "origin", "HEAD")

@@ -47,5 +47,12 @@
     "verification": "! grep -q 'it is never upgraded' packages.json && grep -q 'keeps it current (TOOL-036' packages.json && grep -q 'An unpinned system entry is kept current; a pinned entry still moves only by PR' docs/adr/adr-036-install-channels.md",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "TOOL-036-system-package-upgrade-f8",
+    "behavior": "AC8: dotf update runs system-upgrade on a day HEAD did not move, once, and fails with upgrade-failed when it fails",
+    "verification": "out=$(cd cli && go test -count=1 -v -run 'TestRunUpgradesSystemPackagesOnAQuietDay' ./internal/update/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRunUpgradesSystemPackagesOnAQuietDay'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

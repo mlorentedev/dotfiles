@@ -43,7 +43,9 @@ owner: manu
 
 ## Follow-up (PR 2)
 
-- [ ] `dotf update` runs `system-upgrade` on its daily tick when HEAD did not move, and records the outcome in `last.json`
+- [x] [AC8] Failing test: a current checkout runs the step once; a fast-forward, a reinstall and every skip do not (`TestRunUpgradesSystemPackagesOnAQuietDay`)
+- [x] [AC8] `update.Deps.Upgrade`, wired to `dotf converge --only system-upgrade`; a failure is status `upgrade-failed` with a non-zero exit, a skip is `upgrade-skipped` with its reason, both recorded in `last.json`
+- [x] [AC8] `dotf update --help`, `docs/runbooks/guide-self-deploy-timer.md` and `tool-installation.md` describe the quiet-day step
 
 ## Closing
 

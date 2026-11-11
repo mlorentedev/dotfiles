@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/doctor"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
@@ -28,6 +29,11 @@ Task (Windows), which the 'dotf converge' step self-deploy installs on a machine
 that declares the role ('dotf env role add self-deploy'). It pulls the dotfiles
 repo and runs 'dotf converge' from it (which runs the setup script last on
 Linux and Windows) — but ONLY via a clean fast-forward, and ONLY when HEAD moved.
+On a day HEAD did not move it runs one step instead, 'dotf converge --only
+system-upgrade', which keeps the catalog's unpinned system packages current
+(brew, apt, winget); a full converge already includes that step. A step that
+skips (offline, apt without sudo -n) is recorded as upgrade-skipped with the
+reason and exits 0.
 
 The checkout's DOTF_VERSION pin is part of being up to date. When the running
 dotf is not that version (after a fast-forward, or when the checkout was
@@ -37,10 +43,11 @@ binary; update does not converge a second time with the old one. A source
 build ("dev") is never replaced: the pin check is skipped and said so.
 
 Anything non-actionable (not a git repo, dirty worktree, unreachable remote, no
-upstream, ahead of the upstream, diverged history, or already current with dotf
-at its pin) is logged and skipped with exit 0; a skip names a dotf that is off
-its pin.
-A real converge failure, or a pinned dotf that cannot be installed, is the ONLY
+upstream, ahead of the upstream, or diverged history) is logged and skipped
+with exit 0; a skip names a dotf that is off its pin. Already current with dotf
+at its pin is not a skip: it runs the system-upgrade step described above.
+A real converge failure, a pinned dotf that cannot be installed, or a failed
+system-upgrade step on a quiet day (status upgrade-failed) is the ONLY
 non-zero exit, so the scheduler's last result (launchd's log, 'systemctl --user
 status dotfiles-selfupdate', the task's LastTaskResult) surfaces it. Every run,
 a skip included, records its outcome in <state dir>/update/last.json, which
@@ -70,6 +77,7 @@ Env:
 				Converge: func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
 				Pin:      func() (string, error) { return pinnedDotfVersion(repo) },
 				Install:  func(pin string) error { return runInstaller(c, repo, pin) },
+				Upgrade:  func() (string, error) { return runSystemUpgrade(c.OutOrStdout(), repo) },
 			})
 			c.Println(out.Message)
 			if err != nil {
@@ -82,6 +90,26 @@ Env:
 	cmd.Flags().StringVar(&homes.config, "config-home", "", "absolute XDG_CONFIG_HOME for this run (the Windows task passes it)")
 	cmd.Flags().StringVar(&homes.state, "state-home", "", "absolute XDG_STATE_HOME for this run (the Windows task passes it)")
 	return cmd
+}
+
+// runSystemUpgrade converges the system-upgrade step alone and returns its
+// skip reason, "" when the step ran. A converge whose step skipped exits 0, so
+// without the reason a quiet day that upgrades nothing would read as one that
+// did.
+func runSystemUpgrade(w io.Writer, repo string) (string, error) {
+	rep, err := runConvergeReport(w, repo, false, []string{"system-upgrade"})
+	return systemUpgradeSkip(rep), err
+}
+
+// systemUpgradeSkip is the system-upgrade entry's skip reason in rep, "" when
+// the step ran (or failed: the run's error carries that).
+func systemUpgradeSkip(rep converge.Report) string {
+	for _, e := range rep.Entries {
+		if e.Name == "system-upgrade" && e.Status == converge.StatusSkipped {
+			return e.Detail
+		}
+	}
+	return ""
 }
 
 // updateHomes are the XDG homes a scheduler hands `dotf update` as flags.
