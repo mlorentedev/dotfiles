@@ -43,6 +43,7 @@ func newLaneCmd() *cobra.Command {
 		newLaneInitCmd(),
 		newLaneSwitchCmd(),
 		newLaneParkCmd(),
+		newLaneDoctorCmd(),
 	)
 	return c
 }
