@@ -105,10 +105,13 @@ if [ -f "$top/.dotf-worktree.json" ]; then
     exit 1
   fi
 elif [ -f "$git_dir/dotf-lane" ]; then
-  lane_name="$(sed -n '1s/[[:space:]]*$//p' "$git_dir/dotf-lane" 2>/dev/null)"
-  echo "ERROR: lane '$lane_name' at $top is missing .dotf-worktree.json lease metadata." >&2
-  echo "FIX: restore the lease and switch the lane with: dotf lane init && dotf lane switch <type>/<issue>-<slug>" >&2
-  exit 1
+  # An empty record is no record, as lane.Identity reads it in Go.
+  lane_name="$(sed -n '1s/^[[:space:]]*//;1s/[[:space:]]*$//;1p' "$git_dir/dotf-lane" 2>/dev/null)"
+  if [ -n "$lane_name" ]; then
+    echo "ERROR: lane '$lane_name' at $top is missing .dotf-worktree.json lease metadata." >&2
+    echo "FIX: restore the lease and switch the lane with: dotf lane init && dotf lane switch <type>/<issue>-<slug>" >&2
+    exit 1
+  fi
 fi
 
 # 6. Block direct commits on main/master or detached HEAD at the main repository checkout.

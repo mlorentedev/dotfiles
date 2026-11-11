@@ -36,6 +36,17 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - The membership check runs as a preflight over the three lane paths before `lane init` writes the exclude entries or the marker (second advisory pass): a refusal that came after the marker would leave the guard armed in a repository with no lanes, and the guard's own FIX line would send the user to `dotf lane switch`. `lane switch` and `lane park` resolve the lane by the same path convention, so both now run the same check and refuse a lane of another repository; the AC3 test asserts the refused repository has no marker, that switch and park from it are refused naming the owner, and that the first repository's lane stays detached.
 - The AC3 test compares against `filepath.EvalSymlinks(firstRepo)`: git answers physical paths, and the macOS temp dir is a symlink (the logical form matched only as a substring; a Windows 8.3 temp path would not).
 
+## Review round 1 (nan/glm5.3-flash, FAIL on `594d1764`; `review-round1.md`)
+
+| Finding | Class | Disposition | Evidence |
+|---|---|---|---|
+| `Identity()` on a main checkout carrying `.git/dotf-lane/` (the `lane next` prompt directory) returned an error, not `("", false, nil)` | REAL Major | applied | Reproduced red: `TestIdentity_ReadsTheRecordFromTheWorktreeGitDir` now creates `.git/dotf-lane/` in the main checkout and failed with `read …/.git/dotf-lane: is a directory`; `identity.go` short-circuits `gitDir == commonDir` and treats a directory at the record path as no record; green. |
+| Guard blocks on an empty or whitespace-only record while Go reads it as no record | THEORETICAL Minor | applied | Rule 5b trims the first line and blocks only when non-empty; case 10 writes a whitespace record and asserts the pass. |
+| `samePath` falls back to `filepath.Clean` per side when `EvalSymlinks` fails | SPECULATIVE Minor | declined | Every call site resolves the lane's git dirs first, so both sides exist; the reviewer marked it surface only, do not gate. |
+| Two artifacts named `dotf-lane` in the git-dir namespace (prompt directory, identity record) | THEORETICAL Minor | ticketed | #3320 (rename the prompt directory; the `Identity` special case stays as defence in depth). |
+| `tasks.md` names `--absolute-git-dir`, the guard keeps its `case` idiom | THEORETICAL Minor | declined | Already recorded under Decisions; the reviewer asked for no action. |
+| Windows unverified on the authoring box | Question | declined | Declared in the proposal's Risks; CI's Windows leg is the authoritative run. |
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.

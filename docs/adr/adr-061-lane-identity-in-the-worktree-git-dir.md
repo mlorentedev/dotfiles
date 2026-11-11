@@ -88,7 +88,9 @@ was this ambiguity, not a missing feature.
 5. **`lane.Identity(path)` is the one Go reader** of the record, answering
    `("", false, nil)` for a worktree without a record, a main checkout and a path
    outside any repository, for `doctor` (#3262), `worktree list` and `sweep`
-   (#3293).
+   (#3293). A main checkout is decided by `git dir == common dir`, never by
+   reading: the common dir already holds `dotf lane next`'s prompt directory
+   under the same name (#3320), and a directory at the record path is no record.
 
 ## Consequences
 

@@ -293,6 +293,17 @@ func TestPreCommitLaneGuard(t *testing.T) {
 		t.Fatalf("expected the registered lane 'spike-lane' without a lease to be refused by the pre-commit hook, got err=%v out=%s", commitErr, string(commitOut))
 	}
 
+	// An empty record is no record: Go's lane.Identity and the guard agree.
+	if err := os.WriteFile(filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile), []byte(" \n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runLaneGuardInDir(t, script, altWT); err != nil {
+		t.Fatalf("expected an empty identity record to be read as no record, got err=%v out=%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile), []byte("spike-lane\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	movedWT := filepath.Join(filepath.Dir(altWT), "not-a-lane-name")
 	if out, err := exec.Command("git", "-C", altRepo, "worktree", "move", altWT, movedWT).CombinedOutput(); err != nil {
 		t.Fatalf("worktree move: %v\n%s", err, string(out))

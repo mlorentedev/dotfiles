@@ -22,17 +22,21 @@ const LaneIdentityFile = "dotf-lane"
 // checkout (which has no worktree admin dir) and for a path outside any
 // repository: none of those is an error, they are simply not lanes.
 func Identity(path string) (string, bool, error) {
-	gitDir, _, err := worktreeGitDirs(path)
+	gitDir, commonDir, err := worktreeGitDirs(path)
 	if err != nil {
 		return "", false, err
 	}
-	if gitDir == "" {
+	// A main checkout's git dir is the common dir, which is shared by every
+	// worktree and where `dotf lane next` keeps its prompt DIRECTORY under
+	// this same name. Only a linked worktree's admin dir can hold the record.
+	if gitDir == "" || gitDir == commonDir {
 		return "", false, nil
 	}
-	raw, err := os.ReadFile(filepath.Join(gitDir, LaneIdentityFile))
-	if errors.Is(err, os.ErrNotExist) {
+	record := filepath.Join(gitDir, LaneIdentityFile)
+	if st, serr := os.Stat(record); serr != nil || st.IsDir() {
 		return "", false, nil
 	}
+	raw, err := os.ReadFile(record)
 	if err != nil {
 		return "", false, fmt.Errorf("lane identity: reading %s: %w", filepath.Join(gitDir, LaneIdentityFile), err)
 	}
