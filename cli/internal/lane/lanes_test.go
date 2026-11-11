@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -370,5 +371,34 @@ func TestLaneInitRefusesAPlainDirectoryAtALanePath(t *testing.T) {
 	}
 	if _, serr := os.Stat(filepath.Join(lanePath, "notes.txt")); serr != nil {
 		t.Errorf("the plain directory's content was touched: %v", serr)
+	}
+}
+
+// A dangling symlink at a lane path is a directory entry os.Stat does not
+// see, so a preflight that skips what Stat cannot reach writes the marker
+// and then fails at git worktree add: the refused init the guard must not
+// arm behind.
+func TestLaneInitRefusesADanglingSymlinkAtALanePathBeforeWritingTheMarker(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation needs a privilege on Windows")
+	}
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+	if err := os.MkdirAll(filepath.Dir(lanePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(wtRoot, "nowhere"), lanePath); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := InitLanes(repoDir, wtRoot)
+	if err == nil {
+		t.Fatal("InitLanes over a dangling symlink succeeded; want a refusal")
+	}
+	if !strings.Contains(err.Error(), lanePath) {
+		t.Errorf("error %q does not name %q", err, lanePath)
+	}
+	if _, serr := os.Stat(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s; the guard would be armed with no lanes", LanesMarkerFile)
 	}
 }
