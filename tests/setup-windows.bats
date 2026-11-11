@@ -73,8 +73,9 @@ refute_legacy_mise_sync() {
     grep -q 'packages.json deployed to' "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 installs catalog tools via dotf (best-effort)" {
-    grep -q 'dotf tools install' "$PS1_SCRIPT"
+@test "setup-windows.ps1 converges the tool layer through dotf's tools step (best-effort)" {
+    grep -qE '^[[:space:]]+& dotf converge --only tools[[:space:]]*$' "$PS1_SCRIPT"
+    refute_grep '^[[:space:]]*(&[[:space:]]*)?dotf tools install' "$PS1_SCRIPT"
 }
 
 @test "setup-windows.ps1 no longer deploys Aider configuration (sunset)" {
@@ -295,15 +296,15 @@ refute_legacy_mise_sync() {
 
 # --- OPS-042 (#1336): yarn is a catalog tool; obsidian is not npm at all ---
 # yarn is the classic npm-global, a packages.json entry converged by
-# `dotf tools install`, which setup-windows.ps1 runs before anything needs it,
+# the converge tools step, which setup-windows.ps1 runs before anything needs it,
 # so the script carries no npm block and no versions.conf parser for it.
 # The `obsidian` that obs-cli.ps1 and vault health drive is the CLI built into
 # the Obsidian desktop app. The npm `obsidian-cli` this block once named is an
 # unrelated package, now gone from the catalog too (#1615), and the script
 # must not reintroduce it.
 
-@test "setup-windows.ps1 installs yarn through dotf tools install and names no obsidian npm package (OPS-042, #1615)" {
-    grep -qE '^\s*dotf tools install\s*$' "$PS1_SCRIPT"
+@test "setup-windows.ps1 installs yarn through the tools step and names no obsidian npm package (OPS-042, #1615)" {
+    jq -e '.tools[] | select(.name == "yarn" and .source.type == "npm")' "$DOTFILES_DIR/packages.json" >/dev/null
     refute_grep 'Get-Command obsidian' "$PS1_SCRIPT"
     refute_grep 'yarnPkg' "$PS1_SCRIPT"
     refute_grep 'YARN_VERSION' "$PS1_SCRIPT"
@@ -397,11 +398,13 @@ refute_legacy_mise_sync() {
     grep -qF '& $dotfPath pi packages apply --repo $DotfilesDir' <<<"$block"
 }
 
-# uv on Windows is a packages.json entry (winget astral-sh.uv), so the tools
-# step provides it before the uv-tool entries need it (#2754).
-@test "setup-windows.ps1 gets uv from the catalog, not from uv's installer" {
+# uv on Windows is the versions.conf `# mise: cli` pin, as on Linux and macOS;
+# the tools step syncs it before retrying the uv-tool entries (PLAT-001c).
+@test "setup-windows.ps1 gets uv from mise, not from uv's installer or winget" {
     refute_grep_fixed 'astral.sh/uv/install.ps1' "$PS1_SCRIPT"
-    jq -e '.tools[] | select(.name == "uv" and .source.type == "system" and .source.winget == "astral-sh.uv")' "$DOTFILES_DIR/packages.json" >/dev/null
+    refute_grep_fixed 'astral-sh.uv' "$PS1_SCRIPT"
+    run jq -e '.tools[] | select(.name == "uv")' "$DOTFILES_DIR/packages.json"
+    [ "$status" -ne 0 ]
 }
 
 @test "setup-windows.ps1 has no poetry block: poetry is a packages.json uv-tool entry" {
@@ -409,13 +412,13 @@ refute_legacy_mise_sync() {
 }
 
 # The uvx MCP servers are skipped while uv is absent, so the bare `dotf deploy`
-# that registers them runs after `dotf tools install`, which installs uv, and the
+# that registers them runs after the tools step, which installs uv, and the
 # session PATH is refreshed between them. A clean box's first run otherwise
 # registered neither uvx server and only the second converged (OPS-044, #1361,
 # #2754).
-@test "setup-windows.ps1 registers MCP servers after dotf tools install puts uv on PATH" {
+@test "setup-windows.ps1 registers MCP servers after the tools step puts uv on PATH" {
     local catalog_line sync_line deploy_line
-    catalog_line="$(grep -nE '^[[:space:]]+dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
+    catalog_line="$(grep -nE '^[[:space:]]+& dotf converge --only tools[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
     sync_line="$(awk -v from="$catalog_line" 'NR > from && /^[[:space:]]+Sync-SessionPath[[:space:]]*$/ { print NR; exit }' "$PS1_SCRIPT")"
     deploy_line="$(grep -nE '^[[:space:]]*& dotf deploy[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)"
     [ -n "$catalog_line" ]
@@ -440,10 +443,11 @@ refute_legacy_mise_sync() {
 
 # --- Cross-platform parity: developer tools ---
 
-@test "parity: both OSes get uv from dotf (Linux through mise, Windows through the catalog)" {
+@test "parity: both OSes get uv from mise through dotf" {
     grep -q '^    dotf tools sync ' "$DOTFILES_DIR/setup-linux.sh"
     grep -A1 '^# mise: cli$' "$DOTFILES_DIR/versions.conf" | grep -q '^UV_VERSION='
-    jq -e '.tools[] | select(.name == "uv" and .source.winget == "astral-sh.uv")' "$DOTFILES_DIR/packages.json" >/dev/null
+    # setup-windows.ps1 reaches the same sync through the converge tools step,
+    # asserted by the tools-step test above.
 }
 
 @test "parity: neither script installs poetry itself; the catalog does on every OS" {
@@ -452,11 +456,17 @@ refute_legacy_mise_sync() {
     jq -e '.tools[] | select(.name == "poetry" and (.source.platforms == null))' "$DOTFILES_DIR/packages.json" >/dev/null
 }
 
-# Linux gets age and zoxide from mise (`dotf tools sync` reads the "# mise: cli"
-# mark in versions.conf, #2013 W2); Windows from winget until its own session.
-@test "parity: both OSes install age (Linux through mise)" {
-    grep -B1 '^AGE_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
-    grep -q 'FiloSottile.age' "$PS1_SCRIPT"
+# age, jq, gh, zoxide and node come from mise on every OS: the "# mise: cli"
+# mark in versions.conf, which the tools step syncs (#2013 W2, PLAT-001c). A
+# winget row for one of them would install it twice on Windows, unpinned.
+@test "parity: every OS installs age, jq, gh, zoxide and node through mise, never winget" {
+    local name id
+    for name in AGE JQ GH ZOXIDE NODE; do
+        grep -B1 "^${name}_VERSION=" "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
+    done
+    for id in FiloSottile.age jqlang.jq GitHub.cli ajeetdsouza.zoxide OpenJS.NodeJS.LTS; do
+        refute_grep_fixed "$id" "$PS1_SCRIPT"
+    done
 }
 
 @test "parity: both OSes install eza (Linux through the catalog's apt row)" {
@@ -464,26 +474,6 @@ refute_legacy_mise_sync() {
     # leaves setup-windows.ps1 in the Windows batch (PLAT-001c P5b).
     jq -e '.tools[] | select(.name == "eza" and .source.type == "system" and .source.apt == "eza" and .source.winget == "eza-community.eza")' "$DOTFILES_DIR/packages.json" >/dev/null
     grep -q 'eza-community.eza' "$PS1_SCRIPT"
-}
-
-@test "parity: both OSes install jq (Linux through mise)" {
-    # It grepped setup-linux.sh for `command -v jq`: a proxy that outlived the
-    # download moving to mise (F-030), held up only by the pi settings sync
-    # until #2522 removed it.
-    grep -B1 '^JQ_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
-    grep -q 'jqlang.jq' "$PS1_SCRIPT"
-}
-
-@test "parity: both OSes install gh (Linux and macOS through mise)" {
-    # The apt row it had was below the floor `dotf pr` needs (#2136); the
-    # winget row leaves setup-windows.ps1 once mise runs on Windows (PLAT-001c).
-    grep -B1 '^GH_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
-    grep -q 'GitHub.cli' "$PS1_SCRIPT"
-}
-
-@test "parity: both OSes install zoxide (Linux through mise)" {
-    grep -B1 '^ZOXIDE_VERSION=' "$DOTFILES_DIR/versions.conf" | grep -qx '# mise: cli'
-    grep -q 'ajeetdsouza.zoxide' "$PS1_SCRIPT"
 }
 
 # --- Cross-platform parity: AI config deploy verification ---
@@ -807,17 +797,6 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     grep -qF '[Console]::OutputEncoding = ' "$DOTFILES_DIR/powershell/profile.ps1"
 }
 
-@test "setup-windows.ps1 provisions Node.js before dotf tools install, the npm channel's prerequisite (ADR-036)" {
-    grep -qF 'Id = "OpenJS.NodeJS.LTS"' "$PS1_SCRIPT"
-    # The .ps1 is CRLF (.gitattributes): [[:space:]]* absorbs the CR before the
-    # end anchor on every OS, and GNU grep reads no CR escape anyway.
-    node_line=$(grep -n 'Id = "OpenJS.NodeJS.LTS"' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    tools_line=$(grep -nE '^    dotf tools install[[:space:]]*$' "$PS1_SCRIPT" | head -1 | cut -d: -f1)
-    [ -n "$node_line" ]
-    [ -n "$tools_line" ]
-    [ "$node_line" -lt "$tools_line" ]
-}
-
 @test "every registry PATH rebuild in setup-windows.ps1 goes through Sync-SessionPath (TEST-003)" {
     # A registry-only rebuild drops entries that exist only in this process (a
     # GITHUB_PATH addition; the runner's toolcache node), and the plain
@@ -847,8 +826,8 @@ run_windows_harness_mirror_block() { # <dotf-present> <checkout>
     # population": the invariant is child-pwsh execution, not which installers
     # happen to exist, so this asserts the surviving one rather than counting
     # them. Any installer added later inherits the rule, not this test's silence.
-    # uv's installer went too: the catalog installs uv through winget (#2754),
-    # so the survivor is Install-AgentBinary's.
+    # uv's installer went too: mise installs uv (#2754, PLAT-001c), so the
+    # survivor is Install-AgentBinary's.
     grep -qF -- '-File $installer' "$PS1_SCRIPT"
     run grep -F '& $installer' "$PS1_SCRIPT"
     [ "$status" -ne 0 ]

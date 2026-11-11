@@ -53,6 +53,25 @@ function Read-KnownFailures {
     return ,$entries
 }
 
+# Join-PathEntries: join PATH strings into one, keeping the first spelling of
+# each directory (case- and trailing-slash-insensitive, as Windows compares
+# them) and dropping empty entries. cmd.exe resolves NOTHING from a PATH longer
+# than 8191 chars, wherever the entry sits: measured on the Windows guest, a
+# .cmd calling a .cmd in the first PATH entry ran at 8180 chars and was "not
+# recognized" at 8210 (#3174). Every mise shim is a .cmd that calls mise, so a
+# padded PATH breaks all of them at once.
+function Join-PathEntries {
+    param([AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Paths)
+    $seen = @{}
+    $kept = foreach ($entry in @($Paths | Where-Object { $_ }) -split ';') {
+        $key = $entry.Trim().TrimEnd('\').ToLowerInvariant()
+        if (-not $key -or $seen.ContainsKey($key)) { continue }
+        $seen[$key] = $true
+        $entry.Trim()
+    }
+    return (@($kept) -join ';')
+}
+
 if ($MyInvocation.InvocationName -ne '.') {
     $ErrorActionPreference = 'Stop'
     $known = Join-Path $PSScriptRoot 'doctor-gate-known-failures.txt'
@@ -61,17 +80,55 @@ if ($MyInvocation.InvocationName -ne '.') {
     # global prefix to the User PATH, but a later workflow step inherits the
     # runner's original PATH plus GITHUB_PATH only. Without this, every tool
     # setup just installed reads "not in PATH" (measured on #1308's first run).
-    $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' +
-        [Environment]::GetEnvironmentVariable('PATH', 'User') + ';' + $env:PATH
+    # The process PATH already holds the Machine and User entries, so a plain
+    # concatenation listed most of them twice: 199 entries and 8588 chars on the
+    # runner, past cmd.exe's 8191, and every mise shim then failed with "'mise'
+    # is not recognized" (#3174). Join without repeats instead.
+    $env:PATH = Join-PathEntries -Paths @(
+        [Environment]::GetEnvironmentVariable('PATH', 'Machine'),
+        [Environment]::GetEnvironmentVariable('PATH', 'User'),
+        $env:PATH)
+
+    # The profile hook is the other half of "a fresh terminal", and `-NoProfile`
+    # is what drops it. On Windows a process PATH is the Machine entries then
+    # the User ones, and env-persist can only write the User PATH, so mise's
+    # shims -- and the pinned python they front -- can never precede a Machine
+    # copy of python. `mise activate` is what puts them first, and every
+    # terminal this product deploys runs it. Without it the gate measured a
+    # PATH the product never creates: it FAILed pyyaml and bats on a box whose
+    # own setup doctor had just passed both (#3174). Same idiom as
+    # setup-windows.ps1, so there is one way to activate mise in this repo.
+    #
+    # This models the terminal, and deliberately not the no-profile one: a
+    # scheduled task or GUI app still misses the pins, which is PLAT-001c's
+    # blocker 2 (register ~/.local/bin and the shims in the HKCU PATH from
+    # converge's env-persist) and is reported as the WARN from doctor's
+    # "Persisted environment (user scope)" section. The gate fails on FAILs
+    # only, so that WARN stays visible instead of being papered over here.
+    if (Get-Command mise -ErrorAction SilentlyContinue) {
+        . ([ScriptBlock]::Create((& mise activate pwsh --shims | Out-String)))
+    }
 
     # Name the PATH doctor ran with: a FAIL that reads "git missing" is a
     # statement about this step's environment before it is one about the box.
     $entries = @($env:PATH -split ';' | Where-Object { $_ })
     Write-Host ("doctor gate: PATH has {0} entries, {1} chars" -f $entries.Count, $env:PATH.Length)
     $entries | ForEach-Object { Write-Host "doctor gate:   $_" }
-    foreach ($probe in 'dotf', 'git', 'bash', 'node', 'bw') {
+    # Resolving is not running: a mise shim resolves on PATH while its target
+    # may still refuse to start, and doctor probes by executing. When the two
+    # disagree the FAIL reads "not on PATH" and points at the wrong layer, so
+    # the probe reports both -- the path it found, and what that path did.
+    foreach ($probe in 'dotf', 'git', 'bash', 'node', 'bw', 'mise', 'python') {
         $cmd = Get-Command $probe -ErrorAction SilentlyContinue
-        Write-Host ("doctor gate: {0} -> {1}" -f $probe, ($(if ($cmd) { $cmd.Source } else { 'NOT FOUND' })))
+        if (-not $cmd) {
+            Write-Host ("doctor gate: {0} -> NOT FOUND" -f $probe)
+            continue
+        }
+        $exe = $cmd.Source
+        $ran = & $probe --version 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $first = ($ran -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 1)
+        Write-Host ("doctor gate: {0} -> {1} | --version exit={2} out={3}" -f $probe, $exe, $code, ($first ?? '<empty>'))
     }
 
     # The runner has no identity and must never hold one that resolves real

@@ -53,8 +53,7 @@
           "windows/amd64": "mise-v{version}-windows-x64.exe",
           "windows/arm64": "mise-v{version}-windows-arm64.exe"
         },
-        "checksums": "SHASUMS256.txt",
-        "platforms": ["linux", "darwin"]
+        "checksums": "SHASUMS256.txt"
       }
     },
     {
@@ -118,15 +117,6 @@
       "source": {
         "type": "npm",
         "package": "yarn"
-      }
-    },
-    {
-      "name": "uv",
-      "profile": "full",
-      "source": {
-        "type": "system",
-        "winget": "astral-sh.uv",
-        "command": "uv"
       }
     },
     {
