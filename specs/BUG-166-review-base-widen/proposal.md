@@ -33,6 +33,7 @@ When the base widened, the commits between the fork point and the traced base al
 
 - A stale or absent `origin/*` ref. A stale ref gives an older fork point, which is still an ancestor, so the base can only widen further; that costs reviewer budget and hides nothing. No ref at all keeps today's base. Resolved: both are safe by the widen-only rule.
 - A review on main after a squash: the fork point is HEAD itself, which is never an ancestor of the traced base, so nothing changes. Resolved.
+- Local `main` ahead of a stale `origin/main` by two or more commits, with the spec in the later one: the fork point is an ancestor of the traced base, so the base widens, and the landed commits between them are listed as the spec's own. Resolved: a wider base never hides anything, and the own list is advice to the reviewer, not a scope the archive gate checks.
 - A branch that merged main after the spec landed (the HARNESS-142 shape): the fork point is newer than the traced base, so it is not its ancestor and the base stands. Resolved.
 
 ## Acceptance criteria
