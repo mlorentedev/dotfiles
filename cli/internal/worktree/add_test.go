@@ -130,6 +130,7 @@ type MockAddRunner struct {
 	OnWorktreeAttach      func(repo, target, branch, remote string) error
 	OnWorktreeList        func(repo string) (string, error)
 	OnDirt                func(path string) (Dirt, error)
+	OnWorktreeRemoveForce func(repo, target string) error
 	DefaultBaseRan        bool
 	WorktreeListRan       bool
 }
@@ -183,6 +184,13 @@ func (m *MockAddRunner) WorktreeAddDetached(repo, target, commit string) error {
 		return m.OnWorktreeAddDetached(repo, target, commit)
 	}
 	return errors.New("MockAddRunner: WorktreeAddDetached not stubbed")
+}
+
+func (m *MockAddRunner) WorktreeRemoveForce(repo, target string) error {
+	if m.OnWorktreeRemoveForce != nil {
+		return m.OnWorktreeRemoveForce(repo, target)
+	}
+	return errors.New("MockAddRunner: WorktreeRemoveForce not stubbed")
 }
 
 func TestCheckAutoCommitHooks(t *testing.T) {

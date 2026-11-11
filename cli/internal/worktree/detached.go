@@ -57,8 +57,14 @@ func AddDetachedWithRunner(opts DetachedOptions, runner AddRunner, now time.Time
 		ReapOK:         true,
 		Kind:           opts.Kind,
 	}
+	// Without its lease the worktree carries no kind and no expiry, so nothing
+	// would ever reap it: remove it rather than hand it back (#3223).
 	if err := SaveMetadata(target, meta); err != nil {
-		return nil, fmt.Errorf("saving worktree metadata: %w", err)
+		err = fmt.Errorf("saving worktree metadata: %w", err)
+		if rmErr := runner.WorktreeRemoveForce(opts.RepoRoot, target); rmErr != nil {
+			return nil, errors.Join(err, fmt.Errorf("removing the unlabelled worktree %s: %w", target, rmErr))
+		}
+		return nil, err
 	}
 	ensureExclude(opts.RepoRoot, MetadataFileName)
 	return &Info{Path: target, Head: opts.Commit, IsDetached: true, Metadata: &meta, State: StateActive}, nil

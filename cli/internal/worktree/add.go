@@ -47,6 +47,9 @@ type AddRunner interface {
 	WorktreeAttach(repo, target, branch, remote string) error
 	// WorktreeAddDetached checks commit out at target with no branch.
 	WorktreeAddDetached(repo, target, commit string) error
+	// WorktreeRemoveForce removes a worktree this add just made and cannot
+	// finish, and prunes its record.
+	WorktreeRemoveForce(repo, target string) error
 	WorktreeListPorcelain(repo string) (string, error)
 	// Dirt reports what a worktree holds that git would not recreate.
 	Dirt(path string) (Dirt, error)
@@ -140,6 +143,14 @@ func (r *RealAddRunner) WorktreeAddDetached(repo, target, commit string) error {
 		return fmt.Errorf("git worktree add --detach failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+func (r *RealAddRunner) WorktreeRemoveForce(repo, target string) error {
+	sweep := &RealSweepRunner{}
+	if err := sweep.WorktreeRemoveForce(repo, target); err != nil {
+		return err
+	}
+	return sweep.WorktreePrune(repo)
 }
 
 // refuseBranchAsSlug names the input the caller got wrong. A slug holding a "/" is

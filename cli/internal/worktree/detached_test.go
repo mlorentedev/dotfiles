@@ -116,3 +116,33 @@ func TestAddWithIssueIgnoresALiveReviewWorktree(t *testing.T) {
 		t.Fatalf("a review worktree blocked add --issue: %v", err)
 	}
 }
+
+// A worktree whose lease could not be written carries no kind and no expiry,
+// so sweep never reaps it: the add removes it again rather than return it
+// (#3223).
+func TestAddDetachedRemovesTheWorktreeWhenItsLeaseCannotBeSaved(t *testing.T) {
+	opts := detachedOpts(t)
+	var removed string
+	runner := &MockAddRunner{
+		OnWorktreeAddDetached: func(_, target, _ string) error {
+			// A directory where the lease file goes makes SaveMetadata fail.
+			return os.MkdirAll(filepath.Join(target, MetadataFileName), 0o755)
+		},
+		OnWorktreeRemoveForce: func(_, target string) error {
+			removed = target
+			return os.RemoveAll(target)
+		},
+	}
+
+	_, err := AddDetachedWithRunner(opts, runner, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "saving worktree metadata") {
+		t.Fatalf("err = %v, want the metadata failure", err)
+	}
+	want := filepath.Join(opts.WorktreeRoot, "myrepo", opts.Name)
+	if removed != want {
+		t.Errorf("removed %q, want the worktree %q", removed, want)
+	}
+	if _, err := os.Stat(want); !os.IsNotExist(err) {
+		t.Errorf("the unlabelled worktree is still there: %v", err)
+	}
+}
