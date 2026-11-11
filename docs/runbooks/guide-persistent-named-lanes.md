@@ -11,9 +11,10 @@ host, an operating system, an agent or a machine path.
 
 ```mermaid
 flowchart TB
-  subgraph Data["Data (committed, machine-independent)"]
-    M[".dotf/lanes.json<br/>canonical_lanes[]<br/>third_party_roots[]"]
-    W["&lt;WORKTREE_ROOT&gt;/&lt;repo&gt;/&lt;lane&gt;/.dotf-worktree.json<br/>lane, state, issue, lease"]
+  subgraph Data["Data (the marker is committed; the lease and the record are local to the machine)"]
+    M[".dotf/lanes.json<br/>canonical_lanes[]<br/>third_party_roots[]<br/>committed, travels with every clone"]
+    W["&lt;WORKTREE_ROOT&gt;/&lt;repo&gt;/&lt;lane&gt;/.dotf-worktree.json<br/>lane, state, issue, lease<br/>local, excluded from git"]
+    I["&lt;repo&gt;/.git/worktrees/&lt;id&gt;/dotf-lane<br/>the lane's identity, git-owned<br/>local, never committed"]
   end
   subgraph Code["Code (Go CLI, one definition)"]
     C1["lane.CanonicalLanes"]
@@ -26,8 +27,10 @@ flowchart TB
   C1 -->|writes| M
   C2 -->|unions into| M
   C3 -->|creates + leases| W
-  M -->|activation + policy| G
+  C3 -->|records| I
+  M -->|activation + roots| G
   W -->|lease state| G
+  I -->|identity| G
   G -->|exit 1 blocks commit| Git[["git commit"]]
 ```
 
@@ -40,8 +43,15 @@ Three properties follow from that split:
   `lane.CanonicalLanes` on every `dotf lane init`. `third_party_roots` is unioned
   with whatever the file already declares, so adding a session host is a data
   change that survives re-initialization.
-- **The guard parses, it does not decide.** It reads two string arrays and the
-  lease file. A repository that declares nothing gets no rules.
+- **The guard parses, it does not decide.** It reads the marker's roots, the
+  lease file and the identity record. A repository that declares nothing gets no
+  rules.
+- **A lane's identity is a record, not a name.** `dotf lane init` writes the lane
+  name to `dotf-lane` inside the worktree's git admin dir (ADR-061). Git moves
+  that directory with `git worktree move`, keeps it through `git gc` and `git
+  clean -fdx`, and drops it with `git worktree remove` or `prune`, so the record
+  has exactly the worktree's lifetime and stores no path. The guard never matches
+  a lane by its directory name.
 
 ## 2. The marker contract
 
@@ -65,7 +75,7 @@ read from a worktree).
 | Field | Type | Owner | Semantics |
 |---|---|---|---|
 | `version` | integer | code | Marker schema version. Currently `1`. |
-| `canonical_lanes` | array of string | code | Lane directory names that must carry a lease. Rewritten on every `dotf lane init`. |
+| `canonical_lanes` | array of string | code | The lanes `dotf lane init` provisions. Rewritten on every init; policy for the CLI, not read by the guard. |
 | `third_party_roots` | array of string | operator | Directory names, under the projects boundary, that belong to an external session host. Unioned, never truncated. |
 
 Constraints enforced by tests (`cli/internal/lane`, `cli/internal/hooks`):
@@ -93,8 +103,8 @@ flowchart TD
   E -->|no| F{'.dotf-worktree.json'<br/>present?}
   F -->|yes, state PARKED| B2([exit 1: lane is parked])
   F -->|yes, other state| H
-  F -->|no, basename is a<br/>declared canonical lane| B3([exit 1: missing lease])
-  F -->|no, basename is not a lane| H
+  F -->|no, '$git_dir/dotf-lane'<br/>present| B3([exit 1: missing lease])
+  F -->|no, no identity record| H
   H{branch is main/master, or<br/>detached at main checkout?}
   H -->|yes| B4([exit 1: use a lane])
   H -->|no| OK
@@ -109,7 +119,7 @@ Rule summary:
 | 3 | No `.dotf/lanes.json` | allowed — the guard is not armed |
 | 4 | Worktree sits under a declared `third_party_root` | **blocked** |
 | 5a | `.dotf-worktree.json` present and `state == "PARKED"` | **blocked** |
-| 5b | Directory named after a declared lane, no lease file | **blocked** |
+| 5b | Identity record `$git_dir/dotf-lane` readable with a non-empty first line, or present but unreadable; no lease file | **blocked** |
 | 6a | Branch is `main` or `master` | **blocked** |
 | 6b | Detached HEAD at the main checkout, no lease file | **blocked** |
 
@@ -171,6 +181,15 @@ same merge would block every existing session container on every seat at once.
 5. Announce the change: from that merge onward, commits in third-party session
    roots and on `main` in this repository are refused.
 
+Lanes provisioned by a `dotf` older than the identity record (ADR-061) carry no
+`dotf-lane` file. Re-run `dotf lane init` once after updating: it is idempotent
+and reports `changed=3` for the three restored records, then `changed=0`. Until
+then the guard treats those lanes as unregistered, which only means rule 5b does
+not fire for them. `dotf lane init`, `lane switch` and `lane park` refuse a
+directory at a lane path that is not a worktree of the repository they run in,
+naming the path and its owner, and a refused init writes no marker; the common
+cause is two repositories sharing a basename under one `WORKTREE_ROOT` (#3318).
+
 ## 7. Validation runbook
 
 Every command below is OS-agnostic and agent-agnostic. Run them from the
@@ -187,7 +206,7 @@ shellcheck -s sh git-hooks/lib/lane-guard.sh
 cd cli && go build ./... && go vet ./... && cd ..
 ```
 
-### 7.2 Guard behaviour (all ten scenarios, including the agnosticism ones)
+### 7.2 Guard behaviour (all ten scenarios, including the identity ones)
 
 ```sh
 cd cli
@@ -198,7 +217,10 @@ Expected: `PASS`. The scenarios cover: no marker (allowed), vault (allowed),
 `main` with marker (blocked), issue-queue `.dotf/lane.json` only (allowed),
 third-party root (blocked), PARKED lane (blocked), ACTIVE lane (allowed),
 declared custom root (blocked), undeclared root with no fallback (allowed),
-declared non-canonical lane name (blocked).
+identity: an unleased worktree merely named after a lane (allowed), the same
+worktree once `dotf-lane` is recorded, refused by the guard running as a real
+pre-commit hook (blocked), and still blocked after `git worktree move` to a name
+the marker never declared.
 
 ### 7.3 Marker contract and idempotency
 
@@ -206,10 +228,15 @@ declared non-canonical lane name (blocked).
 cd cli
 go test ./internal/lane/... -count=1 -timeout 30m \
   -run 'TestLaneInitIdempotent|TestLaneInitPreservesDeclaredThirdPartyRoots|TestLaneSwitchRoutingAndWIPCap' -v
+go test ./internal/lane/... -count=1 -timeout 30m \
+  -run 'TestIdentity_|TestWriteIdentity_|TestLaneInitRecordsTheIdentity|TestLaneInitRestoresADeleted|TestLaneInitRefuses' -v
 ```
 
-Expected: `PASS`. These pin the marker's shape, its machine-independence, the
-`third_party_roots` union, the code-owned `canonical_lanes`, and the WIP cap.
+Expected: `PASS`. The first set pins the marker's shape, its machine-independence,
+the `third_party_roots` union, the code-owned `canonical_lanes`, and the WIP cap.
+The second pins the identity record: written on every init exit, restored when
+deleted (`changed=1`, then `0`), surviving `git worktree move`, and the refusal of
+a plain directory or another repository's worktree at a lane path.
 
 ### 7.4 Verify by effect on a real repository
 
@@ -254,11 +281,21 @@ Expected: no matches. If that changes, policy has leaked back into the script.
   --no-verify` bypasses it, and `core.hooksPath` is per-machine, so a seat without
   the deployed hooks has no guard. It exists to make the wrong thing loud, not
   impossible.
-- **Rule 5b keys on the directory basename.** A lane created outside
-  `<WORKTREE_ROOT>/<repo>/<lane>` without a lease file is not detected. The layout
-  is produced by `dotf lane init` itself, so this only bites hand-made lanes.
+- **Rule 5b needs the identity record.** A lane provisioned before ADR-061, or
+  re-created by hand with `git worktree add`, carries no `dotf-lane` file and is
+  not detected until `dotf lane init` runs again. The guard never writes the
+  record: it is a reader. If such a lane was also moved off its canonical path,
+  move it back first (`git worktree move <path> <canonical path>`): re-running
+  init provisions the canonical path and leaves the moved worktree without a
+  record.
+- **Lanes are still located by path.** `dotf lane init` finds a lane at
+  `<WORKTREE_ROOT>/<repo basename>/<lane>`, so two repositories sharing a basename
+  collide there. The second init refuses loudly instead of adopting the first's
+  lanes; a layout that lets both coexist is a follow-up.
 - **The parser fails closed on syntax and open on semantics.** A malformed marker
-  yields empty lists, which means rules 4 and 5 do not apply. `dotf lane init` owns
-  the file format; do not hand-edit it beyond `third_party_roots`.
+  still arms the guard (the file exists) but yields empty lists, so rules 4 and 5a
+  do not apply; rule 5b reads the record independently of the lists and still
+  fires. `dotf lane init` owns the file format; do not hand-edit it beyond
+  `third_party_roots`.
 - **Rule 6 blocks `main`/`master` only.** A repository whose default branch is
   named otherwise relies on rules 4 and 5.

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -245,8 +246,12 @@ func TestPreCommitLaneGuard(t *testing.T) {
 		t.Fatalf("expected undeclared root copilot-worktrees/ to pass when the marker declares no third_party_roots, got err=%v out=%s", err, out)
 	}
 
-	// 10. canonical_lanes is data too: an unleased directory named after a lane the
-	// marker declares is blocked even though the name is unknown to the guard.
+	// 10. A lane's identity is the record `dotf lane init` leaves in the
+	// worktree's git admin dir, not its leaf name: (a) an unleased worktree that
+	// merely shares a declared lane's name passes; (b) with the record present
+	// the commit is refused, by the guard running as a real pre-commit hook;
+	// (c) the record follows the worktree through `git worktree move`, so the
+	// block survives a rename to a name the marker never declared.
 	altRepo := filepath.Join(t.TempDir(), "alt-repo")
 	initGitRepoForLaneGuard(t, altRepo, "main")
 	if err := os.MkdirAll(filepath.Join(altRepo, ".dotf"), 0o755); err != nil {
@@ -259,7 +264,67 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	if out, err := exec.Command("git", "-C", altRepo, "worktree", "add", "-b", "feat/996-spike", altWT, "HEAD").CombinedOutput(); err != nil {
 		t.Fatalf("worktree add alt: %v\n%s", err, string(out))
 	}
-	if out, err := runLaneGuardInDir(t, script, altWT); err == nil || !strings.Contains(out, "lease metadata") {
-		t.Fatalf("expected unleased declared lane 'spike-lane' to be blocked, got err=%v out=%s", err, out)
+	if out, err := runLaneGuardInDir(t, script, altWT); err != nil {
+		t.Fatalf("expected an unregistered worktree merely named 'spike-lane' to pass, got err=%v out=%s", err, out)
+	}
+
+	gitDirOut, gitDirErr := exec.Command("git", "-C", altWT, "rev-parse", "--absolute-git-dir").Output()
+	if gitDirErr != nil {
+		t.Fatalf("rev-parse --absolute-git-dir: %v", gitDirErr)
+	}
+	if err := os.WriteFile(filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile), []byte("spike-lane\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hooksDir := t.TempDir()
+	hook := "#!/bin/sh\nexec \"" + filepath.ToSlash(findGitPOSIXShell(t)) + "\" \"" + filepath.ToSlash(script) + "\"\n"
+	if err := os.WriteFile(filepath.Join(hooksDir, "pre-commit"), []byte(hook), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "-C", altRepo, "config", "core.hooksPath", filepath.ToSlash(hooksDir)).CombinedOutput(); err != nil {
+		t.Fatalf("config core.hooksPath: %v\n%s", err, string(out))
+	}
+	if err := os.WriteFile(filepath.Join(altWT, "work.txt"), []byte("work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "-C", altWT, "add", "work.txt").CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, string(out))
+	}
+	commitOut, commitErr := exec.Command("git", "-C", altWT, "commit", "-m", "spike").CombinedOutput()
+	if commitErr == nil || !strings.Contains(string(commitOut), "lease metadata") || !strings.Contains(string(commitOut), "spike-lane") {
+		t.Fatalf("expected the registered lane 'spike-lane' without a lease to be refused by the pre-commit hook, got err=%v out=%s", commitErr, string(commitOut))
+	}
+
+	// An empty record is no record: Go's lane.Identity and the guard agree.
+	if err := os.WriteFile(filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile), []byte(" \n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runLaneGuardInDir(t, script, altWT); err != nil {
+		t.Fatalf("expected an empty identity record to be read as no record, got err=%v out=%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile), []byte("spike-lane\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A record that exists but cannot be read fails closed, not open.
+	if runtime.GOOS != "windows" && os.Getuid() != 0 {
+		record := filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile)
+		if err := os.Chmod(record, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		out, err := runLaneGuardInDir(t, script, altWT)
+		if cerr := os.Chmod(record, 0o644); cerr != nil {
+			t.Fatal(cerr)
+		}
+		if err == nil || !strings.Contains(out, "not readable") {
+			t.Fatalf("expected an unreadable identity record to block, got err=%v out=%s", err, out)
+		}
+	}
+
+	movedWT := filepath.Join(filepath.Dir(altWT), "not-a-lane-name")
+	if out, err := exec.Command("git", "-C", altRepo, "worktree", "move", altWT, movedWT).CombinedOutput(); err != nil {
+		t.Fatalf("worktree move: %v\n%s", err, string(out))
+	}
+	if out, err := runLaneGuardInDir(t, script, movedWT); err == nil || !strings.Contains(out, "lease metadata") || !strings.Contains(out, "spike-lane") {
+		t.Fatalf("expected the moved lane to stay blocked by its record, got err=%v out=%s", err, out)
 	}
 }

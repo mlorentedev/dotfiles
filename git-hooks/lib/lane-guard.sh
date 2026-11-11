@@ -18,7 +18,11 @@
 # In a repository carrying .dotf/lanes.json, it blocks:
 #   1. Direct commits on main/master at the main checkout (directs to `dotf lane switch`)
 #   2. Commits inside a PARKED persistent lane (.dotf-worktree.json state == "PARKED")
-#   3. Commits inside an unleased canonical lane directory
+#   3. Commits inside a registered lane that carries no lease (.dotf-worktree.json
+#      absent). A lane is recognised by the `dotf-lane` record `dotf lane init`
+#      leaves in the worktree's own git admin dir ($git_dir), never by its
+#      directory name: git moves and prunes that record with the worktree, so a
+#      renamed lane stays a lane and a stranger named after one is not.
 #   4. Commits inside a declared third-party session root (third_party_roots)
 
 set -u
@@ -27,6 +31,10 @@ top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -n "$top" ] || exit 0
 
 git_dir="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
+case "$git_dir" in
+  /*|[A-Za-z]:/*|[A-Za-z]:\\*) ;;
+  *) git_dir="$top/$git_dir" ;;
+esac
 common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || common_dir="$git_dir"
 case "$common_dir" in
   /*|[A-Za-z]:/*|[A-Za-z]:\\*) ;;
@@ -72,10 +80,10 @@ json_list() {
 }
 
 # The marker is the single source of truth: a list it does not declare is a rule
-# that does not apply. No lane name and no session host is hardcoded here, so a
-# repository opts into exactly the roots and lanes it declares.
+# that does not apply. No session host is hardcoded here, so a repository opts
+# into exactly the roots it declares. The marker's lane list is policy for
+# `dotf lane init`, not an identity: this guard never matches a lane by name.
 third_party_roots="$(json_list third_party_roots)"
-canonical_lanes="$(json_list canonical_lanes)"
 
 # 4. Block commits inside a declared third-party session root (m4).
 top_slash="$(printf '%s' "$top" | sed 's|\\|/|g')"
@@ -89,22 +97,28 @@ for root in $third_party_roots; do
   esac
 done
 
-# 5. Block commits inside a PARKED lane or an uninitialized canonical lane directory.
+# 5. Block commits inside a PARKED lane or a registered lane without a lease.
 if [ -f "$top/.dotf-worktree.json" ]; then
   if grep -Eq '"state"[[:space:]]*:[[:space:]]*"PARKED"' "$top/.dotf-worktree.json" 2>/dev/null; then
     echo "ERROR: lane at $top is PARKED (detached idle state)." >&2
     echo "FIX: activate the lane on a feature branch first: dotf lane switch <type>/<issue>-<slug>" >&2
     exit 1
   fi
-else
-  lane_base="${top_slash##*/}"
-  for lane in $canonical_lanes; do
-    if [ "$lane_base" = "$lane" ]; then
-      echo "ERROR: canonical lane directory $top is missing .dotf-worktree.json lease metadata." >&2
-      echo "FIX: initialize and switch the lane with: dotf lane init && dotf lane switch <type>/<issue>-<slug>" >&2
-      exit 1
-    fi
-  done
+elif [ -f "$git_dir/dotf-lane" ]; then
+  # A record that exists but cannot be read is not "no record": fail closed.
+  if [ ! -r "$git_dir/dotf-lane" ]; then
+    echo "ERROR: lane identity record $git_dir/dotf-lane is not readable." >&2
+    echo "FIX: restore it with: dotf lane init" >&2
+    exit 1
+  fi
+  # An empty record is no record, as lane.Identity reads it in Go; both sides
+  # read the first line only.
+  lane_name="$(sed -n '1s/^[[:space:]]*//;1s/[[:space:]]*$//;1p' "$git_dir/dotf-lane" 2>/dev/null)"
+  if [ -n "$lane_name" ]; then
+    echo "ERROR: lane '$lane_name' at $top is missing .dotf-worktree.json lease metadata." >&2
+    echo "FIX: restore the lease and switch the lane with: dotf lane init && dotf lane switch <type>/<issue>-<slug>" >&2
+    exit 1
+  fi
 fi
 
 # 6. Block direct commits on main/master or detached HEAD at the main repository checkout.

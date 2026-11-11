@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -237,5 +238,234 @@ func TestLaneInitExcludesMetadataThroughTheCommonGitDir(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(linked, ".git", "info", "exclude")); err == nil {
 		t.Errorf("%s/.git is a pointer file; the exclusion was written there instead of the common dir", linked)
+	}
+}
+
+// Each lane's identity lives in its git admin dir, written by init on every
+// exit of provisionLane: create, adopt, and the "already healthy" early return
+// (so a record deleted by hand is restored).
+func TestLaneInitRecordsTheIdentityInEachLanesGitDir(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes failed: %v", err)
+	}
+	for _, name := range CanonicalLanes {
+		lanePath := filepath.Join(wtRoot, "dotfiles", name)
+		got, ok, err := Identity(lanePath)
+		if err != nil || !ok || got != name {
+			t.Errorf("Identity(%s) = %q, %v, %v; want %q, true, nil", name, got, ok, err, name)
+		}
+	}
+	if changed, err := InitLanes(repoDir, wtRoot); err != nil || changed != 0 {
+		t.Fatalf("second InitLanes = %d, %v; want 0, nil (the records are already there)", changed, err)
+	}
+
+	// The record is git-owned: it follows the worktree, not the leaf.
+	moved := filepath.Join(wtRoot, "dotfiles", "renamed-by-hand")
+	runGitLaneTest(t, repoDir, "worktree", "move", filepath.Join(wtRoot, "dotfiles", LaneFastTrack), moved)
+	if got, ok, _ := Identity(moved); !ok || got != LaneFastTrack {
+		t.Errorf("Identity after worktree move = %q, %v; want %q, true", got, ok, LaneFastTrack)
+	}
+}
+
+func TestLaneInitRestoresADeletedIdentityRecord(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes failed: %v", err)
+	}
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatSecondary)
+	gitDir := runGitLaneTest(t, lanePath, "rev-parse", "--absolute-git-dir")
+	if err := os.Remove(filepath.Join(gitDir, LaneIdentityFile)); err != nil {
+		t.Fatal(err)
+	}
+
+	changed, err := InitLanes(repoDir, wtRoot)
+	if err != nil {
+		t.Fatalf("InitLanes after deleting the record failed: %v", err)
+	}
+	if changed != 1 {
+		t.Errorf("InitLanes changed = %d, want 1 (the restored record)", changed)
+	}
+	if got, ok, _ := Identity(lanePath); !ok || got != LaneFeatSecondary {
+		t.Errorf("Identity after re-init = %q, %v; want %q, true", got, ok, LaneFeatSecondary)
+	}
+	if changed, err := InitLanes(repoDir, wtRoot); err != nil || changed != 0 {
+		t.Errorf("third InitLanes = %d, %v; want 0, nil", changed, err)
+	}
+}
+
+// Two repositories sharing a basename under one WORKTREE_ROOT resolve to the
+// same lane paths. The second init must refuse the first's lanes, naming the
+// path and the repository they belong to, and leave them untouched.
+func TestLaneInitRefusesALaneDirectoryOfAnotherRepository(t *testing.T) {
+	firstRepo, wtRoot := setupLaneTestRepo(t)
+	secondRepo, _ := setupLaneTestRepo(t)
+	if filepath.Base(firstRepo) != filepath.Base(secondRepo) {
+		t.Fatalf("fixture: basenames differ (%s, %s)", firstRepo, secondRepo)
+	}
+	if _, err := InitLanes(firstRepo, wtRoot); err != nil {
+		t.Fatalf("first InitLanes failed: %v", err)
+	}
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+	before, err := os.ReadFile(filepath.Join(lanePath, worktree.MetadataFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = InitLanes(secondRepo, wtRoot)
+	if err == nil {
+		t.Fatal("InitLanes for the second repository succeeded; want a refusal")
+	}
+	// git answers physical paths; the fixture path may be the logical one.
+	physicalFirstRepo, err2 := filepath.EvalSymlinks(firstRepo)
+	if err2 != nil {
+		t.Fatal(err2)
+	}
+	for _, want := range []string{lanePath, physicalFirstRepo} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+	// A refused init leaves the second repository unarmed: no marker, no lanes.
+	if _, serr := os.Stat(filepath.Join(secondRepo, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s into the second repository; the guard would be armed with no lanes", LanesMarkerFile)
+	}
+	// Nor can the second repository claim or park the first's lanes by path.
+	if _, _, serr := SwitchLane(secondRepo, wtRoot, "feat/1-stranger", ""); serr == nil || !strings.Contains(serr.Error(), physicalFirstRepo) {
+		t.Errorf("SwitchLane from the second repository = %v; want a refusal naming the owner", serr)
+	}
+	if _, perr := ParkLane(secondRepo, lanePath, "", false); perr == nil || !strings.Contains(perr.Error(), physicalFirstRepo) {
+		t.Errorf("ParkLane from the second repository = %v; want a refusal naming the owner", perr)
+	}
+	if head := runGitLaneTest(t, lanePath, "rev-parse", "--abbrev-ref", "HEAD"); head != "HEAD" {
+		t.Errorf("the first repository's lane is no longer detached (HEAD=%s); the stranger checked a branch out in it", head)
+	}
+	after, err := os.ReadFile(filepath.Join(lanePath, worktree.MetadataFileName))
+	if err != nil || !bytes.Equal(before, after) {
+		t.Errorf("the first repository's lane metadata changed (err=%v):\nbefore: %s\nafter:  %s", err, before, after)
+	}
+	if got, ok, _ := Identity(lanePath); !ok || got != LaneFeatPrimary {
+		t.Errorf("the first repository's lane identity = %q, %v; want %q, true", got, ok, LaneFeatPrimary)
+	}
+	if HasNamedLanes(secondRepo, wtRoot) {
+		t.Error("HasNamedLanes(secondRepo) = true; the second repository must not have adopted the first's lanes")
+	}
+}
+
+func TestLaneInitRefusesAPlainDirectoryAtALanePath(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+	if err := os.MkdirAll(lanePath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(lanePath, "notes.txt"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := InitLanes(repoDir, wtRoot)
+	if err == nil {
+		t.Fatal("InitLanes over a plain directory succeeded; want a refusal")
+	}
+	if !strings.Contains(err.Error(), lanePath) {
+		t.Errorf("error %q does not name %q", err, lanePath)
+	}
+	if _, serr := os.Stat(filepath.Join(lanePath, "notes.txt")); serr != nil {
+		t.Errorf("the plain directory's content was touched: %v", serr)
+	}
+	if _, serr := os.Stat(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s; the guard would be armed with no lanes", LanesMarkerFile)
+	}
+}
+
+// A lane root that denies traversal makes Lstat fail with something other
+// than absence. Reading that as "absent" would write the marker and then
+// fail to provision, so it is an error and nothing is written.
+func TestLaneInitRefusesAnUntraversableLaneRootBeforeWritingTheMarker(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Getuid() == 0 {
+		t.Skip("directory modes do not deny the owner on Windows or root")
+	}
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	repoWTRoot := filepath.Join(wtRoot, "dotfiles")
+	if err := os.MkdirAll(repoWTRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(repoWTRoot, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(repoWTRoot, 0o755) })
+
+	_, err := InitLanes(repoDir, wtRoot)
+	if err == nil || !strings.Contains(err.Error(), "inspecting") {
+		t.Fatalf("InitLanes under an untraversable lane root: err=%v, want a refusal naming the inspection", err)
+	}
+	if _, serr := os.Stat(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s; the guard would be armed with no lanes", LanesMarkerFile)
+	}
+}
+
+// A dangling symlink at a lane path is a directory entry os.Stat does not
+// see, so a preflight that skips what Stat cannot reach writes the marker
+// and then fails at git worktree add: the refused init the guard must not
+// arm behind.
+func TestLaneInitRefusesADanglingSymlinkAtALanePathBeforeWritingTheMarker(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation needs a privilege on Windows")
+	}
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+	if err := os.MkdirAll(filepath.Dir(lanePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(wtRoot, "nowhere"), lanePath); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := InitLanes(repoDir, wtRoot)
+	if err == nil {
+		t.Fatal("InitLanes over a dangling symlink succeeded; want a refusal")
+	}
+	if !strings.Contains(err.Error(), lanePath) {
+		t.Errorf("error %q does not name %q", err, lanePath)
+	}
+	if _, serr := os.Stat(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s; the guard would be armed with no lanes", LanesMarkerFile)
+	}
+}
+
+// A symlink at a lane path that resolves to a worktree of this repository is
+// adopted, and coherently: every path comparison resolves symlinks, so the
+// lease and the record land in the target and the lane reads back by either
+// name. Characterises the review question of whether the adoption is safe.
+func TestLaneInitAdoptsASymlinkToThisRepositorysWorktree(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation needs a privilege on Windows")
+	}
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	target := filepath.Join(wtRoot, "elsewhere", LaneFeatPrimary)
+	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", target, "HEAD")
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+	if err := os.MkdirAll(filepath.Dir(lanePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, lanePath); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes over a symlink to this repository's worktree: %v", err)
+	}
+	meta, err := worktree.LoadMetadata(target)
+	if err != nil || meta == nil || meta.Lane != LaneFeatPrimary {
+		t.Fatalf("lease in the target: meta=%+v err=%v", meta, err)
+	}
+	for _, p := range []string{lanePath, target} {
+		name, ok, ierr := Identity(p)
+		if ierr != nil || !ok || name != LaneFeatPrimary {
+			t.Errorf("Identity(%s) = %q, %v, %v; want %q", p, name, ok, ierr, LaneFeatPrimary)
+		}
+	}
+	changed, err := InitLanes(repoDir, wtRoot)
+	if err != nil || changed != 0 {
+		t.Errorf("second init: changed=%d err=%v; want 0, nil", changed, err)
 	}
 }
