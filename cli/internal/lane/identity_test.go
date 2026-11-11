@@ -24,6 +24,13 @@ func TestIdentity_ReadsTheRecordFromTheWorktreeGitDir(t *testing.T) {
 		t.Fatalf("Identity(linked) = %q, %v, %v; want %q, true, nil", name, ok, err, LaneFeatPrimary)
 	}
 
+	if err := os.WriteFile(filepath.Join(gitDir, LaneIdentityFile), []byte(LaneFeatPrimary+"\nresidue\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if name, ok, err := Identity(linked); err != nil || !ok || name != LaneFeatPrimary {
+		t.Fatalf("Identity with residue after the first line = %q, %v, %v; want the first line only", name, ok, err)
+	}
+
 	moved := filepath.Join(wtRoot, "another-leaf")
 	runGitLaneTest(t, repo, "worktree", "move", linked, moved)
 	if name, ok, err := Identity(moved); err != nil || !ok || name != LaneFeatPrimary {

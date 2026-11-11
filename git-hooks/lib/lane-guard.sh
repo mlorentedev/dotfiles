@@ -105,7 +105,14 @@ if [ -f "$top/.dotf-worktree.json" ]; then
     exit 1
   fi
 elif [ -f "$git_dir/dotf-lane" ]; then
-  # An empty record is no record, as lane.Identity reads it in Go.
+  # A record that exists but cannot be read is not "no record": fail closed.
+  if [ ! -r "$git_dir/dotf-lane" ]; then
+    echo "ERROR: lane identity record $git_dir/dotf-lane is not readable." >&2
+    echo "FIX: restore it with: dotf lane init" >&2
+    exit 1
+  fi
+  # An empty record is no record, as lane.Identity reads it in Go; both sides
+  # read the first line only.
   lane_name="$(sed -n '1s/^[[:space:]]*//;1s/[[:space:]]*$//;1p' "$git_dir/dotf-lane" 2>/dev/null)"
   if [ -n "$lane_name" ]; then
     echo "ERROR: lane '$lane_name' at $top is missing .dotf-worktree.json lease metadata." >&2

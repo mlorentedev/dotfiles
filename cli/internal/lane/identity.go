@@ -40,7 +40,10 @@ func Identity(path string) (string, bool, error) {
 	if err != nil {
 		return "", false, fmt.Errorf("lane identity: reading %s: %w", filepath.Join(gitDir, LaneIdentityFile), err)
 	}
-	name := strings.TrimSpace(string(raw))
+	// The first line is the name, as the guard reads it; anything after it is
+	// residue no writer of ours produces.
+	first, _, _ := strings.Cut(string(raw), "\n")
+	name := strings.TrimSpace(first)
 	if name == "" {
 		return "", false, nil
 	}

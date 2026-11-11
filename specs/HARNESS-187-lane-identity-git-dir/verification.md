@@ -47,6 +47,19 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 | `tasks.md` names `--absolute-git-dir`, the guard keeps its `case` idiom | THEORETICAL Minor | declined | Already recorded under Decisions; the reviewer asked for no action. |
 | Windows unverified on the authoring box | Question | declined | Declared in the proposal's Risks; CI's Windows leg is the authoritative run. |
 
+## Review round 2 (nan/mimo-v2.6-flash, PASS on `c79d475d`; `review.md`)
+
+| Finding | Class | Disposition | Evidence |
+|---|---|---|---|
+| An unreadable record (mode 000) fails open in the guard: `sed … 2>/dev/null` yields an empty name | THEORETICAL Minor | applied | Rule 5b now fails closed on `[ ! -r ]` with its own message; case 10 chmods the record to 000 and asserts the block (skipped on Windows and as root, where the mode has no effect). |
+| Multi-line record: the guard reads the first line, `Identity` returned the whole trimmed content | THEORETICAL Minor | applied | `Identity` reads the first line; `TestIdentity_ReadsTheRecordFromTheWorktreeGitDir` writes residue after the name and asserts the name alone. |
+| `writeIdentity` writes in place, not temp-plus-rename | SPECULATIVE Minor | declined | One small write under the init lock; a truncated record is restored by the next `lane init`, which rewrites on any difference. The reviewer marked it surface only. |
+| `tasks.md` names `--absolute-git-dir` for the guard | THEORETICAL Minor | declined | Round 1's disposition stands. |
+| Rule 6b blocks any leaseless detached worktree with a message naming the main checkout | Question (pre-existing) | ticketed | #3324. The rule and message predate this spec; AC2's "not blocked by name" is asserted on a checked-out branch, which is the lane's working state. |
+| Windows unverified on the authoring box | Question | declined | Declared in the proposal's Risks; CI's Windows leg is the authoritative run. |
+
+The two applied rows change code outside the contract set after the reviewed sha; `go test ./internal/lane/ ./internal/hooks/`, vet and the pinned lint on both OSes are green on the resulting head.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.

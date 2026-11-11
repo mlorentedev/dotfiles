@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -302,6 +303,21 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	}
 	if err := os.WriteFile(filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile), []byte("spike-lane\n"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+
+	// A record that exists but cannot be read fails closed, not open.
+	if runtime.GOOS != "windows" && os.Getuid() != 0 {
+		record := filepath.Join(strings.TrimSpace(string(gitDirOut)), lane.LaneIdentityFile)
+		if err := os.Chmod(record, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		out, err := runLaneGuardInDir(t, script, altWT)
+		if cerr := os.Chmod(record, 0o644); cerr != nil {
+			t.Fatal(cerr)
+		}
+		if err == nil || !strings.Contains(out, "not readable") {
+			t.Fatalf("expected an unreadable identity record to block, got err=%v out=%s", err, out)
+		}
 	}
 
 	movedWT := filepath.Join(filepath.Dir(altWT), "not-a-lane-name")
