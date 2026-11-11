@@ -75,9 +75,8 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
   `./` and `docker://` are exempt from `fleet/sha-pin` (a digest pin is a registry rule, not a git one)
 - [x] Mutations caught: the caller exemption, the `./` exemption, an explicit `persist-credentials: true`, an
   exception that ignores its path, one that ignores its rule, the `inherit` match
-- [ ] PR 5b: stale exceptions (matching nothing) and unknown rule ids as findings. dotfiles' own
-  `.github/lint-exceptions.yml` lands with the adoption, by the owner: `.github/**` is not an agent's to merge.
-  Run on dotfiles today: 21 findings, all `fleet/persist-credentials`
+- [x] dotfiles' own `.github/lint-exceptions.yml` lands with the adoption, by the owner (#3336): `.github/**` is
+  not an agent's to merge. Run on dotfiles at PR 4: 21 findings, all `fleet/persist-credentials`
 
 ## PR 5a: the remaining four rules
 
@@ -93,7 +92,7 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 - [x] Mutations caught: `cancel-in-progress: false`, the sequence form of `on:`, the `if:` exemption, `include:`,
   the setup-action scope of `cache:`, the `skip-cache` value, `!` patterns, `**`, regexp metacharacters, the missing
   default branch, the pull-request scope of the cancel rule
-- [x] Run on dotfiles: 29 findings. 21 persist-credentials (#3335), 3 os-on-pull-request (`ci.yml` test-windows,
+- [x] Run on dotfiles: 29 findings (26 once #3305 gated two Windows legs and added a checkout). 21 persist-credentials (#3335), 3 os-on-pull-request (`ci.yml` test-windows,
   `cli.yml` test, `cli-smoke.yml` smoke), 1 cancel-in-progress (`repo-hygiene.yml`), 2 skip-cache (`cli.yml`, the
   exception the proposal names with #2834). `add-to-project.yml` runs on `opened` and `reopened` only: it was a
   finding until the rule read `types:`

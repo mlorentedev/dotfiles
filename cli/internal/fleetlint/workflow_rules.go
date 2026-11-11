@@ -83,7 +83,7 @@ func rerunsOnPush(on *yaml.Node) bool {
 // counts as set.
 func cancelFinding(path string, root, onKey *yaml.Node) []Finding {
 	cKey, c := mapEntry(root, "concurrency")
-	if cancel := mapValue(c, "cancel-in-progress"); cancel != nil && cancel.Value != "false" {
+	if cancel := mapValue(c, "cancel-in-progress"); cancel != nil && !isBool(cancel, false) {
 		return nil
 	}
 	line := onKey.Line
@@ -129,10 +129,10 @@ func osFinding(path string, key, job *yaml.Node) []Finding {
 func cacheFinding(path string, uses, step *yaml.Node) []Finding {
 	with := mapValue(step, "with")
 	var off *yaml.Node
-	if c := mapValue(with, "cache"); strings.Contains(uses.Value, "/setup-") && c != nil && c.Value == "false" {
+	if c := mapValue(with, "cache"); strings.Contains(uses.Value, "/setup-") && isBool(c, false) {
 		off = c
 	}
-	if s := mapValue(with, "skip-cache"); strings.HasPrefix(uses.Value, "golangci/golangci-lint-action@") && s != nil && s.Value == "true" {
+	if s := mapValue(with, "skip-cache"); strings.HasPrefix(uses.Value, "golangci/golangci-lint-action@") && isBool(s, true) {
 		off = s
 	}
 	if off == nil {

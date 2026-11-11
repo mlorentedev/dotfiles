@@ -2,6 +2,7 @@ package fleetlint
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -86,7 +87,7 @@ func lintJob(path string, key, job *yaml.Node) []Finding {
 		}
 		if strings.HasPrefix(su.Value, "actions/checkout@") {
 			pc := mapValue(mapValue(st, "with"), "persist-credentials")
-			if pc == nil || pc.Value != "false" {
+			if !isBool(pc, false) {
 				add(RulePersistCredentials, su.Line, "checkout keeps the token in .git/config; set persist-credentials: false")
 			}
 		}
@@ -102,4 +103,12 @@ func pinned(ref string) bool {
 		return true
 	}
 	return shaRef.MatchString(ref)
+}
+
+// isBool reports whether n spells the boolean want: false, False, FALSE,
+// quoted or not. Value keeps the spelling, and an action reads its inputs as
+// strings with the same three spellings, so comparing with "false" alone would
+// read False as set.
+func isBool(n *yaml.Node, want bool) bool {
+	return n != nil && n.Kind == yaml.ScalarNode && strings.EqualFold(n.Value, strconv.FormatBool(want))
 }

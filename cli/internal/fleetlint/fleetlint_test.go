@@ -261,3 +261,21 @@ func TestRerunsOnPush(t *testing.T) {
 		}
 	}
 }
+
+// A boolean is read in every spelling YAML and an action's inputs accept:
+// False is false, and a quoted "false" is too.
+func TestBooleansInAnySpelling(t *testing.T) {
+	for v, want := range map[string]bool{"false": true, "False": true, "FALSE": true, `"false"`: true, "true": false, "no": false, "${{ x }}": false} {
+		var n yaml.Node
+		if err := yaml.Unmarshal([]byte("k: "+v), &n); err != nil {
+			t.Fatal(err)
+		}
+		if got := isBool(mapValue(n.Content[0], "k"), false); got != want {
+			t.Errorf("%s: got %v, want %v", v, got, want)
+		}
+	}
+	wf := "on: pull_request\nconcurrency:\n  group: g\n  cancel-in-progress: False\njobs: {}\n"
+	if got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": wf}); err != nil || len(got) != 1 || got[0].Rule != RuleCancelInProgress {
+		t.Errorf("cancel-in-progress: False: got %v, %v", got, err)
+	}
+}
