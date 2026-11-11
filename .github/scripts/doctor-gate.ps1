@@ -53,6 +53,25 @@ function Read-KnownFailures {
     return ,$entries
 }
 
+# Join-PathEntries: join PATH strings into one, keeping the first spelling of
+# each directory (case- and trailing-slash-insensitive, as Windows compares
+# them) and dropping empty entries. cmd.exe resolves NOTHING from a PATH longer
+# than 8191 chars, wherever the entry sits: measured on the Windows guest, a
+# .cmd calling a .cmd in the first PATH entry ran at 8180 chars and was "not
+# recognized" at 8210 (#3174). Every mise shim is a .cmd that calls mise, so a
+# padded PATH breaks all of them at once.
+function Join-PathEntries {
+    param([AllowEmptyCollection()][AllowEmptyString()][AllowNull()][string[]]$Paths)
+    $seen = @{}
+    $kept = foreach ($entry in @($Paths | Where-Object { $_ }) -split ';') {
+        $key = $entry.Trim().TrimEnd('\').ToLowerInvariant()
+        if (-not $key -or $seen.ContainsKey($key)) { continue }
+        $seen[$key] = $true
+        $entry.Trim()
+    }
+    return (@($kept) -join ';')
+}
+
 if ($MyInvocation.InvocationName -ne '.') {
     $ErrorActionPreference = 'Stop'
     $known = Join-Path $PSScriptRoot 'doctor-gate-known-failures.txt'
@@ -61,8 +80,14 @@ if ($MyInvocation.InvocationName -ne '.') {
     # global prefix to the User PATH, but a later workflow step inherits the
     # runner's original PATH plus GITHUB_PATH only. Without this, every tool
     # setup just installed reads "not in PATH" (measured on #1308's first run).
-    $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' +
-        [Environment]::GetEnvironmentVariable('PATH', 'User') + ';' + $env:PATH
+    # The process PATH already holds the Machine and User entries, so a plain
+    # concatenation listed most of them twice: 199 entries and 8588 chars on the
+    # runner, past cmd.exe's 8191, and every mise shim then failed with "'mise'
+    # is not recognized" (#3174). Join without repeats instead.
+    $env:PATH = Join-PathEntries -Paths @(
+        [Environment]::GetEnvironmentVariable('PATH', 'Machine'),
+        [Environment]::GetEnvironmentVariable('PATH', 'User'),
+        $env:PATH)
 
     # The profile hook is the other half of "a fresh terminal", and `-NoProfile`
     # is what drops it. On Windows a process PATH is the Machine entries then

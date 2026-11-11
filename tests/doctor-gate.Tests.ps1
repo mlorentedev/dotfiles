@@ -124,3 +124,30 @@ Describe 'Read-KnownFailures' {
         }
     }
 }
+
+Describe 'Join-PathEntries' {
+
+    BeforeAll {
+        . (Join-Path $PSScriptRoot '..\.github\scripts\doctor-gate.ps1')
+    }
+
+    It 'keeps the first spelling of each directory, in order' {
+        $r = Join-PathEntries -Paths @('C:\a;C:\b', 'c:\A\;C:\c', 'C:\b;C:\d')
+        $r | Should -Be 'C:\a;C:\b;C:\c;C:\d'
+    }
+
+    It 'drops empty entries' {
+        Join-PathEntries -Paths @(';C:\a;;', $null, '') | Should -Be 'C:\a'
+    }
+
+    It 'keeps a runner-sized PATH under the cmd.exe limit when it is the same PATH three times' {
+        # The gate joined Machine + User + the process PATH, which already holds
+        # both: 199 entries, 8588 chars. cmd.exe resolves nothing from a PATH
+        # past 8191 chars, so every mise .cmd shim failed with "'mise' is not
+        # recognized" (measured on the Windows guest, #3174).
+        $one = (1..60 | ForEach-Object { "C:\hostedtoolcache\windows\tool$_\bin" }) -join ';'
+        $joined = Join-PathEntries -Paths @($one, $one, $one)
+        $joined.Length | Should -Be $one.Length
+        $joined.Length | Should -BeLessThan 8192
+    }
+}
