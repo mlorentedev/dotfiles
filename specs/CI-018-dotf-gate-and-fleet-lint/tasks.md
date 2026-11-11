@@ -107,7 +107,7 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
   rules an exception may name, and a test ties that list to the fixture directories
 - [x] [AC5] The runbook: `docs/runbooks/guide-fleet-lint.md`
 - [ ] [AC5] The link from ci-workflows ADR-001, a pull request in that repository once the runbook is on main
-- [x] Run over the owner's local checkouts: 222 findings in 13 repositories, no unreadable one
+- [x] Run over the owner's local checkouts: 221 findings in 13 repositories, no unreadable one
 
 ## Closing
 
