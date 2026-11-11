@@ -18,10 +18,10 @@ owner: manu
 
 ## Test status
 
-- `bats $(git grep -l -E 'cli\.yml|cli-smoke\.yml|ci\.yml|filters/code' -- 'tests/*.bats') tests/ci-os-matrix.bats` -> 1..315, no failures
+- `bats $(git grep -l -E 'cli\.yml|cli-smoke\.yml|ci\.yml|filters/code' -- 'tests/*.bats')` -> 1..315 (the list includes tests/ci-os-matrix.bats; naming it twice makes bats plan it twice and exit 1), no failures
 - `actionlint` over ci.yml, cli.yml, cli-smoke.yml -> exit 0
 - `python3 tests/lib/check-workflow-contexts.py .` -> exit 0
-- Mutations: literal OS list in cli-smoke (tests 1, 3 red), `'!tests/**'` added to the filter (test 5 red), push branch dropped from cli's `test_os` (test 2 red)
+- Mutations: literal OS list in cli-smoke (tests 1, 3 red), `'!tests/**'` added to the filter (test 5 red), push branch dropped from cli's `test_os` (test 2 red), the `test` matrix pointed at an output without the pull-request fallback (test 1 red)
 
 ## Decisions made during implementation
 

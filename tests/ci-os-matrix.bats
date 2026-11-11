@@ -15,7 +15,7 @@ setup() {
 
 _py() { # python body with `load(name)` returning a parsed workflow; exit status is the verdict
     python3 - "$WF" "$FILTER" "$BATS_TEST_DIRNAME/../forge/branch-protection.json" "$1" <<'EOF'
-import glob, json, os, sys, yaml
+import glob, json, os, re, sys, yaml
 def load(name):
     wf = yaml.safe_load(open(os.path.join(sys.argv[1], name)))
     wf["on"] = wf.pop(True, wf.get("on"))  # PyYAML reads the bare key `on` as True
@@ -29,8 +29,8 @@ EOF
 }
 
 # The structural rule, so a Windows or macOS job added later is held to it too:
-# on a pull request it is gated at job level, or its OS list comes from a
-# `changes` output. A required check is exempt: a job-level `if` would let it
+# on a pull request it is gated at job level, or its OS list is a `changes`
+# output whose expression keeps Linux alone on a pull request. A required check is exempt: a job-level `if` would let it
 # pass without running (CI-004, tests/lib/check-workflow-contexts.py), so
 # test-windows starts its runner and skips its steps instead (HARNESS-041).
 @test "CI-013: every Windows or macOS job on a pull request is gated before a runner starts" {
@@ -43,8 +43,23 @@ for wf_file in sorted(glob.glob(os.path.join(sys.argv[1], "*.yml"))):
     events = [on] if isinstance(on, str) else list(on or [])
     if "pull_request" not in events:
         continue
-    for job_id, job in (wf.get("jobs") or {}).items():
+    jobs = wf.get("jobs") or {}
+    for job_id, job in jobs.items():
         os_list = str((job.get("strategy") or {}).get("matrix", {}).get("os", ""))
+        # A dynamic OS list counts as gated only when it is a `changes` output
+        # whose expression drops to Linux alone on a pull request; anything else
+        # computed is a source this rule cannot read, so it is flagged.
+        m = re.fullmatch(r"\$\{\{\s*fromJSON\(needs\.changes\.outputs\.(\w+)\)\s*\}\}", os_list)
+        if m:
+            expr = str(((jobs.get("changes") or {}).get("outputs") or {}).get(m.group(1), ""))
+            q = chr(39)  # this body sits in a single-quoted shell word
+            if not (f"github.event_name != {q}pull_request{q}" in expr
+                    and q + "[\"ubuntu-latest\"]" + q in expr):
+                bad.append(f"{name}:{job_id} (OS output {m.group(1)} has no Linux-only branch)")
+            continue
+        if "${{" in os_list:
+            bad.append(f"{name}:{job_id} (OS list from an expression this rule cannot read)")
+            continue
         literal = str(job.get("runs-on", "")) + os_list
         if not any(k in literal for k in ("windows", "macos")):
             continue
