@@ -55,7 +55,14 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 
 ## PR 3: `--adjacency`, `--summary` for `gate spec`
 
-- [ ] [AC2] Adjacency rule through the shim
+- [x] [AC2] Adjacency report through the shim: `tests/spec-gate-adjacency.bats` 15 through
+  `spec_gate_both`, `--adjacency-issues` mapped to `--adjacency`, the step summary compared byte for byte
+  (dotf's `--summary` file, appended once per shell). Mutations caught: the `%` escape, the `|` escape,
+  the 88-byte clip, the closed-issue exclusion
+- [x] A feed whose last line has no newline: the script's `read` drops it, `dotf` reads it. Kept as a fix,
+  since the workflow writes every line terminated and no parity case can tell them apart
+- [x] `--summary` is `gate spec`'s only: the knowledge script writes no step summary, so `gate knowledge`
+  has nothing to port
 
 ## PR 4: `dotf lint fleet`
 

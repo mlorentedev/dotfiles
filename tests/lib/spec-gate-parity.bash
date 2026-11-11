@@ -15,8 +15,9 @@ SPEC_GATE_SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-spec-gate.sh"
 #
 # The dotf leg runs with no token and a PATH holding git alone, so a gh call
 # cannot succeed and would show as a disagreement (AC3). The adjacency report
-# is PR 3's: a run that asks for it, or for --help, skips the dotf leg; a
-# flag the helper does not map fails unless the script rejects it too.
+# and its step summary are compared too: dotf writes the table to its own
+# --summary file, which must equal what each shell appended. --help skips the
+# dotf leg; a flag the helper does not map fails unless the script rejects it.
 # shellcheck disable=SC2154  # bats' run assigns status and output
 spec_gate_both() {
     local base="" head="" skip=""
@@ -27,19 +28,26 @@ spec_gate_both() {
             --head-ref) head="$2"; shift 2 ;;
             --threshold) flags+=(--threshold "$2"); shift 2 ;;
             --explain) flags+=(--explain); shift ;;
-            --adjacency-issues | --help) skip=1; shift ;;
+            --adjacency-issues) flags+=(--adjacency "$2"); shift 2 ;;
+            --help) skip=1; shift ;;
             *) skip=unknown; shift ;;
         esac
     done
     # The dotf leg runs first, so the script's run is the last `run` and its
     # status and output are what the caller asserts on.
     local dotf_status="" dotf_output=""
+    local sum="${GITHUB_STEP_SUMMARY:-}" dotf_sum="$BATS_TEST_TMPDIR/dotf-summary.md" pre_sum="$BATS_TEST_TMPDIR/pre-summary.md"
+    if [ -n "$sum" ]; then
+        rm -f "$dotf_sum"
+        cat "$sum" >"$pre_sum" 2>/dev/null || : >"$pre_sum"
+        flags+=(--summary "$dotf_sum")
+    fi
     if [ -z "$skip" ] && [ -n "$base" ] && [ -n "$head" ]; then
         _spec_gate_event "$BATS_TEST_TMPDIR/spec-event.json"
         local bin="$BATS_TEST_TMPDIR/git-only"
         mkdir -p "$bin"
         [ -e "$bin/git" ] || ln -s "$(command -v git)" "$bin/git"
-        run env -u GH_TOKEN -u GITHUB_TOKEN PATH="$bin" "$DOTF_BIN" gate spec \
+        run env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_STEP_SUMMARY PATH="$bin" "$DOTF_BIN" gate spec \
             --event "$BATS_TEST_TMPDIR/spec-event.json" --base "$base" --head "$head" \
             ${flags[@]+"${flags[@]}"}
         dotf_status="$status" dotf_output="$output"
@@ -57,6 +65,11 @@ spec_gate_both() {
         return 1
     fi
     [ -n "$dotf_status" ] || return 0
+    if [ -n "$sum" ] && ! { cat "$pre_sum" "$dotf_sum" "$dotf_sum" 2>/dev/null | cmp -s - "$sum"; }; then
+        printf 'script and dotf gate spec wrote different step summaries\n--- script (both shells)\n%s\n--- dotf\n%s\n' \
+            "$(cat "$sum")" "$(cat "$dotf_sum" 2>/dev/null)"
+        return 1
+    fi
     if [ "$dotf_status" != "$status" ] ||
         { [ "$status" != 2 ] && [ "$(_spec_gate_common "$dotf_output")" != "$(_spec_gate_common "$output")" ]; }; then
         printf 'script (%s) and dotf gate spec (%s) disagree\n--- script\n%s\n--- dotf\n%s\n' \
