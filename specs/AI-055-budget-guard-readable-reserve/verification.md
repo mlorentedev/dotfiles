@@ -74,19 +74,26 @@ PASS. Message names the missing `timeout-minutes` instead of reporting
 ## AC6 - the committed configuration still passes, AI-054 paths unchanged
 
 ```
-go test ./internal/harness -run TestCheckReviewBudget -count=1 -v   # 19 tests, 19 PASS, 0 FAIL
-go test ./internal/harness -count=1                                  # whole package, ok 13.151s
+go test ./internal/harness -run TestCheckReviewBudget -count=1 -v   # 20 tests, 20 PASS, 0 FAIL
+go test ./internal/harness -count=1                                  # whole package, ok 14.998s
 go vet ./internal/harness                                            # exit 0
-go run ./cmd/dotf harness check --repo-root ..                       # exit 0
-gofmt -d internal/harness/prbudget.go internal/harness/prbudget_test.go   # no output
+go run ./cmd/dotf harness check --repo-root ..                       # exit 0 (no harness drift)
 ```
 
 `TheRepositoryPassesItsOwnGuard` covers the committed `.pr_agent.toml` and
 workflow; `TheGuardLeavesTheJobCeilingToTheBatsTest`,
-`AWorkflowWithoutAReviewStepFailsClosed`, `HalfAReviewerFailsClosed`,
-`ACheckoutWithoutAReviewerSaysNothing`, `AFileWithoutAClipFailsClosed` and
-`AnUnparseableFileFailsClosed` all still pass, so every fail-closed path from
-AI-054 is intact.
+`AWorkflowWithoutAReviewStepFailsClosed`, `HalfAReviewerFailsClosed` (both
+halves), `ACheckoutWithoutAReviewerSaysNothing`, `AFileWithoutAClipFailsClosed`
+and `AnUnparseableFileFailsClosed` all still pass, so every fail-closed path
+from AI-054 is intact.
+
+Formatting: this checkout runs with `core.autocrlf=true`, so the working tree is
+CRLF and `gofmt -l` names both files unconditionally. Normalising to LF first is
+the check that means something:
+
+```
+gofmt -l <LF copies of prbudget.go and prbudget_test.go>   # no output
+```
 
 ## Mutation check - do the new tests munch?
 
@@ -101,10 +108,30 @@ re-running the suite fails exactly the four tests that describe new behaviour:
 FAIL
 ```
 
-The other fifteen, including both restored AI-054 tests, stay green against the
+The other sixteen, including both restored AI-054 tests, stay green against the
 old implementation, which is what separates "new behaviour" from "renamed
 behaviour". The implementation was restored afterwards and the suite re-run
 green.
+
+## Round 2 review disposition
+
+Reviewer `nan/glm5.3-flash` (verdict FAIL, against `06f3100b`). Both Majors were
+real regressions introduced by the port, not stale claims.
+
+| Finding | Severity | Disposition |
+| --- | --- | --- |
+| `7d0c2b33` deleted `AFileWithoutAClipFailsClosed` and the toml-missing half of `HalfAReviewerFailsClosed`, leaving `prbudget.go:259` and `:130` executed 0 times | Major | Fixed. Both restored verbatim from `origin/main`; the coverage they carry is back. |
+| AC6 named a test that no longer existed | Major | Fixed. AC6 above names only tests in the tree, with this round's counts. |
+| `declaresStreaming` matches key presence, so `"false"` and `'[]'` also earn the caveat | Minor | Declined in scope. The caveat is a lower bound either way; a wrong-value key means the call may not stream, and under-reporting there is the safe direction. Tracked as #3302. |
+| A cap of `"0"` or `"-5"` is a number but is reported as "cannot read as a number" | Minor | Declined in scope. The sentence is imprecise for a non-positive literal, the outcome (GAP, not pass) is right, and `checkTokenClip` already rejects the config one line earlier. Tracked as #3302. |
+| A step missing both `CONFIG__AI_TIMEOUT` and `timeout-minutes` reports only the timeout gap | Minor | Declined in scope. Reporting one gap per step is the existing AI-054 shape; the second surfaces once the first is fixed. |
+| A cap declared in `.pr_agent.toml` is invisible to AC2 | Question | Answered: AC2 covers the workflow's own declaration; the toml cap is what `checkTokenClip` bounds, and it is required (`AFileWithoutAClipFailsClosed`). They are different ceilings, deliberately. |
+
+Also restored, because the port had silently reverted them rather than removed
+them on purpose: the `AI-054` fixture comment, the `// Five:` rationale on
+`TheCurrentConfigurationFails`, and main's equal-window negative assertion in
+`AStepThatLowersItsOwnWindowIsMeasuredAgainstIt`. See `tasks.md` for the
+retention bar applied to every deletion in this PR.
 
 ## What this does not prove
 
