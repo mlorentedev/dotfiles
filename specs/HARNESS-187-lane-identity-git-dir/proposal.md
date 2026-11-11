@@ -31,7 +31,7 @@ A lane's identity lives where git keeps the worktree's own state: `lane init` wr
 
 - Treating an app-created worktree under a `third_party_roots` entry as a lane: by decision (owner, 2026-11-11) it is a third-party root and rule 4 keeps blocking it.
 - Moving `.dotf-worktree.json` (the lease) into the git admin dir, so that `git clean -fdx` cannot delete it: #3307.
-- Locating lanes by enumerating `git worktree list` rather than by the `<WORKTREE_ROOT>/<repo basename>/<lane>` convention, and a distinct layout for two repositories that share a basename: `lane init` refuses that case loudly here; a layout that lets both coexist is a follow-up ticket filed from this spec.
+- Locating lanes by enumerating `git worktree list` rather than by the `<WORKTREE_ROOT>/<repo basename>/<lane>` convention, and a distinct layout for two repositories that share a basename: `lane init` refuses that case loudly here; a layout that lets both coexist is #3318, filed from this spec.
 - `doctor` checks on the marker or on identity drift: #3262.
 
 ## Risks / open questions
@@ -43,14 +43,14 @@ A lane's identity lives where git keeps the worktree's own state: `lane init` wr
 
 ## Acceptance criteria
 
-- [ ] AC1: After `dotf lane init`, each canonical lane's git admin dir holds `dotf-lane` with the lane's name; a second run reports `changed=0` and rewrites nothing.
-- [ ] AC2: With the record present and `.dotf-worktree.json` absent, the guard blocks a commit naming the lane and the fix, whatever the directory's leaf is (verified after `git worktree move`); with no record, a worktree merely named after a canonical lane is not blocked.
-- [ ] AC3: `dotf lane init` for a second repository whose basename matches one already initialised under the same `WORKTREE_ROOT` fails with an error naming the path and the repository it belongs to, and leaves the first repository's lanes and metadata untouched.
-- [ ] AC4: `lane.Identity(path)` returns the recorded name for a lane, and `("", false)` for a worktree without a record, a main checkout, and a path outside any repository, with no error for those three.
-- [ ] AC5: Every other case in `cli/internal/hooks/lane_guard_test.go` and `cli/internal/lane` passes unchanged; the guard no longer reads `canonical_lanes`.
+- [x] AC1: After `dotf lane init`, each canonical lane's git admin dir holds `dotf-lane` with the lane's name; a second run reports `changed=0` and rewrites nothing.
+- [x] AC2: With the record present and `.dotf-worktree.json` absent, the guard blocks a commit naming the lane and the fix, whatever the directory's leaf is (verified after `git worktree move`); with no record, a worktree merely named after a canonical lane is not blocked.
+- [x] AC3: `dotf lane init` for a second repository whose basename matches one already initialised under the same `WORKTREE_ROOT` fails with an error naming the path and the repository it belongs to, and leaves the first repository's lanes and metadata untouched.
+- [x] AC4: `lane.Identity(path)` returns the recorded name for a lane, and `("", false)` for a worktree without a record, a main checkout, and a path outside any repository, with no error for those three.
+- [x] AC5: Every other case in `cli/internal/hooks/lane_guard_test.go` and `cli/internal/lane` passes unchanged; the guard no longer reads `canonical_lanes`.
 
 ## References
 
 - Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
-- Related: #3262 (doctor), #3293 (worktree identity), #3307 (lease deleted by `git clean`), `specs/archive/HARNESS-186-named-lanes-sticky-personas/`
+- Related: #3262 (doctor), #3293 (worktree identity), #3307 (lease deleted by `git clean`), #3318 (same-basename layout), `specs/archive/HARNESS-186-named-lanes-sticky-personas/`
 - Runbook: `docs/runbooks/guide-persistent-named-lanes.md`

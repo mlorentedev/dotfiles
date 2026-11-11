@@ -97,8 +97,7 @@ was this ambiguity, not a missing feature.
   (`changed=3`). Until then rule 5b does not fire for them; nothing else changes.
 - Two repositories sharing a basename under one `WORKTREE_ROOT` can no longer
   share lanes by accident; they cannot both have lanes either, until a layout
-  that keys the lane directory on more than the basename exists (follow-up
-  filed from HARNESS-187).
+  that keys the lane directory on more than the basename exists (#3318).
 - The lease (`.dotf-worktree.json`) stays in the worktree and stays deletable by
   `git clean -fdx` (#3307). This record is identity, not state: moving the lease
   is a separate decision.
@@ -115,4 +114,4 @@ was this ambiguity, not a missing feature.
 - [ADR-057](adr-057-project-workspace-boundary-and-worktree-roots.md): the worktree roots a lane may occupy.
 - `docs/runbooks/guide-persistent-named-lanes.md`: the operational guide, including the re-init step.
 - `specs/archive/HARNESS-187-lane-identity-git-dir/`: measurements and acceptance.
-- #3261, #3262, #3293, #3307.
+- #3261, #3262, #3293, #3307, #3318.

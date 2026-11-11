@@ -3,35 +3,35 @@
     "id": "HARNESS-187-lane-identity-git-dir-f1",
     "behavior": "AC1: lane init records the lane name in each lane's git admin dir and a second run changes nothing",
     "verification": "cd cli && go test ./internal/lane/ -run 'TestLaneInitRecordsTheIdentityInEachLanesGitDir$' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "PASS on 3ab5bf01 (TestLaneInitRecordsTheIdentityInEachLanesGitDir, 2026-11-11)"
   },
   {
     "id": "HARNESS-187-lane-identity-git-dir-f2",
     "behavior": "AC2: the guard blocks a registered lane without a lease whatever its leaf is, and never blocks an unregistered directory by its name",
     "verification": "cd cli && go test ./internal/hooks/ -run 'TestPreCommitLaneGuard$' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "PASS on 5f63936f (TestPreCommitLaneGuard case 10 rewritten: unregistered name passes, record blocks through a real pre-commit hook, block survives worktree move)"
   },
   {
     "id": "HARNESS-187-lane-identity-git-dir-f3",
     "behavior": "AC3: lane init refuses a lane directory that is a worktree of another repository and leaves that repository's lanes untouched",
     "verification": "cd cli && go test ./internal/lane/ -run 'TestLaneInitRefusesALaneDirectoryOfAnotherRepository$' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "PASS on 3ab5bf01 (TestLaneInitRefusesALaneDirectoryOfAnotherRepository; also TestLaneInitRefusesAPlainDirectoryAtALanePath)"
   },
   {
     "id": "HARNESS-187-lane-identity-git-dir-f4",
     "behavior": "AC4: lane.Identity answers the recorded name for a lane and (\"\", false) with no error for a worktree without a record, a main checkout and a path outside any repository",
     "verification": "cd cli && go test ./internal/lane/ -run 'TestIdentity_' -count=1",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "PASS on 47df0b33 (TestIdentity_ReadsTheRecordFromTheWorktreeGitDir, TestWriteIdentity_IsIdempotent)"
   },
   {
     "id": "HARNESS-187-lane-identity-git-dir-f5",
     "behavior": "AC5: every other guard and lane case passes and the guard no longer reads canonical_lanes",
     "verification": "cd cli && go test ./internal/hooks/ ./internal/lane/ -count=1 && ! grep -q canonical_lanes ../git-hooks/lib/lane-guard.sh",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "PASS on 5f63936f: both packages ok, grep canonical_lanes on the guard exits 1"
   }
 ]

@@ -13,34 +13,37 @@ owner: manu
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] AC1 (record per lane, `changed=0` on re-run) -> commit `3ab5bf01` / `TestLaneInitRecordsTheIdentityInEachLanesGitDir`, `TestLaneInitRestoresADeletedIdentityRecord` (1 then 0), `TestLaneInitIdempotent` unchanged.
+- [x] AC2 (guard blocks by record whatever the leaf; never by name) -> commit `5f63936f` / `TestPreCommitLaneGuard` case 10: an unleased worktree named `spike-lane` passes; with `lane.LaneIdentityFile` written into its git admin dir a real `git commit` with the guard installed as `pre-commit` (through `core.hooksPath`) is refused naming `lease metadata` and `spike-lane`; after `git worktree move` to `not-a-lane-name` it is still refused.
+- [x] AC3 (second repository with the same basename refused, first untouched) -> commit `3ab5bf01` / `TestLaneInitRefusesALaneDirectoryOfAnotherRepository` (error names the lane path and the first repository; its metadata byte-identical; `HasNamedLanes(second)` false), `TestLaneInitRefusesAPlainDirectoryAtALanePath`.
+- [x] AC4 (`lane.Identity` contract) -> commit `47df0b33` / `TestIdentity_ReadsTheRecordFromTheWorktreeGitDir` (lane, after move, no record, main checkout, outside git), `TestWriteIdentity_IsIdempotent` (main checkout refused).
+- [x] AC5 (other cases pass, guard reads no `canonical_lanes`) -> `go test ./internal/hooks/ ./internal/lane/` ok on `5f63936f`; `grep -c canonical_lanes git-hooks/lib/lane-guard.sh` prints `0`.
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: `cd cli && go test ./internal/hooks/ ./internal/lane/ -count=1` -> `ok` both packages (hooks 4.9s, lane 30.3s, 2026-11-11).
+- `features.json`: f1..f5 all PASS, run one by one from `cli/` on `437eb1ed`.
+- Static: `go build ./... && go vet ./... && GOOS=windows go vet ./...` clean; `golangci-lint run ./...` and `GOOS=windows golangci-lint run ./...` at the pinned 2.12.2 report `0 issues` (cache clean refused, another session held the cache; no finding to dismiss); `shellcheck -s sh` and `sh -n` on the guard clean; `dotf lessons fmt` formatted 0 files.
+- Manual smoke test: the record's lifecycle (`worktree move`, `gc`, `repair`, `remove`, `rm -rf` + `prune`, re-create, `clean -fdx`) was measured on a scratch repository before the spec was written; the Go tests repeat the `move` leg. Not re-run on a live lane: this box's lanes are provisioned by the release binary and get their record when `dotf lane init` runs after the release.
+- No regressions in existing test suite: yes. Case 10 of the guard test changed meaning by design (proposal, Risks).
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
+- `HasNamedLanes` gained the same membership check as `provisionLane`. The AC3 test asserted the second repository must not believe it has lanes, and the only caller (`handoff.go`) routes work into the primary lane on a true answer, so a path-only answer there was the same defect one call later. Cost: two git invocations on the handoff path.
+- `Identity` treats a git exit error as "not a repository" and only a failure to run git as an error. `rev-parse` exits 128 both for a path outside any repository and for a nonexistent one; the spec wants `("", false, nil)` for the first, and a nonexistent path is not a lane either.
+- The guard absolutises `git_dir` with the same `case` the script already used for `common_dir`, rather than switching to `--absolute-git-dir`: one idiom in the file, and `--path-format` needs git 2.31 while the existing pattern needs nothing.
 
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-579-a-directory-name-is-not-an-identity.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-061-lane-identity-in-the-worktree-git-dir.md
+- [x] New pattern candidate for `00_meta/patterns/`? no: one project's lane system; the lesson carries the transferable rule and no second project has lanes yet.
 
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
 - [ ] Folder moved: `specs/HARNESS-187-lane-identity-git-dir/` -> `specs/archive/HARNESS-187-lane-identity-git-dir/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
