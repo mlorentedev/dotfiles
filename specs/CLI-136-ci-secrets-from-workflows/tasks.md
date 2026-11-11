@@ -25,25 +25,25 @@ owner: manu
 
 Package `cli/internal/secrets` (`ciwf.go`): pure functions over workflow bytes, then the fleet walk behind a reader seam, then the command.
 
-- [ ] [P] [AC1] Failing test: `workflowReads` collects `secrets.X`, `secrets['X']`, `secrets["X"]` from a workflow, excluding `GITHUB_TOKEN`; a caller's explicit mapping yields the name it maps from
-- [ ] [AC1] Implement `workflowReads`
-- [ ] [P] [AC4] Failing test: `toJSON(secrets)` and `secrets[matrix.k]` come back as unknown with the expression, not as names
-- [ ] [AC4] Implement the unknown branch
-- [ ] [P] [AC2] [AC5] Failing test: a job `uses: owner/repo/.github/workflows/w.yml@sha` with `secrets: inherit` yields the callee's `on.workflow_call.secrets` keys, each marked required or optional; a bare `on:` key parses as the string (go.yaml.in/yaml/v3)
-- [ ] [AC2] [AC5] Implement `inheritedCalls` and `calleeSecrets`
-- [ ] [AC1] [AC2] [AC3] [AC5] Failing test: `CheckRepo` against a fake reader and a registry diffs the read set with `SelectCI`'s upload list into missing (optional ones marked), excess and unknown
-- [ ] [AC1] [AC2] [AC3] [AC5] Implement `CheckRepo` (callee fetched once per workflow and ref)
-- [ ] [AC1] Command `dotf secrets ci-check [--repo]...`: per-repository report, names only, non-zero exit on missing or excess; the fleet from `gh repo list` when no `--repo` is given
-- [ ] [AC1] Live run over the fleet, with the output recorded in `verification.md`
+- [x] [P] [AC1] Failing test: `workflowReads` collects `secrets.X`, `secrets['X']`, `secrets["X"]` from a workflow, excluding `GITHUB_TOKEN`; a caller's explicit mapping yields the name it maps from
+- [x] [AC1] Implement `workflowReads`
+- [x] [P] [AC4] Failing test: `toJSON(secrets)` and `secrets[matrix.k]` come back as unknown with the expression, not as names
+- [x] [AC4] Implement the unknown branch
+- [x] [P] [AC2] [AC5] Failing test: a job `uses: owner/repo/.github/workflows/w.yml@sha` with `secrets: inherit` yields the callee's `on.workflow_call.secrets` keys, each marked required or optional; a bare `on:` key parses as the string (go.yaml.in/yaml/v3)
+- [x] [AC2] [AC5] Implement `inheritedCalls` and `calleeSecrets`
+- [x] [AC1] [AC2] [AC3] [AC5] Failing test: `CheckRepo` against a fake reader and a registry diffs the read set with `SelectCI`'s upload list into missing (optional ones marked), excess and unknown
+- [x] [AC1] [AC2] [AC3] [AC5] Implement `CheckRepo` (callee fetched once per workflow and ref)
+- [x] [AC1] Command `dotf secrets ci-check [--repo]...`: per-repository report, names only, non-zero exit on missing or excess; the fleet from `gh repo list` when no `--repo` is given
+- [x] [AC1] Live run over the fleet, with the output recorded in `verification.md`
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
 - [ ] PR opened referencing this spec folder
 
 ## Machine-readable features
