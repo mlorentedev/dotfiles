@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -268,7 +267,7 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 // ResolveMainRepoRoot returns the main superproject repository root directory,
 // even when dir is inside a linked worktree or a subdirectory of one.
 func ResolveMainRepoRoot(dir string) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "--git-common-dir")
+	cmd := gitIn(dir, "rev-parse", "--git-common-dir")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("resolving git common dir: %w", err)
@@ -287,7 +286,7 @@ func ResolveMainRepoRoot(dir string) (string, error) {
 // ResolveWorktreeRoot returns the root directory of the worktree containing dir,
 // even when dir is a subdirectory inside that worktree.
 func ResolveWorktreeRoot(dir string) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel")
+	cmd := gitIn(dir, "rev-parse", "--show-toplevel")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("resolving worktree toplevel: %w", err)

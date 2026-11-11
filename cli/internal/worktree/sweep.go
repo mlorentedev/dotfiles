@@ -3,7 +3,6 @@ package worktree
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,7 +23,7 @@ type RealSweepRunner struct {
 }
 
 func (r *RealSweepRunner) WorktreeRemove(repoRoot, worktreePath string) error {
-	cmd := exec.Command("git", "-C", repoRoot, "worktree", "remove", worktreePath)
+	cmd := gitIn(repoRoot, "worktree", "remove", worktreePath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree remove failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
@@ -32,7 +31,7 @@ func (r *RealSweepRunner) WorktreeRemove(repoRoot, worktreePath string) error {
 }
 
 func (r *RealSweepRunner) WorktreeRemoveForce(repoRoot, worktreePath string) error {
-	cmd := exec.Command("git", "-C", repoRoot, "worktree", "remove", "--force", worktreePath)
+	cmd := gitIn(repoRoot, "worktree", "remove", "--force", worktreePath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree remove --force failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
@@ -41,7 +40,7 @@ func (r *RealSweepRunner) WorktreeRemoveForce(repoRoot, worktreePath string) err
 
 func (r *RealSweepRunner) BranchDelete(repoRoot, branch string) (string, error) {
 	// First resolve exact full SHA for instant recovery logging (AC5)
-	shaCmd := exec.Command("git", "-C", repoRoot, "rev-parse", branch)
+	shaCmd := gitIn(repoRoot, "rev-parse", branch)
 	shaOut, err := shaCmd.Output()
 	sha := strings.TrimSpace(string(shaOut))
 	if err != nil || sha == "" {
@@ -51,7 +50,7 @@ func (r *RealSweepRunner) BranchDelete(repoRoot, branch string) (string, error) 
 	// Log before deletion for instant undoability (AC5)
 	_, _ = fmt.Fprintf(os.Stderr, "Deleting branch %s (was %s)\n", branch, sha)
 
-	delCmd := exec.Command("git", "-C", repoRoot, "branch", "-D", branch)
+	delCmd := gitIn(repoRoot, "branch", "-D", branch)
 	if out, err := delCmd.CombinedOutput(); err != nil {
 		return sha, fmt.Errorf("git branch -D failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
@@ -59,7 +58,7 @@ func (r *RealSweepRunner) BranchDelete(repoRoot, branch string) (string, error) 
 }
 
 func (r *RealSweepRunner) WorktreePrune(repoRoot string) error {
-	cmd := exec.Command("git", "-C", repoRoot, "worktree", "prune")
+	cmd := gitIn(repoRoot, "worktree", "prune")
 	return cmd.Run()
 }
 
@@ -431,7 +430,7 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 	if baseRef == "" {
 		baseRef = "HEAD"
 	}
-	if err := exec.Command("git", "-C", info.Path, "checkout", "--detach", baseRef).Run(); err != nil {
+	if err := gitIn(info.Path, "checkout", "--detach", baseRef).Run(); err != nil {
 		if info.Metadata != nil {
 			_ = SaveMetadata(info.Path, *info.Metadata)
 		}

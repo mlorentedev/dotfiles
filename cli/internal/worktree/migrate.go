@@ -3,7 +3,6 @@ package worktree
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -98,7 +97,7 @@ func moveWorktree(repoRoot string, m Move) error {
 	if err := os.MkdirAll(filepath.Dir(m.To), 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", filepath.Dir(m.To), err)
 	}
-	if out, err := exec.Command("git", "-C", repoRoot, "worktree", "move", m.From, m.To).CombinedOutput(); err != nil {
+	if out, err := gitIn(repoRoot, "worktree", "move", m.From, m.To).CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree move failed: %s", strings.TrimSpace(string(out)))
 	}
 	return nil

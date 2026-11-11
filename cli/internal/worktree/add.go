@@ -3,7 +3,6 @@ package worktree
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -72,7 +71,7 @@ var remoteBaseRefs = []string{"origin/HEAD", "origin/main", "origin/master"}
 func (r *RealAddRunner) DefaultBase(repo string) (string, error) {
 	// A failed fetch (offline) still leaves the last-fetched refs, which are a
 	// better base than none; say so instead of refusing.
-	if out, err := exec.Command("git", "-C", repo, "fetch", "--quiet", "origin").CombinedOutput(); err != nil {
+	if out, err := gitIn(repo, "fetch", "--quiet", "origin").CombinedOutput(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "warning: git fetch origin failed, using the last-fetched refs: %s\n", strings.TrimSpace(string(out)))
 	}
 	if ref := firstRef(repo, remoteBaseRefs); ref != "" {
@@ -92,12 +91,12 @@ func firstRef(repo string, refs []string) string {
 }
 
 func (r *RealAddRunner) WorktreeAdd(repo, target, branch, base string) error {
-	args := []string{"-C", repo, "worktree", "add", target, "-b", branch}
+	args := []string{"worktree", "add", target, "-b", branch}
 	if base != "" {
 		args = append(args, base)
 	}
 
-	cmd := exec.Command("git", args...)
+	cmd := gitIn(repo, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree add failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
@@ -112,8 +111,8 @@ func (r *RealAddRunner) ExistingBranch(repo, branch string) (string, bool) {
 	// answer, even over a stale remote ref; an unreachable origin leaves the
 	// last-fetched ref as the best one.
 	// LC_ALL=C: the message is matched, and git translates it.
-	fetch := exec.Command("git", "-C", repo, "fetch", "--quiet", "origin", "refs/heads/"+branch+":refs/remotes/origin/"+branch)
-	fetch.Env = append(os.Environ(), "LC_ALL=C")
+	fetch := gitIn(repo, "fetch", "--quiet", "origin", "refs/heads/"+branch+":refs/remotes/origin/"+branch)
+	fetch.Env = append(fetch.Env, "LC_ALL=C")
 	out, err := fetch.CombinedOutput()
 	if err != nil && strings.Contains(string(out), "couldn't find remote ref") {
 		return "", false
@@ -128,18 +127,18 @@ func (r *RealAddRunner) ExistingBranch(repo, branch string) (string, bool) {
 }
 
 func (r *RealAddRunner) WorktreeAttach(repo, target, branch, remote string) error {
-	args := []string{"-C", repo, "worktree", "add", target, branch}
+	args := []string{"worktree", "add", target, branch}
 	if remote != "" {
-		args = []string{"-C", repo, "worktree", "add", "--track", "-b", branch, target, remote + "/" + branch}
+		args = []string{"worktree", "add", "--track", "-b", branch, target, remote + "/" + branch}
 	}
-	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+	if out, err := gitIn(repo, args...).CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree add failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
 func (r *RealAddRunner) WorktreeAddDetached(repo, target, commit string) error {
-	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "--detach", target, commit).CombinedOutput(); err != nil {
+	if out, err := gitIn(repo, "worktree", "add", "--detach", target, commit).CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree add --detach failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
@@ -439,7 +438,7 @@ func ensureExclude(repoRoot, pattern string) {
 // CheckAutoCommitHooks detects if git hooks or plugin configs specify auto-commit behavior (Gate A).
 func CheckAutoCommitHooks(repoRoot string) string {
 	hooksDir := filepath.Join(repoRoot, ".git", "hooks")
-	if out, err := exec.Command("git", "-C", repoRoot, "config", "--local", "--get", "core.hooksPath").Output(); err == nil {
+	if out, err := gitIn(repoRoot, "config", "--local", "--get", "core.hooksPath").Output(); err == nil {
 		p := strings.TrimSpace(string(out))
 		if p != "" {
 			hooksDir = p
