@@ -1,0 +1,27 @@
+version: 1
+run_id: "review-20261111t0740z"
+armed_by: manu
+armed_at: 2026-11-11T07:40:31Z
+expires_at: 2026-11-11T19:40:31Z
+objective: "Advance the spec-review and merge-gate line: prepare the merge-grant path exclusion for the owner, spec and fix the review-base range (#3258, #1551), then further tickets of the same line."
+branch: chore/autopilot-review-20261111t0740z
+scope:
+  write_paths: ["cli/**", "specs/**", "docs/**", ".agent/**", ".github/merge-grant.yml"]
+  frozen_paths: ["harness/**", ".github/workflows/**", "**/AGENTS.md", "versions.conf"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, jq]
+queue:
+  source: bitacora
+  filter: "dotfiles spec review / review gate / merge gate issues: #3258, #1551, #1511, merge-grant exclusion"
+  max_items: 5
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+notes: ".github/merge-grant.yml PR is prepared only: a PR that changes the grant is never merged under it."
