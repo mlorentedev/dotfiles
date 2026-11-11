@@ -124,7 +124,11 @@ type SweepReport struct {
 	// MergeUnknownSkips names each worktree kept only because the forge could
 	// not say whether its branch landed (#2873).
 	MergeUnknownSkips []SessionSkip `json:"merge_unknown_skips,omitempty"`
-	DryRun            bool          `json:"dry_run"`
+	// LaneSkips names each named lane counted in SkippedCount that sweep did
+	// not park, with the reason: a dirty tree, a landing it could not confirm,
+	// or a detach git refused (#3263).
+	LaneSkips []SessionSkip `json:"lane_skips,omitempty"`
+	DryRun    bool          `json:"dry_run"`
 	// ProcessDiscovery is false when Gate f has no implementation on this
 	// platform and is therefore refusing everything. Reported because an inert
 	// sweep prints "reaped 0" exactly like a machine with nothing to clean up,
@@ -347,10 +351,11 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 				report.Reaped = append(report.Reaped, info)
 				continue
 			}
-			if parkSingleNamedLane(opts.RepoRoot, info, runner, opts.LandedHeads) {
+			if parked, why := parkSingleNamedLane(opts.RepoRoot, info, runner, opts.LandedHeads); parked {
 				report.Reaped = append(report.Reaped, info)
 			} else {
 				report.SkippedCount++
+				report.LaneSkips = append(report.LaneSkips, SessionSkip{Path: info.Path, Reason: why})
 			}
 			continue
 		}
@@ -388,22 +393,12 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	return report, nil
 }
 
-func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) bool {
+func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (parked bool, why string) {
 	if isDirty(info.Path, runner) {
-		return false
+		return false, "has uncommitted changes or untracked files"
 	}
-	if !isMerged(repoRoot, info.Branch, runner) {
-		heads := landedHeads
-		if heads == nil {
-			heads = mergedPRHeads
-		}
-		if _, _, landed, _ := branchLanding(repoRoot, info.Path, heads); !landed {
-			return false
-		}
-	} else if landedHeads != nil {
-		if _, _, landed, _ := branchLanding(repoRoot, info.Path, landedHeads); !landed {
-			return false
-		}
+	if landed, why := laneLanded(repoRoot, info, runner, landedHeads); !landed {
+		return false, why
 	}
 	laneName := filepath.Base(info.Path)
 	createdAt := time.Now()
@@ -424,23 +419,52 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 		CreatedAt: createdAt,
 		ReapOK:    false,
 	}); err != nil {
-		return false
+		return false, "its lease could not be written: " + err.Error()
 	}
 	baseRef := resolveBaseRef(repoRoot)
 	if baseRef == "" {
 		baseRef = "HEAD"
 	}
-	if err := gitIn(info.Path, "checkout", "--detach", baseRef).Run(); err != nil {
+	if out, err := gitIn(info.Path, "checkout", "--detach", baseRef).CombinedOutput(); err != nil {
 		if info.Metadata != nil {
 			_ = SaveMetadata(info.Path, *info.Metadata)
 		}
-		return false
+		return false, "git refused to detach it: " + gitFailure(out, err)
 	}
 	_ = os.Remove(filepath.Join(info.Path, ".dotf-lane-prompt.md"))
 	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
 	releaseIssueClaimRefs(repoRoot, issueNum)
 	archiveBranchMemoryThread(repoRoot, info.Branch)
-	return true
+	return true, ""
+}
+
+// gitFailure is the first line git said when it refused, or its exit status
+// when it said nothing: the report prints one line per lane.
+func gitFailure(out []byte, err error) string {
+	if msg, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n"); msg != "" {
+		return msg
+	}
+	return err.Error()
+}
+
+// laneLanded is the landing decision parkSingleNamedLane acts on, kept apart
+// from the parking itself. Ancestry alone cannot see a squash merge, so a
+// branch git does not call merged is asked of the forge (the caller's
+// LandedHeads, or gh); a landing nobody could confirm is reported as such,
+// never resolved to "not landed".
+func laneLanded(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (bool, string) {
+	heads := landedHeads
+	if !isMerged(repoRoot, info.Branch, runner) && heads == nil {
+		heads = mergedPRHeads
+	}
+	if heads == nil {
+		return true, ""
+	}
+	_, _, landed, why := branchLanding(repoRoot, info.Path, heads)
+	if !landed && why == "" {
+		why = "its landing could not be decided"
+	}
+	return landed, why
 }
 
 func Sweep(opts SweepOptions) (*SweepReport, error) {
