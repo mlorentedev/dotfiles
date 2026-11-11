@@ -1,7 +1,7 @@
 ---
 id: "TOOL-036-system-package-upgrade"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-10"
 issue: "mlorentedev/dotfiles#3283"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

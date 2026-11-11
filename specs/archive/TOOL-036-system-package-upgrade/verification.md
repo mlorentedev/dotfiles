@@ -43,3 +43,20 @@ owner: manu
 - Every `features.json` gate (f1-f8) run from the repository root: exit 0; each entry's `evidence` names the tests that passed.
 - `cd cli && go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> exit 0, 56 packages ok; `golangci-lint cache clean && golangci-lint run` -> `0 issues.`
 - Linux and Windows acceptance against a real package manager remains a post-release run (see the smoke-test line above); the parsing for both is unit-tested against recorded listings.
+
+## Review dispositions (review.md, nan/deepseek-v4-flash, PASS-WITH-GAPS)
+
+| Finding | Disposition |
+|---|---|
+| Major, THEORETICAL: winget "nothing outdated" detected by English text | Ticketed #3343: needs a real Windows host to confirm the exit code before the fix. |
+| Minor: Linux plan without root previews nothing, yet the runbook advises the preview | Applied: `guide-self-deploy-timer.md` scopes the preview to macOS and Windows and names `apt list --upgradable` for Linux. |
+| Minor: a permanently skipping machine renders as a doctor pass | Already ticketed: #3321. |
+| Minor, REAL: no cmd-level test for `upgrade-failed` on a quiet day | Ticketed #3344 (the fixture needs a per-OS stub manager; the wiring is generic). |
+| Minor, REAL: no lesson for the #3295 Id-column defect | Applied: `docs/lessons/lesson-583-a-fixed-width-table-cell-can-impersonate-an-id.md`. |
+| Post-release Linux and Windows acceptance | Stays the declared deferral; #3343 carries the Windows run. |
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-583-a-fixed-width-table-cell-can-impersonate-an-id.md (and lesson 580 from PR 2)
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-036-install-channels.md (amended 2026-11-10: unpinned system entries upgrade, pinned entries move by PR)
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: parsing a tool's human table by header-measured columns is recorded in lesson 583; it has not recurred in another project
