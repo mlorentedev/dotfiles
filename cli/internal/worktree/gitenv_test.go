@@ -1,6 +1,10 @@
 package worktree
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -65,4 +69,83 @@ func TestFirstRef_ReadsTheNamedRepositoryWhateverGitDirSays(t *testing.T) {
 	if got := firstRef(mine, []string{"main"}); got != "main" {
 		t.Errorf("firstRef = %q, want main from the named repository", got)
 	}
+}
+
+// The destructive calls are the ones that matter: with GIT_DIR naming another
+// repository, branch -D deleted that repository's branch of the same name (#3275).
+func TestRealSweepRunner_DeletesTheBranchOfTheNamedRepositoryWhateverGitDirSays(t *testing.T) {
+	tmp := t.TempDir()
+	mine, other := filepath.Join(tmp, "mine"), filepath.Join(tmp, "other")
+	for _, repo := range []string{mine, other} {
+		gitT(t, tmp, "init", "-q", "-b", "main", repo)
+		gitT(t, repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init")
+		gitT(t, repo, "branch", "doomed")
+	}
+	t.Setenv("GIT_DIR", filepath.Join(other, ".git"))
+
+	if _, err := (&RealSweepRunner{}).BranchDelete(mine, "doomed"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Unsetenv("GIT_DIR"); err != nil { // t.Setenv above restores it
+		t.Fatal(err)
+	}
+	if out := gitT(t, other, "branch", "--list", "doomed"); !strings.Contains(out, "doomed") {
+		t.Errorf("deleted the branch of the repository GIT_DIR named")
+	}
+	if out := gitT(t, mine, "branch", "--list", "doomed"); strings.Contains(out, "doomed") {
+		t.Errorf("left the named repository's branch in place")
+	}
+}
+
+// Every git call in this package goes through gitIn, and nothing rebuilds an
+// environment from os.Environ() but gitIn: one call that does lets an inherited
+// GIT_DIR point it at another repository (#3122, #3275).
+func TestPackage_RunsGitOnlyThroughGitIn(t *testing.T) {
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if ok && fn.Name.Name == "gitIn" {
+				continue
+			}
+			ast.Inspect(decl, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				switch callee(call) {
+				case "exec.Command":
+					if lit, ok := call.Args[0].(*ast.BasicLit); ok && lit.Value == `"git"` {
+						t.Errorf("%s: exec.Command(\"git\", …) outside gitIn", fset.Position(call.Pos()))
+					}
+				case "os.Environ":
+					t.Errorf("%s: os.Environ() outside gitIn", fset.Position(call.Pos()))
+				}
+				return true
+			})
+		}
+	}
+}
+
+func callee(call *ast.CallExpr) string {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return ""
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return ""
+	}
+	return pkg.Name + "." + sel.Sel.Name
 }

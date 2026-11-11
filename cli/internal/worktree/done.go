@@ -3,7 +3,6 @@ package worktree
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -89,7 +88,7 @@ func Done(opts DoneOptions) (DoneResult, error) {
 	case !landed:
 		return DoneResult{KeptBranch: branch, KeptReason: why}, nil
 	}
-	if out, err := exec.Command("git", "-C", absRepo, "branch", "-D", branch).CombinedOutput(); err != nil {
+	if out, err := gitIn(absRepo, "branch", "-D", branch).CombinedOutput(); err != nil {
 		return DoneResult{KeptBranch: branch, KeptReason: "git branch -D failed: " + strings.TrimSpace(string(out))}, nil
 	}
 	return DoneResult{DeletedBranch: branch, DeletedSHA: tip}, nil
@@ -116,7 +115,7 @@ func Park(opts DoneOptions) (DoneResult, error) {
 	defer unlock()
 
 	// Best-effort fetch so origin/main reflects any remote PR merge before tip check (m-CODE-3).
-	_ = exec.Command("git", "-C", absRepo, "fetch", "--quiet", "origin").Run()
+	_ = gitIn(absRepo, "fetch", "--quiet", "origin").Run()
 
 	if err := checkUncommittedChanges(absWT, opts.Force); err != nil {
 		return DoneResult{}, err
@@ -165,11 +164,11 @@ func Park(opts DoneOptions) (DoneResult, error) {
 	if baseRef == "" {
 		baseRef = "HEAD"
 	}
-	detachArgs := []string{"-C", absWT, "checkout", "--detach", baseRef}
+	detachArgs := []string{"checkout", "--detach", baseRef}
 	if opts.Force {
-		detachArgs = []string{"-C", absWT, "checkout", "--force", "--detach", baseRef}
+		detachArgs = []string{"checkout", "--force", "--detach", baseRef}
 	}
-	if out, err := exec.Command("git", detachArgs...).CombinedOutput(); err != nil {
+	if out, err := gitIn(absWT, detachArgs...).CombinedOutput(); err != nil {
 		if meta != nil {
 			_ = SaveMetadata(absWT, *meta)
 		}
@@ -187,7 +186,7 @@ func Park(opts DoneOptions) (DoneResult, error) {
 		return DoneResult{KeptBranch: branch, KeptReason: why}, nil
 	}
 	_, _ = fmt.Fprintf(os.Stderr, "Deleting branch %s (was %s)\n", branch, tip)
-	if out, err := exec.Command("git", "-C", absRepo, "branch", "-D", branch).CombinedOutput(); err != nil {
+	if out, err := gitIn(absRepo, "branch", "-D", branch).CombinedOutput(); err != nil {
 		return DoneResult{KeptBranch: branch, KeptReason: "git branch -D failed: " + strings.TrimSpace(string(out))}, nil
 	}
 	return DoneResult{DeletedBranch: branch, DeletedSHA: tip}, nil
@@ -200,18 +199,18 @@ func releaseIssueClaimRefs(absRepo string, issueNum int) {
 	}
 	claimRef := fmt.Sprintf("refs/dotf/claims/%d", issueNum)
 	seenRef := fmt.Sprintf("refs/dotf/seen/%d", issueNum)
-	expectedOut, _ := exec.Command("git", "-C", absRepo, "rev-parse", "--verify", "--quiet", seenRef).Output()
+	expectedOut, _ := gitIn(absRepo, "rev-parse", "--verify", "--quiet", seenRef).Output()
 	expectedSHA := strings.TrimSpace(string(expectedOut))
 	if expectedSHA == "" {
-		claimOut, _ := exec.Command("git", "-C", absRepo, "rev-parse", "--verify", "--quiet", claimRef).Output()
+		claimOut, _ := gitIn(absRepo, "rev-parse", "--verify", "--quiet", claimRef).Output()
 		expectedSHA = strings.TrimSpace(string(claimOut))
 	}
-	_ = exec.Command("git", "-C", absRepo, "update-ref", "-d", claimRef).Run()
-	_ = exec.Command("git", "-C", absRepo, "update-ref", "-d", seenRef).Run()
+	_ = gitIn(absRepo, "update-ref", "-d", claimRef).Run()
+	_ = gitIn(absRepo, "update-ref", "-d", seenRef).Run()
 	if expectedSHA != "" {
-		_ = exec.Command("git", "-C", absRepo, "push", "--quiet", "--no-verify", "--force-with-lease="+claimRef+":"+expectedSHA, "origin", ":"+claimRef).Run()
+		_ = gitIn(absRepo, "push", "--quiet", "--no-verify", "--force-with-lease="+claimRef+":"+expectedSHA, "origin", ":"+claimRef).Run()
 	} else {
-		_ = exec.Command("git", "-C", absRepo, "push", "--quiet", "--no-verify", "origin", ":"+claimRef).Run()
+		_ = gitIn(absRepo, "push", "--quiet", "--no-verify", "origin", ":"+claimRef).Run()
 	}
 }
 
@@ -231,7 +230,7 @@ func archiveBranchMemoryThread(absRepo, branch string) {
 // branchLanding reads the worktree's branch and tip, and whether that tip has
 // landed. A detached HEAD has no branch to delete; neither has main or master.
 func branchLanding(absRepo, absWT string, heads LandedHeads) (branch, tip string, landed bool, why string) {
-	out, err := exec.Command("git", "-C", absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+	out, err := gitIn(absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 	if err != nil {
 		return "", "", false, ""
 	}
@@ -239,11 +238,11 @@ func branchLanding(absRepo, absWT string, heads LandedHeads) (branch, tip string
 	if branch == "main" || branch == "master" {
 		return "", "", false, ""
 	}
-	if out, err = exec.Command("git", "-C", absWT, "rev-parse", "HEAD").Output(); err != nil {
+	if out, err = gitIn(absWT, "rev-parse", "HEAD").Output(); err != nil {
 		return branch, "", false, "its tip could not be read"
 	}
 	tip = strings.TrimSpace(string(out))
-	if base := resolveBaseRef(absRepo); base != "" && exec.Command("git", "-C", absRepo, "merge-base", "--is-ancestor", tip, base).Run() == nil {
+	if base := resolveBaseRef(absRepo); base != "" && gitIn(absRepo, "merge-base", "--is-ancestor", tip, base).Run() == nil {
 		return branch, tip, true, ""
 	}
 	if ok, err := landedInMergedPR(absWT, branch, tip, heads); ok {
@@ -357,7 +356,7 @@ func checkUnpushedCommits(absRepo, absWT string, force bool, heads LandedHeads) 
 		return nil
 	}
 	// Check if upstream tracking branch is configured
-	upstreamCmd := exec.Command("git", "-C", absWT, "rev-parse", "--symbolic-full-name", "@{u}")
+	upstreamCmd := gitIn(absWT, "rev-parse", "--symbolic-full-name", "@{u}")
 	if err := upstreamCmd.Run(); err == nil {
 		count, err := countRevList(absWT, "@{u}..HEAD")
 		if err != nil {
@@ -398,11 +397,11 @@ func checkUnpushedCommits(absRepo, absWT string, force bool, heads LandedHeads) 
 // landedOnMergedPR asks landedInMergedPR about the worktree's own branch and
 // tip. A detached HEAD names no pull request and answers no.
 func landedOnMergedPR(absWT string, heads LandedHeads) (bool, error) {
-	branch, err := exec.Command("git", "-C", absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+	branch, err := gitIn(absWT, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 	if err != nil {
 		return false, nil //nolint:nilerr // detached: no branch, no pull request
 	}
-	tip, err := exec.Command("git", "-C", absWT, "rev-parse", "HEAD").Output()
+	tip, err := gitIn(absWT, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return false, err
 	}
@@ -410,7 +409,7 @@ func landedOnMergedPR(absWT string, heads LandedHeads) (bool, error) {
 }
 
 func countRevList(dir, revRange string) (int, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-list", revRange, "--count").Output()
+	out, err := gitIn(dir, "rev-list", revRange, "--count").Output()
 	if err != nil {
 		return 0, err
 	}
@@ -429,14 +428,14 @@ func resolveBaseRef(repoDir string) string {
 }
 
 func removeWorktree(absRepo, absWT string, force bool) error {
-	args := []string{"-C", absRepo, "worktree", "remove", absWT}
+	args := []string{"worktree", "remove", absWT}
 	if force {
 		args = append(args, "--force")
 	}
-	cmd := exec.Command("git", args...)
+	cmd := gitIn(absRepo, args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree remove failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
-	_ = exec.Command("git", "-C", absRepo, "worktree", "prune").Run()
+	_ = gitIn(absRepo, "worktree", "prune").Run()
 	return nil
 }
