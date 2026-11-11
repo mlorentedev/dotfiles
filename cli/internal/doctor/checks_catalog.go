@@ -40,17 +40,17 @@ func readPackageCatalog(sys *System, cfg *Config) (tools.Catalog, string, error)
 	return tools.Catalog{}, "", unreadable
 }
 
-// catalogPin returns the packages.json pin for name, or "" when the catalog or
-// the tool is absent. packages.json is the pin SSOT for every catalog tool
-// (bw, sops, and since AI-034/#1294 opencode); versions.conf keeps only the
-// pins the shell layer still consumes.
+// catalogPin returns the pin for name: packages.json's for a catalog tool
+// (sops, and since AI-034/#1294 opencode), else the <NAME>_VERSION pin in
+// versions.conf, where a tool mise installs keeps it (#2438: bw, copilot,
+// opencode and yarn moved to mise's npm backend). "" when neither holds it.
 func catalogPin(sys *System, cfg *Config, name string) string {
 	for _, t := range loadCatalog(sys, cfg).Tools {
 		if t.Name == name {
 			return t.Version
 		}
 	}
-	return ""
+	return cfg.Versions[strings.ToUpper(strings.ReplaceAll(name, "-", "_"))+"_VERSION"]
 }
 
 // checkShadowedCatalogTools reports an npm-distributed catalog tool that
