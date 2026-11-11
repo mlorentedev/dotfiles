@@ -69,8 +69,8 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		repo, info, tip := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
 
-		if !parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
-			t.Fatal("did not park a lane whose tip is the head of a merged pull request")
+		if parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads); !parked {
+			t.Fatalf("did not park a lane whose tip is the head of a merged pull request: %s", why)
 		}
 		if got := laneState(t, info.Path); got != "PARKED" {
 			t.Errorf("state = %q, want PARKED", got)
@@ -84,8 +84,12 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		repo, info, _ := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return nil, errors.New("forge unreachable") }
 
-		if parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
 			t.Fatal("parked a lane although nothing could say it landed")
+		}
+		if !strings.Contains(why, "could not check for a merged pull request") || !strings.Contains(why, "forge unreachable") {
+			t.Errorf("reason %q does not say the landing could not be checked, nor why", why)
 		}
 		if got := laneState(t, info.Path); got != "ACTIVE" {
 			t.Errorf("state = %q, want ACTIVE", got)
@@ -101,8 +105,12 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
 			t.Fatal("parked a lane holding an untracked file")
+		}
+		if !strings.Contains(why, "uncommitted") {
+			t.Errorf("reason %q does not name the dirty tree", why)
 		}
 		if got := laneState(t, info.Path); got != "ACTIVE" {
 			t.Errorf("state = %q, want ACTIVE", got)
@@ -121,8 +129,12 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
 			t.Fatal("reported a lane as parked although its checkout could not detach")
+		}
+		if !strings.Contains(why, "detach") || !strings.Contains(why, "index.lock") {
+			t.Errorf("reason %q does not name the refused detach and git's error", why)
 		}
 		if got := laneState(t, info.Path); got == "PARKED" {
 			t.Error("state left PARKED on a lane that is still on its branch")
@@ -131,4 +143,39 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 			t.Errorf("HEAD = %q, want the lane's branch", got)
 		}
 	})
+}
+
+// The part of #3263 that #3310 left open: a lane sweep did not park was one
+// more in the skipped count, and the reason parkSingleNamedLane had already
+// computed was dropped. The report names the lane and the reason.
+func TestSweepReportsALaneItDidNotPark(t *testing.T) {
+	withHostProcessInside(t, false)
+	repo, info, tip := parkLaneFixture(t)
+	// Landed on main, so sweep classifies the lane as parkable; the held
+	// index lock then makes the detach fail while status still reads clean.
+	runGitParkTest(t, repo, "merge", "--ff-only", "feat/lane-a")
+	runGitParkTest(t, repo, "push", "origin", "main")
+	gitDir := runGitParkTest(t, info.Path, "rev-parse", "--absolute-git-dir")
+	if err := os.WriteFile(filepath.Join(gitDir, "index.lock"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot:    repo,
+		LockPath:    filepath.Join(t.TempDir(), "sweep.lock"),
+		LandedHeads: func(_, _ string) ([]string, error) { return []string{tip}, nil },
+	}, &RealSweepRunner{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Reaped) != 0 {
+		t.Fatalf("reaped %v: want nothing", report.Reaped)
+	}
+	if len(report.LaneSkips) != 1 || !samePath(report.LaneSkips[0].Path, info.Path) ||
+		!strings.Contains(report.LaneSkips[0].Reason, "detach") || !strings.Contains(report.LaneSkips[0].Reason, "index.lock") {
+		t.Errorf("LaneSkips = %+v: want %s with the refused detach as the reason", report.LaneSkips, info.Path)
+	}
+	if got := laneState(t, info.Path); got != "ACTIVE" {
+		t.Errorf("state = %q, want ACTIVE", got)
+	}
 }
