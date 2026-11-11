@@ -124,10 +124,15 @@ func TestPackage_RunsGitOnlyThroughGitIn(t *testing.T) {
 				if !ok {
 					return true
 				}
-				switch callee(call) {
-				case "exec.Command":
-					if lit, ok := call.Args[0].(*ast.BasicLit); ok && lit.Value == `"git"` {
-						t.Errorf("%s: exec.Command(\"git\", …) outside gitIn", fset.Position(call.Pos()))
+				switch name := callee(call); name {
+				case "exec.Command", "exec.CommandContext":
+					prog := call.Args[0]
+					if name == "exec.CommandContext" {
+						prog = call.Args[1]
+					}
+					// A program named by a variable could be git: only a literal proves it is not.
+					if lit, ok := prog.(*ast.BasicLit); !ok || lit.Value == `"git"` {
+						t.Errorf("%s: %s runs git, or a program this test cannot name, outside gitIn", fset.Position(call.Pos()), name)
 					}
 				case "os.Environ":
 					t.Errorf("%s: os.Environ() outside gitIn", fset.Position(call.Pos()))
