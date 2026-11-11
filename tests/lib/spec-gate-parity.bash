@@ -7,7 +7,7 @@
 
 SPEC_GATE_SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-spec-gate.sh"
 
-# spec_gate_both [script args...]: run the script under zsh and bash, then,
+# spec_gate_both [script args...]: run the script under zsh and bash and,
 # when the arguments name both refs, `dotf gate spec` on an event built from
 # the same SDD_* environment. Requires the same status and, short of exit 2
 # (the two word a wiring error differently), the same output. Leaves the
@@ -15,38 +15,52 @@ SPEC_GATE_SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-spec-gate.sh"
 #
 # The dotf leg runs with no token and a PATH holding git alone, so a gh call
 # cannot succeed and would show as a disagreement (AC3). The adjacency report
-# is PR 3's: a run that asks for it skips the dotf leg.
+# is PR 3's: a run that asks for it, or for --help, skips the dotf leg; a
+# flag the helper does not map fails unless the script rejects it too.
 # shellcheck disable=SC2154  # bats' run assigns status and output
 spec_gate_both() {
-    run_both_shells "$SPEC_GATE_SCRIPT" "$@" || return 1
-    local sh_status="$status" sh_output="$output"
-    local base="" head="" extra=""
+    local base="" head="" skip=""
+    local -a flags=() a=("$@")
     while [ $# -gt 0 ]; do
         case "$1" in
             --base-ref) base="$2"; shift 2 ;;
             --head-ref) head="$2"; shift 2 ;;
-            --threshold) extra="$extra --threshold $2"; shift 2 ;;
-            --explain) extra="$extra --explain"; shift ;;
-            --adjacency-issues) return 0 ;;
-            *) return 0 ;;
+            --threshold) flags+=(--threshold "$2"); shift 2 ;;
+            --explain) flags+=(--explain); shift ;;
+            --adjacency-issues | --help) skip=1; shift ;;
+            *) skip=unknown; shift ;;
         esac
     done
-    [ -n "$base" ] && [ -n "$head" ] || return 0
-
-    _spec_gate_event "$BATS_TEST_TMPDIR/spec-event.json"
-    local bin="$BATS_TEST_TMPDIR/git-only"
-    mkdir -p "$bin"
-    [ -e "$bin/git" ] || ln -s "$(command -v git)" "$bin/git"
-    # $extra is flags this function built, never caller text: split on purpose.
-    # shellcheck disable=SC2086
-    run env -u GH_TOKEN -u GITHUB_TOKEN PATH="$bin" "$DOTF_BIN" gate spec \
-        --event "$BATS_TEST_TMPDIR/spec-event.json" --base "$base" --head "$head" $extra
-    local dotf_status="$status" dotf_output="$output"
-    status="$sh_status" output="$sh_output"
-    if [ "$dotf_status" != "$sh_status" ] ||
-        { [ "$sh_status" != 2 ] && [ "$(_spec_gate_common "$dotf_output")" != "$(_spec_gate_common "$sh_output")" ]; }; then
+    # The dotf leg runs first, so the script's run is the last `run` and its
+    # status and output are what the caller asserts on.
+    local dotf_status="" dotf_output=""
+    if [ -z "$skip" ] && [ -n "$base" ] && [ -n "$head" ]; then
+        _spec_gate_event "$BATS_TEST_TMPDIR/spec-event.json"
+        local bin="$BATS_TEST_TMPDIR/git-only"
+        mkdir -p "$bin"
+        [ -e "$bin/git" ] || ln -s "$(command -v git)" "$bin/git"
+        run env -u GH_TOKEN -u GITHUB_TOKEN PATH="$bin" "$DOTF_BIN" gate spec \
+            --event "$BATS_TEST_TMPDIR/spec-event.json" --base "$base" --head "$head" \
+            ${flags[@]+"${flags[@]}"}
+        dotf_status="$status" dotf_output="$output"
+    fi
+    run_both_shells "$SPEC_GATE_SCRIPT" ${a[@]+"${a[@]}"} || return 1
+    # A flag this helper does not know is only safe to skip when the script
+    # rejects it too; one it accepts means the dotf leg is missing a case.
+    if [ "$skip" = unknown ] && [ "$status" != 2 ]; then
+        printf 'spec_gate_both: the script accepted a flag this helper does not map: %s\n' "${a[*]}"
+        return 1
+    fi
+    if [ -z "$skip" ] && [ "$status" != 2 ] && { [ -n "$base" ] || [ -n "$head" ]; } &&
+        { [ -z "$base" ] || [ -z "$head" ]; }; then
+        printf 'spec_gate_both: the script ran with one ref; give both or neither\n'
+        return 1
+    fi
+    [ -n "$dotf_status" ] || return 0
+    if [ "$dotf_status" != "$status" ] ||
+        { [ "$status" != 2 ] && [ "$(_spec_gate_common "$dotf_output")" != "$(_spec_gate_common "$output")" ]; }; then
         printf 'script (%s) and dotf gate spec (%s) disagree\n--- script\n%s\n--- dotf\n%s\n' \
-            "$sh_status" "$dotf_status" "$sh_output" "$dotf_output"
+            "$status" "$dotf_status" "$output" "$dotf_output"
         return 1
     fi
 }

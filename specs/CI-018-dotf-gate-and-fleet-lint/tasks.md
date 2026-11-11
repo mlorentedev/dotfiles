@@ -48,8 +48,8 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
   by hand is compared on neither side
 - [x] [AC2] Archive-on-merge, dependency and `skip-sdd` escapes, the LOC walk and `--explain`
 - [x] [AC2] Repository slug: `GITHUB_REPOSITORY`, then origin, as the script; empty ignores qualified
-  references. The event's `repository.full_name` is not read yet: the script does not, and the parity
-  suites have no way to tell the two apart
+  references. The event's `repository.full_name` is deliberately not a third source: on a runner
+  `GITHUB_REPOSITORY` is always set and names the same repository for a `pull_request` event
 - Out of scope: `spec-gate-pr.bats` and `spec-gate-prepush.bats` test the `gh` wrappers that resolve the PR
   live; the shared composite replaces them with the event file.
 
