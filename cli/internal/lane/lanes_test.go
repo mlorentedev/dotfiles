@@ -372,6 +372,35 @@ func TestLaneInitRefusesAPlainDirectoryAtALanePath(t *testing.T) {
 	if _, serr := os.Stat(filepath.Join(lanePath, "notes.txt")); serr != nil {
 		t.Errorf("the plain directory's content was touched: %v", serr)
 	}
+	if _, serr := os.Stat(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s; the guard would be armed with no lanes", LanesMarkerFile)
+	}
+}
+
+// A lane root that denies traversal makes Lstat fail with something other
+// than absence. Reading that as "absent" would write the marker and then
+// fail to provision, so it is an error and nothing is written.
+func TestLaneInitRefusesAnUntraversableLaneRootBeforeWritingTheMarker(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Getuid() == 0 {
+		t.Skip("directory modes do not deny the owner on Windows or root")
+	}
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	repoWTRoot := filepath.Join(wtRoot, "dotfiles")
+	if err := os.MkdirAll(repoWTRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(repoWTRoot, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(repoWTRoot, 0o755) })
+
+	_, err := InitLanes(repoDir, wtRoot)
+	if err == nil || !strings.Contains(err.Error(), "inspecting") {
+		t.Fatalf("InitLanes under an untraversable lane root: err=%v, want a refusal naming the inspection", err)
+	}
+	if _, serr := os.Stat(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))); serr == nil {
+		t.Errorf("the refused init wrote %s; the guard would be armed with no lanes", LanesMarkerFile)
+	}
 }
 
 // A dangling symlink at a lane path is a directory entry os.Stat does not

@@ -3,7 +3,9 @@ package lane
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -108,21 +110,14 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 	// add refuses, and Stat would report it absent.
 	for _, name := range CanonicalLanes {
 		lanePath := filepath.Join(repoWTRoot, name)
-		if _, statErr := os.Lstat(lanePath); statErr != nil {
-			continue
-		}
-		if err := assertWorktreeOf(absRepo, gitCommonDir, lanePath); err != nil {
-			return 0, fmt.Errorf("lane init: %w", err)
+		if err := refuseStranger(absRepo, gitCommonDir, lanePath); err != nil {
+			return 0, err
 		}
 	}
 	for _, name := range []string{worktree.MetadataFileName, PromptFile} {
 		if err := excludeFile(gitCommonDir, name); err != nil {
 			return 0, err
 		}
-	}
-
-	if _, err := writeLanesMarker(absRepo); err != nil {
-		return 0, err
 	}
 
 	changed := 0
@@ -135,7 +130,31 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 			changed++
 		}
 	}
+	// The marker arms the guard, so it is written last: a provision that
+	// failed, or a record that could not be written, leaves no marker behind,
+	// and the next init adopts whatever was provisioned and retries the rest.
+	if _, err := writeLanesMarker(absRepo); err != nil {
+		return changed, err
+	}
 	return changed, nil
+}
+
+// refuseStranger is the preflight of one lane path: absent is fine, a
+// worktree of this repository is fine, anything else is refused, and an
+// entry that cannot even be inspected (a parent that denies traversal) is an
+// error rather than "absent", since provisioning would fail after the fact.
+func refuseStranger(absRepo, gitCommonDir, lanePath string) error {
+	_, statErr := os.Lstat(lanePath)
+	switch {
+	case errors.Is(statErr, fs.ErrNotExist):
+		return nil
+	case statErr != nil:
+		return fmt.Errorf("lane init: inspecting %s: %w", lanePath, statErr)
+	}
+	if err := assertWorktreeOf(absRepo, gitCommonDir, lanePath); err != nil {
+		return fmt.Errorf("lane init: %w", err)
+	}
+	return nil
 }
 
 // resolveGitCommonDir answers the repository's shared git directory — where
@@ -165,7 +184,11 @@ func resolveGitCommonDir(repo string) (string, error) {
 func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool, error) {
 	now := time.Now()
 
-	if _, statErr := os.Lstat(lanePath); statErr != nil {
+	_, statErr := os.Lstat(lanePath)
+	if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
+		return false, fmt.Errorf("lane init: inspecting %s: %w", lanePath, statErr)
+	}
+	if statErr != nil {
 		out, err := exec.Command("git", "-C", absRepo, "worktree", "add", "--detach", lanePath, baseRef).CombinedOutput()
 		if err != nil {
 			return false, fmt.Errorf("lane init: git worktree add --detach %s failed (%w): %s", name, err, strings.TrimSpace(string(out)))

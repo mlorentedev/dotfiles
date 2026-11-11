@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,7 +34,15 @@ func Identity(path string) (string, bool, error) {
 		return "", false, nil
 	}
 	record := filepath.Join(gitDir, LaneIdentityFile)
-	if st, serr := os.Stat(record); serr != nil || st.IsDir() {
+	st, serr := os.Stat(record)
+	switch {
+	case errors.Is(serr, fs.ErrNotExist):
+		return "", false, nil
+	case serr != nil:
+		// Permission, loop or I/O: not "no record". The guard fails closed
+		// on an unreadable record, and so does every reader of ours.
+		return "", false, fmt.Errorf("lane identity: inspecting %s: %w", record, serr)
+	case st.IsDir():
 		return "", false, nil
 	}
 	raw, err := os.ReadFile(record)
