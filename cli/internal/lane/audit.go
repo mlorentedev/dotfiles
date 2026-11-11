@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
@@ -84,16 +84,13 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 // auditRoots makes both roots absolute. An empty worktree root would resolve
 // to the cwd and every FIX line would then point at the wrong path.
 func auditRoots(repoRoot, worktreeRoot string) (absRepo, absWTRoot string, err error) {
-	if absRepo, err = filepath.Abs(repoRoot); err != nil {
-		return "", "", err
-	}
 	if strings.TrimSpace(worktreeRoot) == "" {
 		return "", "", fmt.Errorf("lane doctor: WORKTREE_ROOT cannot be empty")
 	}
-	if absWTRoot, err = filepath.Abs(worktreeRoot); err != nil {
-		return "", "", err
+	if absRepo, err = filepath.Abs(repoRoot); err == nil {
+		absWTRoot, err = filepath.Abs(worktreeRoot)
 	}
-	return absRepo, absWTRoot, nil
+	return absRepo, absWTRoot, err
 }
 
 // anyLaneExists is the "initialised here" test: a declared lane either exists
@@ -111,15 +108,11 @@ func anyLaneExists(declared []string, laneDir string, records map[string][]laneR
 // marker does not declare, sorted by lane name. Both repairs are legitimate,
 // so the FIX names both and decides neither.
 func undeclaredRecords(declared []string, records map[string][]laneRecord) []Finding {
-	names := make([]string, 0, len(records))
-	for name := range records {
-		if !slices.Contains(declared, name) {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names)
 	var out []Finding
-	for _, name := range names {
+	for _, name := range slices.Sorted(maps.Keys(records)) {
+		if slices.Contains(declared, name) {
+			continue
+		}
 		for _, r := range records[name] {
 			out = append(out, Finding{name,
 				fmt.Sprintf("the worktree at %s is recorded as this lane, which the marker does not declare", r.path),
@@ -201,10 +194,7 @@ func hasDrivePrefix(n string) bool {
 }
 
 func sameSet(a, b []string) bool {
-	sa, sb := slices.Clone(a), slices.Clone(b)
-	sort.Strings(sa)
-	sort.Strings(sb)
-	return slices.Equal(sa, sb)
+	return slices.Equal(slices.Sorted(slices.Values(a)), slices.Sorted(slices.Values(b)))
 }
 
 // laneRecord is one worktree admin dir under the common git dir that carries
@@ -279,7 +269,7 @@ func auditLane(absRepo, commonDir, name, expected string, records []laneRecord) 
 		// registration; without this check it would read as a missing lease
 		// and the FIX would name a command that refuses the directory.
 		if err := assertWorktreeOf(absRepo, commonDir, expected); err != nil {
-			return []Finding{{name, err.Error(), strangerDirFix}}
+			return []Finding{{name, err.Error(), strangerFix(err, r.adminDir)}}
 		}
 		return auditLease(name, expected)
 	}
@@ -287,7 +277,7 @@ func auditLane(absRepo, commonDir, name, expected string, records []laneRecord) 
 		return []Finding{{name, "is absent at " + expected, "dotf lane init"}}
 	}
 	if err := assertWorktreeOf(absRepo, commonDir, expected); err != nil {
-		return []Finding{{name, err.Error(), strangerDirFix}}
+		return []Finding{{name, err.Error(), strangerFix(err, "")}}
 	}
 	return []Finding{{name, "the worktree at " + expected + " carries no identity record, so guard rule 5b does not fire there", "dotf lane init"}}
 }
@@ -298,6 +288,28 @@ func auditLane(absRepo, commonDir, name, expected string, records []laneRecord) 
 // registered path, so `dotf lane init` alone fails after the move (measured
 // 2026-11-11).
 const strangerDirFix = "move the directory aside and run git worktree prune, then dotf lane init"
+
+// foreignLaneFix is the repair when the directory is a worktree that is not
+// this repository's: nothing there is ours to move, prune or repair. Measured
+// 2026-11-11: from the repository whose registration is stale, `git worktree
+// prune` keeps the entry while the other's .git file exists, `remove --force`
+// refuses, and `git worktree repair` rewrites the other repository's .git
+// file to point here, hijacking its worktree. Only the stale admin dir is
+// ours, and only a hand delete drops it.
+const foreignLaneFix = "the worktree there is not this repository's: leave it to its owner, and give this clone a different directory name before dotf lane init (#3318)"
+
+// strangerFix picks the repair for an assertWorktreeOf refusal: the move and
+// prune only for a plain directory; adminDir, when set, is this repository's
+// stale registration of the path.
+func strangerFix(err error, adminDir string) string {
+	if errors.Is(err, errNotAWorktree) {
+		return strangerDirFix
+	}
+	if adminDir != "" {
+		return "delete this repository's stale registration " + adminDir + " by hand; " + foreignLaneFix
+	}
+	return foreignLaneFix
+}
 
 func auditLease(name, path string) []Finding {
 	meta, err := worktree.LoadMetadata(path)
