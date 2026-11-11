@@ -115,7 +115,16 @@ model_weak = "openai/qwen3.6"
 # reasoning-class, so 200k is a deliberate floor well inside each, raised only
 # against measured need.
 custom_model_max_tokens = 200000
-max_model_tokens = 200000
+
+# The prompt clip is the window MINUS the answer, not the window itself
+# (AI-048, #3281). At 200,000 inside a 200,000 window it left the 40,000-token
+# answer no room, so it clipped nothing and read as a guard it never was: no
+# prompt could reach a threshold equal to the ceiling it was comparing against.
+# 150,000 + 40,000 = 190,000, which leaves 10,000 spare. The largest review
+# prompt measured here is about 97,000 tokens (glm5.3-flash, AI-045 AC9), so no
+# measured review is clipped; raise this only against a window raised first.
+# `dotf harness check` fails when this plus the answer cap reaches the window.
+max_model_tokens = 150000
 
 # The PR body is clipped to this before it enters the prompt; upstream's 500
 # (v0.48.0) cut a 3,225-character body, and this repo's template puts the

@@ -1,0 +1,264 @@
+package harness
+
+import (
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+)
+
+// The steps below mirror .github/workflows/pr-agent.yml as it stood before
+// AI-048: the two Anthropic attempts declare ai_timeout and an output cap, the
+// NaN attempt declares neither and lowers retry_same_model_on_timeout to false.
+const (
+	budgetTomlPreFix = `max_model_tokens = 200000
+custom_model_max_tokens = 200000
+fallback_models = ["openai/deepseek-v4-flash", "openai/glm5.3-flash"]
+`
+
+	budgetTomlFixed = `max_model_tokens = 120000
+custom_model_max_tokens = 200000
+fallback_models = ["openai/deepseek-v4-flash", "openai/glm5.3-flash"]
+`
+
+	budgetStepFirstPreFix = `      - name: PR-Agent on Anthropic, drawn first
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 8
+        env:
+          CONFIG__FALLBACK_MODELS: "[]"
+          CONFIG__AI_TIMEOUT: "360"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+`
+
+	budgetStepFirstFixed = `      - name: PR-Agent on Anthropic, drawn first
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 13
+        env:
+          CONFIG__FALLBACK_MODELS: "[]"
+          CONFIG__AI_TIMEOUT: "360"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+`
+
+	budgetStepNaNPreFix = `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 12
+        env:
+          CONFIG__FALLBACK_MODELS: ${{ steps.route.outputs.nan_fallbacks }}
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
+`
+
+	budgetStepNaNFixed = `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 12
+        env:
+          CONFIG__FALLBACK_MODELS: ${{ steps.route.outputs.nan_fallbacks }}
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          CONFIG__AI_TIMEOUT: "120"
+          CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
+`
+
+	budgetStepSecondPreFix = `      - name: PR-Agent on Anthropic, after NaN published nothing
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 8
+        env:
+          CONFIG__FALLBACK_MODELS: "[]"
+          CONFIG__AI_TIMEOUT: "360"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+`
+
+	budgetStepSecondFixed = `      - name: PR-Agent on Anthropic, after NaN published nothing
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 13
+        env:
+          CONFIG__FALLBACK_MODELS: "[]"
+          CONFIG__AI_TIMEOUT: "360"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+`
+)
+
+// budgetRepo is a checkout holding only the two files the guard reads.
+func budgetRepo(t *testing.T, toml, workflow string) string {
+	t.Helper()
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, prAgentTomlFile), toml)
+	writeFile(t, filepath.Join(repo, filepath.FromSlash(prAgentWorkflowFile)), budgetWorkflow(34, workflow))
+	return repo
+}
+
+// budgetWorkflow wraps review steps in the job that runs them.
+func budgetWorkflow(jobMinutes int, steps ...string) string {
+	return "jobs:\n  review:\n    timeout-minutes: " + strconv.Itoa(jobMinutes) + "\n    steps:\n" + strings.Join(steps, "")
+}
+
+// budgetProblemText is the whole report as one string, for the assertions that
+// ask what a line says rather than how many there are.
+func budgetProblemText(t *testing.T, repoRoot string) (int, string) {
+	t.Helper()
+	found := problems(checkReviewBudget(repoRoot))
+	return len(found), strings.Join(found, "\n")
+}
+
+func TestCheckReviewBudget_TheCurrentConfigurationFails(t *testing.T) {
+	repo := budgetRepo(t, budgetTomlPreFix,
+		budgetStepFirstPreFix+budgetStepNaNPreFix+budgetStepSecondPreFix)
+
+	n, text := budgetProblemText(t, repo)
+	if n != 4 {
+		t.Fatalf("want 4 problems (clip, two step ceilings, undeclared ai_timeout), got %d:\n%s", n, text)
+	}
+	for _, want := range []string{
+		"the prompt clip in",
+		"cannot afford its own attempts",
+		"does not declare CONFIG__AI_TIMEOUT",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("report does not mention %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestCheckReviewBudget_TheFixedConfigurationPasses(t *testing.T) {
+	repo := budgetRepo(t, budgetTomlFixed,
+		budgetStepFirstFixed+budgetStepNaNFixed+budgetStepSecondFixed)
+
+	if n, text := budgetProblemText(t, repo); n != 0 {
+		t.Fatalf("want no problems, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_TheGuardLeavesTheJobCeilingToTheBatsTest(t *testing.T) {
+	// The job's arithmetic needs the probe seconds and the route's pair, which
+	// this guard does not model; a first attempt at it here passed a job ceiling
+	// one minute short of the truth. tests/pr-agent-config.bats owns that number.
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, prAgentTomlFile), budgetTomlFixed)
+	writeFile(t, filepath.Join(repo, filepath.FromSlash(prAgentWorkflowFile)),
+		budgetWorkflow(1, budgetStepFirstFixed+budgetStepNaNFixed+budgetStepSecondFixed))
+
+	if n, text := budgetProblemText(t, repo); n != 0 {
+		t.Fatalf("the guard must say nothing about the job ceiling, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_TheTokenClipNeedsRoomForTheAnswer(t *testing.T) {
+	// A clip equal to the window clips nothing, and one that leaves less room
+	// than the answer needs is the same defect wearing a different number.
+	for _, toml := range []string{
+		"max_model_tokens = 200000\ncustom_model_max_tokens = 200000\n",
+		"max_model_tokens = 170000\ncustom_model_max_tokens = 200000\n",
+	} {
+		repo := budgetRepo(t, toml, budgetStepFirstFixed)
+		if n, text := budgetProblemText(t, repo); n == 0 || !strings.Contains(text, "prompt clip in") {
+			t.Errorf("want a clip problem for %q, got %d:\n%s", toml, n, text)
+		}
+	}
+}
+
+func TestCheckReviewBudget_TheClipMustLeaveSlackNotJustFit(t *testing.T) {
+	// 160000 + 40000 exactly fills a 200000 window, which is zero slack and the
+	// guard refuses it; one token less is room for the answer to be a token
+	// longer than declared. Both sides are asserted so the boundary is the
+	// stated one rather than whatever the arithmetic happens to produce.
+	if n, text := budgetProblemText(t, budgetRepo(t,
+		"max_model_tokens = 160000\ncustom_model_max_tokens = 200000\n", budgetStepFirstFixed)); n == 0 {
+		t.Errorf("160000 + 40000 = 200000 is not under 200000, so this must fail:\n%s", text)
+	}
+	if n, text := budgetProblemText(t, budgetRepo(t,
+		"max_model_tokens = 159000\ncustom_model_max_tokens = 200000\n", budgetStepFirstFixed)); n != 0 {
+		t.Errorf("159000 + 40000 is under 200000; got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_RetryFalseHalvesTheAttempts(t *testing.T) {
+	// Three models, 120 s each: one attempt fits a 6 minute ceiling, two do not.
+	declared := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 6
+        env:
+          CONFIG__FALLBACK_MODELS: ["a", "b", "c"]
+          CONFIG__AI_TIMEOUT: "120"
+          CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
+`
+	undeclared := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 6
+        env:
+          CONFIG__FALLBACK_MODELS: ["a", "b", "c"]
+          CONFIG__AI_TIMEOUT: "120"
+`
+	if n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, declared)); n != 0 {
+		t.Errorf("one attempt of 360 s fits 360 s; got %d:\n%s", n, text)
+	}
+	if n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, undeclared)); n == 0 ||
+		!strings.Contains(text, "2 attempts") {
+		t.Errorf("two attempts of 360 s do not fit 360 s; got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_AnExpressionChainUsesTheTomlPoolAsItsBound(t *testing.T) {
+	// The NaN step's list is a GitHub expression, so the guard falls back to
+	// the pool the route draws from: 1 + 2 models, not 1.
+	repo := budgetRepo(t, budgetTomlFixed, `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 5
+        env:
+          CONFIG__FALLBACK_MODELS: ${{ steps.route.outputs.nan_fallbacks }}
+          CONFIG__AI_TIMEOUT: "120"
+          CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
+`)
+	if n, text := budgetProblemText(t, repo); n == 0 || !strings.Contains(text, "3 models x 1 attempts") {
+		t.Fatalf("want the toml pool as the bound, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_AStepThatDeclaresItsOwnClipIsCheckedToo(t *testing.T) {
+	// The workflow's env overrides .pr_agent.toml, so a lowered file with a
+	// step still exporting the old clip is clipped by a number nobody changed.
+	step := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 13
+        env:
+          CONFIG__MAX_MODEL_TOKENS: "200000"
+          CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+          CONFIG__AI_TIMEOUT: "360"
+`
+	n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, step))
+	if n == 0 || !strings.Contains(text, "the prompt clip in PR-Agent never fires") {
+		t.Fatalf("want the step's own clip checked, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_AWorkflowWithoutAReviewStepFailsClosed(t *testing.T) {
+	repo := budgetRepo(t, budgetTomlFixed, `      - uses: actions/checkout@0000
+        timeout-minutes: 1
+`)
+	n, text := budgetProblemText(t, repo)
+	if n == 0 || !strings.Contains(text, prAgentImage) {
+		t.Fatalf("want an error naming the marker, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_HalfAReviewerFailsClosed(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, prAgentTomlFile), budgetTomlFixed)
+	if n, text := budgetProblemText(t, repo); n == 0 || !strings.Contains(text, prAgentWorkflowFile) {
+		t.Fatalf("want an error naming the missing workflow, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_ACheckoutWithoutAReviewerSaysNothing(t *testing.T) {
+	if n, text := budgetProblemText(t, t.TempDir()); n != 0 {
+		t.Fatalf("a repo without pr-agent has no budget to guard, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_TheRepositoryPassesItsOwnGuard(t *testing.T) {
+	// The gate runs against this checkout, so the two files here must satisfy
+	// the guard the same way CI requires them to.
+	root := filepath.Join("..", "..", "..")
+	if n, text := budgetProblemText(t, root); n != 0 {
+		t.Fatalf("this repository's own reviewer budget does not hold, got %d:\n%s", n, text)
+	}
+}

@@ -1079,9 +1079,9 @@ print(ids.index('route') < ids.index('pr_agent_anthropic_first') < ids.index('pu
       < ids.index('pr_agent') < ids.index('published_after_nan') < ids.index('pr_agent_anthropic_second'))
 "
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "pr_agent_anthropic_first 8 True !cancelled() && steps.route.outputs.first == 'anthropic'" ]
+    [ "${lines[0]}" = "pr_agent_anthropic_first 13 True !cancelled() && steps.route.outputs.first == 'anthropic'" ]
     [ "${lines[1]}" = "pr_agent 12 True !cancelled() && (steps.route.outputs.first == 'nan' || steps.published_after_anthropic.outputs.published == 'false')" ]
-    [ "${lines[2]}" = "pr_agent_anthropic_second 8 True !cancelled() && steps.published_after_nan.outputs.published == 'false'" ]
+    [ "${lines[2]}" = "pr_agent_anthropic_second 13 True !cancelled() && steps.published_after_nan.outputs.published == 'false'" ]
     [ "${lines[3]}" = "True" ]
     # Each probe runs only after the first attempt it measures, toward the other provider.
     run _step_if "s.get('id') == 'published_after_anthropic'"
@@ -1250,10 +1250,19 @@ nt = json.loads(e['CONFIG__NO_TEMPERATURE_MODELS'])
 print(all(a in nt and a.split('/', 1)[1] in nt for a in allowed),
       sorted(json.loads(e['CONFIG__CLAUDE_ADAPTIVE_THINKING_MODELS_OVERRIDE'])) == sorted(allowed),
       e['CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING'])
-# The prompt cap equals the NaN attempt's, so every pool member reviews the same
-# diff (the owner chose parity over Haiku's 100,000-token price step, 2026-10-08).
+# The prompt cap is the NaN attempt's, so every pool member reviews the same
+# diff (the owner chose parity over Haiku's 100,000-token price step,
+# 2026-10-08). What parity means changed with AI-048: it is prompt-for-prompt
+# ACROSS providers, not prompt-for-window. Capping the prompt AT the window was
+# the inert setting, because the answer had no room, so the cap clipped nothing.
+# The arithmetic itself lives in the guard (cli/internal/harness/prbudget.go);
+# this line keeps the two attempts from drifting apart.
+import tomllib
+cap = tomllib.load(open('$REPO/.pr_agent.toml', 'rb'))['config']['max_model_tokens']
 nan = by['pr_agent']['env']
-print(e['CONFIG__MAX_MODEL_TOKENS'] == e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'] == nan['CONFIG__CUSTOM_MODEL_MAX_TOKENS'])
+print(e['CONFIG__MAX_MODEL_TOKENS'] == str(cap) == nan.get('CONFIG__MAX_MODEL_TOKENS', str(cap)),
+      e['CONFIG__CUSTOM_MODEL_MAX_TOKENS'] == nan['CONFIG__CUSTOM_MODEL_MAX_TOKENS'],
+      cap + int(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS']) < int(e['CONFIG__CUSTOM_MODEL_MAX_TOKENS']))
 # LiteLLM's 4,096 default for an unknown Claude model would cut a thinking review short,
 # and a model its map knows gets the map's ceiling: PR-Agent's own cap must say the same.
 print(e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS'] if e.get('CONFIG__MAX_OUTPUT_TOKENS') == e['DEFAULT_ANTHROPIC_CHAT_MAX_TOKENS']
@@ -1273,7 +1282,6 @@ print(all(a in prices and worst(a) < prices[a][2] for a in allowed))
 print(int(e['CONFIG__AI_TIMEOUT']) < a1['timeout-minutes'] * 60)
 # Every model id .pr_agent.toml pins (model, model_weak, any later one) is a NaN
 # id. Each needs its own override here, or a call to it leaves Anthropic for NaN.
-import tomllib
 cfg = tomllib.load(open('$REPO/.pr_agent.toml', 'rb'))['config']
 pinned = sorted(k for k, v in cfg.items() if k.startswith('model') and isinstance(v, str) and '/' in v)
 print(pinned, all(e.get('CONFIG__' + k.upper()) == routed for k in pinned))
@@ -1289,7 +1297,7 @@ print(lines[0].endswith(routed) and lines[2].endswith(routed))
     [ "${lines[3]}" = "True" ]
     [ "${lines[4]}" = "[]" ]
     [ "${lines[5]}" = "True True true" ]
-    [ "${lines[6]}" = "True" ]
+    [ "${lines[6]}" = "True True True" ]
     [ "${lines[7]}" = "40000" ]
     [ "${lines[8]}" = "True" ]
     [ "${lines[9]}" = "True" ]

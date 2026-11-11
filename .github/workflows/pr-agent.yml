@@ -173,14 +173,19 @@ jobs:
       cancel-in-progress: false
       queue: max
     # At most two bounded PR-Agent attempts, one per provider (12 minutes on NaN,
-    # 8 on Anthropic), plus the probes before them, setup, and the two publication
+    # 13 on Anthropic), plus the probes before them, setup, and the two publication
     # measurements and the final guard after them (each up to three API calls with
     # retry sleeps). The second attempt runs only when the first published nothing
     # (AI-045 AC9), so a day without trouble holds the one-at-a-time lane no
-    # longer than before. The sum is 33 minutes, two of them building dotf, and the bound exceeds it rather
+    # longer than before. The sum is 36 minutes, and the bound exceeds it rather
     # than equals it (AC7), so a probe that runs to its last second still leaves
     # the final guard time to report.
-    timeout-minutes: 34
+    #
+    # 37, not 34: the Anthropic attempt's own ceiling is 13 so that it can afford
+    # the two calls `ai_timeout = 360` allows (AI-048), and a step ceiling that
+    # grows past the job's slack is the ceiling-that-covers-nothing defect one
+    # level up. tests/pr-agent-config.bats computes this sum and is what caught it.
+    timeout-minutes: 37
     steps:
       # `The-PR-Agent/pr-agent`, not `qodo-ai/pr-agent` as #786's body says: the
       # project has been renamed and the old path now redirects. Pinned to a tag
@@ -394,10 +399,11 @@ jobs:
       #   5.5 costs $0.10 / $0.50 per million input / output tokens for prompts
       #   up to 100,000 tokens, and five times that above it; Sonnet 5.5 costs
       #   $2 / $10 with no price step.
-      # - The PROMPT is capped at 200,000 tokens (`max_model_tokens`; the
+      # - The PROMPT is capped at 150,000 tokens (`max_model_tokens`; the
       #   `custom_` twin is needed because PR-Agent's registry does not know the
       #   model), the same as the NaN attempt, so every pool member reviews the
-      #   same diff. The owner chose parity over the price step (2026-10-08):
+      #   same diff. The cap is the 200,000 window minus the 40,000 answer, not
+      #   the window: an equal number clipped nothing (AI-048). The owner chose parity over the price step (2026-10-08):
       #   PR-Agent's tokenizer counts about 30% fewer tokens than Claude's, so a
       #   diff past roughly 75,000 of PR-Agent's crosses 100,000 and pays the
       #   higher prices for that request.
@@ -427,7 +433,10 @@ jobs:
       # - The call is not streamed. PR-Agent forces streaming only for an
       #   OpenAI-compatible base URL, and none is set for Anthropic. `ai_timeout`
       #   therefore bounds the whole answer, thinking included, so it is raised
-      #   from 120 s to 360 s. The step's 8 minutes bound everything else.
+      #   from 120 s to 360 s. The step's 13 minutes bound the attempts: 360 s
+      #   twice (a timed-out model is retried once by default here) is 720 s,
+      #   and 8 minutes covered 480 s of that, so the step killed itself before
+      #   its own retry could finish (AI-048, #3281). 13 x 60 = 780 s.
       #
       # Same action, same pin, same github_action_config as the NaN attempt: a
       # test holds the review settings equal, so either provider reviews what
@@ -435,7 +444,7 @@ jobs:
       - name: PR-Agent on Anthropic, drawn first
         id: pr_agent_anthropic_first
         if: "!cancelled() && steps.route.outputs.first == 'anthropic'"
-        timeout-minutes: 8
+        timeout-minutes: 13
         continue-on-error: true
         uses: docker://pragent/pr-agent@sha256:80edef71baa3df28c129d858d4b53784abfc14704c235efb32b6c461d5399a6d  # v0.48.0
         env:
@@ -445,7 +454,7 @@ jobs:
           CONFIG__MODEL: ${{ steps.route.outputs.anthropic_model }}
           CONFIG__MODEL_WEAK: ${{ steps.route.outputs.anthropic_model }}
           CONFIG__FALLBACK_MODELS: "[]"
-          CONFIG__MAX_MODEL_TOKENS: "200000"
+          CONFIG__MAX_MODEL_TOKENS: "150000"
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
           CONFIG__NO_TEMPERATURE_MODELS: >-
             ["anthropic/claude-haiku-5-5", "claude-haiku-5-5",
@@ -539,6 +548,13 @@ jobs:
           CONFIG__MODEL: ${{ steps.route.outputs.nan_model }}
           CONFIG__FALLBACK_MODELS: ${{ steps.route.outputs.nan_fallbacks }}
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
+          # Declared, not inherited (AI-048, #3281). The step ran on the image's
+          # 120 s default, which happened to be safe only because the streaming
+          # below makes it bound the gap between chunks rather than the call, and
+          # because `retry_same_model_on_timeout = false` keeps the attempt count
+          # at one. That is exactly how svqtriana run 42562380120 died: it
+          # inherited a timeout nobody wrote down and lost the whole job to it.
+          CONFIG__AI_TIMEOUT: "120"
           # AI-045 AC6 (#1858, #1923): stream every NaN call. Non-streamed, NaN's edge
           # cuts the answer at about 125 s, and a request it holds open sits silent
           # past `ai_timeout`, which bounds the gap between reads rather than the
@@ -659,7 +675,7 @@ jobs:
       - name: PR-Agent on Anthropic, after NaN published nothing
         id: pr_agent_anthropic_second
         if: "!cancelled() && steps.published_after_nan.outputs.published == 'false'"
-        timeout-minutes: 8
+        timeout-minutes: 13
         continue-on-error: true
         uses: docker://pragent/pr-agent@sha256:80edef71baa3df28c129d858d4b53784abfc14704c235efb32b6c461d5399a6d  # v0.48.0
         env:
@@ -669,7 +685,7 @@ jobs:
           CONFIG__MODEL: ${{ steps.route.outputs.anthropic_model }}
           CONFIG__MODEL_WEAK: ${{ steps.route.outputs.anthropic_model }}
           CONFIG__FALLBACK_MODELS: "[]"
-          CONFIG__MAX_MODEL_TOKENS: "200000"
+          CONFIG__MAX_MODEL_TOKENS: "150000"
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
           CONFIG__NO_TEMPERATURE_MODELS: >-
             ["anthropic/claude-haiku-5-5", "claude-haiku-5-5",
