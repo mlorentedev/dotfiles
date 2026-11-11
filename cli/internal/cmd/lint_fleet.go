@@ -49,7 +49,7 @@ An exception missing any of the four fields is itself a finding
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runLintFleet(c.OutOrStdout(), c.ErrOrStderr(), dir, defaultBranch, summary)
+			return runLintFleet(c.OutOrStdout(), c.ErrOrStderr(), lintFleetDeps{branchOf: fleetlint.DefaultBranch}, dir, defaultBranch, summary)
 		},
 	}
 	cmd.Flags().StringVar(&dir, "dir", ".", "repository root to check")
@@ -58,9 +58,15 @@ An exception missing any of the four fields is itself a finding
 	return cmd
 }
 
-func runLintFleet(stdout, stderr io.Writer, dir, defaultBranch, summary string) error {
+// lintFleetDeps is the command's one external surface: what a checkout's
+// origin/HEAD names, which reads git.
+type lintFleetDeps struct {
+	branchOf func(dir string) string
+}
+
+func runLintFleet(stdout, stderr io.Writer, deps lintFleetDeps, dir, defaultBranch, summary string) error {
 	if defaultBranch == "" {
-		defaultBranch = fleetlint.DefaultBranch(dir)
+		defaultBranch = deps.branchOf(dir)
 	}
 	findings, err := fleetlint.Lint(dir, defaultBranch)
 	if errors.Is(err, fleetlint.ErrNoDefaultBranch) {

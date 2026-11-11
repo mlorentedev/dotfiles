@@ -82,9 +82,10 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 
 - [x] [AC4] `fleet/cancel-in-progress` (workflow-level `concurrency` only; an expression counts as set, `false` does
   not; only where a push to the pull request starts the workflow again, so `types:` without `synchronize` is exempt), `fleet/os-on-pull-request` (no `if:`, and `runs-on` names Windows or macOS literally or through a literal
-  matrix or its `include:`; a computed matrix is conditional), `fleet/skip-cache` (an explicit switch-off only:
+  matrix, its `include:`, a nested `matrix.a.b` path, less an `exclude:` on that axis alone; a computed matrix is conditional), `fleet/skip-cache` (an explicit switch-off only:
   `cache: false` on a `*/setup-*` step, `skip-cache: true` on golangci-lint-action), `fleet/branch-filter` (push and
-  pull_request `branches:` read as GitHub does, in order, last match wins, `**` crossing a slash; `branches-ignore`
+  pull_request `branches:` read as GitHub does, in order, last match wins, `**` crossing a slash, `?` and `+`
+  quantifying the preceding character, `[...]` a class, `\` escaping; `branches-ignore`
   not read)
 - [x] Default branch: `--default-branch`, else what origin/HEAD names. A branch filter with neither is exit 2,
   never a pass

@@ -21,7 +21,7 @@ const (
 // it against: the rule cannot answer, and an unanswered rule is not a pass.
 var ErrNoDefaultBranch = errors.New("a workflow filters on branches and the default branch is unknown")
 
-var matrixRef = regexp.MustCompile(`^\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}$`)
+var matrixRef = regexp.MustCompile(`^\$\{\{\s*matrix\.([A-Za-z0-9_-]+)((?:\.[A-Za-z0-9_-]+)*)\s*\}\}$`)
 
 // DefaultBranch is the branch origin/HEAD names in dir's checkout, or "".
 func DefaultBranch(dir string) string {
@@ -109,10 +109,7 @@ func osFinding(path string, key, job *yaml.Node) []Finding {
 	for _, label := range scalars(ro) {
 		values := []string{label}
 		if m := matrixRef.FindStringSubmatch(label); m != nil {
-			values = scalars(mapValue(matrix, m[1]))
-			for _, inc := range seq(mapValue(matrix, "include")) {
-				values = append(values, scalars(mapValue(inc, m[1]))...)
-			}
+			values = matrixValues(matrix, m[1], strings.Split(strings.TrimPrefix(m[2], "."), "."))
 		}
 		for _, v := range values {
 			if l := strings.ToLower(v); strings.Contains(l, "windows") || strings.Contains(l, "macos") {
@@ -122,6 +119,41 @@ func osFinding(path string, key, job *yaml.Node) []Finding {
 		}
 	}
 	return nil
+}
+
+// matrixValues are the values matrix.<axis>.<path...> takes in a literal
+// matrix: each axis entry and each include: entry, followed down an object
+// value's path. An entry an exclude: removes on that axis alone is dropped;
+// one excluded only together with another axis may still run, so it stays.
+func matrixValues(matrix *yaml.Node, axis string, path []string) []string {
+	excluded := map[string]bool{}
+	for _, ex := range seq(mapValue(matrix, "exclude")) {
+		if v := mapValue(ex, axis); v != nil && len(ex.Content) == 2 && v.Kind == yaml.ScalarNode {
+			excluded[v.Value] = true
+		}
+	}
+	nodes := seq(mapValue(matrix, axis))
+	if n := mapValue(matrix, axis); n != nil && n.Kind == yaml.ScalarNode {
+		nodes = []*yaml.Node{n}
+	}
+	for _, inc := range seq(mapValue(matrix, "include")) {
+		if v := mapValue(inc, axis); v != nil {
+			nodes = append(nodes, v)
+		}
+	}
+	var out []string
+	for _, n := range nodes {
+		if n.Kind == yaml.ScalarNode && excluded[n.Value] {
+			continue
+		}
+		for _, seg := range path {
+			if seg != "" {
+				n = mapValue(n, seg)
+			}
+		}
+		out = append(out, scalars(n)...)
+	}
+	return out
 }
 
 // cacheFinding: a setup action keeps its cache and a linter does not skip
@@ -167,31 +199,44 @@ func matchesBranch(patterns []string, branch string) bool {
 	in := false
 	for _, p := range patterns {
 		neg := strings.HasPrefix(p, "!")
-		if globRegexp(strings.TrimPrefix(p, "!")).MatchString(branch) {
+		if filterRegexp(strings.TrimPrefix(p, "!")).MatchString(branch) {
 			in = !neg
 		}
 	}
 	return in
 }
 
-// globRegexp is a filter pattern as a regexp: ** crosses a slash, * and ?
-// do not, and everything else is literal.
-func globRegexp(p string) *regexp.Regexp {
+// filterRegexp is a GitHub filter pattern as a regexp: * matches within a
+// path segment and ** across them; ? and + make the preceding character
+// optional or repeated; [...] is a character class; \ escapes the next
+// character. A pattern that is not valid as one matches only itself.
+func filterRegexp(p string) *regexp.Regexp {
 	var b strings.Builder
 	for i := 0; i < len(p); i++ {
-		switch {
+		switch c := p[i]; {
+		case c == '\\' && i+1 < len(p):
+			i++
+			b.WriteString(regexp.QuoteMeta(p[i : i+1]))
 		case strings.HasPrefix(p[i:], "**"):
 			b.WriteString(".*")
 			i++
-		case p[i] == '*':
+		case c == '*':
 			b.WriteString("[^/]*")
-		case p[i] == '?':
-			b.WriteString("[^/]")
+		case c == '?' || c == '+':
+			b.WriteByte(c)
+		case c == '[' && strings.IndexByte(p[i:], ']') > 1:
+			end := i + strings.IndexByte(p[i:], ']')
+			b.WriteString(p[i : end+1])
+			i = end
 		default:
 			b.WriteString(regexp.QuoteMeta(p[i : i+1]))
 		}
 	}
-	return regexp.MustCompile("^" + b.String() + "$")
+	re, err := regexp.Compile("^(?:" + b.String() + ")$")
+	if err != nil {
+		return regexp.MustCompile("^" + regexp.QuoteMeta(p) + "$")
+	}
+	return re
 }
 
 // scalars is a scalar's value, or a sequence's scalar values.

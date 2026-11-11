@@ -221,8 +221,16 @@ func TestMatchesBranch(t *testing.T) {
 		{[]string{"!main", "*"}, "main", true},
 		{[]string{"**"}, "release/v1", true},
 		{[]string{"*"}, "release/v1", false},
-		{[]string{"rel?ase/*"}, "release/v1", true},
+		{[]string{"rele?ase/*"}, "relase/v1", true},
+		{[]string{"rel?ase/*"}, "release/v1", false},
+		{[]string{"main?"}, "main", true},
+		{[]string{"v1+"}, "v111", true},
+		{[]string{"**", "!ma[a-z]n"}, "main", false},
+		{[]string{"ma[0-9]n"}, "main", false},
+		{[]string{`ma\*n`}, "ma*n", true},
+		{[]string{`ma\*n`}, "main", false},
 		{[]string{"ma.n"}, "main", false},
+		{[]string{"+main"}, "+main", true},
 	}
 	for _, c := range cases {
 		if got := matchesBranch(c.patterns, c.branch); got != c.want {
@@ -277,5 +285,29 @@ func TestBooleansInAnySpelling(t *testing.T) {
 	wf := "on: pull_request\nconcurrency:\n  group: g\n  cancel-in-progress: False\njobs: {}\n"
 	if got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": wf}); err != nil || len(got) != 1 || got[0].Rule != RuleCancelInProgress {
 		t.Errorf("cancel-in-progress: False: got %v, %v", got, err)
+	}
+}
+
+// A literal matrix is read as GitHub expands it: an object-valued axis
+// through its property path, and an exclude: on that axis alone removes it.
+func TestOSOnPullRequestReadsTheMatrix(t *testing.T) {
+	job := func(matrix, runsOn string) string {
+		return "on: pull_request\nconcurrency:\n  group: g\n  cancel-in-progress: true\njobs:\n  t:\n    timeout-minutes: 5\n" +
+			"    strategy:\n      matrix:\n" + matrix + "    runs-on: " + runsOn + "\n    steps:\n      - run: true\n"
+	}
+	for name, c := range map[string]struct {
+		wf   string
+		want int
+	}{
+		"nested":            {job("        runner: [{os: ubuntu-latest}, {os: windows-latest}]\n", "${{ matrix.runner.os }}"), 1},
+		"nested linux only": {job("        runner: [{os: ubuntu-latest}]\n", "${{ matrix.runner.os }}"), 0},
+		"excluded":          {job("        os: [ubuntu-latest, windows-latest]\n        exclude: [{os: windows-latest}]\n", "${{ matrix.os }}"), 0},
+		"partly excluded":   {job("        os: [ubuntu-latest, windows-latest]\n        go: [a, b]\n        exclude: [{os: windows-latest, go: a}]\n", "${{ matrix.os }}"), 1},
+		"included":          {job("        os: [ubuntu-latest]\n        include: [{os: macos-latest}]\n", "${{ matrix.os }}"), 1},
+	} {
+		got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": c.wf})
+		if err != nil || len(got) != c.want {
+			t.Errorf("%s: got %v, %v, want %d finding(s)", name, got, err, c.want)
+		}
 	}
 }
