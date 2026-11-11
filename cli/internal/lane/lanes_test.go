@@ -431,3 +431,41 @@ func TestLaneInitRefusesADanglingSymlinkAtALanePathBeforeWritingTheMarker(t *tes
 		t.Errorf("the refused init wrote %s; the guard would be armed with no lanes", LanesMarkerFile)
 	}
 }
+
+// A symlink at a lane path that resolves to a worktree of this repository is
+// adopted, and coherently: every path comparison resolves symlinks, so the
+// lease and the record land in the target and the lane reads back by either
+// name. Characterises the review question of whether the adoption is safe.
+func TestLaneInitAdoptsASymlinkToThisRepositorysWorktree(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation needs a privilege on Windows")
+	}
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	target := filepath.Join(wtRoot, "elsewhere", LaneFeatPrimary)
+	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", target, "HEAD")
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+	if err := os.MkdirAll(filepath.Dir(lanePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, lanePath); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes over a symlink to this repository's worktree: %v", err)
+	}
+	meta, err := worktree.LoadMetadata(target)
+	if err != nil || meta == nil || meta.Lane != LaneFeatPrimary {
+		t.Fatalf("lease in the target: meta=%+v err=%v", meta, err)
+	}
+	for _, p := range []string{lanePath, target} {
+		name, ok, ierr := Identity(p)
+		if ierr != nil || !ok || name != LaneFeatPrimary {
+			t.Errorf("Identity(%s) = %q, %v, %v; want %q", p, name, ok, ierr, LaneFeatPrimary)
+		}
+	}
+	changed, err := InitLanes(repoDir, wtRoot)
+	if err != nil || changed != 0 {
+		t.Errorf("second init: changed=%d err=%v; want 0, nil", changed, err)
+	}
+}
