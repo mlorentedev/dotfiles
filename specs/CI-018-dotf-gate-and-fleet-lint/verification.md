@@ -15,7 +15,7 @@ owner: manu
 - [ ] AC2 -> PR 2a (parsers), PR 2b (`tests/check-spec-gate.bats` 30 and `tests/spec-gate-archive.bats` 35 through the parity shim), PR 3 (`tests/spec-gate-adjacency.bats` 15 through the shim, step summary compared)
 - [x] AC3 (knowledge half) -> PR 1, the no-network trap in `_dotf_gate`
 - [ ] AC4 -> PR 4 (four rules, exceptions: `go test ./internal/fleetlint/`), PR 5a (the other four)
-- [ ] AC5 -> PR 5b
+- [ ] AC5 -> PR 5b (`go test ./internal/fleetlint/ ./internal/cmd/ -run "Fleet|Exception|Repos"`, the runbook `docs/runbooks/guide-fleet-lint.md`); open until ci-workflows ADR-001 links it
 
 ## Test status
 
@@ -23,11 +23,13 @@ owner: manu
 - PR 1: `go test ./...`, `go vet ./...`, `GOOS=windows go vet ./...`, `golangci-lint run` and the Windows lint -> clean
 - PR 2b: `bats tests/check-spec-gate.bats tests/spec-gate-archive.bats` -> 1..65; mutations: a verdict message (24 red), the archived-at-head check removed (6 red)
 - PR 1 mutations: a changed problem message (3 cases red), `escaped` inverted (3 cases red)
+- PR 5b: `go test ./...`, both vets and both lints clean; mutations, each red: the stale-exception check, the unknown-rule check, the `.git` test in `Repos`, the `[OK]` line on an incomplete run, the checkout prefix, a failed checkout counted, the empty-fleet error
 
 ## Decisions made during implementation
 
 - The parity harness compares output except on exit 2: the shell gate reports an unset variable, `dotf` an event with no pull request, and both mean the wiring is wrong.
 - The tokenizer for paths is compiled POSIX (leftmost-longest), matching the shell gate's `grep -oE`.
+- `--fleet` refuses `--default-branch`: the checkouts it reads do not share one default branch, so each is checked against its own origin/HEAD.
 
 ## Promotion candidates
 

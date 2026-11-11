@@ -19,3 +19,4 @@ Operational guides and procedures for managing the dotfiles environment.
 | [guide-git-config.md](guide-git-config.md) | Git config ownership (`~/.gitconfig` vs the deployed include) and the GitHub credential helper that works without a shell | Active |
 | [guide-persistent-named-lanes.md](guide-persistent-named-lanes.md) | Persistent named lanes (HARNESS-186): the marker contract, the pre-commit lane guard decision flow, lane lifecycle, use cases, activation checklist and the agnostic validation runbook | Active |
 | [tool-installation.md](tool-installation.md) | How tools reach a machine: one channel per class, the dotf catalog, and adding a tool | Active |
+| [guide-fleet-lint.md](guide-fleet-lint.md) | The fleet CI standard: the eight `dotf lint fleet` rules, `--fleet` over every checkout, and declaring an exception | Active |

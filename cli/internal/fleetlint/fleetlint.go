@@ -120,3 +120,22 @@ func mapEntry(m *yaml.Node, key string) (*yaml.Node, *yaml.Node) {
 	}
 	return nil, nil
 }
+
+// Repos are the names of dir's immediate subdirectories that are git
+// checkouts, sorted. A .git file counts: a worktree is a checkout too.
+func Repos(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(dir, e.Name(), ".git")); err == nil {
+			out = append(out, e.Name())
+		}
+	}
+	return out, nil
+}

@@ -100,9 +100,14 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 
 ## PR 5b: `--fleet`, exception hygiene, runbook
 
-- [ ] [AC5] `--fleet <dir>` over the checkouts under a directory, findings per repository
-- [ ] Stale exceptions (matching nothing) and unknown rule ids as findings
-- [ ] [AC5] The runbook section, linked from ci-workflows ADR-001
+- [x] [AC5] `--fleet <dir>` over the git checkouts directly under a directory, each against its own origin/HEAD,
+  findings prefixed with the checkout's name; one that cannot be read is reported and the rest still checked
+  (exit 2); no checkout at all is exit 2; `--dir` and `--default-branch` refused with it
+- [x] Stale exceptions (matching nothing) and unknown rule ids as findings; the fixture test walks the list of
+  rules an exception may name, and a test ties that list to the fixture directories
+- [x] [AC5] The runbook: `docs/runbooks/guide-fleet-lint.md`
+- [ ] [AC5] The link from ci-workflows ADR-001, a pull request in that repository once the runbook is on main
+- [x] Run over the owner's local checkouts: 233 findings in 13 repositories, no unreadable one
 
 ## Closing
 
