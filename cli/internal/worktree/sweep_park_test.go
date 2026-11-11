@@ -92,6 +92,26 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		}
 	})
 
+	// Every conflicting tree #3263 names shows in status (an untracked file or a
+	// modification), so the lane is refused before any state is written.
+	t.Run("a lane with an untracked file is not parked", func(t *testing.T) {
+		repo, info, tip := parkLaneFixture(t)
+		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
+		if err := os.WriteFile(filepath.Join(info.Path, "README.md.orig"), []byte("scratch\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		if parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
+			t.Fatal("parked a lane holding an untracked file")
+		}
+		if got := laneState(t, info.Path); got != "ACTIVE" {
+			t.Errorf("state = %q, want ACTIVE", got)
+		}
+		if got := runGitParkTest(t, info.Path, "symbolic-ref", "--short", "HEAD"); got != "feat/lane-a" {
+			t.Errorf("HEAD = %q, want the lane's branch", got)
+		}
+	})
+
 	t.Run("a lane git refuses to detach keeps its state", func(t *testing.T) {
 		repo, info, tip := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
