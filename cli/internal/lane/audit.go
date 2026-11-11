@@ -44,16 +44,7 @@ type Audit struct {
 // worktreeRoot and reports every incoherence. A marker finding stops the
 // audit: lanes cannot drift from a list that is not a list.
 func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
-	absRepo, err := filepath.Abs(repoRoot)
-	if err != nil {
-		return Audit{}, err
-	}
-	// An empty root would resolve to the cwd and every FIX line would point
-	// at the wrong path.
-	if strings.TrimSpace(worktreeRoot) == "" {
-		return Audit{}, fmt.Errorf("lane doctor: WORKTREE_ROOT cannot be empty")
-	}
-	absWTRoot, err := filepath.Abs(worktreeRoot)
+	absRepo, absWTRoot, err := auditRoots(repoRoot, worktreeRoot)
 	if err != nil {
 		return Audit{}, err
 	}
@@ -80,31 +71,62 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	}
 	a.Findings = append(a.Findings, unreadable...)
 	laneDir := filepath.Join(absWTRoot, filepath.Base(absRepo))
-	for _, name := range marker.CanonicalLanes {
-		if _, serr := os.Stat(filepath.Join(laneDir, name)); serr == nil || len(records[name]) > 0 {
-			a.Initialised = true
-		}
-	}
+	a.Initialised = anyLaneExists(marker.CanonicalLanes, laneDir, records)
 	if a.Initialised {
 		for _, name := range marker.CanonicalLanes {
 			a.Findings = append(a.Findings, auditLane(absRepo, commonDir, name, filepath.Join(laneDir, name), records[name])...)
 		}
 	}
+	a.Findings = append(a.Findings, undeclaredRecords(marker.CanonicalLanes, records)...)
+	return a, nil
+}
+
+// auditRoots makes both roots absolute. An empty worktree root would resolve
+// to the cwd and every FIX line would then point at the wrong path.
+func auditRoots(repoRoot, worktreeRoot string) (absRepo, absWTRoot string, err error) {
+	if absRepo, err = filepath.Abs(repoRoot); err != nil {
+		return "", "", err
+	}
+	if strings.TrimSpace(worktreeRoot) == "" {
+		return "", "", fmt.Errorf("lane doctor: WORKTREE_ROOT cannot be empty")
+	}
+	if absWTRoot, err = filepath.Abs(worktreeRoot); err != nil {
+		return "", "", err
+	}
+	return absRepo, absWTRoot, nil
+}
+
+// anyLaneExists is the "initialised here" test: a declared lane either exists
+// at its canonical path or is recorded by git somewhere.
+func anyLaneExists(declared []string, laneDir string, records map[string][]laneRecord) bool {
+	for _, name := range declared {
+		if _, err := os.Stat(filepath.Join(laneDir, name)); err == nil || len(records[name]) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// undeclaredRecords reports every worktree whose record names a lane the
+// marker does not declare, sorted by lane name. Both repairs are legitimate,
+// so the FIX names both and decides neither.
+func undeclaredRecords(declared []string, records map[string][]laneRecord) []Finding {
 	names := make([]string, 0, len(records))
 	for name := range records {
-		if !slices.Contains(marker.CanonicalLanes, name) {
+		if !slices.Contains(declared, name) {
 			names = append(names, name)
 		}
 	}
 	sort.Strings(names)
+	var out []Finding
 	for _, name := range names {
 		for _, r := range records[name] {
-			a.Findings = append(a.Findings, Finding{name,
+			out = append(out, Finding{name,
 				fmt.Sprintf("the worktree at %s is recorded as this lane, which the marker does not declare", r.path),
 				fmt.Sprintf("if it is not a lane, delete %s; if it is, declare it and run dotf lane init", filepath.Join(r.adminDir, LaneIdentityFile))})
 		}
 	}
-	return a, nil
+	return out
 }
 
 // parseMarker validates the marker's shape and content, naming the field of
@@ -116,6 +138,9 @@ func parseMarker(raw []byte) (lanesMarker, []Finding) {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&m); err != nil {
 		return m, []Finding{{LanesMarkerFile, "does not parse: " + err.Error(), "run dotf lane init to rewrite it, then commit the marker"}}
+	}
+	if dec.More() {
+		return m, []Finding{{LanesMarkerFile, "carries trailing data after the object", "run dotf lane init to rewrite it, then commit the marker"}}
 	}
 	var out []Finding
 	if m.Version != 1 {
@@ -130,10 +155,10 @@ func parseMarker(raw []byte) (lanesMarker, []Finding) {
 	return m, out
 }
 
-// validateNames checks a marker list of directory names: non-empty, no blank
-// or duplicate entry, no separator and no drive prefix. Separators are the
-// literal `/` and `\` because the marker is OS-independent: filepath.IsAbs
-// would answer for the OS the audit runs on.
+// validateNames checks a marker list of directory names: non-empty, no blank,
+// padded, dot or duplicate entry, no separator and no drive prefix.
+// Separators are the literal `/` and `\` because the marker is
+// OS-independent: filepath.IsAbs would answer for the OS the audit runs on.
 func validateNames(field string, names []string, fix string) []Finding {
 	if len(names) == 0 {
 		return []Finding{{field, "is empty", fix}}
@@ -141,19 +166,38 @@ func validateNames(field string, names []string, fix string) []Finding {
 	var out []Finding
 	seen := map[string]bool{}
 	for _, n := range names {
-		switch {
-		case strings.TrimSpace(n) == "":
-			out = append(out, Finding{field, "carries an empty entry", fix})
-		case len(n) >= 2 && n[1] == ':' && (n[0]|0x20 >= 'a' && n[0]|0x20 <= 'z'):
-			out = append(out, Finding{field, fmt.Sprintf("entry %q starts with a drive prefix", n), fix})
-		case strings.ContainsAny(n, `/\`):
-			out = append(out, Finding{field, fmt.Sprintf("entry %q carries a path separator", n), fix})
-		case seen[n]:
-			out = append(out, Finding{field, fmt.Sprintf("entry %q is a duplicate", n), fix})
+		if problem := nameProblem(n, seen[n]); problem != "" {
+			out = append(out, Finding{field, problem, fix})
 		}
 		seen[n] = true
 	}
 	return out
+}
+
+// nameProblem is what disqualifies n as a directory name in the marker, or
+// empty when nothing does.
+func nameProblem(n string, duplicate bool) string {
+	switch {
+	case strings.TrimSpace(n) == "":
+		return "carries an empty entry"
+	case strings.TrimSpace(n) != n:
+		return fmt.Sprintf("entry %q carries leading or trailing whitespace", n)
+	case n == "." || n == "..":
+		return fmt.Sprintf("entry %q is not a directory name", n)
+	case hasDrivePrefix(n):
+		return fmt.Sprintf("entry %q starts with a drive prefix", n)
+	case strings.ContainsAny(n, `/\`):
+		return fmt.Sprintf("entry %q carries a path separator", n)
+	case duplicate:
+		return fmt.Sprintf("entry %q is a duplicate", n)
+	}
+	return ""
+}
+
+// hasDrivePrefix is true for `C:` and `c:` openings, checked before the
+// separator rule so `C:\hosts` is reported as the drive it names.
+func hasDrivePrefix(n string) bool {
+	return len(n) >= 2 && n[1] == ':' && n[0]|0x20 >= 'a' && n[0]|0x20 <= 'z'
 }
 
 func sameSet(a, b []string) bool {
@@ -231,16 +275,29 @@ func auditLane(absRepo, commonDir, name, expected string, records []laneRecord) 
 		if !samePath(r.path, expected) {
 			return []Finding{{name, fmt.Sprintf("is at %s, not at %s", r.path, expected), fmt.Sprintf("git worktree move %s %s", r.path, expected)}}
 		}
+		// A lane wiped and recreated by hand keeps its record and its
+		// registration; without this check it would read as a missing lease
+		// and the FIX would name a command that refuses the directory.
+		if err := assertWorktreeOf(absRepo, commonDir, expected); err != nil {
+			return []Finding{{name, err.Error(), strangerDirFix}}
+		}
 		return auditLease(name, expected)
 	}
 	if _, err := os.Stat(expected); err != nil {
 		return []Finding{{name, "is absent at " + expected, "dotf lane init"}}
 	}
 	if err := assertWorktreeOf(absRepo, commonDir, expected); err != nil {
-		return []Finding{{name, err.Error(), "move the directory aside, then dotf lane init"}}
+		return []Finding{{name, err.Error(), strangerDirFix}}
 	}
 	return []Finding{{name, "the worktree at " + expected + " carries no identity record, so guard rule 5b does not fire there", "dotf lane init"}}
 }
+
+// strangerDirFix repairs a directory at a lane path that is not this
+// repository's worktree. The prune is not optional: git keeps the lane
+// registered after its directory is wiped, and `git worktree add` refuses a
+// registered path, so `dotf lane init` alone fails after the move (measured
+// 2026-11-11).
+const strangerDirFix = "move the directory aside and run git worktree prune, then dotf lane init"
 
 func auditLease(name, path string) []Finding {
 	meta, err := worktree.LoadMetadata(path)
