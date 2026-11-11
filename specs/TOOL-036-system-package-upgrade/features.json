@@ -3,56 +3,56 @@
     "id": "TOOL-036-system-package-upgrade-f1",
     "behavior": "AC1: darwin plan lists only outdated catalog formulae/casks; refresh is info",
     "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgrade.*Darwin.*Plan' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgrade'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: --- PASS TestSystemUpgradeDarwinPlanListsOnlyOutdatedCatalogEntries"
   },
   {
     "id": "TOOL-036-system-package-upgrade-f2",
     "behavior": "AC2: darwin apply upgrades, cleans up, and a second run is changed=0",
     "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgrade.*Darwin.*Apply' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgrade'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: --- PASS TestSystemUpgradeDarwinApplyUpgradesCleansAndConverges, TestSystemUpgradeDarwinApplyIgnoresPinnedFormula, TestSystemUpgradeDarwinApplySkipsASudoCaskWithoutSudo"
   },
   {
     "id": "TOOL-036-system-package-upgrade-f3",
     "behavior": "AC3: a formula outside the catalog is never upgraded",
     "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgrade.*OutsideCatalog' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgrade'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: --- PASS TestSystemUpgradeOutdatedPackageOutsideCatalogIsNeverUpgraded"
   },
   {
     "id": "TOOL-036-system-package-upgrade-f4",
     "behavior": "AC4: linux skips without non-interactive sudo and upgrades only catalog packages with it",
     "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgrade.*Linux' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgrade'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: --- PASS TestSystemUpgradeLinuxWithoutSudoSkips, TestSystemUpgradeLinuxWithSudoUpgradesCatalogPackages, TestSystemUpgradeLinuxAsRootRunsWithoutSudo"
   },
   {
     "id": "TOOL-036-system-package-upgrade-f5",
     "behavior": "AC5: windows upgrades per id and isolates one failure",
     "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgrade.*Windows' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgrade'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: --- PASS TestSystemUpgradeWindowsUpgradesPerIdAndIsolatesAFailure, TestSystemUpgradeWindowsPlanUpgradesNothing, TestSystemUpgradeWindowsMatchesOnlyTheIdColumn, TestSystemUpgradeWindowsIdColumnCountsDisplayWidth"
   },
   {
     "id": "TOOL-036-system-package-upgrade-f6",
     "behavior": "AC6: a failed refresh is a skip, not a failure",
     "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgrade.*Refresh' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgrade'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: --- PASS TestSystemUpgradeRefreshFailureSkipsWithTheManagersError"
   },
   {
     "id": "TOOL-036-system-package-upgrade-f7",
     "behavior": "AC7: packages.json and ADR-036 state the upgrade rule",
     "verification": "! grep -q 'it is never upgraded' packages.json && grep -q 'keeps it current (TOOL-036' packages.json && grep -q 'An unpinned system entry is kept current; a pinned entry still moves only by PR' docs/adr/adr-036-install-channels.md",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: packages.json and ADR-036 carry the rule; the retired wording is absent"
   },
   {
     "id": "TOOL-036-system-package-upgrade-f8",
     "behavior": "AC8: dotf update runs system-upgrade on a day HEAD did not move, once, and fails with upgrade-failed when it fails",
     "verification": "out=$(cd cli && go test -count=1 -v -run 'TestRunUpgradesSystemPackagesOnAQuietDay' ./internal/update/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestRunUpgradesSystemPackagesOnAQuietDay'",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "exit 0 at af73427a, 2026-11-11: --- PASS TestRunUpgradesSystemPackagesOnAQuietDay"
   }
 ]

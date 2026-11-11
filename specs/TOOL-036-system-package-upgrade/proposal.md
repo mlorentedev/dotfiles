@@ -1,7 +1,7 @@
 ---
 id: "TOOL-036-system-package-upgrade"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-11-10"
 issue: "mlorentedev/dotfiles#3283"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -53,14 +53,14 @@ The catalog's entries are the *targets*. Their dependencies follow the manager: 
 
 ## Acceptance criteria
 
-- [ ] AC1: On darwin, a plan lists the outdated catalog formulae and casks (and only those) as changes, and reports the refresh as info.
-- [ ] AC2: An apply upgrades them, runs `brew cleanup` and `brew autoremove`, and a second run reports `changed=0`.
-- [ ] AC3: A formula the catalog does not name is never passed to `brew upgrade`, even when outdated.
-- [ ] AC4: On linux without non-interactive sudo, the step reports a skip naming the reason and the run does not fail. With sudo, `apt-get install --only-upgrade` runs on the outdated catalog packages only.
-- [ ] AC5: On Windows, `winget upgrade --id <id> -e` runs once per outdated catalog id. One failing id does not stop the others; the step fails with an error that names it, and only the ids that upgraded are reported as upgraded. The id is read from the listing's Id column alone.
-- [ ] AC6: A refresh that fails makes the step skip with the manager's error, and the run continues.
-- [ ] AC7: `packages.json`'s `$comment` and ADR-036 state the new rule (unpinned system entries upgrade; pinned entries move by PR).
-- [ ] AC8: The daily `dotf update` runs this step on a day HEAD did not move (it lands as a second PR). A fast-forward, a reinstall and every skip do not run it a second time. A failure of the step on that day exits non-zero with status `upgrade-failed`. A skip of the step exits 0 with status `upgrade-skipped` and the skip reason. Both are recorded in `last.json`, so a machine that never upgrades is visible.
+- [x] AC1: On darwin, a plan lists the outdated catalog formulae and casks (and only those) as changes, and reports the refresh as info.
+- [x] AC2: An apply upgrades them, runs `brew cleanup` and `brew autoremove`, and a second run reports `changed=0`.
+- [x] AC3: A formula the catalog does not name is never passed to `brew upgrade`, even when outdated.
+- [x] AC4: On linux without non-interactive sudo, the step reports a skip naming the reason and the run does not fail. With sudo, `apt-get install --only-upgrade` runs on the outdated catalog packages only.
+- [x] AC5: On Windows, `winget upgrade --id <id> -e` runs once per outdated catalog id. One failing id does not stop the others; the step fails with an error that names it, and only the ids that upgraded are reported as upgraded. The id is read from the listing's Id column alone.
+- [x] AC6: A refresh that fails makes the step skip with the manager's error, and the run continues.
+- [x] AC7: `packages.json`'s `$comment` and ADR-036 state the new rule (unpinned system entries upgrade; pinned entries move by PR).
+- [x] AC8: The daily `dotf update` runs this step on a day HEAD did not move (it lands as a second PR). A fast-forward, a reinstall and every skip do not run it a second time. A failure of the step on that day exits non-zero with status `upgrade-failed`. A skip of the step exits 0 with status `upgrade-skipped` and the skip reason. Both are recorded in `last.json`, so a machine that never upgrades is visible.
 
 ## References
 

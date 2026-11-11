@@ -49,12 +49,12 @@ owner: manu
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...` and `golangci-lint run` pass
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in, including a real plan → apply → `changed=0` run on the owner's Mac
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] `go build ./... && go vet ./... && GOOS=windows go vet ./... && go test ./...` and `golangci-lint run` pass
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in, including a real plan → apply → `changed=0` run on the owner's Mac
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 
