@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f1",
+    "behavior": "dotf gate knowledge passes every case of tests/check-knowledge-gate.bats through the event shim",
+    "verification": "bats tests/check-knowledge-gate.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f2",
+    "behavior": "dotf gate spec passes every case of the spec-gate suites through the event shim",
+    "verification": "echo 'not implemented (PR 2)' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f3",
+    "behavior": "The gates make no network call: no token, and a PATH holding git alone",
+    "verification": "bats tests/check-knowledge-gate.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f4",
+    "behavior": "Each fleet rule has a stable id, good and bad fixtures, and exceptions scoped to rule and path with reason and issue",
+    "verification": "echo 'not implemented (PR 4)' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f5",
+    "behavior": "dotf lint fleet --fleet lists findings per repository; rules documented in one runbook section",
+    "verification": "echo 'not implemented (PR 5)' && exit 1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
