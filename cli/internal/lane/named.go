@@ -104,9 +104,11 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 	}
 	// Refuse before writing anything: a marker left behind by a refused init
 	// would arm the guard in a repository that has no lanes to switch to.
+	// Lstat, not Stat: a dangling symlink is a directory entry git worktree
+	// add refuses, and Stat would report it absent.
 	for _, name := range CanonicalLanes {
 		lanePath := filepath.Join(repoWTRoot, name)
-		if _, statErr := os.Stat(lanePath); statErr != nil {
+		if _, statErr := os.Lstat(lanePath); statErr != nil {
 			continue
 		}
 		if err := assertWorktreeOf(absRepo, gitCommonDir, lanePath); err != nil {
@@ -163,7 +165,7 @@ func resolveGitCommonDir(repo string) (string, error) {
 func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool, error) {
 	now := time.Now()
 
-	if _, statErr := os.Stat(lanePath); statErr != nil {
+	if _, statErr := os.Lstat(lanePath); statErr != nil {
 		out, err := exec.Command("git", "-C", absRepo, "worktree", "add", "--detach", lanePath, baseRef).CombinedOutput()
 		if err != nil {
 			return false, fmt.Errorf("lane init: git worktree add --detach %s failed (%w): %s", name, err, strings.TrimSpace(string(out)))
