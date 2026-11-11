@@ -145,8 +145,10 @@ Describe 'Join-PathEntries' {
         # both: 199 entries, 8588 chars. cmd.exe resolves nothing from a PATH
         # past 8191 chars, so every mise .cmd shim failed with "'mise' is not
         # recognized" (measured on the Windows guest, #3174).
-        $one = (1..60 | ForEach-Object { "C:\hostedtoolcache\windows\tool$_\bin" }) -join ';'
+        $one = (1..100 | ForEach-Object { "C:\hostedtoolcache\windows\tool$_\bin" }) -join ';'
         $joined = Join-PathEntries -Paths @($one, $one, $one)
+        # Without the dedup the join is three times this long, past 8191.
+        ($one.Length * 3) | Should -BeGreaterThan 8191
         $joined.Length | Should -Be $one.Length
         $joined.Length | Should -BeLessThan 8192
     }
