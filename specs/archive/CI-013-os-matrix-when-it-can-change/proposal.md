@@ -1,7 +1,7 @@
 ---
 id: "CI-013-os-matrix-when-it-can-change"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-11"
 issue: "mlorentedev/dotfiles#3149"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

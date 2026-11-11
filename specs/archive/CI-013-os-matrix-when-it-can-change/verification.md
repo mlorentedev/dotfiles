@@ -29,3 +29,9 @@ owner: manu
 - golangci-lint `skip-cache: true` stays (#2834). Declined in the proposal.
 - The integration cache is written by the push to main only; pull requests read it.
 - `predicate-quantifier: some-with-excludes` rather than `every`: same result for `**` plus exclusions, and it reads as what it means.
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-578-a-path-filter-saves-only-what-its-diff-class-costs.md
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a CI configuration choice recorded in the proposal; the required-check change it waits on is decided in mlorentedev/ci-workflows
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the shared gate composite already carries the cross-repository shape
