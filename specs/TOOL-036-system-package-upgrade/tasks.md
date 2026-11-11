@@ -28,10 +28,18 @@ owner: manu
 - [x] [AC2] [AC3] Failing test: apply upgrades only catalog formulae/casks, then cleanup + autoremove; second plan is `changed=0`
 - [x] [AC2] [AC3] Implement darwin apply + housekeeping
 - [x] [P] [AC4] Failing test + implement linux: `sudo -n true` gate, skip reason, `--only-upgrade` on outdated catalog packages
-- [x] [P] [AC5] Failing test + implement windows: per-id `winget upgrade`, one failure isolated, probe fails on it
+- [x] [P] [AC5] Failing test + implement windows: per-id `winget upgrade`, one failure isolated and named in the step error
 - [x] [AC6] Failing test + implement: refresh failure is a skip with the manager's error
 - [x] Register the step after `tools` in `Registry` and in every test that enumerates steps
 - [x] [AC7] `packages.json` `$comment` and ADR-036 amendment
+
+## Follow-up (PR 1b, `fix/winget-outdated-id-column`)
+
+#3287 merged at 6debd6ae before the fix for its last review finding was pushed, so that fix lands here.
+
+- [x] [AC5] Failing test: a truncated Name cell (`Example application Git…`) must not mark `Git.Git` as outdated
+- [x] [AC5] `wingetIDs` reads only the Id column, located from the header line by display column (wide characters fill two, `TestSystemUpgradeWindowsIdColumnCountsDisplayWidth`); a truncated Id cell (`…`) still prefix-matches
+- [x] [AC5] Proposal AC5 says only the ids that upgraded are reported, and that the id is read from the Id column
 
 ## Follow-up (PR 2)
 

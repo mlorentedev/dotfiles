@@ -15,7 +15,7 @@ owner: manu
 - [x] AC2 -> `TestSystemUpgrade*Darwin*Apply` (74192f21), second run asserted changed=0 with no upgrade or housekeeping argv; on the Mac: apply -> `0 changed, 1 ok`, then plan -> `0 to change`
 - [x] AC3 -> `TestSystemUpgrade*OutsideCatalog` (table over darwin/linux/windows). Mutation `isBehind(t) || true` failed 9 tests, reverted
 - [x] AC4 -> `TestSystemUpgrade*Linux*` (no sudo: skip with reason; sudo: `--only-upgrade` on catalog packages; root: bare)
-- [x] AC5 -> `TestSystemUpgrade*Windows*` (per-id upgrade, one failure isolated, Probe names it)
+- [x] AC5 -> `TestSystemUpgrade*Windows*` (per-id upgrade, one failure isolated and named in the step error, detail names only the upgraded; `TestSystemUpgradeWindowsMatchesOnlyTheIdColumn` reads the Id column by header position)
 - [x] AC6 -> `TestSystemUpgrade*Refresh*` on all three OSes
 - [x] AC7 -> af71fcc7: `packages.json` `$comment`, ADR-036 amendment 2026-11-10; 02586d37: `catalog.go`, `system.go`, runbook
 
@@ -33,3 +33,4 @@ owner: manu
 - Housekeeping failure is a note in Detail, not a step failure.
 - Linux skips the whole step (refresh included) without root, since `apt-get update` needs root too.
 - `needs_sudo` casks and brew-pinned formulae are excluded per entry and named, so Probe can converge.
+- winget prints a fixed-width table, and a Name cell can contain text that looks like a catalog id. The id match therefore reads the Id column alone. Its start is taken from the header line, and columns are counted as display cells, the way winget pads them (`golang.org/x/text/width`): a CJK or fullwidth character fills two cells, so a wide name or a localized header does not shift the slice. The release needs this fix as well as #3287: it landed separately in PR 1b, after #3287 merged at 6debd6ae.
