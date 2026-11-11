@@ -101,6 +101,27 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - **The NaN step's `ai_timeout` is stated, not changed.** `120` is what it
   already ran; the finding was that no file in this repository says so.
 
+## Findings on the PR, before the pooled review (2026-11-11)
+
+The PR-Agent review on #3289 (openai/deepseek-v4-flash) and an independent advisory
+audit (an Anthropic session on another checkout, no signature, mutation battery on
+copies of the tree) came back before `dotf spec review` ran. Dispositions:
+
+| Finding | Class | Disposition |
+|---|---|---|
+| A step's `CONFIG__CUSTOM_MODEL_MAX_TOKENS` is never read, so a step window of 160000 passes against the toml's 200000 (`prbudget.go:230`) | REAL | **applied**, `da794f16`. Reproduced first: `dotf pr reproduce --probe <window 200000 -> 160000 on the drawn step> --defect-when-passes -- dotf harness check --repo-root .` -> `reproduced (exit 0, defect when the check passes)` on `9bf05c5c`. The step is now measured against its own window; `TestCheckReviewBudget_AStepThatLowersItsOwnWindowIsMeasuredAgainstIt`. |
+| The job ceiling counts one route probe; `route.go` probes the drawn Anthropic model and, on a risky PR, the risk model too, so the worst case is 25 + 6 + 3 + 3 = 37, equal to the 37-minute job | audit, Major | **applied**, `da794f16`. The bats test reads the probed models from `harness/reviewer-pool.json` (`True 38 25 6 3`, red at 37 with `False 37 25 6 3`); the job is 38; lesson 573, the runbook, the workflow comment and this spec carry the corrected sum. |
+| Three `prbudget.go` mutants survive `go test`: first output cap instead of the largest, toml absent beside a workflow, `max_model_tokens` absent | audit, Minor | **applied**, `da794f16`: three tests anchor them. |
+| Zero reserve when no step declares an output cap or declares an expression (`prbudget.go:227`); a step at exactly its ceiling passes (`need <= have`) | THEORETICAL / audit | **ticketed** #3301 |
+| The streamed NaN step's `ai_timeout` bounds the gap between chunks, not the answer (`prbudget.go:284`); client `num_retries` unset upstream multiplies the handler's attempts | THEORETICAL / audit | **ticketed** #3302, measurement first |
+| A token override at the job or workflow `env:` level is invisible to the guard | audit, Minor | **ticketed** #3299 |
+| A reviewer step that loses the `pragent/pr-agent` marker (`uses: The-PR-Agent/...`, `run: docker run`, a reusable-workflow job) drops out with exit 0 | audit, Minor | **ticketed** #3300 |
+| Raising the job to 40 leaves both the guard and bats green | audit, premise | **declined**: the bats job test is a lower bound; added slack is legitimate. |
+
+Verification after the fixes, on macOS: `go test ./internal/harness/` ok, `go vet` and
+`GOOS=windows go vet` clean, `golangci-lint run ./internal/harness/...` 0 issues,
+`bats tests/pr-agent-config.bats` 72/72, `dotf harness check --repo-root .` exit 0.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
