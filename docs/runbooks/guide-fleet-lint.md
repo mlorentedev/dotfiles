@@ -42,7 +42,8 @@ dotf lint fleet --fleet ~/Projects            # every git checkout directly unde
 
 `--fleet` checks each checkout against the branch its own `origin/HEAD` names and prefixes each finding with the
 checkout's directory name. A checkout that cannot be read is reported as `[ERROR] <name>: …` and the others are
-still checked; the run then exits 2.
+still checked; the run then exits 2. A symlinked checkout is read too. A checkout with no `origin/HEAD` and a branch filter is
+one of those errors: run `git remote set-head origin --auto` in it, or lint it alone with `--dir` and `--default-branch`.
 
 | Exit | Meaning |
 |---|---|

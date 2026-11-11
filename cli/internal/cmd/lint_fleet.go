@@ -86,15 +86,14 @@ func lintRepo(deps lintFleetDeps, dir, defaultBranch string) ([]fleetlint.Findin
 	if defaultBranch == "" {
 		defaultBranch = deps.branchOf(dir)
 	}
-	findings, err := fleetlint.Lint(dir, defaultBranch)
-	if errors.Is(err, fleetlint.ErrNoDefaultBranch) {
-		err = fmt.Errorf("%w: pass --default-branch", err)
-	}
-	return findings, err
+	return fleetlint.Lint(dir, defaultBranch)
 }
 
 func runLintFleet(stdout, stderr io.Writer, deps lintFleetDeps, dir, defaultBranch, summary string) error {
 	findings, err := lintRepo(deps, dir, defaultBranch)
+	if errors.Is(err, fleetlint.ErrNoDefaultBranch) {
+		err = fmt.Errorf("%w: pass --default-branch", err)
+	}
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "[ERROR] %v\n", err)
 		return withExitCode(2, err)
@@ -117,6 +116,10 @@ func runLintFleetAll(stdout, stderr io.Writer, deps lintFleetDeps, dir, summary 
 	var failed []string
 	for _, r := range repos {
 		findings, err := lintRepo(deps, filepath.Join(dir, r), "")
+		if errors.Is(err, fleetlint.ErrNoDefaultBranch) {
+			// --fleet takes no --default-branch: name the remedies that apply.
+			err = fmt.Errorf("%w: run git remote set-head origin --auto in it, or lint it alone with --dir and --default-branch", err)
+		}
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "[ERROR] %s: %v\n", r, err)
 			failed = append(failed, r)

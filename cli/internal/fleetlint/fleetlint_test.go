@@ -383,3 +383,15 @@ func TestReposAreTheCheckoutsUnderADirectory(t *testing.T) {
 		t.Error("a missing directory: want an error")
 	}
 }
+
+// A checkout linked in from elsewhere is read, not skipped as clean.
+func TestReposFollowSymlinks(t *testing.T) {
+	elsewhere := repo(t, map[string]string{"real/.git/HEAD": "ref: refs/heads/main\n"})
+	dir := t.TempDir()
+	if err := os.Symlink(filepath.Join(elsewhere, "real"), filepath.Join(dir, "linked")); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+	if got, err := Repos(dir); err != nil || strings.Join(got, ",") != "linked" {
+		t.Errorf("got %v, %v, want linked", got, err)
+	}
+}

@@ -156,3 +156,15 @@ func TestLintFleetRefusesSingleRepositoryFlags(t *testing.T) {
 		}
 	}
 }
+
+// --fleet refuses --default-branch, so an unknown one names the remedies
+// that apply to a fleet instead.
+func TestLintFleetUnknownDefaultBranchHint(t *testing.T) {
+	fleet := fleetDir(t, map[string]string{"a": "on:\n  push:\n    branches: [main]\njobs: {}\n"})
+	var out bytes.Buffer
+	deps := lintFleetDeps{branchOf: func(string) string { return "" }}
+	code := ExitCode(runLintFleetAll(&out, &out, deps, fleet, ""))
+	if code != 2 || !strings.Contains(out.String(), "git remote set-head origin --auto") || strings.Contains(out.String(), ": pass --default-branch") {
+		t.Errorf("exit %d, %q", code, out.String())
+	}
+}

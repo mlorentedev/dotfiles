@@ -122,7 +122,8 @@ func mapEntry(m *yaml.Node, key string) (*yaml.Node, *yaml.Node) {
 }
 
 // Repos are the names of dir's immediate subdirectories that are git
-// checkouts, sorted. A .git file counts: a worktree is a checkout too.
+// checkouts, sorted, a symlinked one included. A .git file counts: a worktree
+// is a checkout too.
 func Repos(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -130,7 +131,9 @@ func Repos(dir string) ([]string, error) {
 	}
 	var out []string
 	for _, e := range entries {
-		if !e.IsDir() {
+		// Stat follows a symlink: a checkout linked in from elsewhere is
+		// still a checkout, and skipping it would read as clean.
+		if fi, err := os.Stat(filepath.Join(dir, e.Name())); err != nil || !fi.IsDir() {
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(dir, e.Name(), ".git")); err == nil {
