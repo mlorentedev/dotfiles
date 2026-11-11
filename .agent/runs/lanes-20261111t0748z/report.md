@@ -38,3 +38,54 @@ Armed 2026-11-11T07:48Z, expires 2026-11-11T19:48Z. Objective: land HARNESS-187 
 - #3265 not started: it builds on `laneLanded` from the parked branch, so it waits on the #3263 answer. Queue is exhausted for this run; what remains is landing #3338.
 - #3338 attempts 3 and 4 failed the same way (`test`, "Install zsh": `Temporary failure resolving 'azure.archive.ubuntu.com'`; `integration` went green on attempt 3). Every branch's run since 13:53Z fails there, so the breaker applies: no more immediate reruns. Filed #3339 (chore P3, two options: fall back to the canonical mirror when the Azure one does not resolve, or stop installing zsh on the runner); `.github/**` is frozen for this run, so the fix is not attempted here. One deferred rerun of the failed job queued for ~15:30Z; #3338 stays a draft until its head is green.
 - #3338 attempt 6 (17:02Z) green on `af40a0a9`; marked ready at 17:04Z. PR-Agent full review at 17:10Z: no findings, three ticket-compliance rows (git older than 2.48 skip, #3327 and #3337 defer); CodeRabbit hit its free-tier limit at 17:04Z and published no review. Triage posted, scoped queue clear, landed with `dotf pr land` at `9431209a` (`af40a0a` squash) under the standing grant; #3262 closed by the merge. `feat-3262-lane-doctor` worktree and branch removed.
+
+## Disarm
+
+**run lanes-20261111t0748z — ended queue-exhausted after 3 iterations / 9h50m (07:41Z to 17:31Z) — 2 done, 2 parked, 2 merged, 1 unmerged.** Waiting on a human: the #3263 A/B and the #3293 A/B. Nothing irreversible is pending; the two merges (#3325, #3338) are the irreversible part and both are on main.
+
+### Waiting on you, irreversible first
+
+1. **Landed on main:** #3325 (`8be2610`, HARNESS-187, lane identity in the worktree git dir, ADR-061) and #3338 (`9431209a`, HARNESS-190, `dotf lane doctor`). Both under the standing grant: CI green on the head SHA, clean, `## Review triage` posted, scoped queue clear. #3338 landed reviewed by PR-Agent and three pooled adversarial rounds; CodeRabbit published no review (free-tier limit), disclosed in the triage.
+2. **#3263, parked (Blocked):** fix written and green on `fix/3263-sweep-skip-reason` (`9a52fd06` test, `6c186810` fix, `c39d7c7c` lesson 584), local only, in `/Users/manu/Projects/worktrees/dotfiles/fix-3263-sweep-skip-reason`. Do not `worktree done` it. Question: (A) free a spec slot or `--over-wip-limit`, then `dotf spec init HARNESS-191-sweep-skip-reason --issue 3263`, review and archive in the PR; or (B) push under `skip-sdd` with the rationale (33 added executable lines, additive `omitempty` JSON key). Cheapest unblock: answer on the issue; the branch pushes the moment either is chosen.
+3. **#3293, parked by scope (Backlog, never claimed):** the squash-merge half is #3310 + #3263; the identity half asks (A) a provenance record per worktree (the ADR-061 shape) or (B) namespaced app roots enforced by `doctor`. Nothing is built for it.
+
+### Parked, with the question restated
+
+- #3263: see item 2 above. Rung reached: implementation complete, push refused by the SDD gate (66 gate lines against 50), `spec init` refused at the WIP limit (10 of 10). The run's rule says an unattended session does not land a public-contract change under `skip-sdd`.
+- #3293: see item 3. Rung reached: scope split only.
+- #3265 (extract `Park`/`parkSingleNamedLane`/`switchLaneLocked` under 40 lines): not started; `laneLanded` on the parked branch is its first seam, so it waits on the #3263 answer. Not claimed, Backlog.
+
+### Done but unmerged
+
+- `fix/3263-sweep-skip-reason`, three commits, tests re-run green on the final tree (`go test ./internal/worktree/ ./internal/cmd/` ok, `GOOS=windows go vet` ok, pinned lint 0 issues on both OSes).
+
+### Evidence index
+
+| Item | Command | Exit | Where |
+|---|---|---|---|
+| #3325 | `cd cli && go test ./... -count=1`; `golangci-lint run` both GOOS | 0 | PR #3325 body, `specs/archive/HARNESS-187-*/verification.md` |
+| #3325 land | `dotf pr triage-queue --pr 3325 && dotf pr land 3325` | 0 | PR #3325 `## Review triage` comment, merge at `8be2610` |
+| #3338 | `go test ./internal/lane/ ./internal/cmd/`; lint both GOOS | 0 | PR #3338 body, `specs/archive/HARNESS-190-lane-doctor/verification.md` |
+| #3338 CI | run 43039304975, attempts 1 to 6 (`test` and `integration` red on the Azure apt mirror until attempt 6) | green on attempt 6 | #3339 names the logs |
+| #3338 land | `go run ./cmd/dotf pr triage-queue --pr 3338` then `pr land 3338` | 0, `[MERGED] #3338 at af40a0a` | PR #3338 `## Review triage` at 17:1xZ |
+| #3263 | `go test ./internal/worktree/ ./internal/cmd/ -count=1`; `GOOS=windows go vet`; pinned lint | 0 | worktree `fix-3263-sweep-skip-reason`, branch at `c39d7c7c` |
+| #3263 push | `git push -u origin fix/3263-sweep-skip-reason` | 1 (SDD spec-gate, 66 LOC) | issue #3263 park comment |
+| #3263 spec | `go run ./cmd/dotf spec init HARNESS-191-sweep-skip-reason --issue 3263` | 1 (10 active specs, limit 10) | same |
+| Repo-wide queue at disarm | `go run ./cmd/dotf pr triage-queue` | 1: only #3334, not this run's PR | this file |
+
+### Budget spent
+
+3 iterations, 9h50m wall clock of a 12h window, 5 queue items (2 landed, 1 parked done, 1 parked by scope, 1 not started), 8 tickets filed (#3318, #3320, #3324, #3327, #3331, #3333, #3337, #3339), all on the board with Status, Priority and Type. No dollar figure exists for this run; the pooled reviews drew on the NaN pool (`ai/nan/README.md` has the rates) and none is attributable here.
+
+### Host-suspend line
+
+The host stayed awake. The window was not fully covered by the run itself: from roughly 15:25Z to 17:01Z the session was paused by the harness's usage limit, so #3338's sixth attempt ran at 17:02Z instead of ~15:50Z. No work was lost; one rerun was delayed.
+
+### Knowledge
+
+- Lesson 582 (landed with #3338), lesson 584 (on the parked branch), ADR-061 (landed with #3325).
+- Vault: the autopilot skill's third eligibility veto now judges the WIP limit at selection, by the gate's own count (`00_meta/skills/autopilot/SKILL.md`, vault `8fc6d656`); reaches the repo copy on the next `dotf harness refresh` (`harness/**` is frozen for this run).
+
+### The one next action
+
+Answer #3263: A or B. Everything else in this line of work (#3265, the #3293 identity half) follows from that branch landing.
