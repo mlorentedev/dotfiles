@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1496,5 +1497,23 @@ func TestFindGitBash_FallsBackToTheStandardInstallRoots(t *testing.T) {
 	}
 	if got, reason := findGitBash(viaGit); reason != "" || got != onPath {
 		t.Errorf("findGitBash via git = (%q, %q), want (%q, \"\")", got, reason, onPath)
+	}
+}
+
+func TestGitRootsFrom(t *testing.T) {
+	for _, tc := range []struct {
+		name, programFiles, localAppData string
+		want                             []string
+	}{
+		{"both set", "P", "L", []string{filepath.Join("P", "Git"), filepath.Join("L", "Programs", "Git")}},
+		{"only the machine root", "P", "", []string{filepath.Join("P", "Git")}},
+		{"only the user root", "", "L", []string{filepath.Join("L", "Programs", "Git")}},
+		{"neither", "", "", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := gitRootsFrom(tc.programFiles, tc.localAppData); !slices.Equal(got, tc.want) {
+				t.Errorf("gitRootsFrom(%q, %q) = %q, want %q", tc.programFiles, tc.localAppData, got, tc.want)
+			}
+		})
 	}
 }

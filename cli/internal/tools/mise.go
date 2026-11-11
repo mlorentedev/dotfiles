@@ -914,12 +914,18 @@ var gitExecPath = func() ([]byte, error) { return exec.Command("git", "--exec-pa
 // existed, so `git --exec-path` cannot find it (#3328); these roots do not
 // depend on the PATH.
 var gitStandardRoots = func() []string {
+	return gitRootsFrom(os.Getenv("ProgramFiles"), os.Getenv("LocalAppData"))
+}
+
+// gitRootsFrom derives the install roots from the two environment values, and
+// skips one that is unset rather than searching a root-relative path.
+func gitRootsFrom(programFiles, localAppData string) []string {
 	var roots []string
-	if pf := os.Getenv("ProgramFiles"); pf != "" {
-		roots = append(roots, filepath.Join(pf, "Git"))
+	if programFiles != "" {
+		roots = append(roots, filepath.Join(programFiles, "Git"))
 	}
-	if local := os.Getenv("LocalAppData"); local != "" {
-		roots = append(roots, filepath.Join(local, "Programs", "Git"))
+	if localAppData != "" {
+		roots = append(roots, filepath.Join(localAppData, "Programs", "Git"))
 	}
 	return roots
 }
