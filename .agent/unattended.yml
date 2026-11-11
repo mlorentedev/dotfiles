@@ -1,0 +1,33 @@
+version: 1
+run_id: "ci-gate-20261111T0740Z"
+armed_by: manu
+armed_at: 2026-11-11T07:42:00Z
+expires_at: 2026-11-11T19:42:00Z
+objective: "Advance the dotfiles side of mlorentedev/ci-workflows#8: finish #3305 (CI-013) up to the owner's merge, land #3304, then build #3147 (dotf lint fleet rules plus dotf gate spec|knowledge to the CI-008 surface agreed with the ci-workflows session) and open #3306's first PR as a draft."
+worktree: /Users/manu/Projects/worktrees/dotfiles/chore-autopilot-ci-gate-20261111t0740z
+branch: chore/autopilot-ci-gate-20261111t0740z
+scope:
+  write_paths: ["cli/**", "tests/**", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", "specs/CI-013-os-matrix-when-it-can-change/**", "specs/CI-*/**", ".github/workflows/ci.yml", ".github/workflows/cli.yml", ".github/workflows/cli-smoke.yml", ".github/filters/**"]
+  vault_paths: ["10_projects/dotfiles/memory/MEMORY.md", "10_projects/dotfiles/memory/threads/**"]
+  frozen_paths: ["harness/**", "**/AGENTS.md", ".agent/unattended.yml", "scripts/**", "setup-*.sh", "setup-*.ps1", "versions.conf", "specs/**/review.md", "forge/branch-protection.json", ".github/merge-grant.yml", ".github/workflows/release*.yml"]
+  max_files: 20
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, actionlint, python3, caffeinate]
+queue:
+  source: bitacora
+  filter: "in order: #3305 (triage, independent spec review, archive; the owner merges), #3304 (triage, land under the standing grant), #3147 (new spec; Go PRs land under the grant when they touch no .github/**), #3306 PR 1 (gate job, draft only). Tickets found along this line are filed, not worked unless they block it."
+  max_items: 6
+  explicit_grants:
+    - "#3305 and #3306 touch .github/workflows with the owner's approval of this line (2026-11-11); they are opened and triaged, never merged by the run."
+  held_for_owner:
+    - "Any PR touching .github/**, branch protection, or a release."
+    - "#3147's 'no linter runs with skip-cache' rule conflicts with dotfiles#2834: implement it as reportable with the #2834 exception documented, or park the rule; never remove dotfiles' skip-cache."
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 120
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
