@@ -48,18 +48,8 @@ func withTurnCapHint(err error, repoRoot, specID, specDir string, slot ReviewSlo
 	if rerr != nil || !found || req.Reviewer == "" {
 		return err
 	}
-	entries, perr := loadReviewerPoolEntries(repoRoot)
-	if perr != nil {
-		return err
-	}
-	for _, e := range entries {
-		if strings.TrimSpace(e.ID) != req.Reviewer {
-			continue
-		}
-		if hint := TurnCapHint(e.Runner, TranscriptPathIn(repoRoot, specID, slot)); hint != "" {
-			return fmt.Errorf("%w\n%s", err, hint)
-		}
-		break
+	if hint := TurnCapHint(runnerOf(repoRoot, req.Reviewer), TranscriptPathIn(repoRoot, specID, slot)); hint != "" {
+		return fmt.Errorf("%w\n%s", err, hint)
 	}
 	// Not a turn cap: say what the reviewer itself said (#1511). A run that
 	// died after the launcher's startup window is first noticed here.
@@ -67,6 +57,21 @@ func withTurnCapHint(err error, repoRoot, specID, specDir string, slot ReviewSlo
 		return fmt.Errorf("%w\nthe review launched with %s left no verdict. %s", err, req.Reviewer, words)
 	}
 	return err
+}
+
+// runnerOf is the runner of the pool member with this id, or "" when the pool
+// cannot be read or has no such member.
+func runnerOf(repoRoot, reviewer string) string {
+	entries, err := loadReviewerPoolEntries(repoRoot)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if strings.TrimSpace(e.ID) == reviewer {
+			return e.Runner
+		}
+	}
+	return ""
 }
 
 // ReviewerLastWords quotes the start and end of what a reviewer wrote, from

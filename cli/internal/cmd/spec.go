@@ -711,11 +711,13 @@ not be copied back is kept.`,
 			res, err := spec.RunWithLimits(spec.Limits{Deadline: limit, StallTimeout: stall, Transcript: transcript},
 				args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), errw)
 			if err != nil {
+				writeErrorStub(errw, review, transcript, copyBack, "the reviewer could not be started: "+err.Error())
 				finishReviewTree(errw, review, tree, copyBack)
 				return err
 			}
 			stray := reportStrayWrites(errw, review, before, snapErr)
 			defer finishReviewTree(errw, review, tree, copyBack)
+			writeErrorStub(errw, review, transcript, copyBack, runEnding(res, limit, stall, review))
 			switch res.Stop {
 			case spec.StopDeadline:
 				_, _ = fmt.Fprintf(errw, "[review] stopped at the %s deadline: the time limit ended this run, not a verdict\n", limit)
@@ -745,6 +747,52 @@ not be copied back is kept.`,
 	cmd.Flags().StringVar(&tree, "worktree", "", "the review worktree the run is in, removed when it ends")
 	cmd.Flags().StringVar(&copyBack, "copy-back", "", "the caller's spec folder the review file is copied back to")
 	return cmd
+}
+
+// runEnding says how a review run ended, for the ERROR record a run that
+// signed nothing leaves (BUG-168).
+func runEnding(res spec.RunResult, limit, stall time.Duration, review string) string {
+	switch {
+	case res.Stop == spec.StopDeadline:
+		return fmt.Sprintf("stopped at the %s deadline", limit)
+	case res.Stop == spec.StopStall && res.LastCall != "":
+		return fmt.Sprintf("stopped: the transcript did not change for %s; the last tool call recorded was %s", stall, res.LastCall)
+	case res.Stop == spec.StopStall:
+		return fmt.Sprintf("stopped: the transcript did not change for %s", stall)
+	case res.Code != 0:
+		return fmt.Sprintf("the reviewer exited with status %d without writing %s", res.Code, filepath.Base(review))
+	default:
+		return "the reviewer exited 0 without writing " + filepath.Base(review)
+	}
+}
+
+// writeErrorStub leaves a review file with verdict ERROR when the run left
+// none (BUG-168, #1511), and says so on errw. The transcript is the one the
+// stall detector watched, else the slot's beside the caller's spec folder,
+// where the launcher writes it. A stub that cannot be written is reported:
+// the run then ends as it did before, with no review file.
+func writeErrorStub(errw io.Writer, review, transcript, callerSpec, ended string) {
+	if review == "" {
+		return
+	}
+	if transcript == "" {
+		dir := callerSpec
+		if dir == "" {
+			dir = filepath.Dir(review)
+		}
+		name := spec.FirstSigner.Transcript
+		if filepath.Base(review) == spec.SecondSigner.Review {
+			name = spec.SecondSigner.Transcript
+		}
+		transcript = filepath.Join(dir, name)
+	}
+	wrote, err := spec.WriteErrorStub(review, transcript, ended)
+	switch {
+	case err != nil:
+		_, _ = fmt.Fprintf(errw, "[review] the run left no %s, and recording that failed: %v\n", filepath.Base(review), err)
+	case wrote:
+		_, _ = fmt.Fprintf(errw, "[review] the run left no %s: wrote one with verdict ERROR, saying how it ended and what the reviewer wrote\n", filepath.Base(review))
+	}
 }
 
 // exitStrayWrites is the status of a review run that exited 0 but left files

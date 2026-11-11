@@ -597,7 +597,11 @@ func VerifyReviewProducedIn(specDir string, slot ReviewSlot, transcript string) 
 			"the transcript of the run that wrote nothing: %s",
 			slot.Review, transcript)
 	}
-	if _, _, err := FindReviewIn(specDir, slot); err != nil {
+	if r, _, err := FindReviewIn(specDir, slot); err != nil {
+		if r.Verdict == VerdictError {
+			// The launcher wrote it, not the reviewer (BUG-168).
+			return fmt.Errorf("%w\nreview transcript: %s", err, transcript)
+		}
 		return fmt.Errorf("the reviewer wrote a malformed %s: %w\nreview transcript: %s",
 			slot.Review, err, transcript)
 	}
