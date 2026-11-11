@@ -390,6 +390,9 @@ func TestSystemUpgradeWindowsUpgradesPerIdAndIsolatesAFailure(t *testing.T) {
 	if res.Changes != 1 {
 		t.Errorf("Changes = %d, want 1: only eza was upgraded", res.Changes)
 	}
+	if !strings.Contains(res.Detail, "upgraded: eza-community.eza") || strings.Contains(res.Detail, "Git.Git") {
+		t.Errorf("Detail = %q, want only the id whose upgrade exited 0 named as upgraded", res.Detail)
+	}
 	if f.index(failing) < 0 || f.index("winget upgrade --id eza-community.eza -e --silent --accept-source-agreements --accept-package-agreements") < 0 {
 		t.Errorf("each id gets its own upgrade, whatever happened to the first: %v", f.log)
 	}

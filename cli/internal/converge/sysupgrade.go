@@ -111,12 +111,12 @@ func (r systemUpgrade) darwin(dryRun bool, targets []sysTarget) (Result, error) 
 		return Result{}, err
 	}
 	due, waiting := r.splitPrivilege(behind)
-	res := Result{Changes: len(due), Detail: upgradeDetail(dryRun, "brew update", due, waiting)}
+	res := Result{Changes: len(due), Detail: upgradeDetail(dryRun, "brew update", due, due, waiting)}
 	if dryRun || len(due) == 0 {
 		return res, nil
 	}
 	done, err := r.brewUpgrade(due)
-	res.Changes = done
+	res.Changes, res.Detail = len(done), upgradeDetail(false, "brew update", due, done, waiting)
 	if err != nil {
 		return res, err
 	}
@@ -141,13 +141,14 @@ func (r systemUpgrade) linux(dryRun bool, targets []sysTarget) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Changes: len(due), Detail: upgradeDetail(dryRun, "apt-get update", due, nil)}
+	res := Result{Changes: len(due), Detail: upgradeDetail(dryRun, "apt-get update", due, due, nil)}
 	if dryRun || len(due) == 0 {
 		return res, nil
 	}
 	argv := append(r.asRoot("apt-get", "install", "--only-upgrade", "-y"), pkgList(due)...)
 	if _, err := r.run(argv[0], argv[1:]...); err != nil {
-		res.Changes = 0
+		// One apt transaction: a failure upgraded nothing the step can name.
+		res.Changes, res.Detail = 0, upgradeDetail(false, "apt-get update", due, nil, nil)
 		return res, fmt.Errorf("%s: %w", strings.Join(argv, " "), err)
 	}
 	res.Detail += r.housekeeping(r.asRoot("apt-get", "autoremove", "-y"))
@@ -165,20 +166,21 @@ func (r systemUpgrade) windows(dryRun bool, targets []sysTarget) (Result, error)
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Changes: len(due), Detail: upgradeDetail(dryRun, "winget source update", due, nil)}
+	res := Result{Changes: len(due), Detail: upgradeDetail(dryRun, "winget source update", due, due, nil)}
 	if dryRun {
 		return res, nil
 	}
 	var failed []error
-	res.Changes = 0
+	var done []sysTarget
 	for _, t := range due {
 		argv := []string{"winget", "upgrade", "--id", t.pkg, "-e", "--silent", "--accept-source-agreements", "--accept-package-agreements"}
 		if _, err := r.run(argv[0], argv[1:]...); err != nil {
 			failed = append(failed, fmt.Errorf("%s: %w", t.pkg, err))
 			continue
 		}
-		res.Changes++
+		done = append(done, t)
 	}
+	res.Changes, res.Detail = len(done), upgradeDetail(false, "winget source update", due, done, nil)
 	return res, errors.Join(failed...)
 }
 
@@ -208,16 +210,17 @@ func (r systemUpgrade) housekeeping(cmds ...[]string) string {
 }
 
 // brewUpgrade upgrades the formulae and the casks, each as one command, and
-// counts what a succeeded command upgraded. A failure of one kind does not
+// returns what a succeeded command upgraded. A failure of one kind does not
 // keep the other from running.
-func (r systemUpgrade) brewUpgrade(due []sysTarget) (int, error) {
+func (r systemUpgrade) brewUpgrade(due []sysTarget) ([]sysTarget, error) {
 	var failed []error
-	done := 0
+	var done []sysTarget
 	for _, g := range []struct {
 		manager string
 		args    []string
 	}{{"brew", []string{"upgrade"}}, {"brew-cask", []string{"upgrade", "--cask"}}} {
-		pkgs := pkgList(ofManager(due, g.manager))
+		group := ofManager(due, g.manager)
+		pkgs := pkgList(group)
 		if len(pkgs) == 0 {
 			continue
 		}
@@ -226,7 +229,7 @@ func (r systemUpgrade) brewUpgrade(due []sysTarget) (int, error) {
 			failed = append(failed, fmt.Errorf("brew %s: %w", strings.Join(argv, " "), err))
 			continue
 		}
-		done += len(pkgs)
+		done = append(done, group...)
 	}
 	return done, errors.Join(failed...)
 }
@@ -409,17 +412,19 @@ func pkgList(list []sysTarget) []string {
 func pkgNames(list []sysTarget) string { return strings.Join(pkgList(list), ", ") }
 
 // upgradeDetail is the step's report line: the refresh as info (it is never
-// counted as a change), then what is, or would be, upgraded, then what waits
-// on a password.
-func upgradeDetail(dryRun bool, refresh string, due []sysTarget, waiting []string) string {
+// counted as a change), then what would be upgraded (a plan) or what an
+// upgrade command that exited 0 did upgrade (an apply), then what waits on a
+// password. A package whose upgrade failed is never named as upgraded: the
+// step's error names it.
+func upgradeDetail(dryRun bool, refresh string, due, done []sysTarget, waiting []string) string {
 	parts := []string{"index refreshed (" + refresh + ")"}
 	switch {
 	case len(due) == 0:
 		parts = append(parts, "catalog entries up to date")
 	case dryRun:
 		parts = append(parts, "to upgrade: "+pkgNames(due))
-	default:
-		parts = append(parts, "upgraded: "+pkgNames(due))
+	case len(done) > 0:
+		parts = append(parts, "upgraded: "+pkgNames(done))
 	}
 	if len(waiting) > 0 {
 		parts = append(parts, "left, needs sudo: "+strings.Join(waiting, ", ")+" (run `dotf converge --only system-upgrade` from a terminal)")
