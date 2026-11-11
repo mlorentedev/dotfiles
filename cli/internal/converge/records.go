@@ -87,6 +87,10 @@ type Options struct {
 	// HerdrRun runs herdr for its agent integrations; unset, that half of
 	// agent-extensions is skipped.
 	HerdrRun tools.Runner
+	// SystemRun runs the OS package manager (brew, apt-get, winget) for the
+	// system-upgrade step and returns stdout; ExecManager in production. Unset,
+	// that step is skipped.
+	SystemRun tools.Runner
 	// PwshRun runs pwsh for the pwsh-modules step; tools.ExecRunner in
 	// production. Unset, that step is skipped.
 	PwshRun pwsh.Runner
@@ -123,6 +127,7 @@ func Registry(o Options) []Reconciler {
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, preview: HarnessPreview, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs, registered: o.RegisteredPath},
+		systemUpgrade{run: o.SystemRun, has: onPath},
 		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},

@@ -96,6 +96,7 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	opts := convergeOptions()
 	if rl != nil {
 		opts.MiseRun = loggedRunner(opts.MiseRun, rl.Stream())
+		opts.SystemRun = loggedRunner(opts.SystemRun, rl.Stream())
 	}
 	reg := converge.Registry(opts)
 	if len(only) > 0 {
@@ -239,6 +240,7 @@ var convergeOptions = func() converge.Options {
 		Claude:         claudeSyncer,
 		AgyPaths:       agyPaths,
 		HerdrRun:       tools.ExecRunner,
+		SystemRun:      converge.ExecManager,
 		PwshRun:        tools.ExecRunner,
 		CompletionRun:  converge.ExecStdout,
 		Scheduler:      converge.NativeScheduler(os.Getuid(), schedule.Elevated),
