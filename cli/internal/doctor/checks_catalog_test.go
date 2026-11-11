@@ -26,6 +26,26 @@ func TestCatalogPin_ReadsTheCheckoutBeforeTheMirror(t *testing.T) {
 	}
 }
 
+// #2438: a CLI that moved from the catalog to mise's npm backend keeps its pin in
+// versions.conf. The pin checks read the catalog first, then that file, so
+// moving it neither blanks the check nor makes it a FAIL.
+func TestCatalogPin_FallsBackToTheVersionsConfPinOfAMiseTool(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "packages.json"), catalogWithOpencode)
+	sys := newSys(map[string]string{"DOTFILES_REPO_DIR": repo}, nil, nil)
+	cfg := &Config{Versions: map[string]string{"COPILOT_VERSION": "1.0.81", "OPENCODE_VERSION": "9.9.9"}}
+
+	if got := catalogPin(sys, cfg, "copilot"); got != "1.0.81" {
+		t.Errorf("a tool absent from the catalog takes its versions.conf pin, got %q", got)
+	}
+	if got := catalogPin(sys, cfg, "opencode"); got != "1.16.2" {
+		t.Errorf("the catalog still wins for a tool it holds, got %q", got)
+	}
+	if got := catalogPin(sys, cfg, "nope"); got != "" {
+		t.Errorf("no pin anywhere, got %q", got)
+	}
+}
+
 // Two opencode copies on PATH — the Windows work box's npm-global + winget
 // pair — must be named; one copy must stay quiet.
 func TestCheckShadowedCatalogTools_NamesEveryDirectoryProvidingTheTool(t *testing.T) {
