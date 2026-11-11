@@ -93,3 +93,4 @@ Answer #3263: A or B. Everything else in this line of work (#3265, the #3293 ide
 ### Post-disarm: main after #3338
 
 - `ci.yml` on main at `9431209a` (run 43065883128): `test` and `integration` failed on the Azure apt mirror again (`Temporary failure resolving 'azure.archive.ubuntu.com'` in "Install zsh"; the container build's `apt-get update` likewise), the #3339 signature, not the change: the same head passed both jobs on PR #3338's attempt 6 at 17:02Z. One `rerun --failed` issued; the evidence is on #3339.
+- Rerun (attempt 2) of run 43065883128 green: main at `9431209a` passes `test` and `integration`. Nothing landed by this run is red on main.
