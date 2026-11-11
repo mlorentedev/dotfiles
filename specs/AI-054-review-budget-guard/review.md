@@ -1,91 +1,89 @@
 ---
 spec: "AI-054-review-budget-guard"
-verdict: "FAIL"
-reviewed_sha: "2eea97b3a77cc2a9992a904381257bc7eec5827f"
-reviewer: "nan/mimo-v2.6-flash"
-date: "2026-11-11"
+verdict: "PASS-WITH-GAPS"
+reviewed_sha: "8e1248802ce4481b510ac85c50e731a4afdc3e28"
+reviewer: "nan/glm5.3-flash"
+date: "2026-11-10"
 ---
 
 ## Adversarial review
 
-**Scope**: AI-054-review-budget-guard (whole change, `git diff ef14013b05592e1a061c663851674ccbf6f1dfdb...HEAD`; 5 first-parent commits, no merges in range: 6449133, 9bf05c5, dc2d07b8, f4cc882, 2eea97b)
-
-**Sources**: `specs/AI-054-review-budget-guard/{proposal,tasks,verification,review}.md`, `features.json`, `review-request.json`; `cli/internal/harness/prbudget.go` + `prbudget_test.go`, `cli/internal/harness/check.go`, `.pr_agent.toml`, `.github/workflows/pr-agent.yml`, `tests/pr-agent-config.bats`, `docs/runbooks/guide-pr-agent-reviewer.md`, `docs/lessons/lesson-573-*.md`.
+**Scope**: AI-054-review-budget-guard — whole change, `git diff ef14013b05592e1a061c663851674ccbf6f1dfdb...HEAD` (8 first-parent commits, no merges in range; all 8 belong to this spec's work: 6449133, 9bf05c5, dc2d07b8, f4cc882, 2eea97b, 6b1ff96, 937f92a, 8e12488).
+**Sources**: `specs/AI-054-review-budget-guard/{proposal,tasks,verification}.md`, `features.json`, `review-request.json`, `review.md` (round 1, `937f92aa`); `cli/internal/harness/prbudget.go` + `prbudget_test.go`, `check.go`, `.pr_agent.toml`, `.github/workflows/pr-agent.yml`, `tests/pr-agent-config.bats`, `docs/runbooks/guide-pr-agent-reviewer.md`, `docs/lessons/lesson-573-*.md`.
 
 ### Gate pre-flight
 
-- Contract digests match `review-request.json` exactly via `dotf spec digest AI-054-review-budget-guard` (features 2d9da26b…, proposal 05c8987b…, tasks 9b987d0e…). Not stale at review time.
-- `reviewer: nan/mimo-v2.6-flash` is a pool member (`harness/reviewer-pool.json:87`). No `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]` tags in the folder. `reviewed_sha` = `git rev-parse HEAD` = 2eea97b3.
-- `proposal.md` declares no `risk:` → single signature required.
+- Contract digests match `review-request.json` exactly via `dotf spec digest AI-054-review-budget-guard` (features `584f13f0…`, proposal `edb297ea…`, tasks `8c422b4d…`). Not stale at review time.
+- `reviewer: nan/glm5.3-flash` recorded as drawn. No `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]` tags in the spec folder. `reviewed_sha` = `git rev-parse HEAD` = 8e12488.
+- `proposal.md` declares no `risk:` → single signature suffices.
 
 ### Spec and task alignment
 
-Reproduced in this session (not taken on trust):
+All six ACs map to named tests, every one re-run in this session:
 
 | Claim | Command | Result |
 |---|---|---|
 | Package green | `go test ./internal/harness/ -timeout 5m` | ok, exit 0 |
-| Review tests | `go test ./internal/harness/ -run Review -v` | **15/15** pass (verification.md says 12/12 — stale) |
-| Guard green on this repo | `go run ./cmd/dotf harness check --repo-root ..` | exit 0; 4 clip OK lines + 3 ceiling OK lines |
-| Guard red on pre-fix config | base `.pr_agent.toml` + `pr-agent.yml` (ef14013b) extracted to `mktemp -d`, same command | exit 1; **7** budget findings (4 clips + 2 ceilings + 1 undeclared `ai_timeout`) — tasks.md says six |
-| AC4 behaviour (unparseable) | garbage toml in `mktemp -d` root | `[ERROR] .pr_agent.toml: not valid TOML…` — behaviour holds at runtime, but **no committed test** (finding 1) |
-| AC3 SSOT | `bats tests/pr-agent-config.bats` | 72/72 pass |
-| Build/vet/lint | `go build ./...`, `go vet` (+`GOOS=windows`), `golangci-lint run ./internal/harness/...`, `gofmt -l` | all clean (lint: 0 issues) |
+| Review tests | `go test ./internal/harness/ -run Review -v` | **16/16** pass, matching verification.md |
+| AC1/AC2/AC4 feature set | `test -run '…TheCurrentConfigurationFails\|TheFixedConfigurationPasses\|TheRepositoryPassesItsOwnGuard$'`, `test -run '…AWorkflow…\|HalfAReviewer\|AFileWithoutAClip\|AnUnparseable\|ACheckout…$'` | pass (4 + 1 ok) |
+| Guard green on this repo | `go run ./cmd/dotf harness check --repo-root ..` | exit 0, 4 clip-OK + 3 ceiling-OK lines, `no harness drift` |
+| AC3 job ceiling | `bats tests/pr-agent-config.bats --filter 'the job outlives both bounded Actions and the probes'` | ok (sum `38 > 25+6+3+3`) |
+| AC6 routing + parity | bats filters `at most two bounded attempts…`, `the Anthropic attempts run the routed model…` | both ok (`13 13 True…`, `True True True`) |
+| AC5 runbook | grep for `31-minute` / 8-minute / 200000-as-clip | only window-side 200000 remains (intended) |
+| Wire-in | `grep checkReviewBudget cli/internal/harness/check.go` | called from `CheckDrift` |
+| Red guard exits non-zero | mutation: clip 200000 beside workflow `mktemp` copy, `harness check --repo-root $TMP` | `[GAP]` printed, **exit 1** |
+| Lint/build | `go build ./...`, `go vet ./internal/harness/`, `gofmt -l`, `golangci-lint run ./internal/harness/...` | clean, 0 issues |
 
-Mutation battery (all in `mktemp -d` git worktrees, all reverted, worktrees removed; working tree clean apart from this review):
+Mutation battery on copies of the tree in a `mktemp -d` checkout of the two files + `harness/` (all reverted, repo tree clean):
 
-1. `clipLine`: `<` → `<=` → `TestCheckReviewBudget_TheClipMustLeaveSlackNotJustFit` **red** (AC1 boundary bites).
-2. workflow job `timeout-minutes: 38` → `37` → `@test "pr-agent: the job outlives both bounded Actions and the probes before them"` **red** at `False 37 25 6 3` (AC3 SSOT bites, matching verification.md's claim).
-3. `.pr_agent.toml` clip `150000` → `200000` → `dotf harness check` **red** with the clip GAP on the file and on the NaN step, Anthropic steps still OK (AC1 end-to-end bites).
-4. Same toml mutation → `@test "pr-agent: the Anthropic attempts run the routed model, allowlisted, with bounded input and output"` (the parity test) **red** at line 1306 (AC6 bites).
+| Mutation | Observed |
+|---|---|
+| toml `max_model_tokens` 150000 → 200000 | `[GAP] the prompt clip in .pr_agent.toml never fires: 200000 + 40000 = 240000, not under 200000` |
+| drawn-first step's `CONFIG__CUSTOM_MODEL_MAX_TOKENS` 200000 → 160000 | `[GAP] … drawn first … 150000 + 40000 = 190000, not under 160000` (the audited fix `f4cc882` bites) |
+| NaN step's `CONFIG__AI_TIMEOUT: "120"` deleted | `[GAP] PR-Agent does not declare CONFIG__AI_TIMEOUT` |
+| first Anthropic `timeout-minutes: 13 → 8` | `[GAP] … 1 models x 2 attempts x 360 s = 720 s in a 480 s ceiling` |
 
-Tasks: all boxes ticked except the final review task. One ticked task has no corresponding artifact (finding 1). The late audit fix (f4cc882) updated code, workflow, runbook and the proposal's *What*, but left several recorded counts and the proposal's AC5/Risks stale (findings 2–4). Dispositions for the PR-agent review and the independent audit are recorded in `verification.md` with tickets #3299–#3302 — good practice, two citation defects in them (findings 3–4).
+Round-1 finding dispositions verified against the tree: `TestCheckReviewBudget_AnUnparseableFileFailsClosed` exists and pins the garbage-in-either-file case (round-1 Major, applied); proposal says "AI-054's AC7" nowhere and cites "AI-045's AC7"; the fix cited on the branch is `f4cc882` (no dangling `da794f6`); `features.json` carries three features whose verification commands I ran, all green.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
 |----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Major | REAL | spec/tests (AC4) | AC4's "either file is present but unparseable" clause has no test, yet tasks.md ticks `Red: a test builds a repo with a reviewer but an unparseable .pr_agent.toml / workflow` — no such test exists anywhere in the package, and verification.md's AC4 evidence cites only the no-step, missing-file and neither-file tests | `prbudget_test.go` has 15 test funcs; grep for `unparseable\|not valid\|invalid` matches nothing; only `prbudget_test.go` references the guard's functions | **UNTESTED** — the finding *is* the absent regression test (behaviour itself observed working: `[ERROR] .pr_agent.toml: not valid TOML…` on a garbage-toml root) | tests (+ verification.md to name it once added) |
-| Major | REAL | spec (contract, AC5) | AC5 requires the runbook to state "the 37-minute job"; the runbook states **38** (correctly — the audit raised it), the proposal's *What* says 38, but proposal Risks still says "the job ceiling (37)" and AC5 says 37: AC5 cannot be honestly ticked as written. verification.md ticks AC5 while misquoting the file as "the step/job rows are `13` and `37`" | proposal.md:43 (38) vs :55 ("(37)") vs :69 (AC5 "37-minute job"); runbook job row `38`; f4cc882 amended only the What (2-line proposal change) | The number is pinned by `@test "pr-agent: the job outlives both bounded Actions and the probes before them"` — green at 38, red at 37 (reproduced); the defect is spec text | spec (proposal.md = contract → digest change → re-review; verification.md line free) |
-| Minor | REAL | spec + verification (counts) | The late fix's sweep missed recorded counts: tasks.md "six findings" (pre-fix run now reports **7** — f4cc882's step-window measurement added a fourth clip line); verification.md "asserts **four** findings" (the test asserts **5**), "**12/12**" (now 15), "**six** findings" (7) | my pre-fix run (7 findings); `TestCheckReviewBudget_TheCurrentConfigurationFails` asserts `n != 5`; `-run Review -v` = 15 | `TestCheckReviewBudget_TheCurrentConfigurationFails` (named) | tasks.md (contract) + verification.md |
-| Minor | REAL | verification (citations) | The disposition table credits `da794f16` for both applied fixes; that sha is an ancestor of no branch (dangling, content differs: job 37, sum 36) and cannot be resolved on a fresh clone. The in-range commit is `f4cc882` | `git merge-base --is-ancestor da794f16 HEAD` → not ancestor; `git branch -a --contains da794f16` → empty; `git range-diff` da794f16 vs f4cc882 shows the 37-vs-38 content difference | n/a | verification.md (outside contract) |
-| Minor | REAL | spec (contract, features.json) | `features.json` is untouched template scaffolding: `behavior: "Outcome 1"`, `verification: "echo 'not implemented' && exit 1"`, `state: "pending"` — contradicts the ticked implementation. Its digest is in `review-request.json`, so it must be decided while the contract is open | file contents; `dotf spec digest` | n/a — whether the archive gate consumes `features.json` state is **UNVERIFIED** (gate lives outside this repo; not run, it would mutate) | spec (contract) — owner decides: fill or drop |
-| Minor | THEORETICAL | code (fail-open edge) | A step-level *expression*-valued `CONFIG__MAX_MODEL_TOKENS` / `CONFIG__CUSTOM_MODEL_MAX_TOKENS` / `CONFIG__MAX_OUTPUT_TOKENS` reads as 0 and is silently skipped in `checkTokenClip` (fail-open), while an expression `ai_timeout` fails closed — inconsistent direction. Tickets #3299 (job/workflow-level env) and #3301 (reserve) do not cover a step's clip/window expression | prbudget.go: `if s.maxTokens <= 0 && s.window <= 0 { continue }`; `envInt` returns 0 on `Atoi` failure; both committed clip overrides are literals (workflow:459, :690) | UNTESTED; closest is `TestCheckReviewBudget_AnExpressionChainUsesTheTomlPoolAsItsBound` (fallbacks only) | code or ticket (#3299-adjacent) |
-| Minor | SPECULATIVE | spec (citation) | proposal.md cites a bare "AC7" — this spec has only AC1–AC6; it is AI-045's AC7 (`specs/archive/AI-045-nan-catalog-alignment/proposal.md:98`, which indeed requires the job bound to exceed the sum). The workflow/bats bare "(AC7)" predate this change | proposal.md:43 vs :65–70; AI-045 archive | n/a | spec (optional; bundle with the FAIL edits) |
+| Minor | REAL | spec artifacts (contract) | `proposal.md` Risks still carries stale arithmetic: "*12 + 13 = 25* of the 34 minutes available; the probes, setup and publication calls take *the other 11*" — 34−25 is 9, the post-audit other-part is 12, and the job is now 38; it contradicts the same proposal's own `25 + 6 + 3 + 3 = 37` two paragraphs earlier | read of `proposal.md` line 60; no repro needed, it is a written contradiction | UNTESTED (prose) | spec (proposal.md is contract set — disposition in `verification.md`, fix next contract revision; editing it now would invalidate this review) |
+| Minor | THEORETICAL | guard coverage | A token override at the job or workflow-level `env:` is invisible to the clip check (fail-open class) | ticket **#3299**, OPEN | UNTESTED at job level; step-level override covered by `TestCheckReviewBudget_AStepThatDeclaresItsOwnClipIsCheckedToo` | already ticketed (#3299) — tracked |
+| Minor | THEORETICAL | guard reserve | Reserve is 0 when no review step declares an output cap, and a step declaring one as an expression reads as 0; a step at exactly its ceiling passes (`need <= have`) | ticket **#3301**, OPEN | boundary `< vs <=` covered by `TestCheckReviewBudget_TheClipMustLeaveSlackNotJustFit`; the missing-cap case is UNTESTED | already ticketed (#3301) — tracked |
+| Minor | THEORETICAL | guard marker | A review step that loses the `pragent/pr-agent` marker (`uses:` rename, `run: docker run`, reusable workflow) drops out silently only when *no* step has it; a partial marker loss inside a job that still has one step is not detected | ticket **#3300**, OPEN | `TestCheckReviewBudget_AWorkflowWithoutAReviewStepFailsClosed` covers the all-lost case; partial loss UNTESTED | already ticketed (#3300) — tracked |
+| Minor | THEORETICAL | timeout semantics | The streamed NaN step's `ai_timeout` bounds the gap between chunks, not the whole answer, and upstream `num_retries` is unset | ticket **#3302**, OPEN; also `runbook` names the streaming difference | UNTESTED (needs measurement) | already ticketed (#3302) — tracked |
+| Minor | THEORETICAL | guard chain bound | `literalList` accepts only JSON; a YAML flow-list literal (`[a, b]`, unquoted) falls back to the toml pool count, which can over-estimate chain — a false positive, the safe direction | code read of `prbudget.go` `literalList` | UNTESTED | code (follow-up ticket candidate; no action needed this round) |
 
-Strengths, where they mitigate a documented risk: the deleted weak Go job-ceiling bound is pinned against return by `TestCheckReviewBudget_TheGuardLeavesTheJobCeilingToTheBatsTest` (reproduced green on a 1-minute job), which addresses exactly the "guard agrees with a wrong ceiling" risk this spec exists for.
+No Blockers. No REAL Majors. The four tickets above (#3299–#3302) exist, are OPEN, and are dispositioned in `verification.md` with reproduce-first evidence — they are tracked, not open claims.
+
+### Test deletions — retention field check
+
+The change deletes the first-attempt Go job-ceiling check (`jobCeiling`, `prWorstPath`, `prSetupSeconds`) together with its test. Every retention field is recorded: (1) the deleted test guarded a bound that passed at 34 on a job needing 37; (2) the stronger proof that remains is shown — `tests/pr-agent-config.bats:1189` computes the sum from the workflow and the pool and was demonstrated red at 37 (`False 37 25 6 3`) before the job moved to 38; (3) no production caller remains; (4) history is this change itself; (5) the focused command is the bats filter, run green here. The silence against a weaker duplicate is pinned by `TestCheckReviewBudget_TheGuardLeavesTheJobCeilingToTheBatsTest`. Compliant.
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | C | All runtime behaviour I could exercise is correct, but AC5 is not met as written and AC4's unparseable clause has no committed test — criteria partially met |
-| Verification       | C | Evidence is extensive and I reproduced it, but a cluster of recorded claims do not hold as written (four/five, 12/15, six/seven, 37/38, unreachable da794f16) |
-| Scope              | A | Exactly the spec's work: 5 in-range commits, no merges, no creep; the audit amendments are documented in-commit |
-| Reliability        | B | Fail-closed paths observed end-to-end (half reviewer, no step, garbage toml, missing clip); residual expression-level fail-open edges are theoretical and ticketed |
-| Maintainability    | A | golangci-lint 0 issues, gofmt/vet clean (incl. GOOS=windows), functions <40 lines, WHY-comments throughout, 15 named fixture tests |
-| Handoff-readiness  | C | Lesson-573, runbook and dispositions exist, but the contract text contradicts delivered reality in three places (AC5, Risks "(37)", task tick) |
+| Correctness        | B | All six ACs verified by named tests re-run here plus an independent mutation battery; residual gaps are narrow, ticketed blind spots (job-level env, marker loss) |
+| Verification       | A | Every claim in verification.md reproduced in this session from the stated command; digests, exit codes and lint all checked |
+| Scope              | A | Diff is exactly the guard + the two config files it fixes + runbook/lesson/spec; no creep |
+| Reliability        | A | Fail-closed at every parse/half-file/no-step path, each with a named test; red exit verified |
+| Maintainability    | A | Small functions, low complexity, table-driven fixtures, comments state why (34→37 incident recorded in both code and spec) |
+| Handoff-readiness  | A | Lesson-573 promoted, runbook refreshed, round-1 dispositions and four open tickets recorded with reproduce-first evidence |
 
 ### Verdict
 
-**FAIL.** Two **REAL Majors** force it regardless of rubric: (1) an acceptance-criterion clause (AC4 unparseable) with **UNTESTED** coverage whose implementing task is ticked against a test that does not exist — by the gate's own rule an UNTESTED Major needs a named regression test before PASS; (2) AC5 as written cannot be honestly ticked against the delivered runbook, and its verification tick misquotes the artifact — a contract-set defect, and the contract set must be edited before this can archive. The rubric independently floors at PASS-WITH-GAPS (three C's); severity × reality governs and is the more severe path.
+**PASS WITH GAPS** — no Blocker, no REAL Major; five Minors, three REAL/THEORETICAL already ticketed (#3299–#3302) and one spec-text inconsistency (proposal Risks arithmetic) to disposition. Rubric all B or above.
+
+`dotf spec archive` is **advisable** in the current state: the contract digests match, the review is fresh at the reviewed sha, and every round-1 Major was applied with a named test. The tracked minors ride in their own tickets and do not gate the archive.
 
 ### Recommended next steps
 
-Contract set (`proposal.md`, `tasks.md`, `features.json`) — these are the point of a FAIL; a re-review follows them:
+Route by set: the contract set is closed under this verdict — these are for the implementer to disposition in `verification.md` (applied / ticketed / declined with reason) or to carry into the existing tickets.
 
-1. `proposal.md` AC5: "the 37-minute job" → "the 38-minute job"; Risks: "the job ceiling (37)" → "(38)". (Optional: qualify "AC7" as "AI-045's AC7".)
-2. `tasks.md`: "six findings" → "seven findings" (the pre-fix run's actual count under the current guard).
-3. `features.json`: fill the placeholder Outcome/verification or state in it why the placeholder stands for this spec.
-
-Tests (outside the contract set):
-
-4. Add the AC4 unparseable regression test (invalid toml and invalid workflow fixtures, each asserting a problem) — this is the Major's fix and makes the existing tick true.
-
-`verification.md` (outside the contract set, editable any time):
-
-5. Correct the counts ("four"→"five", "12/12"→"15/15", "six"→"seven"), the AC5 evidence line ("13 and 37"→"13 and 38"), replace the unreachable `da794f16` citation with `f4cc882`, and name the new unparseable test under AC4.
-
-Then re-run `dotf spec review AI-054-review-budget-guard` — the contract edits change the digests, so this verdict is superseded by the next round by design.
-
-**UNVERIFIED**: archive-gate internals and its handling of `features.json` (implementation is outside this repository and was not run, since archiving would mutate); verification.md's Windows-side bats run (I ran the full file on macOS: 72/72); the origin of dangling `da794f16` beyond "no branch contains it".
+- Confirm the dispositions on #3299, #3300, #3301 and #3302 stay recorded here and land with their own tests when the tickets are picked up (no contract edit).
+- Disposition the proposal Risks stale arithmetic ("34 minutes available", "the other 11") in `verification.md`; correct it whenever the contract is next legitimately revised.
+- Optional follow-up ticket: `literalList` rejecting unquoted YAML flow lists over-estimates chain via the toml pool — safe direction, worth one sentence in #3299's class rather than code now.
+- When #3301/#3299 are fixed, extend `dotf pr reproduce` coverage to the job-level env override so the blind spot cannot re-open silently.

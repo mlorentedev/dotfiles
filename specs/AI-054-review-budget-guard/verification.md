@@ -140,6 +140,19 @@ Verification after the fixes, on macOS: `go test ./internal/harness/` ok, `go ve
 
 The contract digests changed, so a second round follows.
 
+## Pooled review, round 2 (2026-11-11, nan/glm5.3-flash): PASS-WITH-GAPS
+
+`review.md` at `8e124880`; no Blocker, no REAL Major. Dispositions:
+
+| Finding | Disposition |
+|---|---|
+| `proposal.md` Risks still says "of the 34 minutes available; ... the other 11" beside the corrected `25 + 6 + 3 + 3 = 37` (Minor, REAL, prose) | **declined this round**: the contract set is closed under this verdict and an edit would void it. The What paragraph two lines above carries the live sum (37 under a 38-minute job); the Risks sentence describes the pre-audit arithmetic it was written against. Corrected at the next legitimate contract revision. |
+| Job/workflow-level `env:` override invisible (THEORETICAL) | **tracked**, #3299 |
+| Zero reserve, expression output cap, `need <= have` at the boundary (THEORETICAL) | **tracked**, #3301 |
+| Partial marker loss inside a job that keeps one marked step (THEORETICAL) | **tracked**, #3300, noted there |
+| Streamed `ai_timeout` and `num_retries` (THEORETICAL) | **tracked**, #3302 |
+| `literalList` accepts JSON only; an unquoted YAML flow list falls back to the toml pool count, over-estimating chain (THEORETICAL, safe direction) | **tracked**, noted on #3299 as the same class: a value the guard cannot read. |
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
