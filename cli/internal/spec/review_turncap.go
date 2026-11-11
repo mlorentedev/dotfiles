@@ -60,7 +60,37 @@ func withTurnCapHint(err error, repoRoot, specID, specDir string, slot ReviewSlo
 		}
 		break
 	}
+	// Not a turn cap: say what the reviewer itself said (#1511). A run that
+	// died after the launcher's startup window is first noticed here.
+	if words, ok := ReviewerLastWords(TranscriptPathIn(repoRoot, specID, slot)); ok {
+		return fmt.Errorf("%w\nthe review launched with %s left no verdict. %s", err, req.Reviewer, words)
+	}
 	return err
+}
+
+// ReviewerLastWords quotes the end of what a reviewer wrote, from its stderr
+// first and then its transcript, and reports whether there was anything to
+// quote. The end, because that is where a run writes how it finished.
+func ReviewerLastWords(transcript string) (string, bool) {
+	for _, src := range []struct{ label, path string }{
+		{"stderr", StderrPath(transcript)},
+		{"transcript", transcript},
+	} {
+		b, err := os.ReadFile(src.path)
+		if err != nil {
+			continue
+		}
+		out := strings.TrimSpace(string(b))
+		if out == "" {
+			continue
+		}
+		const max = 800
+		if len(out) > max {
+			out = fmt.Sprintf("… (truncated; full %s at %s)\n", src.label, src.path) + out[len(out)-max:]
+		}
+		return "It wrote, on " + src.label + ":\n" + out, true
+	}
+	return "", false
 }
 
 // piTurnCap reads a pi --mode json transcript and reports how many turns ran

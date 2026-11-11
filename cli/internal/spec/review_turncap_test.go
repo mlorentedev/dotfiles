@@ -192,3 +192,38 @@ func TestArchiveGateNamesTheCapOnlyForAMissingVerdict(t *testing.T) {
 		t.Errorf("a written verdict's refusal got a turn-cap hint: %v", err)
 	}
 }
+
+// #1511: a detached review that died after the launcher's startup window (a
+// spent quota took 5.6s) leaves no verdict, and archive is the first place
+// anyone hears of it. The refusal quotes what the reviewer said, so "it died
+// on quota" does not read as "nobody ran it".
+func TestArchiveGateQuotesWhatADeadReviewerSaid(t *testing.T) {
+	repoRoot, specDir := archiveCapFixture(t, 460, false)
+	quota := `{"event":"result","result":{"status":"ERROR","error":"Individual quota reached. Resets in 1h6m26s.","usage":{"total_tokens":0}}}`
+	if err := os.WriteFile(TranscriptPath(repoRoot, "X"), []byte(quota+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := checkReviewGate(repoRoot, "X", specDir, nil)
+	if err == nil {
+		t.Fatal("a review that wrote no verdict must not archive")
+	}
+	if !strings.Contains(err.Error(), "Individual quota reached") || !strings.Contains(err.Error(), "nan/deepseek-v4-flash") {
+		t.Errorf("the refusal must quote the reviewer and name it: %v", err)
+	}
+}
+
+// A long transcript is quoted from its end, where a run's outcome is written.
+func TestReviewerLastWordsQuotesTheEnd(t *testing.T) {
+	transcript := filepath.Join(t.TempDir(), "t.jsonl")
+	body := strings.Repeat("{\"event\":\"delta\"}\n", 200) + `{"event":"result","error":"the end"}` + "\n"
+	if err := os.WriteFile(transcript, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	words, ok := ReviewerLastWords(transcript)
+	if !ok || !strings.Contains(words, "the end") {
+		t.Errorf("want the transcript's end quoted, got ok=%v %q", ok, words)
+	}
+	if _, ok := ReviewerLastWords(filepath.Join(t.TempDir(), "absent.jsonl")); ok {
+		t.Error("no transcript and no stderr must report nothing to quote")
+	}
+}
