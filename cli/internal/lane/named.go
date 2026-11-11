@@ -114,7 +114,7 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 
 	changed := 0
 	for _, name := range CanonicalLanes {
-		created, err := provisionLane(absRepo, filepath.Join(repoWTRoot, name), name, baseRef)
+		created, err := provisionLane(absRepo, gitCommonDir, filepath.Join(repoWTRoot, name), name, baseRef)
 		if err != nil {
 			return changed, err
 		}
@@ -141,9 +141,15 @@ func resolveGitCommonDir(repo string) (string, error) {
 	return common, nil
 }
 
-// provisionLane makes the lane at lanePath exist detached at baseRef and carry
-// lease metadata, reporting whether it wrote anything.
-func provisionLane(absRepo, lanePath, name, baseRef string) (bool, error) {
+// provisionLane makes the lane at lanePath exist detached at baseRef, carry
+// lease metadata and carry its identity record, reporting whether it wrote
+// anything. The identity is written on every exit, so a record deleted by
+// hand is restored by the next init. A directory already at lanePath is
+// adopted only when it is a worktree of this repository; anything else is
+// refused, because adopting it would hand this repository's lane name to a
+// stranger (two repositories with one basename under one WORKTREE_ROOT
+// resolve to the same lane paths).
+func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool, error) {
 	now := time.Now()
 
 	if _, statErr := os.Stat(lanePath); statErr != nil {
@@ -151,17 +157,25 @@ func provisionLane(absRepo, lanePath, name, baseRef string) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("lane init: git worktree add --detach %s failed (%w): %s", name, err, strings.TrimSpace(string(out)))
 		}
-		return true, saveLaneMetadata(lanePath, worktree.Metadata{
+		if err := saveLaneMetadata(lanePath, worktree.Metadata{
 			Lane:      name,
 			State:     string(worktree.StateParked),
 			CreatedAt: now,
 			ReapOK:    false,
-		})
+		}); err != nil {
+			return true, err
+		}
+		_, err = writeIdentity(lanePath, name)
+		return true, err
+	}
+
+	if err := assertWorktreeOf(absRepo, repoCommonDir, lanePath); err != nil {
+		return false, err
 	}
 
 	meta, merr := worktree.LoadMetadata(lanePath)
 	if merr == nil && meta != nil && meta.Lane == name && meta.State != "" && !meta.ReapOK {
-		return false, nil
+		return writeIdentity(lanePath, name)
 	}
 
 	state := string(worktree.StateParked)
@@ -172,14 +186,68 @@ func provisionLane(absRepo, lanePath, name, baseRef string) (bool, error) {
 	if out, berr := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output(); berr == nil && strings.TrimSpace(string(out)) != "" {
 		state = string(worktree.StateActive)
 	}
-	return true, saveLaneMetadata(lanePath, worktree.Metadata{
+	if err := saveLaneMetadata(lanePath, worktree.Metadata{
 		Lane:           name,
 		State:          state,
 		Issue:          issueNum,
 		CreatedAt:      now,
 		LeaseExpiresAt: now.Add(leaseTTL),
 		ReapOK:         false,
-	})
+	}); err != nil {
+		return true, err
+	}
+	_, err := writeIdentity(lanePath, name)
+	return true, err
+}
+
+// assertWorktreeOf refuses a lanePath that is not a linked worktree of the
+// repository whose common dir is repoCommonDir: a plain directory, a worktree
+// of another repository, a main checkout, or a directory inside some
+// worktree. Paths are compared with symlinks resolved, because macOS's
+// $TMPDIR and git disagree on the physical path.
+func assertWorktreeOf(absRepo, repoCommonDir, lanePath string) error {
+	gitDir, commonDir, err := worktreeGitDirs(lanePath)
+	if err != nil {
+		return err
+	}
+	if gitDir == "" {
+		return fmt.Errorf("lane init: %s exists but is not a git worktree; move it aside or remove it", lanePath)
+	}
+	if !samePath(commonDir, repoCommonDir) {
+		return fmt.Errorf("lane init: %s is a worktree of %s, not of %s; two repositories share a basename under this WORKTREE_ROOT", lanePath, repoOf(commonDir), absRepo)
+	}
+	if samePath(gitDir, commonDir) {
+		return fmt.Errorf("lane init: %s is the main checkout of %s, not a linked worktree", lanePath, absRepo)
+	}
+	top, err := exec.Command("git", "-C", lanePath, "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return fmt.Errorf("lane init: resolving the worktree root of %s: %w", lanePath, err)
+	}
+	if !samePath(strings.TrimSpace(string(top)), lanePath) {
+		return fmt.Errorf("lane init: %s is inside the worktree %s, not a worktree itself", lanePath, strings.TrimSpace(string(top)))
+	}
+	return nil
+}
+
+// repoOf names the checkout a common dir belongs to: the parent of `.git`, or
+// the common dir itself when the repository is bare.
+func repoOf(commonDir string) string {
+	if filepath.Base(commonDir) == ".git" {
+		return filepath.Dir(commonDir)
+	}
+	return commonDir
+}
+
+func samePath(a, b string) bool {
+	ra, err := filepath.EvalSymlinks(a)
+	if err != nil {
+		ra = filepath.Clean(a)
+	}
+	rb, err := filepath.EvalSymlinks(b)
+	if err != nil {
+		rb = filepath.Clean(b)
+	}
+	return ra == rb
 }
 
 func saveLaneMetadata(lanePath string, meta worktree.Metadata) error {
@@ -398,14 +466,26 @@ func parseIssueFromBranch(branch string) int {
 	return n
 }
 
-// HasNamedLanes reports whether repoRoot has persistent named lanes initialized under worktreeRoot.
+// HasNamedLanes reports whether repoRoot has persistent named lanes
+// initialized under worktreeRoot. The primary lane must carry lane metadata
+// AND be a worktree of repoRoot: another repository with the same basename
+// resolves to the same path, and routing a handoff into its lanes would hand
+// this repository's work to a stranger.
 func HasNamedLanes(repoRoot, worktreeRoot string) bool {
 	if repoRoot == "" || worktreeRoot == "" {
 		return false
 	}
 	repoName := filepath.Base(filepath.Clean(repoRoot))
-	meta, err := worktree.LoadMetadata(filepath.Join(worktreeRoot, repoName, LaneFeatPrimary))
-	return err == nil && meta != nil && meta.Lane == LaneFeatPrimary
+	lanePath := filepath.Join(worktreeRoot, repoName, LaneFeatPrimary)
+	meta, err := worktree.LoadMetadata(lanePath)
+	if err != nil || meta == nil || meta.Lane != LaneFeatPrimary {
+		return false
+	}
+	repoCommonDir, err := resolveGitCommonDir(repoRoot)
+	if err != nil {
+		return false
+	}
+	return assertWorktreeOf(repoRoot, repoCommonDir, lanePath) == nil
 }
 
 // ParkLane parks the specified lane (or the lane at cwd) in-place, releases any
