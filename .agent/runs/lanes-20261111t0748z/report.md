@@ -89,3 +89,7 @@ The host stayed awake: `caffeinate -i -s -t 43200` armed at 07:41Z and still run
 ### The one next action
 
 Answer #3263: A or B. Everything else in this line of work (#3265, the #3293 identity half) follows from that branch landing.
+
+### Post-disarm: main after #3338
+
+- `ci.yml` on main at `9431209a` (run 43065883128): `test` and `integration` failed on the Azure apt mirror again (`Temporary failure resolving 'azure.archive.ubuntu.com'` in "Install zsh"; the container build's `apt-get update` likewise), the #3339 signature, not the change: the same head passed both jobs on PR #3338's attempt 6 at 17:02Z. One `rerun --failed` issued; the evidence is on #3339.
