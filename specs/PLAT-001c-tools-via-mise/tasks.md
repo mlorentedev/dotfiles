@@ -409,6 +409,17 @@ The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows
 - [ ] Windows: a clean Arm64 guest places all four through the tools step, `copilot --version` runs from the mise shim, and a second converge reports `changed=0`. Hosted-runner green is not this evidence (lesson 561)
 - Verification of the reader, on darwin-arm64: `go test ./internal/{tools,doctor,converge}` passes, `GOOS=windows go vet ./...` is clean and `golangci-lint run ./internal/tools/...` reports 0 issues. The Windows-only tests (`TestSync_WindowsInstallsNpmCLIsWithNodeFirst`, the `copilot` row of the install-env test) compile there and run on the Windows job, not on the Mac
 - Scope: this change marks nothing in `versions.conf` and touches no catalog entry, so no machine changes until the pins row ships
+- Measured 2026-11-11 on a clean Windows 11 Arm64 guest (`dotf vm windows --ref feat/mise-npm-pins --dotf <arm64 source build> --keep`; branch carries the four pins, the four packages.json deletions, the `vcredist` entry ahead of mise and the doctor fallback to versions.conf). Not a PR: the released-first guard refuses the pins until a release past 0.79.0 is the `DOTF_VERSION` pin
+  - Run 1 failed in 55 min: no `vcredist` entry on the branch, so `mise-v2026.9.13-windows-arm64.exe does not run`. Run 2 (45 min tools step): vcredist, mise, node, bw, copilot and yarn installed and ran; the step still failed on two new, different defects
+  - bats: `git --exec-path` found no git, which the catalog installed earlier in the same process, so Git Bash was not found (#3328)
+  - opencode: not running at its pin; the cause is not diagnosed, the converge log stayed in the guest (#3329)
+  - AC4 stays open. The pins row below is blocked on #3328 and #3329 as well as the release
+- PR B will also need these, each outside this run's reach (the envelope froze them):
+  - an ADR-036 amendment, with `tests/versions-conf.bats` test 11, which says opencode's pin lives in packages.json
+  - `tests/ci-npm-cli-cache.bats` test 6, and the CI npm cache step it checks, in `.github/workflows`
+  - `tests/copilot-config.bats` test 27, which asserts copilot is a packages.json catalog tool
+  - `TestCheckVersionMatch` in `cli/internal/doctor/checks_test.go`, which reads the checkout's packages.json instead of its own fixture
+  - the npm installer in `install.go`, deleted only after the release, so the released dotf still understands every machine's catalog
 - Open: copilot has its own `copilot update`; no environment switch for it is known yet, so it is not in `ownUpdaterOff`. The catalog's npm install had the same exposure
 
 ## Closing
