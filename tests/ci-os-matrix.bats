@@ -36,8 +36,8 @@ EOF
 @test "CI-013: every Windows or macOS job on a pull request is gated before a runner starts" {
     run _py '
 bad = []
-for path in sorted(glob.glob(os.path.join(sys.argv[1], "*.yml"))):
-    name = os.path.basename(path)
+for wf_file in sorted(glob.glob(os.path.join(sys.argv[1], "*.yml"))):
+    name = os.path.basename(wf_file)
     wf = load(name)
     on = wf["on"]
     events = [on] if isinstance(on, str) else list(on or [])
