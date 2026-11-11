@@ -1,0 +1,25 @@
+version: 1
+run_id: "npm20261111t0745z"
+armed_by: manu
+armed_at: 2026-11-11T07:50:00Z
+expires_at: 2026-11-11T19:50:00Z
+objective: "Measure the mise npm backend for bw, copilot, opencode and yarn on a clean Windows 11 Arm64 guest with a source-built dotf, and leave the pin change (PR B of #2438) prepared and evidenced on the run branch for the release the owner has not cut."
+scope:
+  write_paths: ["versions.conf", "packages.json", "cli/internal/tools/mise*.go", "cli/internal/doctor/checks_tools*.go", "cli/internal/doctor/checks_catalog*.go", "specs/PLAT-001c-tools-via-mise/**", "docs/lessons/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "secrets/**", "scripts/install.ps1", "setup-windows.ps1", "setup-linux.sh", "tests/**", "cli/internal/tools/system*.go", "cli/internal/tools/catalog*.go", "cli/internal/tools/install*.go", "cli/internal/converge/**", "cli/internal/vm/**", "cli/internal/spec/**", "cli/internal/worktree/**", "cli/internal/autopilot/**", "docs/adr/**", "docs/runbooks/**"]
+  max_files: 10
+  max_loc: 300
+allowed_commands: [dotf, gh, git, make, go, golangci-lint, bats, shellcheck, qemu-system-aarch64, swtpm, caffeinate]
+queue:
+  source: bitacora
+  filter: 'the PLAT-001c Windows tools line only: #2438 (the four npm CLIs under mise; prepare the pins, the four packages.json deletions and the doctor reads that follow from them, and measure on a clean Arm64 guest; the npm installer code in install.go and the versions-conf.bats guard are untouched) and the evidence comment for #2346; nothing in cli/internal/tools/system*.go or cli/internal/converge (the TOOL-036 session owns them, branch feat/system-package-upgrade); never close an issue an active spec names; no harness/** or workflow change'
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 120
+  max_consecutive_failures: 2
+authority:
+  merge: never
+  push: true
+  open_pr: true
+  advisor_tier: top
