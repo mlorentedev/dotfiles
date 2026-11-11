@@ -1252,7 +1252,7 @@ print(all(a in nt and a.split('/', 1)[1] in nt for a in allowed),
       e['CONFIG__ENABLE_CLAUDE_ADAPTIVE_THINKING'])
 # The prompt cap is the NaN attempt's, so every pool member reviews the same
 # diff (the owner chose parity over Haiku's 100,000-token price step,
-# 2026-10-08). What parity means changed with AI-048: it is prompt-for-prompt
+# 2026-10-08). What parity means changed with AI-054: it is prompt-for-prompt
 # ACROSS providers, not prompt-for-window. Capping the prompt AT the window was
 # the inert setting, because the answer had no room, so the cap clipped nothing.
 # The arithmetic itself lives in the guard (cli/internal/harness/prbudget.go);

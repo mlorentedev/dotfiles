@@ -1,13 +1,13 @@
 ---
 tags: [spec, tasks, templates]
 created: "2026-11-10"
-id: "AI-048-review-budget-guard"
+id: "AI-054-review-budget-guard"
 type: spec-tasks
 status: active
 owner: manu
 ---
 
-# Tasks - AI-048-review-budget-guard
+# Tasks - AI-054-review-budget-guard
 
 > TDD order. One task = one focused commit. Tick as you go.
 
@@ -68,4 +68,4 @@ owner: manu
 
 - [x] `go test ./internal/harness/` green (full package, not only `-run Review`).
 - [x] `harness check --repo-root ..` green on the fixed configuration and red on the pre-fix one (both captured in `verification.md`).
-- [ ] `dotf spec review AI-048-review-budget-guard` passes before archive.
+- [ ] `dotf spec review AI-054-review-budget-guard` passes before archive.

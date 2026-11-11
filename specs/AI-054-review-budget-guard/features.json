@@ -1,6 +1,6 @@
 [
   {
-    "id": "AI-048-review-budget-guard-f1",
+    "id": "AI-054-review-budget-guard-f1",
     "behavior": "Outcome 1",
     "verification": "echo 'not implemented' && exit 1",
     "state": "pending",

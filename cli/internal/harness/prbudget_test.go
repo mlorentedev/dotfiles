@@ -8,7 +8,7 @@ import (
 )
 
 // The steps below mirror .github/workflows/pr-agent.yml as it stood before
-// AI-048: the two Anthropic attempts declare ai_timeout and an output cap, the
+// AI-054: the two Anthropic attempts declare ai_timeout and an output cap, the
 // NaN attempt declares neither and lowers retry_same_model_on_timeout to false.
 const (
 	budgetTomlPreFix = `max_model_tokens = 200000

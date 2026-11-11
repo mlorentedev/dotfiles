@@ -182,7 +182,7 @@ jobs:
     # the final guard time to report.
     #
     # 37, not 34: the Anthropic attempt's own ceiling is 13 so that it can afford
-    # the two calls `ai_timeout = 360` allows (AI-048), and a step ceiling that
+    # the two calls `ai_timeout = 360` allows (AI-054), and a step ceiling that
     # grows past the job's slack is the ceiling-that-covers-nothing defect one
     # level up. tests/pr-agent-config.bats computes this sum and is what caught it.
     timeout-minutes: 37
@@ -403,7 +403,7 @@ jobs:
       #   `custom_` twin is needed because PR-Agent's registry does not know the
       #   model), the same as the NaN attempt, so every pool member reviews the
       #   same diff. The cap is the 200,000 window minus the 40,000 answer, not
-      #   the window: an equal number clipped nothing (AI-048). The owner chose parity over the price step (2026-10-08):
+      #   the window: an equal number clipped nothing (AI-054). The owner chose parity over the price step (2026-10-08):
       #   PR-Agent's tokenizer counts about 30% fewer tokens than Claude's, so a
       #   diff past roughly 75,000 of PR-Agent's crosses 100,000 and pays the
       #   higher prices for that request.
@@ -436,7 +436,7 @@ jobs:
       #   from 120 s to 360 s. The step's 13 minutes bound the attempts: 360 s
       #   twice (a timed-out model is retried once by default here) is 720 s,
       #   and 8 minutes covered 480 s of that, so the step killed itself before
-      #   its own retry could finish (AI-048, #3281). 13 x 60 = 780 s.
+      #   its own retry could finish (AI-054, #3281). 13 x 60 = 780 s.
       #
       # Same action, same pin, same github_action_config as the NaN attempt: a
       # test holds the review settings equal, so either provider reviews what
@@ -548,7 +548,7 @@ jobs:
           CONFIG__MODEL: ${{ steps.route.outputs.nan_model }}
           CONFIG__FALLBACK_MODELS: ${{ steps.route.outputs.nan_fallbacks }}
           CONFIG__CUSTOM_MODEL_MAX_TOKENS: "200000"
-          # Declared, not inherited (AI-048, #3281). The step ran on the image's
+          # Declared, not inherited (AI-054, #3281). The step ran on the image's
           # 120 s default, which happened to be safe only because the streaming
           # below makes it bound the gap between chunks rather than the call, and
           # because `retry_same_model_on_timeout = false` keeps the attempt count

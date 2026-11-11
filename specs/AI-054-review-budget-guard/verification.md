@@ -1,13 +1,13 @@
 ---
 tags: [spec, verification, templates]
 created: "2026-11-10"
-id: "AI-048-review-budget-guard"
+id: "AI-054-review-budget-guard"
 type: spec-verification
 status: active
 owner: manu
 ---
 
-# Verification - AI-048-review-budget-guard
+# Verification - AI-054-review-budget-guard
 
 ## Evidence
 
@@ -111,6 +111,6 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 ## Archive checklist
 
 - [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/AI-048-review-budget-guard/` -> `specs/archive/AI-048-review-budget-guard/`
+- [ ] Folder moved: `specs/AI-054-review-budget-guard/` -> `specs/archive/AI-054-review-budget-guard/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)

@@ -1,5 +1,5 @@
 ---
-id: "AI-048-review-budget-guard"
+id: "AI-054-review-budget-guard"
 type: spec
 status: verifying # draft | implementing | verifying | archived
 created: "2026-11-10"
@@ -9,7 +9,7 @@ template_version: "1.0"
 owner: manu
 ---
 
-# AI-048-review-budget-guard
+# AI-054-review-budget-guard
 
 ## Why
 

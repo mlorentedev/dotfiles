@@ -86,7 +86,7 @@ type workflowJob struct {
 // upper bound taken from the two largest step ceilings passes at 34 minutes on a
 // job that needs 37, which is a guard that protects nothing. tests/pr-agent-config.bats
 // computes it exactly, from the numbers where they are set, and it is what
-// caught the 34-minute ceiling when a step ceiling grew (AI-048).
+// caught the 34-minute ceiling when a step ceiling grew (AI-054).
 func checkReviewBudget(repoRoot string) []CheckLine {
 	cfg, problem := loadReviewConfig(repoRoot)
 	if problem != nil || cfg == nil {
