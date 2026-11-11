@@ -3,21 +3,21 @@
     "id": "AI-054-review-budget-guard-f1",
     "behavior": "the guard is red on the pre-fix configuration (clip equal to the window, 720 s of attempts in a 480 s ceiling, an undeclared NaN ai_timeout) and green on the committed one",
     "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget_(TheCurrentConfigurationFails|TheFixedConfigurationPasses|TheRepositoryPassesItsOwnGuard)$'",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "ok on macOS 2026-11-11 at 56852244: go test exit 0; mutation 150000 -> 200000 in .pr_agent.toml turns dotf harness check red (round-2 review battery)"
   },
   {
     "id": "AI-054-review-budget-guard-f2",
     "behavior": "the guard fails closed: no review step, half a reviewer, no clip, or an unparseable file each report a problem; a checkout with neither file reports nothing",
     "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget_(AWorkflowWithoutAReviewStepFailsClosed|HalfAReviewerFailsClosed|AFileWithoutAClipFailsClosed|AnUnparseableFileFailsClosed|ACheckoutWithoutAReviewerSaysNothing)$'",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "ok on macOS 2026-11-11 at 56852244: go test exit 0, five fail-closed tests plus the silent neither-file case; garbage toml and garbage workflow each name their file"
   },
   {
     "id": "AI-054-review-budget-guard-f3",
     "behavior": "the job ceiling outlives the two bounded Anthropic steps plus both route probes, setup and publication (25 + 6 + 3 + 3 = 37 < 38), read from the workflow and the reviewer pool rather than copied",
     "verification": "bats tests/pr-agent-config.bats --filter 'the job outlives both bounded Actions and the probes before them'",
-    "state": "pending",
-    "evidence": ""
+    "state": "verified",
+    "evidence": "ok on macOS 2026-11-11: bats prints True 38 25 6 3; red at 37 (False 37 25 6 3) and red with a loud message when the pool loses its risk route"
   }
 ]

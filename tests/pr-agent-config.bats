@@ -1213,7 +1213,9 @@ chain = 1 + len(json.loads(by['models']['env']['DECLARED_FALLBACK_MODELS']))
 pool = [m.get('pr_agent') or {} for m in json.load(open('$REPO/harness/reviewer-pool.json'))['pool']]
 drawn = next((m['model'] for m in pool if m.get('model', '').startswith('anthropic/') and m.get('weight', 0) > 0), None)
 risk = next((m['model'] for m in pool if m.get('route') == 'risk'), None)
-probed = len({m for m in (drawn, risk) if m})
+if drawn is None or risk is None:
+    raise SystemExit('reviewer-pool.json has no drawable anthropic/ member or no route: risk member; the probe count would silently drop to %d' % len({m for m in (drawn, risk) if m}))
+probed = 2 if drawn != risk else 1
 probes = math.ceil((knob('PREFLIGHT_TIMEOUT', 'preflight.go', 'defaultPreflightSecond') * chain
                     + knob('ROUTE_PROBE_TIMEOUT', 'probe.go', 'defaultProbeTimeout') * probed) / 60)
 after = len([s for s in job['steps'] if s.get('id') in ('published_after_anthropic', 'published_after_nan')

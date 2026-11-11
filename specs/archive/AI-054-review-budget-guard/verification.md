@@ -165,5 +165,5 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/AI-054-review-budget-guard/` -> `specs/archive/AI-054-review-budget-guard/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3281 closes on merge through the PR body's `Fixes #3281`; the board column follows the issue (`bitacora-status` job)
 - [x] Promotions above executed (if any)
