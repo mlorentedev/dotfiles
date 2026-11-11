@@ -3,6 +3,7 @@ package lane
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -144,7 +145,9 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 			t.Fatal(err)
 		}
 		a := audit(t, repoDir, wtRoot)
-		wantFindings(t, a, 1, LaneFeatPrimary, lanePath, "no longer exists", "git worktree repair")
+		// Leaf names, not full paths: git records the physical path and the
+		// test holds the logical one (macOS /private/var, Windows 8.3 names).
+		wantFindings(t, a, 1, LaneFeatPrimary, "no longer exists", "git worktree repair")
 		if strings.Contains(joined(a), "dotf lane init") {
 			t.Errorf("lane init cannot repair a registered path; git refuses to add there:\n%s", joined(a))
 		}
@@ -155,7 +158,51 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 		elsewhere := filepath.Join(wtRoot, "dotfiles", "elsewhere")
 		runGitLaneTest(t, repoDir, "worktree", "move", lanePath, elsewhere)
 		a := audit(t, repoDir, wtRoot)
-		wantFindings(t, a, 1, LaneFastTrack, elsewhere, lanePath, "git worktree move")
+		wantFindings(t, a, 1, LaneFastTrack, "elsewhere", "is at ", "git worktree move")
+	})
+	t.Run("relative gitdir entries (worktree.useRelativePaths) resolve", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		runGitLaneTest(t, repoDir, "config", "worktree.useRelativePaths", "true")
+		if _, err := InitLanes(repoDir, wtRoot); err != nil {
+			t.Fatal(err)
+		}
+		gitDir, _, err := worktreeGitDirs(filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary))
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := os.ReadFile(filepath.Join(gitDir, "gitdir"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if filepath.IsAbs(strings.TrimSpace(string(raw))) {
+			t.Skip("this git does not honour worktree.useRelativePaths")
+		}
+		wantFindings(t, audit(t, repoDir, wtRoot), 0)
+	})
+	t.Run("an unreadable record is a finding, as the guard fails closed on it", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Getuid() == 0 {
+			t.Skip("mode bits do not deny reads here")
+		}
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		gitDir, _, err := worktreeGitDirs(filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary))
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := filepath.Join(gitDir, LaneIdentityFile)
+		if err := os.Chmod(record, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(record, 0o644) })
+		a := audit(t, repoDir, wtRoot)
+		if len(a.Findings) == 0 || !strings.Contains(joined(a), "not readable") {
+			t.Fatalf("want the unreadable record reported, got:\n%s", joined(a))
+		}
+	})
+	t.Run("an empty worktree root is refused, not resolved to the cwd", func(t *testing.T) {
+		repoDir, _ := initialisedLaneRepo(t)
+		if _, err := AuditLanes(repoDir, ""); err == nil || !strings.Contains(err.Error(), "WORKTREE_ROOT") {
+			t.Fatalf("want an error naming WORKTREE_ROOT, got %v", err)
+		}
 	})
 	t.Run("a worktree recorded as a lane the marker does not declare", func(t *testing.T) {
 		repoDir, wtRoot := initialisedLaneRepo(t)
@@ -165,7 +212,7 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 			t.Fatal(err)
 		}
 		a := audit(t, repoDir, wtRoot)
-		wantFindings(t, a, 1, "spike-lane", spike, "does not declare", LaneIdentityFile)
+		wantFindings(t, a, 1, "spike-lane", "spike", "does not declare", LaneIdentityFile)
 	})
 }
 

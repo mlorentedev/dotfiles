@@ -33,6 +33,14 @@ func Identity(path string) (string, bool, error) {
 	if gitDir == "" || gitDir == commonDir {
 		return "", false, nil
 	}
+	return readIdentityRecord(gitDir)
+}
+
+// readIdentityRecord is the one reader of the record in a worktree admin dir,
+// for Identity and for the audit alike, so the two cannot disagree with each
+// other or with the guard: absent, a directory or empty is no record; a record
+// that exists but cannot be read is an error, never silence.
+func readIdentityRecord(gitDir string) (string, bool, error) {
 	record := filepath.Join(gitDir, LaneIdentityFile)
 	st, serr := os.Stat(record)
 	switch {
@@ -47,7 +55,7 @@ func Identity(path string) (string, bool, error) {
 	}
 	raw, err := os.ReadFile(record)
 	if err != nil {
-		return "", false, fmt.Errorf("lane identity: reading %s: %w", filepath.Join(gitDir, LaneIdentityFile), err)
+		return "", false, fmt.Errorf("lane identity: reading %s: %w", record, err)
 	}
 	// The first line is the name, as the guard reads it; anything after it is
 	// residue no writer of ours produces.

@@ -48,6 +48,11 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	if err != nil {
 		return Audit{}, err
 	}
+	// An empty root would resolve to the cwd and every FIX line would point
+	// at the wrong path.
+	if strings.TrimSpace(worktreeRoot) == "" {
+		return Audit{}, fmt.Errorf("lane doctor: WORKTREE_ROOT cannot be empty")
+	}
 	absWTRoot, err := filepath.Abs(worktreeRoot)
 	if err != nil {
 		return Audit{}, err
@@ -69,10 +74,11 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	if err != nil {
 		return a, err
 	}
-	records, err := laneRecords(commonDir)
+	records, unreadable, err := laneRecords(commonDir)
 	if err != nil {
 		return a, err
 	}
+	a.Findings = append(a.Findings, unreadable...)
 	laneDir := filepath.Join(absWTRoot, filepath.Base(absRepo))
 	for _, name := range marker.CanonicalLanes {
 		if _, serr := os.Stat(filepath.Join(laneDir, name)); serr == nil || len(records[name]) > 0 {
@@ -165,37 +171,44 @@ type laneRecord struct {
 }
 
 // laneRecords reads git's own registry of linked worktrees
-// (<common dir>/worktrees/*/), keyed by recorded lane name. This is the
-// direction from disk to marker: a lane moved by hand keeps its admin dir, its
-// record and a gitdir pointing at the old path, which `git worktree list`
-// only reports as prunable and a path lookup would report as absent.
-func laneRecords(commonDir string) (map[string][]laneRecord, error) {
+// (<common dir>/worktrees/*/), keyed by recorded lane name, and reports a
+// record that exists but cannot be read as a finding, as the guard fails
+// closed on it. This is the direction from disk to marker: a lane moved by
+// hand keeps its admin dir, its record and a gitdir pointing at the old path,
+// which `git worktree list` only reports as prunable and a path lookup would
+// report as absent. gitdir is relative to the admin dir under
+// worktree.useRelativePaths (git 2.48+), absolute otherwise.
+func laneRecords(commonDir string) (map[string][]laneRecord, []Finding, error) {
 	entries, err := os.ReadDir(filepath.Join(commonDir, "worktrees"))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("lane doctor: reading the worktree registry of %s: %w", commonDir, err)
+		return nil, nil, fmt.Errorf("lane doctor: reading the worktree registry of %s: %w", commonDir, err)
 	}
 	out := map[string][]laneRecord{}
+	var unreadable []Finding
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
 		adminDir := filepath.Join(commonDir, "worktrees", e.Name())
-		raw, rerr := os.ReadFile(filepath.Join(adminDir, LaneIdentityFile))
+		name, ok, rerr := readIdentityRecord(adminDir)
 		if rerr != nil {
+			unreadable = append(unreadable, Finding{adminDir, "the identity record there is not readable, so the guard refuses commits in that worktree", "restore it with dotf lane init"})
 			continue
 		}
-		first, _, _ := strings.Cut(string(raw), "\n")
-		name := strings.TrimSpace(first)
 		gitdir, gerr := os.ReadFile(filepath.Join(adminDir, "gitdir"))
-		if name == "" || gerr != nil {
+		if !ok || gerr != nil {
 			continue
 		}
-		out[name] = append(out[name], laneRecord{adminDir: adminDir, path: filepath.Dir(filepath.Clean(strings.TrimSpace(string(gitdir))))})
+		p := filepath.FromSlash(strings.TrimSpace(string(gitdir)))
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(adminDir, p)
+		}
+		out[name] = append(out[name], laneRecord{adminDir: adminDir, path: filepath.Dir(filepath.Clean(p))})
 	}
-	return out, nil
+	return out, unreadable, nil
 }
 
 // auditLane checks one declared lane: where git registered it, whether that is
