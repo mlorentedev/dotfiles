@@ -113,6 +113,7 @@ func TestAuditLanes_ReportsACorruptedMarkerByField(t *testing.T) {
 		{"dot entry", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":[".."]}`, []string{"third_party_roots", `".."`, "not a directory name"}},
 		{"padded entry", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":[" x "]}`, []string{"third_party_roots", `" x "`, "whitespace"}},
 		{"trailing data after the object", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":["x"]} {"version":2}`, []string{LanesMarkerFile, "trailing"}},
+		{"empty entry", `{"version":1,"canonical_lanes":["feat-lane-primary","feat-lane-secondary","fast-track-lane"],"third_party_roots":[""]}`, []string{"third_party_roots", "empty entry"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -217,6 +218,15 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 		a := audit(t, repoDir, wtRoot)
 		wantFindings(t, a, 1, "spike-lane", "spike", "does not declare", LaneIdentityFile)
 	})
+	t.Run("a lane recorded in more than one worktree", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		twin := filepath.Join(wtRoot, "dotfiles", "twin")
+		runGitLaneTest(t, repoDir, "worktree", "add", "--detach", twin, "HEAD")
+		if _, err := writeIdentity(twin, LaneFeatPrimary); err != nil {
+			t.Fatal(err)
+		}
+		wantFindings(t, audit(t, repoDir, wtRoot), 1, LaneFeatPrimary, "more than one worktree", "twin", "git worktree remove")
+	})
 }
 
 func TestAuditLanes_ReportsABrokenLane(t *testing.T) {
@@ -253,6 +263,19 @@ func TestAuditLanes_ReportsABrokenLane(t *testing.T) {
 		}
 		wantFindings(t, audit(t, repoDir, wtRoot), 1, LaneFeatPrimary, "lease", LaneFastTrack, "dotf lane init")
 	})
+	t.Run("lease in a state the lanes do not use", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+		meta, err := worktree.LoadMetadata(lanePath)
+		if err != nil || meta == nil {
+			t.Fatalf("lease: %v", err)
+		}
+		meta.State = "REAPED"
+		if err := worktree.SaveMetadata(lanePath, *meta); err != nil {
+			t.Fatal(err)
+		}
+		wantFindings(t, audit(t, repoDir, wtRoot), 1, LaneFeatPrimary, `"REAPED"`, "neither ACTIVE nor PARKED", "dotf lane park")
+	})
 	t.Run("a plain directory at a lane path", func(t *testing.T) {
 		repoDir, wtRoot := initialisedLaneRepo(t)
 		lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatSecondary)
@@ -280,5 +303,57 @@ func TestAuditLanes_ReportsABrokenLane(t *testing.T) {
 		if strings.Contains(joined(a), "lease") {
 			t.Errorf("a plain directory is reported as such, not as a missing lease:\n%s", joined(a))
 		}
+	})
+}
+
+// A worktree of another repository at a lane path is not this repository's
+// to move, prune or repair. Measured 2026-11-11 on a scratch pair: from the
+// repository whose registration is stale, git worktree prune keeps the entry
+// while the other's .git file exists, git worktree remove --force refuses
+// ("does not point back"), and git worktree repair REWRITES the other
+// repository's .git file to point at this one, hijacking its worktree.
+func TestAuditLanes_LeavesAnotherRepositorysWorktreeAlone(t *testing.T) {
+	wantForeign := func(t *testing.T, a Audit, n int, wants ...string) {
+		t.Helper()
+		wantFindings(t, a, n, append(wants, "share a basename", "#3318")...)
+		for _, forbidden := range []string{"prune", "repair", "move the directory"} {
+			if strings.Contains(joined(a), forbidden) {
+				t.Errorf("the FIX names %q against a worktree that is not this repository's:\n%s", forbidden, joined(a))
+			}
+		}
+	}
+	t.Run("a fresh clone whose lane paths hold another repository's lanes", func(t *testing.T) {
+		owner, wtRoot := initialisedLaneRepo(t)
+		clone, _ := setupLaneTestRepo(t)
+		if _, err := writeLanesMarker(clone); err != nil {
+			t.Fatal(err)
+		}
+		a := audit(t, clone, wtRoot)
+		if !a.Initialised {
+			t.Fatal("Initialised = false: the occupied lane paths read as a clone with nothing to audit, so dotf lane init would be the advice and it refuses")
+		}
+		wantForeign(t, a, 3, LaneFeatPrimary, LaneFeatSecondary, LaneFastTrack, "different directory name")
+		// The named repair works: under another directory name the clone
+		// provisions its own lanes, and the owner's stay coherent.
+		renamed := clone + "-two"
+		if err := os.Rename(clone, renamed); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := InitLanes(renamed, wtRoot); err != nil {
+			t.Fatalf("InitLanes after the rename: %v", err)
+		}
+		wantFindings(t, audit(t, renamed, wtRoot), 0)
+		wantFindings(t, audit(t, owner, wtRoot), 0)
+	})
+	t.Run("this repository's stale registration at a path another repository's worktree took", func(t *testing.T) {
+		owner, wtRoot := initialisedLaneRepo(t)
+		lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+		if err := os.RemoveAll(lanePath); err != nil {
+			t.Fatal(err)
+		}
+		other, _ := setupLaneTestRepo(t)
+		runGitLaneTest(t, other, "worktree", "add", "--detach", lanePath, "HEAD")
+		a := audit(t, owner, wtRoot)
+		wantForeign(t, a, 1, LaneFeatPrimary, "stale registration", filepath.Join("worktrees", LaneFeatPrimary), "by hand")
 	})
 }
