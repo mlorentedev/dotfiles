@@ -287,7 +287,9 @@ marker, or a marker whose lanes are not provisioned on this machine, prints one
 line and exits 0: the marker is committed and travels with every clone, the lanes
 are per machine. Any incoherence prints one `ERROR`/`FIX` pair per finding on
 stdout and exits 1; the audit repairs nothing, the FIX line names the command
-that does. Exit 2 means the audit could not run (not a git repository).
+that does. Exit 2 means the audit could not run: not a git repository, an
+empty `WORKTREE_ROOT`, or a worktree registry that cannot be read; the reason
+is on stderr.
 
 It reports, in this order and stopping at the first group that fires:
 

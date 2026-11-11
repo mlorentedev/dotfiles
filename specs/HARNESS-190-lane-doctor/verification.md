@@ -49,6 +49,15 @@ Every finding, with its disposition; `review.md` is the reviewer's and is not ed
 | `newLaneDoctorCmd` is 43 lines | Minor, REAL | apply in `9fbb5452`: `runLaneDoctor` extracted (31 lines), and it no longer resolves the cwd itself since `ResolveMainRepoRoot(".")` does. |
 | Evidence anchors name commits that are not ancestors of the reviewed tip | Minor, REAL | apply: the provenance line in Test status says why (two rebases) and anchors on test names and commands; `features.json` evidence re-run and re-anchored on `9fbb5452`. |
 
+## Review round 3 (nan/glm5.3-flash, PASS, reviewed_sha b6d74f79)
+
+The reviewer re-ran vet, the pinned linter and both touched packages on `b6d74f79`, matched the contract digests, and mutation-tested the round-2 fix (disabling the `errNotAWorktree` branch turns both subtests of `TestAuditLanes_LeavesAnotherRepositorysWorktreeAlone` red).
+
+| Finding | Class | Disposition |
+|---|---|---|
+| `laneRecords` skips an admin dir whose record reads but whose `gitdir` is missing or unreadable, so the lane is then misdiagnosed from the paths that remain | Minor, THEORETICAL | ticketed as #3337: reporting it the way an unreadable record is reported costs about four production lines and this change sits at 297 of its 300-line budget; the state is reachable (git lists it as prunable) but was argued from the code, not observed. |
+| AC4 is silent about the exit-2 path the implementation adds for an audit that cannot run | Minor, SPECULATIVE | applied in the runbook (7.6 names the three causes and that the reason is on stderr); the contract set is closed after the review, so AC4 is not edited. |
+
 ## Decisions made during implementation
 
 - The check is `dotf lane doctor` plus `lane.AuditLanes`, not a `dotf doctor` sweep entry: the committed envelope of this run does not list `cli/internal/doctor/**`, the issue allows the subcommand as the home, and the sweep entry is #3327 with two options. The runbook's known limits say so.
