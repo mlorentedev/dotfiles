@@ -43,10 +43,13 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 
 ## PR 2b: `dotf gate spec` core
 
-- [ ] [AC2] Parity harness over `check-spec-gate.bats` and `spec-gate-archive.bats`, PATH holding git alone
-- [ ] [AC2] Archive-on-merge, dependency and `skip-sdd` escapes, the LOC walk and `--explain`
-- [ ] [AC2] Repository slug: `GITHUB_REPOSITORY`, then the event's `repository.full_name`, then origin; empty
-  ignores qualified references, as the script does
+- [x] [AC2] Parity harness `tests/lib/spec-gate-parity.bash` over `check-spec-gate.bats` and
+  `spec-gate-archive.bats`, PATH holding git alone; the one paragraph that tells a script user how to re-run
+  by hand is compared on neither side
+- [x] [AC2] Archive-on-merge, dependency and `skip-sdd` escapes, the LOC walk and `--explain`
+- [x] [AC2] Repository slug: `GITHUB_REPOSITORY`, then origin, as the script; empty ignores qualified
+  references. The event's `repository.full_name` is not read yet: the script does not, and the parity
+  suites have no way to tell the two apart
 - Out of scope: `spec-gate-pr.bats` and `spec-gate-prepush.bats` test the `gh` wrappers that resolve the PR
   live; the shared composite replaces them with the event file.
 
