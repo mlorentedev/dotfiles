@@ -41,7 +41,7 @@ Armed 2026-11-11T07:48Z, expires 2026-11-11T19:48Z. Objective: land HARNESS-187 
 
 ## Disarm
 
-**run lanes-20261111t0748z — ended queue-exhausted after 3 iterations / 9h50m (07:41Z to 17:31Z) — 2 done, 2 parked, 2 merged, 1 unmerged.** Waiting on a human: the #3263 A/B and the #3293 A/B. Nothing irreversible is pending; the two merges (#3325, #3338) are the irreversible part and both are on main.
+**run lanes-20261111t0748z — ended queue-exhausted after 3 iterations / 9h37m (07:41Z to 17:18Z) — 2 done, 2 parked, 2 merged, 1 unmerged.** Waiting on a human: the #3263 A/B and the #3293 A/B. Nothing irreversible is pending; the two merges (#3325, #3338) are the irreversible part and both are on main.
 
 ### Waiting on you, irreversible first
 
@@ -75,11 +75,11 @@ Armed 2026-11-11T07:48Z, expires 2026-11-11T19:48Z. Objective: land HARNESS-187 
 
 ### Budget spent
 
-3 iterations, 9h50m wall clock of a 12h window, 5 queue items (2 landed, 1 parked done, 1 parked by scope, 1 not started), 8 tickets filed (#3318, #3320, #3324, #3327, #3331, #3333, #3337, #3339), all on the board with Status, Priority and Type. No dollar figure exists for this run; the pooled reviews drew on the NaN pool (`ai/nan/README.md` has the rates) and none is attributable here.
+3 iterations, 9h37m wall clock of a 12h window, 5 queue items (2 landed, 1 parked done, 1 parked by scope, 1 not started), 8 tickets filed (#3318, #3320, #3324, #3327, #3331, #3333, #3337, #3339), all on the board with Status, Priority and Type. No dollar figure exists for this run; the pooled reviews drew on the NaN pool (`ai/nan/README.md` has the rates) and none is attributable here.
 
 ### Host-suspend line
 
-The host stayed awake. The window was not fully covered by the run itself: from roughly 15:25Z to 17:01Z the session was paused by the harness's usage limit, so #3338's sixth attempt ran at 17:02Z instead of ~15:50Z. No work was lost; one rerun was delayed.
+The host stayed awake: `caffeinate -i -s -t 43200` armed at 07:41Z and still running at disarm. The window was not fully covered by the run itself: from roughly 15:25Z to 17:01Z the session was paused by the harness's usage limit, so #3338's sixth attempt ran at 17:02Z instead of ~15:50Z. No work was lost; one rerun was delayed.
 
 ### Knowledge
 
