@@ -58,3 +58,11 @@ The Gitea half of `LandedHeads` above could not finish on a real repository. `pe
 Gitea now answers with `GET /repos/{owner}/{repo}/pulls/{base}/{head}` against the default branch: 1.2s, it resolves a deleted branch, and a 404 means no pull request. The price is that it returns the newest pull request against one base, so `LandedHeads` no longer returns every one on Gitea. A reused branch name or a pull request into another base can read "not landed". That is the safe side: `worktree done` refuses and the worktree stays, while the listing's failure left every branch `unknown`. GitHub is unchanged. The owner chose this on 2026-11-02.
 
 Clause 4 of the amendment above is out of date: `worktree list` and `sweep` already take this read through `forgeLandedHeads`, so on a Gitea origin they report landed branches too.
+
+## Amendment (2026-11-11, #3257): one host, one write token, whatever the owner
+
+Clause 4 keys `forge/hosts.json` by host, so two owners on one host share a write credential by design. On `gitea.kubelab.live`, `dotf forge` writes into `personal/` and into the client organization with the same `GITEA_KUBELAB_TOKEN`.
+
+The split between that token and the organization-scoped one is by scope, not by identity. The default is the narrower token, which has no `write:organization`. The broader one is kept for the operations that need its scope. Keying the map by owner would route routine issue writes to the broader token, so the map stays keyed by host. Clause 4's "the wrong forge's token" still holds between forges; within one forge, the scope a write needs decides the token.
+
+The forge cannot say which account a token belongs to, because no token holds `read:user`. The registry records what was measured instead.
