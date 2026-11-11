@@ -4,27 +4,27 @@
     "behavior": "AC1: a corrupted marker is reported with the offending field named, and a coherent or uninitialised repository yields no finding",
     "verification": "cd cli && go test ./internal/lane/ -run 'TestAuditLanes_(ReportsACorruptedMarkerByField|IsSilentOnACoherentRepository|SeparatesNotInitialisedFromDrift)$' -count=1",
     "state": "verified",
-    "evidence": "PASS on 14647b4b (ok internal/lane, 2026-11-11): twelve marker shapes each name their field (dot, padded and trailing-data cases added after review round 1), a coherent repository and an uninitialised marker yield no finding"
+    "evidence": "PASS on 9fbb5452 (ok internal/lane, 2026-11-11): TestAuditLanes_ReportsACorruptedMarkerByField runs thirteen marker shapes, each naming its field (dot, padded and trailing-data cases after review round 1, the empty entry after round 2); a coherent repository and an uninitialised marker yield no finding"
   },
   {
     "id": "HARNESS-190-lane-doctor-f2",
     "behavior": "AC2: a lane moved by hand, a lane moved with git worktree move and a worktree recorded as an undeclared lane are each reported as drift with the git command that repairs them",
     "verification": "cd cli && go test ./internal/lane/ -run 'TestAuditLanes_ReportsDriftInBothDirections$' -count=1",
     "state": "verified",
-    "evidence": "PASS on 1dc8f727 (ok internal/lane 1.773s, 2026-11-11): mv names git worktree repair and never dotf lane init; worktree move names git worktree move back; an undeclared record names the record file"
+    "evidence": "PASS on 9fbb5452 (ok internal/lane, 2026-11-11): TestAuditLanes_ReportsDriftInBothDirections: mv names git worktree repair and never dotf lane init; worktree move names git worktree move back; an undeclared record names the record file; a lane recorded in two worktrees names git worktree remove"
   },
   {
     "id": "HARNESS-190-lane-doctor-f3",
-    "behavior": "AC3: a missing lease, a missing identity record, a lease naming another lane, a stranger directory at a lane path and a plain directory git still registers are each one finding naming the lane and its repair",
-    "verification": "cd cli && go test ./internal/lane/ -run 'TestAuditLanes_ReportsABrokenLane$' -count=1",
+    "behavior": "AC3: a missing lease, a missing identity record, a lease naming another lane or in a state the lanes do not use, a stranger directory at a lane path, a plain directory git still registers, and another repository's worktree at a lane path (with or without a stale registration on this side) are each one finding naming the lane and its repair, and the repair never prunes, moves or repairs another repository's worktree",
+    "verification": "cd cli && go test ./internal/lane/ -run 'TestAuditLanes_(ReportsABrokenLane|LeavesAnotherRepositorysWorktreeAlone)$' -count=1",
     "state": "verified",
-    "evidence": "PASS on 14647b4b (ok internal/lane, 2026-11-11): exactly one finding per broken lane; the registered plain directory is reported as not a git worktree with git worktree prune in the FIX, never as a missing lease"
+    "evidence": "PASS on 9fbb5452 (ok internal/lane, 2026-11-11): exactly one finding per broken lane; the registered plain directory names git worktree prune and never a lease; TestAuditLanes_LeavesAnotherRepositorysWorktreeAlone asserts the foreign-worktree FIX names neither prune, repair nor a move, names the stale admin dir to delete by hand when there is one, and that the named repair (a different directory name) lets InitLanes succeed with both repositories coherent afterwards"
   },
   {
     "id": "HARNESS-190-lane-doctor-f4",
     "behavior": "AC4: dotf lane doctor exits 0 silently on a coherent repository, 0 with one line when unmanaged or uninitialised, and 1 with ERROR/FIX pairs and no cobra Error: line on a finding",
     "verification": "cd cli && go test ./internal/cmd/ -run 'TestLaneDoctor' -count=1",
     "state": "verified",
-    "evidence": "PASS on 1dc8f727 (ok internal/cmd 1.386s, 2026-11-11), re-run on 14647b4b: TestLaneDoctor_ExitsZeroWithAtMostOneLine (three cases) and TestLaneDoctor_AFindingExitsOneWithoutCobrasErrorLine"
+    "evidence": "PASS on 9fbb5452 (ok internal/cmd, 2026-11-11): TestLaneDoctor_ExitsZeroWithAtMostOneLine (three cases) and TestLaneDoctor_AFindingExitsOneWithoutCobrasErrorLine, unchanged by the extraction of runLaneDoctor"
   }
 ]

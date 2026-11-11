@@ -36,7 +36,10 @@ sweep entry calls the same function. It reports:
   other than 1, an empty `canonical_lanes` or `third_party_roots`, or an entry that is empty,
   duplicated, carries `/` or `\`, or starts with a drive prefix;
 - `canonical_lanes` differs from the lane set this `dotf` provisions (what `lane init` rewrites);
-- a declared lane that is absent, is a directory that is not a worktree of this repository, is a
+- a declared lane that is absent, is a directory that is not a worktree of this repository (a
+  plain directory is moved aside and pruned; a worktree of another repository is left to its
+  owner, since `git worktree repair` from here would rewrite its `.git` file, and the FIX names a
+  different directory name for this clone, #3318), is a
   worktree without the identity record (guard rule 5b does not fire there), is registered by git at a
   path that no longer exists (moved by hand), is at a path other than its canonical one (moved with
   `git worktree move`), is recorded in more than one worktree, or has no lease, a lease naming another
@@ -45,7 +48,9 @@ sweep entry calls the same function. It reports:
 
 A repository without the marker is not lane-managed: one line, exit 0. A marker with no lane present
 on this machine is "not initialised here", also one line and exit 0: the marker is committed and
-travels to every clone, the lanes are per machine.
+travels to every clone, the lanes are per machine. That rule applies only when nothing stands at
+the lane paths: a clone whose canonical lane paths hold another repository's worktrees is reported
+(one finding per lane), because the line's advice, `dotf lane init`, refuses in that state.
 
 The drift direction from disk to marker enumerates the worktree admin dirs under the common git dir
 (`<repo>/.git/worktrees/*/`), where the identity record lives (ADR-061), not `git worktree list`:
@@ -80,15 +85,19 @@ No auto-repair. Every FIX line names the command that repairs the finding.
 Observable outcomes. Each must be testable.
 
 - [ ] AC1: a corrupted marker is reported with the offending field named: invalid JSON, an unknown
-      key, a wrong `version`, an empty list, an entry with a separator or a drive prefix, a
-      duplicate, and a lane set that differs from the one `dotf` provisions.
+      key, a wrong `version`, an empty list, an entry that is empty, padded, `.` or `..`, carries a
+      separator or a drive prefix, a duplicate, trailing data after the object, and a lane set that
+      differs from the one `dotf` provisions.
 - [ ] AC2: a lane renamed by `mv` is reported as registered at a path that no longer exists with
       `git worktree repair` as the FIX; a lane moved with `git worktree move` is reported at its new
       path with `git worktree move` back as the FIX; a worktree recorded as an undeclared lane is
       reported.
 - [ ] AC3: a lane without its lease, without its identity record, with a lease naming another lane,
-      and a lane directory that is not this repository's worktree are each one finding naming the
-      lane and the repair.
+      with a lease in a state the lanes do not use, recorded in more than one worktree, and a lane
+      directory that is not this repository's worktree (a plain directory, or another repository's
+      worktree, with or without a stale registration of the path on this side) are each one finding
+      naming the lane and the repair, and the repair never prunes, moves or repairs another
+      repository's worktree.
 - [ ] AC4: a coherent lane-managed repository exits 0 with no output from `dotf lane doctor`; a
       repository without the marker and a marker with no lane initialised on this machine each exit
       0 with one line; any finding exits 1 with the ERROR/FIX pairs on stdout and no cobra `Error:`

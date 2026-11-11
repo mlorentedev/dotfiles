@@ -302,11 +302,18 @@ It reports, in this order and stopping at the first group that fires:
    worktree move` back), recorded in more than one worktree, absent, a directory
    that is not this repository's worktree, a worktree without the record (rule
    5b does not fire there), or a lease missing, naming another lane or in a
-   state the lanes do not use.
+   state the lanes do not use. A plain directory at a lane path is moved aside
+   and pruned; a worktree of another repository there (two clones sharing a
+   basename, #3318) is left to its owner. Measured 2026-11-11 on a scratch
+   pair: from the repository whose registration of that path is stale,
+   `git worktree prune` keeps the entry while the other `.git` file exists,
+   `git worktree remove --force` refuses, and **`git worktree repair <path>`
+   rewrites the other repository's `.git` file to point here**, hijacking its
+   worktree. The FIX names the stale admin dir to delete by hand instead.
 3. Any worktree whose record names a lane the marker does not declare.
 
 The registry, not `git worktree list` or the canonical path, is what survives a
-rename by hand (lesson 581). The Go tests that pin each shape:
+rename by hand (lesson 582). The Go tests that pin each shape:
 
 ```sh
 cd cli
@@ -330,7 +337,9 @@ go test ./internal/cmd/... -count=1 -run 'TestLaneDoctor' -v
 - **Lanes are still located by path.** `dotf lane init` finds a lane at
   `<WORKTREE_ROOT>/<repo basename>/<lane>`, so two repositories sharing a basename
   collide there. The second init refuses loudly instead of adopting the first's
-  lanes; a layout that lets both coexist is a follow-up.
+  lanes, and `dotf lane doctor` run from the second reports each lane path as
+  the first's with a FIX that touches nothing of the first's; a layout that lets
+  both coexist is the follow-up (#3318).
 - **The parser fails closed on syntax and open on semantics.** A malformed marker
   still arms the guard (the file exists) but yields empty lists, so rules 4 and 5a
   do not apply; rule 5b reads the record independently of the lists and still

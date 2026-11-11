@@ -1,5 +1,5 @@
 ---
-id: "lesson-581-audit-against-the-registry-that-survives-the-rename"
+id: "lesson-582-audit-against-the-registry-that-survives-the-rename"
 type: lesson
 status: active
 title: "Audit against the registry that survives the rename"
@@ -35,4 +35,8 @@ prune` as the FIX; a record at a path other than the canonical one is "moved" wi
 back; only a lane with no record at all is "absent" with `dotf lane init`. Before writing a check that
 reports absence, run the commands that produce the absence and read what the system kept: the
 registry that survives the rename is where the audit reads, and the FIX line follows from which
-state the operator is actually in.
+state the operator is actually in. The same measurement rule found the second defect: a FIX written
+for a plain directory ("move aside, prune") was also handed out for another repository's worktree at
+the path, and running the commands showed `git worktree repair` from the wrong repository rewrites
+the other worktree's `.git` file, so that case names nothing of git's and leaves the worktree to its
+owner.
