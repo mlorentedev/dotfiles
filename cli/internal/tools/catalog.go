@@ -71,9 +71,11 @@ type Tool struct {
 //     name skips the entry on that OS, as a platforms miss does. It is not
 //     pinned, so Tool.Version must be absent and presence is the convergence
 //     rule: the entry is satisfied when its Command is on PATH, or else when the
-//     manager lists the package (dpkg-query, brew list --versions, winget list),
-//     and it is never upgraded. A catalog that carries one is only read by a
-//     dotf that knows the type; an older one skips it with a warning.
+//     manager lists the package (dpkg-query, brew list --versions, winget list).
+//     `dotf tools install` never upgrades it; the converge step system-upgrade
+//     does, after refreshing the manager (TOOL-036, ADR-036 amendment
+//     2026-11-10). A catalog that carries one is only read by a dotf that
+//     knows the type; an older one skips it with a warning.
 type Source struct {
 	Type string `json:"type"`
 	Repo string `json:"repo"`

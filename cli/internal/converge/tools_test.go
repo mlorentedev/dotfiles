@@ -132,6 +132,8 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // installed (OPS-053). workstation-target follows: it reads the
 // deployed public key's source in the checkout and changes how the machine
 // faces the network, so it comes after everything a user session needs.
+// system-upgrade follows tools: tools installs what is absent, and it moves
+// what is already there (TOOL-036).
 // agent-extensions comes after tools, whose PATH reaches the claude mise
 // installs, and last among the native steps, so a plugin that cannot install
 // stops nothing else (#2387). The setup script runs last, after every native
@@ -141,7 +143,7 @@ func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,pwsh-modules,pi-settings,configs-deploy,orca-hooks,shell-completions,records-bind,git-config,ts-bridge-client,git-lfs,git-hooks,env-persist,self-deploy,hive-upgrade-retire,workstation-target,agent-extensions,legacy-setup" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,system-upgrade,pwsh-modules,pi-settings,configs-deploy,orca-hooks,shell-completions,records-bind,git-config,ts-bridge-client,git-lfs,git-hooks,env-persist,self-deploy,hive-upgrade-retire,workstation-target,agent-extensions,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }

@@ -11,8 +11,10 @@ import (
 // System packages (source.type "system") are converged by the OS package
 // manager, not downloaded by dotf: linux goes through apt, darwin through
 // Homebrew, windows through winget. There is no pin to compare, so the
-// reconcile policy is presence alone and the answer is install or skip, never
-// upgrade; a second run therefore runs no manager command.
+// reconcile policy of the install path is presence alone and the answer is
+// install or skip, never upgrade; a second run therefore runs no manager
+// command. Keeping an installed package current is the converge step
+// system-upgrade's job (TOOL-036), not this file's.
 //
 // Presence is one rule, asked in one order (systemInstalled): the entry's
 // declared Command is on PATH, otherwise the manager's own record lists the
