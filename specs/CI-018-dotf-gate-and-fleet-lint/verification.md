@@ -12,7 +12,7 @@ owner: manu
 ## Evidence
 
 - [x] AC1 (knowledge half) -> PR 1, `tests/check-knowledge-gate.bats` (45 cases through both gates)
-- [ ] AC2 -> PR 2 and PR 3
+- [ ] AC2 -> PR 2a (parsers), PR 2b (`tests/check-spec-gate.bats` 30 and `tests/spec-gate-archive.bats` 35 through the parity shim), PR 3 (adjacency)
 - [x] AC3 (knowledge half) -> PR 1, the no-network trap in `_dotf_gate`
 - [ ] AC4 -> PR 4 and PR 5
 - [ ] AC5 -> PR 5
@@ -21,6 +21,7 @@ owner: manu
 
 - PR 1: `bats tests/check-knowledge-gate.bats` -> 1..45, no failures
 - PR 1: `go test ./...`, `go vet ./...`, `GOOS=windows go vet ./...`, `golangci-lint run` and the Windows lint -> clean
+- PR 2b: `bats tests/check-spec-gate.bats tests/spec-gate-archive.bats` -> 1..65; mutations: a verdict message (24 red), the archived-at-head check removed (6 red)
 - PR 1 mutations: a changed problem message (3 cases red), `escaped` inverted (3 cases red)
 
 ## Decisions made during implementation

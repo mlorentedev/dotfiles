@@ -159,3 +159,39 @@ func TestParseNumstat(t *testing.T) {
 		t.Error("a non-numeric count must be an error, not a zero")
 	}
 }
+
+func TestSkipRationale(t *testing.T) {
+	const h = "SDD skip rationale"
+	cases := []struct {
+		body string
+		want bool
+	}{
+		{"## SDD skip rationale\nmechanical rename\n", true},
+		{"## SDD skip rationale  \n\n  \n## Next\ntext", false},
+		{"## SDD skip rationale\n\n", false},
+		{"## Summary\nx", false},
+		{"### SDD skip rationale\nx", false},
+		{"## SDD skip rationale\n## SDD skip rationale\nreason", true},
+	}
+	for _, c := range cases {
+		if got := SkipRationale(c.body, h); got != c.want {
+			t.Errorf("SkipRationale(%q) = %v, want %v", c.body, got, c.want)
+		}
+	}
+}
+
+func TestSpecProposalID(t *testing.T) {
+	cases := []struct{ path, root, want string }{
+		{"specs/X/proposal.md", "", "X"},
+		{"specs/X/deep/proposal.md", "", ""},
+		{"specs/archive/X/proposal.md", "", ""},
+		{"specs/archive/X/proposal.md", "archive/", "X"},
+		{"specs/archive/_abandoned/X/proposal.md", "archive/", ""},
+		{"specs/X/tasks.md", "", ""},
+	}
+	for _, c := range cases {
+		if got := SpecProposalID(c.path, c.root); got != c.want {
+			t.Errorf("SpecProposalID(%q, %q) = %q, want %q", c.path, c.root, got, c.want)
+		}
+	}
+}

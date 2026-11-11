@@ -25,7 +25,7 @@ is the caller's job (the shared pr-checks workflow does it).
 
 Exit status: 0 passes, 1 fails, 2 is a usage or environment error.`,
 	}
-	cmd.AddCommand(newGateKnowledgeCmd())
+	cmd.AddCommand(newGateKnowledgeCmd(), newGateSpecCmd())
 	return cmd
 }
 

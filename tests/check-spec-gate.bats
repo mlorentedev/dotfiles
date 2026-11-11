@@ -3,6 +3,8 @@
 
 load 'lib/both-shells'
 load 'lib/fixture-template'
+load 'lib/dotf-bin'
+load 'lib/spec-gate-parity'
 
 # Built once per file and copied per test (CI-012 N3).
 _seed_fixture() {
@@ -22,6 +24,7 @@ teardown_file() { fixture_template_release; }
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    dotf_bin_resolve "$BATS_FILE_TMPDIR/dotf" || return 1
     REPO_FIXTURE="/tmp/bats_specgate_$$_${BATS_TEST_NUMBER:-0}"
     rm -rf "$REPO_FIXTURE"
     fixture_template_copy repo "$REPO_FIXTURE"
@@ -39,7 +42,7 @@ _commit() {
 }
 
 # Every case runs the gate under zsh and bash, which must agree.
-_both() { run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" "$@"; }
+_both() { spec_gate_both "$@"; }
 
 @test "check-spec-gate.sh --help shows usage and exits 0" {
     _both --help

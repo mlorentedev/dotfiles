@@ -11,6 +11,8 @@
 
 load 'lib/both-shells'
 load 'lib/fixture-template'
+load 'lib/dotf-bin'
+load 'lib/spec-gate-parity'
 
 # Built once per file and copied per test (CI-012 N3).
 _seed_fixture() {
@@ -32,6 +34,7 @@ teardown_file() { fixture_template_release; }
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    dotf_bin_resolve "$BATS_FILE_TMPDIR/dotf" || return 1
     GATE="$SCRIPTS_DIR/check-spec-gate.sh"
     # mktemp picks the unique name; the copy needs it not to exist yet.
     REPO_FIXTURE="$(mktemp -d "/tmp/bats_archivegate_XXXXXX")"
@@ -86,7 +89,7 @@ tiny_change() {
     git commit -q -m "tiny change"
 }
 
-run_gate() { run_both_shells "$GATE" --base-ref main --head-ref feature; }
+run_gate() { spec_gate_both --base-ref main --head-ref feature; }
 
 @test "AC1: closing an issue whose active spec is not archived fails the gate" {
     seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
@@ -368,7 +371,7 @@ big_change() {
     archive_spec FOO-001-demo
     export SDD_PR_BODY="Closes #123"
 
-    run_both_shells "$GATE" --base-ref main --head-ref feature --explain
+    spec_gate_both --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
     [[ "$output" == *"Active-spec LOC (added+removed): 0"* ]] || false
     [[ "$output" == *"Specs archived for archive-on-merge"* ]] || false
