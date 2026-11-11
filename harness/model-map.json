@@ -80,7 +80,7 @@
         "pr-agent-ci"
       ],
       "probe": "env:NAN_API_KEY",
-      "why": "Reasoning-class models on a flat subscription. The pool CI and the TUI both draw from, which is why the reserve exists."
+      "why": "Reasoning-class models billed from one credit pool per account (qwen3.6 and gemma4 spend none; rates in ai/nan/README.md). The pool CI and the TUI both draw from, which is why the reserve exists."
     },
     "claude": {
       "auth": "subscription",
