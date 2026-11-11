@@ -6,8 +6,8 @@
 // tested path.
 //
 // The load-bearing contract: every non-actionable condition (not a repo, dirty
-// worktree, offline, no upstream, already current, ahead, diverged) is a benign SKIP
-// (nil error). The only errors are a real converge failure after a successful
+// worktree, offline, no upstream, ahead, diverged) is a benign SKIP (nil
+// error). Already current runs the system-upgrade step (below), not a skip. The only errors are a real converge failure after a successful
 // fast-forward, a failed install of the pinned dotf, and a failed system-upgrade
 // step on a day the checkout did not move — so a systemd timer / Scheduled
 // Task run reports failure only when something genuinely broke, never for the
@@ -127,8 +127,8 @@ func upgradeQuietDay(d Deps, msg, note string) (Outcome, error) {
 	}
 	skipped, err := d.Upgrade()
 	if err != nil {
-		return Outcome{Status: StatusUpgradeFailed, Message: msg + "; the system-upgrade step failed — see the report above" + note},
-			fmt.Errorf("system-upgrade: %w", err)
+		// err already names the step (converge: system-upgrade: ...).
+		return Outcome{Status: StatusUpgradeFailed, Message: msg + "; the system-upgrade step failed — see the report above" + note}, err
 	}
 	if skipped != "" {
 		// A skip exits 0 inside converge too: the record is the one place a

@@ -43,9 +43,9 @@ binary; update does not converge a second time with the old one. A source
 build ("dev") is never replaced: the pin check is skipped and said so.
 
 Anything non-actionable (not a git repo, dirty worktree, unreachable remote, no
-upstream, ahead of the upstream, diverged history, or already current with dotf
-at its pin) is logged and skipped with exit 0; a skip names a dotf that is off
-its pin.
+upstream, ahead of the upstream, or diverged history) is logged and skipped
+with exit 0; a skip names a dotf that is off its pin. Already current with dotf
+at its pin is not a skip: it runs the system-upgrade step described above.
 A real converge failure, a pinned dotf that cannot be installed, or a failed
 system-upgrade step on a quiet day (status upgrade-failed) is the ONLY
 non-zero exit, so the scheduler's last result (launchd's log, 'systemctl --user
@@ -98,12 +98,18 @@ Env:
 // did.
 func runSystemUpgrade(w io.Writer, repo string) (string, error) {
 	rep, err := runConvergeReport(w, repo, false, []string{"system-upgrade"})
+	return systemUpgradeSkip(rep), err
+}
+
+// systemUpgradeSkip is the system-upgrade entry's skip reason in rep, "" when
+// the step ran (or failed: the run's error carries that).
+func systemUpgradeSkip(rep converge.Report) string {
 	for _, e := range rep.Entries {
 		if e.Name == "system-upgrade" && e.Status == converge.StatusSkipped {
-			return e.Detail, err
+			return e.Detail
 		}
 	}
-	return "", err
+	return ""
 }
 
 // updateHomes are the XDG homes a scheduler hands `dotf update` as flags.
