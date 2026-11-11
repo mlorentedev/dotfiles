@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 // TurnCapHint names the cause when a review failed because the runner stopped
@@ -60,7 +61,85 @@ func withTurnCapHint(err error, repoRoot, specID, specDir string, slot ReviewSlo
 		}
 		break
 	}
+	// Not a turn cap: say what the reviewer itself said (#1511). A run that
+	// died after the launcher's startup window is first noticed here.
+	if words, ok := ReviewerLastWords(TranscriptPathIn(repoRoot, specID, slot)); ok {
+		return fmt.Errorf("%w\nthe review launched with %s left no verdict. %s", err, req.Reviewer, words)
+	}
 	return err
+}
+
+// ReviewerLastWords quotes the start and end of what a reviewer wrote, from
+// its stderr first and then its transcript, and reports whether there was
+// anything to quote.
+func ReviewerLastWords(transcript string) (string, bool) {
+	for _, src := range []struct{ label, path string }{
+		{"stderr", StderrPath(transcript)},
+		{"transcript", transcript},
+	} {
+		raw, err := readEnds(src.path)
+		if err != nil {
+			continue
+		}
+		out := strings.TrimSpace(raw)
+		if out == "" {
+			continue
+		}
+		return "It wrote, on " + src.label + ":\n" + headAndTail(out, src.label, src.path), true
+	}
+	return "", false
+}
+
+// endWindow is how much of each end of a long file readEnds reads: a
+// transcript can be very large, and only quoteHalf bytes of each end are kept.
+const (
+	quoteHalf = 400
+	endWindow = 4096
+)
+
+// readEnds reads a file whole when it is small, and otherwise only its first
+// and last endWindow bytes, joined: enough for headAndTail to cut from.
+func readEnds(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	st, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	if st.Size() <= 2*endWindow {
+		b, err := io.ReadAll(f)
+		return string(b), err
+	}
+	head := make([]byte, endWindow)
+	tail := make([]byte, endWindow)
+	if _, err := f.ReadAt(head, 0); err != nil {
+		return "", err
+	}
+	if _, err := f.ReadAt(tail, st.Size()-endWindow); err != nil && err != io.EOF {
+		return "", err
+	}
+	return string(head) + string(tail), nil
+}
+
+// headAndTail keeps the start of a long output, where a startup failure names
+// its cause, and its end, where a run writes how it finished. It cuts on rune
+// boundaries and replaces any invalid byte a killed process left behind, so
+// the quote is valid UTF-8.
+func headAndTail(out, label, path string) string {
+	if len(out) > 2*quoteHalf {
+		head, tail := quoteHalf, len(out)-quoteHalf
+		for head > 0 && !utf8.RuneStart(out[head]) {
+			head--
+		}
+		for tail < len(out) && !utf8.RuneStart(out[tail]) {
+			tail++
+		}
+		out = out[:head] + fmt.Sprintf("\n… (truncated; full %s at %s)\n", label, path) + out[tail:]
+	}
+	return strings.ToValidUTF8(out, "\uFFFD")
 }
 
 // piTurnCap reads a pi --mode json transcript and reports how many turns ran

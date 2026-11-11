@@ -854,23 +854,8 @@ func confirmLaunched(slot spec.ReviewSlot, session, transcript, specID string, c
 // launching failed — the original defect discarded the reason entirely, which is
 // why nobody could tell a broken credential from a missing binary.
 func reviewerLastWords(transcript string) string {
-	for _, src := range []struct{ label, path string }{
-		{"stderr", spec.StderrPath(transcript)},
-		{"transcript", transcript},
-	} {
-		b, err := os.ReadFile(src.path)
-		if err != nil {
-			continue
-		}
-		out := strings.TrimSpace(string(b))
-		if out == "" {
-			continue
-		}
-		const max = 800
-		if len(out) > max {
-			out = out[:max] + fmt.Sprintf("\n… (truncated; full %s at %s)", src.label, src.path)
-		}
-		return "It wrote, on " + src.label + ":\n" + out
+	if words, ok := spec.ReviewerLastWords(transcript); ok {
+		return words
 	}
 	return "It wrote nothing to either the transcript or its stderr, so the failure happened before the reviewer produced output at all."
 }

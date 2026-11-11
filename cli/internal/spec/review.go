@@ -393,10 +393,10 @@ func checkSignature(repoRoot, specID, specDir string, slot ReviewSlot, checker S
 	review, found, err := FindReviewIn(specDir, slot)
 	if !found {
 		if slot.Name == SecondSigner.Name {
-			return Review{}, fmt.Errorf("proposal.md declares `risk: high`, which needs a second signature from another vendor, and there is no %s\n"+
+			return Review{}, withTurnCapHint(fmt.Errorf("proposal.md declares `risk: high`, which needs a second signature from another vendor, and there is no %s\n"+
 				"run `dotf spec review %s --second` once the first review has passed\n"+
 				"to proceed without one, lower the declared risk in proposal.md, or declare `review: waived` with a `review_waived_reason:`",
-				slot.Review, specID)
+				slot.Review, specID), repoRoot, specID, specDir, slot)
 		}
 		return Review{}, withTurnCapHint(fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
 			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md",
