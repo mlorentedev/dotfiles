@@ -21,8 +21,13 @@ Once a day the timer runs `dotf update` (the Go port of the former
 2. `git fetch`es; skips on a network failure.
 3. Fast-forwards `main` **only** if it can; skips on diverged/non-ff history.
 4. Runs `dotf converge` **only if `HEAD` actually moved**. Its last step re-runs the setup script.
+5. On a day `HEAD` did not move, runs one step instead: `dotf converge --only system-upgrade`, which refreshes
+   brew, apt or winget and upgrades the catalog's outdated unpinned system packages (TOOL-036). A full converge
+   already includes that step, so it never runs twice.
 
-Every skip exits 0 (benign). Only a converge that runs and fails exits non-zero.
+Every skip exits 0 (benign). Only a converge that runs and fails exits non-zero, and so does a failed
+`system-upgrade` step on a quiet day (record status `upgrade-failed`). A refresh that fails offline, or apt
+without `sudo -n`, is a skip inside the step and exits 0.
 
 ```mermaid
 flowchart TB
@@ -33,7 +38,8 @@ flowchart TB
     F -- yes --> FF{fast-forward possible?}
     FF -- no --> S3["skip — diverged (exit 0)"]
     FF -- yes --> M{HEAD moved?}
-    M -- no --> S4["skip — already current (exit 0)"]
+    M -- no --> UP["dotf converge --only system-upgrade"]
+    UP --> OK2(["status current (exit 0)"]) & UF(["upgrade-failed (exit ≠0)"])
     M -- yes --> SETUP["dotf converge (setup script last)"]
     SETUP --> OK([exit 0]) & ERR(["exit ≠0 — only real failure"])
 ```

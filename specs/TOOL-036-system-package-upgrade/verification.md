@@ -17,6 +17,7 @@ owner: manu
 - [x] AC4 -> `TestSystemUpgrade*Linux*` (no sudo: skip with reason; sudo: `--only-upgrade` on catalog packages; root: bare)
 - [x] AC5 -> `TestSystemUpgrade*Windows*` (per-id upgrade, one failure isolated and named in the step error, detail names only the upgraded; `TestSystemUpgradeWindowsMatchesOnlyTheIdColumn` reads the Id column by header position)
 - [x] AC6 -> `TestSystemUpgrade*Refresh*` on all three OSes
+- [x] AC8 -> `TestRunUpgradesSystemPackagesOnAQuietDay` (current runs the step once; fast-forward, reinstall, dirty, offline and ahead do not; a failure is `upgrade-failed` with an error) and `TestUpdate_ConvergesAfterAFastForward` (a quiet day's report counts one step and runs no setup script). On the owner's Mac, 2026-11-11, `DOTFILES_REPO_DIR=<scratch clone> go run ./cmd/dotf update --state-home <scratch>` -> exit 0, `[ OK ] system-upgrade 5.1s index refreshed (brew update); catalog entries up to date`, `last.json` status `current`
 - [x] AC7 -> af71fcc7: `packages.json` `$comment`, ADR-036 amendment 2026-11-10; 02586d37: `catalog.go`, `system.go`, runbook
 
 ## Test status
@@ -34,3 +35,5 @@ owner: manu
 - Linux skips the whole step (refresh included) without root, since `apt-get update` needs root too.
 - `needs_sudo` casks and brew-pinned formulae are excluded per entry and named, so Probe can converge.
 - winget prints a fixed-width table, and a Name cell can contain text that looks like a catalog id. The id match therefore reads the Id column alone. Its start is taken from the header line, and columns are counted as display cells, the way winget pads them (`golang.org/x/text/width`): a CJK or fullwidth character fills two cells, so a wide name or a localized header does not shift the slice. The release needs this fix as well as #3287: it landed separately in PR 1b, after #3287 merged at 6debd6ae.
+- A failed `system-upgrade` step on a quiet day exits non-zero under its own status, `upgrade-failed`. After a fast-forward the same step failure already fails the run as `converge-failed`, and the same failure should not be softer on a quiet day. The separate status lets doctor's Self-deploy line tell a failed package upgrade from a broken deploy. It is not a stuck status: it clears when the package upgrades. A refresh failure, or apt without `sudo -n`, is a skip inside the step and exits 0 (AC6, AC4).
+- The quiet-day run is `dotf converge --only system-upgrade`, not a full converge. A full converge on a day nothing moved would re-run the setup script daily, which is the cost the "ONLY when HEAD moved" rule exists to avoid.

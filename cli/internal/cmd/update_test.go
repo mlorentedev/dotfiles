@@ -109,9 +109,11 @@ func TestUpdate_ConvergesAfterAFastForward(t *testing.T) {
 		return o
 	}
 
+	// A quiet day runs the system-upgrade step alone (TOOL-036): no setup
+	// script and no other step: the report counts one step.
 	stdout, _, err := execute(t, "update")
-	if err != nil || setups != 0 || strings.Contains(stdout, "converge on") {
-		t.Fatalf("nothing to pull must converge nothing: err=%v setups=%d\n%s", err, setups, stdout)
+	if err != nil || setups != 0 || !strings.Contains(stdout, "system-upgrade step converged") || !strings.Contains(stdout, "0 changed, 0 ok, 0 opaque, 1 skipped, 0 failed") {
+		t.Fatalf("nothing to pull must run only system-upgrade: err=%v setups=%d\n%s", err, setups, stdout)
 	}
 	assertUpdateRecord(t, filepath.Join(state, "dotfiles"), "current")
 

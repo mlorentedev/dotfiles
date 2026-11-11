@@ -8,9 +8,15 @@
 // The load-bearing contract: every non-actionable condition (not a repo, dirty
 // worktree, offline, no upstream, already current, ahead, diverged) is a benign SKIP
 // (nil error). The only errors are a real converge failure after a successful
-// fast-forward and a failed install of the pinned dotf — so a systemd timer /
-// Scheduled Task run reports failure only when the deploy genuinely broke,
-// never for the routine "nothing to do".
+// fast-forward, a failed install of the pinned dotf, and a failed system-upgrade
+// step on a day the checkout did not move — so a systemd timer / Scheduled
+// Task run reports failure only when something genuinely broke, never for the
+// routine "nothing to do".
+//
+// A day the checkout did not move still runs the system-upgrade converge step
+// (TOOL-036), which keeps the catalog's unpinned system packages current. A
+// fast-forward converges in full and a reinstall converges with the new
+// binary, so both already include it, and a skip runs nothing.
 //
 // The checkout's DOTF_VERSION pin is part of "up to date" (BUG-144): a
 // converge run by a dotf older than the pin lacks the steps the checkout
@@ -31,12 +37,14 @@ import (
 // `dotf converge` to the checkout; the command layer wires it. Pin reads the
 // checkout's DOTF_VERSION (after the fast-forward, so it is the new one), ""
 // when unpinned. Install runs the checkout's installer for that version, which
-// replaces the dotf binary and converges with the new one.
+// replaces the dotf binary and converges with the new one. Upgrade runs only
+// the system-upgrade converge step; nil runs nothing.
 type Deps struct {
 	Git      func(args ...string) (string, error)
 	Converge func() error
 	Pin      func() (string, error)
 	Install  func(pin string) error
+	Upgrade  func() error
 }
 
 // Config is the resolved run configuration. The converge run is captured by the
@@ -53,7 +61,7 @@ var releaseVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 // Outcome classifies a run for the caller to log. Every Outcome except the
 // setup-failure path is returned with a nil error.
 type Outcome struct {
-	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|ff-failed|updated|reinstalled|converge-failed|install-failed
+	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|ff-failed|updated|reinstalled|converge-failed|install-failed|upgrade-failed
 	Message  string // human-readable line
 	Upstream string // the upstream branch, once resolved (e.g. origin/main)
 	Detail   string // multi-line evidence for the status (the dirtying paths), printed after Message
@@ -61,8 +69,9 @@ type Outcome struct {
 
 // Run executes the self-update against cfg.Repo using the injected Deps. It
 // returns a non-nil error ONLY when the converge fails after a clean
-// fast-forward or the pinned dotf cannot be installed; every other branch is a
-// benign skip (nil error) so a scheduled run does not report spurious failures.
+// fast-forward, the pinned dotf cannot be installed, or the system-upgrade step
+// fails on a day the checkout is current; every other branch is a benign skip
+// (nil error) so a scheduled run does not report spurious failures.
 func Run(cfg Config, d Deps) (Outcome, error) {
 	out := Sync(cfg.Repo, d.Git)
 	switch out.Status {
@@ -97,7 +106,7 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 		return Outcome{Status: "reinstalled", Message: fmt.Sprintf("dotf %s -> %s (the DOTF_VERSION pin) installed and converged by the new binary", cfg.Version, pin)}, nil
 	}
 	if out.Status == StatusCurrent {
-		return skip(out.Status, out.Message+" — no deploy needed"+note)
+		return upgradeQuietDay(d, out.Message+" — no deploy needed", note)
 	}
 	// Clean fast-forward landed → converge from it.
 	if err := d.Converge(); err != nil {
@@ -105,6 +114,21 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 			fmt.Errorf("converge: %w", err)
 	}
 	return Outcome{Status: "updated", Message: "self-update complete (fast-forwarded to " + out.Upstream + ")" + note}, nil
+}
+
+// upgradeQuietDay runs the system-upgrade step on a day the checkout did not
+// move. Its failure is the same class as a converge failure after a
+// fast-forward, where the same step would fail the run, so it fails this one
+// too, under its own status so doctor can tell it from a broken deploy.
+func upgradeQuietDay(d Deps, msg, note string) (Outcome, error) {
+	if d.Upgrade == nil {
+		return skip(StatusCurrent, msg+note)
+	}
+	if err := d.Upgrade(); err != nil {
+		return Outcome{Status: StatusUpgradeFailed, Message: msg + "; the system-upgrade step failed — see the report above" + note},
+			fmt.Errorf("system-upgrade: %w", err)
+	}
+	return Outcome{Status: StatusCurrent, Message: msg + "; system-upgrade step converged" + note}, nil
 }
 
 // skipDrift is a skip that installs nothing but names a running dotf that is not
@@ -149,6 +173,9 @@ const (
 	StatusCurrent       = "current"
 	StatusAhead         = "ahead"
 	StatusFastForwarded = "fast-forwarded"
+	// StatusUpgradeFailed is Run's alone: the checkout was current and the
+	// system-upgrade step failed.
+	StatusUpgradeFailed = "upgrade-failed"
 	// StatusBehind is Assess's answer for a clean checkout its upstream
 	// strictly contains: Sync would fast-forward it. Sync itself never
 	// returns it.

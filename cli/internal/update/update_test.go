@@ -176,3 +176,53 @@ func TestAssess_ReportsBehindAndNeverMerges(t *testing.T) {
 		t.Errorf("Sync on the same checkout = %q, want %q", got, StatusFastForwarded)
 	}
 }
+
+// TestRunUpgradesSystemPackagesOnAQuietDay covers TOOL-036's daily tick: a day
+// the checkout did not move still runs the system-upgrade step, once. Every
+// other path either converges in full (which includes the step) or skips, so
+// the step must not run a second time there.
+func TestRunUpgradesSystemPackagesOnAQuietDay(t *testing.T) {
+	tests := []struct {
+		name        string
+		mutate      func(g fakeGit)
+		running     string // the running dotf; behind the pin installs it
+		upgradeErr  error
+		wantStatus  string
+		wantErr     bool
+		wantUpgrade bool
+	}{
+		{name: "current upgrades", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, wantStatus: StatusCurrent, wantUpgrade: true},
+		{name: "current, upgrade fails", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, upgradeErr: errors.New("winget: 1 id failed"), wantStatus: StatusUpgradeFailed, wantErr: true, wantUpgrade: true},
+		{name: "fast-forward converges in full instead", mutate: func(fakeGit) {}, wantStatus: "updated"},
+		{name: "current, behind the pin: the installer converges", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, running: "0.69.0", wantStatus: "reinstalled"},
+		{name: "dirty skips", mutate: func(g fakeGit) { g.out["status --porcelain"] = " M x" }, wantStatus: "dirty"},
+		{name: "offline skips", mutate: func(g fakeGit) { g.fail["fetch --quiet"] = true }, wantStatus: "offline"},
+		{name: "ahead skips", mutate: func(g fakeGit) { g.out["merge-base HEAD @{u}"] = "bbbb" }, wantStatus: StatusAhead},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := healthyGit()
+			tt.mutate(g)
+			upgrades := 0
+			out, err := Run(Config{Repo: "/repo", Version: tt.running}, Deps{
+				Git:      g.run,
+				Converge: func() error { return nil },
+				Pin:      func() (string, error) { return "0.70.0", nil },
+				Install:  func(string) error { return nil },
+				Upgrade:  func() error { upgrades++; return tt.upgradeErr },
+			})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if out.Status != tt.wantStatus {
+				t.Errorf("status = %q, want %q (msg: %s)", out.Status, tt.wantStatus, out.Message)
+			}
+			if want := map[bool]int{true: 1, false: 0}[tt.wantUpgrade]; upgrades != want {
+				t.Errorf("Upgrade calls = %d, want %d", upgrades, want)
+			}
+			if tt.wantUpgrade && !strings.Contains(out.Message, "system-upgrade") {
+				t.Errorf("message = %q, want it to name the system-upgrade step", out.Message)
+			}
+		})
+	}
+}
