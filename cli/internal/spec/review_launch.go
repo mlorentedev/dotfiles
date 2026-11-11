@@ -355,6 +355,11 @@ func writeReviewScope(b *strings.Builder, scope ReviewScope) {
 			"`git log --first-parent --no-merges %s..HEAD` lists the commits made on the branch\n"+
 			"itself, not those a merge brought in (a sub-branch merged into it is a merge too).\n"+
 			"Judge what the spec names first, and the rest only where it interacts.\n\n", scope.BaseSHA, scope.BaseSHA)
+		if scope.WidenedFrom != "" {
+			fmt.Fprintf(b, "The spec folder was first committed after %s; the launcher widened the base to\n"+
+				"where the branch left the default branch, because the work before the spec folder is\n"+
+				"the spec's too: a fix committed before its spec is in this range on purpose.\n\n", scope.WidenedFrom)
+		}
 		writeOwnCommits(b, scope)
 	}
 }

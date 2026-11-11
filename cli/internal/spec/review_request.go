@@ -112,6 +112,9 @@ type ReviewScope struct {
 	OwnIssue int
 	// OwnFolderOnly is why no issue was matched, when OwnIssue is 0.
 	OwnFolderOnly string
+	// WidenedFrom is the traced base when BaseSHA was widened to the fork
+	// point (BUG-166), else "". Advice to the reviewer, like Own.
+	WidenedFrom string
 }
 
 // Initial reports whether the scope reviews from the empty tree.
@@ -166,6 +169,10 @@ func RequestIgnoredIn(repoRoot, specDir string, slot ReviewSlot) bool {
 // That second case is the whole point: it is the one the old code got wrong by
 // having no answer at all.
 //
+// On a work branch whose spec folder came after its code, the parent of the
+// adding commit is after the code; ResolveReviewBaseDetail widens it to the
+// fork point then, and only ever earlier (BUG-166).
+//
 // A folder that was renamed -- by hand, or by `spec archive` moving it under
 // specs/archive/ -- appears ADDED under its new path, so the search follows each
 // rename back to the folder's first name (BUG-108, #1829). Without that, the base
@@ -205,15 +212,56 @@ type ReviewBase struct {
 	SHA     string
 	Refusal BaseRefusal
 	RootSHA string
+	// WidenedFrom is the traced base when SHA was widened to the fork point
+	// (BUG-166), else "". The commits between them are work the branch did
+	// before it committed the spec folder.
+	WidenedFrom string
 }
 
 // ResolveReviewBaseDetail is ResolveReviewBase that also names why no base
 // resolved. The launcher needs the reason, not just the absence: only a spec
 // born in the root commit has a supported review without a base commit, and an
 // untraceable move must stay refused however it is asked for.
+//
+// A resolved base then widens to the fork point when that is earlier (BUG-166,
+// #3258): a spec folder committed after the code it describes otherwise puts
+// the base after the code, and the reviewer certifies a diff without it.
 func ResolveReviewBaseDetail(repoRoot, specDir string) ReviewBase {
 	base, _ := traceSpecFolder(repoRoot, specDir)
+	if base.SHA == "" {
+		return base
+	}
+	if fork := forkPoint(repoRoot); fork != "" && fork != base.SHA && isAncestor(repoRoot, fork, base.SHA) {
+		base.WidenedFrom, base.SHA = base.SHA, fork
+	}
 	return base
+}
+
+// defaultBranchRefs is where the remote's default branch is looked for, in
+// order: the same list `dotf worktree add` bases a new branch on.
+var defaultBranchRefs = []string{"origin/HEAD", "origin/main", "origin/master"}
+
+// forkPoint is where HEAD left the remote's default branch, or "" when no such
+// ref exists. A stale ref only makes it older, which widens a review and never
+// narrows one.
+func forkPoint(repoRoot string) string {
+	for _, ref := range defaultBranchRefs {
+		if exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", "--quiet", ref).Run() != nil {
+			continue
+		}
+		out, err := exec.Command("git", "-C", repoRoot, "merge-base", "HEAD", ref).Output()
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(out))
+	}
+	return ""
+}
+
+// isAncestor reports whether a is an ancestor of b. Any failure is false, so
+// the base stays the traced one.
+func isAncestor(repoRoot, a, b string) bool {
+	return exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", a, b).Run() == nil
 }
 
 // SpecFolderNames returns every repository-relative path the spec folder has

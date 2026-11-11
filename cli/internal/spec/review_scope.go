@@ -40,6 +40,14 @@ type OwnCommitSet struct {
 // Any git failure is an error, never an empty set: a broken range must not
 // read as a spec with no commits of its own.
 func OwnCommits(repoRoot, base, head string, folders []string, issue int) (OwnCommitSet, error) {
+	return OwnCommitsWidened(repoRoot, base, "", head, folders, issue)
+}
+
+// OwnCommitsWidened is OwnCommits for a base widened to the fork point
+// (BUG-166): every commit in base..widenedFrom is the branch's work before it
+// committed the spec folder, and is the spec's own whatever its message says.
+// The commit the widening exists to include is a fix that names no issue.
+func OwnCommitsWidened(repoRoot, base, widenedFrom, head string, folders []string, issue int) (OwnCommitSet, error) {
 	rng := base + ".." + head
 	all, err := gitLines(repoRoot, "log", "--no-merges", "--topo-order", "--reverse", "--format=%H%x00%s", rng)
 	if err != nil {
@@ -52,6 +60,15 @@ func OwnCommits(repoRoot, base, head string, folders []string, issue int) (OwnCo
 	}
 	for _, sha := range byPath {
 		own[sha] = true
+	}
+	if widenedFrom != "" {
+		before, err := gitLines(repoRoot, "log", "--no-merges", "--format=%H", base+".."+widenedFrom)
+		if err != nil {
+			return OwnCommitSet{}, err
+		}
+		for _, sha := range before {
+			own[sha] = true
+		}
 	}
 	if issue > 0 {
 		// "#1727" not followed by a digit, so #17270 does not match.
