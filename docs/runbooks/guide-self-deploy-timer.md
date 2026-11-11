@@ -120,8 +120,10 @@ Get-ScheduledTaskInfo -TaskName DotfilesSelfUpdate   # LastRunTime / LastTaskRes
 
 Run it once by hand with `dotf update`. On a clean, current checkout whose installed `dotf` matches
 the `DOTF_VERSION` pin, it still runs the system-upgrade step (step 5 above), which upgrades any
-outdated catalog package on the real machine. Preview that first with
-`dotf converge --plan --only system-upgrade`. When the installed `dotf` is not the pin, it runs the
+outdated catalog package on the real machine. On macOS and Windows, preview that first with
+`dotf converge --plan --only system-upgrade`. On Linux without passwordless `sudo` the step skips whole, refresh and
+listing included, so the preview prints only the `needs root` reason; `apt list --upgradable` shows what is
+outdated. When the installed `dotf` is not the pin, it runs the
 installer instead, which installs the pin and converges.
 
 ## Diagnose

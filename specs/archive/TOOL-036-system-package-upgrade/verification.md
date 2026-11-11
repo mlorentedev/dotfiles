@@ -37,3 +37,26 @@ owner: manu
 - winget prints a fixed-width table, and a Name cell can contain text that looks like a catalog id. The id match therefore reads the Id column alone. Its start is taken from the header line, and columns are counted as display cells, the way winget pads them (`golang.org/x/text/width`): a CJK or fullwidth character fills two cells, so a wide name or a localized header does not shift the slice. The release needs this fix as well as #3287: it landed separately in PR 1b, after #3287 merged at 6debd6ae.
 - A failed `system-upgrade` step on a quiet day exits non-zero under its own status, `upgrade-failed`. After a fast-forward the same step failure already fails the run as `converge-failed`, and the same failure should not be softer on a quiet day. The separate status lets doctor's Self-deploy line tell a failed package upgrade from a broken deploy. It is not a stuck status: it clears when the package upgrades. A refresh failure, or apt without `sudo -n`, is a skip inside the step and exits 0 (AC6, AC4). `dotf update` reads the step's entry from the run's report (`runConvergeReport`) and records `upgrade-skipped` with the reason, because converge's exit status alone cannot tell a skip from an upgrade (pr-agent on #3312). It is not a stuck status: an offline day clears by itself.
 - The quiet-day run is `dotf converge --only system-upgrade`, not a full converge. A full converge on a day nothing moved would re-run the setup script daily, which is the cost the "ONLY when HEAD moved" rule exists to avoid.
+
+## Closing verification (main at af73427a, after #3312, 2026-11-11)
+
+- Every `features.json` gate (f1-f8) run from the repository root: exit 0; each entry's `evidence` names the tests that passed.
+- `cd cli && go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> exit 0, 56 packages ok; `golangci-lint cache clean && golangci-lint run` -> `0 issues.`
+- Linux and Windows acceptance against a real package manager remains a post-release run (see the smoke-test line above); the parsing for both is unit-tested against recorded listings.
+
+## Review dispositions (review.md, nan/deepseek-v4-flash, PASS-WITH-GAPS)
+
+| Finding | Disposition |
+|---|---|
+| Major, THEORETICAL: winget "nothing outdated" detected by English text | Ticketed #3343: needs a real Windows host to confirm the exit code before the fix. |
+| Minor: Linux plan without root previews nothing, yet the runbook advises the preview | Applied: `guide-self-deploy-timer.md` scopes the preview to macOS and Windows and names `apt list --upgradable` for Linux. |
+| Minor: a permanently skipping machine renders as a doctor pass | Already ticketed: #3321. |
+| Minor, REAL: no cmd-level test for `upgrade-failed` on a quiet day | Ticketed #3344 (the fixture needs a per-OS stub manager; the wiring is generic). |
+| Minor, REAL: no lesson for the #3295 Id-column defect | Applied: `docs/lessons/lesson-583-a-fixed-width-table-cell-can-impersonate-an-id.md`. |
+| Post-release Linux and Windows acceptance | Stays the declared deferral; #3343 carries the Windows run. |
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-583-a-fixed-width-table-cell-can-impersonate-an-id.md (and lesson 580 from PR 2)
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-036-install-channels.md (amended 2026-11-10: unpinned system entries upgrade, pinned entries move by PR)
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: parsing a tool's human table by header-measured columns is recorded in lesson 583; it has not recurred in another project
