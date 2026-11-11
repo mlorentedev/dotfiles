@@ -58,6 +58,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
   - **F6 is acknowledged, and tasks.md is not edited.** `tasks.md` still says `gh repo list`. The proposal and the code use REST `user/repos` (#3228), and tasks.md is part of the reviewed contract set.
   - **F7 is confirmed.** A repository whose only signal is an unknown read exits 0 and prints `UNKNOWN`, as AC4 and `features.json` f4 specify: nothing can be concluded about it, so it neither passes nor fails. If a gate later needs unknown to block, that is a flag on the command, not this default.
 - After the round-1 fixes, the live fleet run gave output identical to the first run.
+- **Review round 2 (PASS-WITH-GAPS, agy/gemini-3.8-flash-high, at c42cb3db), dispositions:**
+  - **F9 is declined.** It concerns secrets read in a bare `if:`, which is not reachable: Actions does not make the `secrets` context available to `jobs.<id>.if` or `steps[*].if`, so a workflow cannot read a secret there with or without `${{ }}`.
+  - **F10 is applied.** `'secrets'` inside an expression string literal is no longer an unknown read. There is a `TestWorkflowReadsUnknown` row for it, and its mutation is killed.
+  - **F11 is applied.** A callee's `required` now counts as true in any YAML 1.2 spelling (`true`, `True`, `TRUE`), because the flag is decoded as a bool. There is a `TestCalleeSecrets` row for it, and its mutation is killed.
 
 ## Promotion candidates
 

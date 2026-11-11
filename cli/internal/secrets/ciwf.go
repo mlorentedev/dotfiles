@@ -54,9 +54,11 @@ var (
 	exprRe = regexp.MustCompile(`(?s)\$\{\{(.*?)\}\}`)
 	// secrets.NAME, secrets['NAME'] or secrets["NAME"]; anything else after
 	// `secrets` is a whole-context or computed read.
-	secretsRe  = regexp.MustCompile(`\bsecrets\b`)
-	literalRe  = regexp.MustCompile(`^(?:\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)|\s*\[\s*'([A-Za-z_][A-Za-z0-9_]*)'\s*\]|\s*\[\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\])`)
-	reusableRe = regexp.MustCompile(`^([^/\s]+/[^/\s]+)/(.+)@([^@\s]+)$`)
+	secretsRe = regexp.MustCompile(`\bsecrets\b`)
+	literalRe = regexp.MustCompile(`^(?:\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)|\s*\[\s*'([A-Za-z_][A-Za-z0-9_]*)'\s*\]|\s*\[\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\])`)
+	// An expression string literal: single quotes, '' escapes a quote.
+	stringLitRe = regexp.MustCompile(`'(?:[^']|'')*'`)
+	reusableRe  = regexp.MustCompile(`^([^/\s]+/[^/\s]+)/(.+)@([^@\s]+)$`)
 )
 
 // workflowReads returns the secret names a workflow reads, sorted, unique and
@@ -82,9 +84,13 @@ func workflowReads(wf []byte) (names, unknown []string, err error) {
 
 // exprReads appends the secret reads of one ${{ }} expression's body.
 func exprReads(expr string, names, unknown []string) ([]string, []string) {
+	quoted := stringLitRe.FindAllStringIndex(expr, -1)
 	for _, loc := range secretsRe.FindAllStringIndex(expr, -1) {
 		if loc[0] > 0 && expr[loc[0]-1] == '.' {
 			continue // inputs.secrets, github.secrets: another context's field
+		}
+		if insideAny(loc[0], quoted) {
+			continue // 'secrets' as a string literal, not the context
 		}
 		lit := literalRe.FindStringSubmatch(expr[loc[1]:])
 		if lit == nil {
@@ -96,6 +102,15 @@ func exprReads(expr string, names, unknown []string) ([]string, []string) {
 		}
 	}
 	return names, unknown
+}
+
+func insideAny(i int, spans [][]int) bool {
+	for _, sp := range spans {
+		if i >= sp[0] && i < sp[1] {
+			return true
+		}
+	}
+	return false
 }
 
 // decodeDocs decodes every YAML document in wf: a file may hold more than one,
@@ -184,11 +199,17 @@ func calleeSecrets(wf []byte) (map[string]bool, error) {
 			continue
 		}
 		for i := 0; i+1 < len(secrets.Content); i += 2 {
-			req := mappingValue(secrets.Content[i+1], "required")
-			out[strings.ToUpper(secrets.Content[i].Value)] = req != nil && req.Value == "true"
+			out[strings.ToUpper(secrets.Content[i].Value)] = isTrue(mappingValue(secrets.Content[i+1], "required"))
 		}
 	}
 	return out, nil
+}
+
+// isTrue reports whether n is a YAML boolean true in any spelling the YAML
+// 1.2 core schema accepts (true, True, TRUE).
+func isTrue(n *yaml.Node) bool {
+	var b bool
+	return n != nil && n.Decode(&b) == nil && b
 }
 
 func mappingValue(n *yaml.Node, key string) *yaml.Node {

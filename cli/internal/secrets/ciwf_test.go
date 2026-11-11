@@ -49,6 +49,7 @@ func TestWorkflowReadsUnknown(t *testing.T) {
       ALL: ${{ toJSON(secrets) }}
       ONE: ${{ secrets[matrix.key] }}
       OK: ${{ secrets.FINE }}
+      LIT: ${{ contains(github.event.comment.body, 'secrets') }}
 `)
 	names, unknown, err := workflowReads(wf)
 	if err != nil {
@@ -101,12 +102,14 @@ on:
       PR_AGENT_ANTHROPIC_API_KEY:
         required: false
       NO_FLAG: {}
+      TITLE_CASE:
+        required: True
 `)
 	got, err := calleeSecrets(wf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"NAN_API_KEY": true, "PR_AGENT_ANTHROPIC_API_KEY": false, "NO_FLAG": false}
+	want := map[string]bool{"NAN_API_KEY": true, "PR_AGENT_ANTHROPIC_API_KEY": false, "NO_FLAG": false, "TITLE_CASE": true}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("callee secrets = %v, want %v", got, want)
 	}
