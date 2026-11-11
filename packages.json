@@ -16,8 +16,9 @@
     "                                         load), so no cask entry ships before that release is the pin",
     "                    command              optional: the executable it puts on PATH; found there,",
     "                                         the entry is satisfied whichever channel installed it",
-    "                  A system entry has no version: it is not pinned, presence is what converges,",
-    "                  and it is never upgraded. A dotf that predates the type skips it with a warning,",
+    "                  A system entry has no version: it is not pinned, so presence is what `tools`",
+    "                  converges and the `system-upgrade` step keeps it current (TOOL-036, ADR-036",
+    "                  amendment 2026-11-10). A dotf that predates the type skips it with a warning,",
     "                  so no system entry was added before a release carrying the reader was the pin (0.65.0).",
     "",
     "source.platforms (every type) narrows an entry to the listed GOOS values."

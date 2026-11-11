@@ -130,3 +130,21 @@ The 2026-10-21 amendment's rule 3 said the tool "is probed where the installer p
 
 **Trade-off.** A uv copy *above* the pin is ignored. The launcher's own version decides, and hive's bin dir goes first on PATH once it self-installs, so that copy is shadowed and the doctor names it. On Windows the copy is illegitimate under hive ADR-019, so ignoring it costs nothing. The pin floor still holds where it matters: a launcher already above the pin, such as a hand-run `hive self-upgrade 5.0`, is never downgraded.
 
+## Amendment 2026-11-10 (TOOL-036, #3283)
+
+**An unpinned system entry is kept current; a pinned entry still moves only by PR.**
+
+Until now a catalog `system` entry (a brew formula or cask, an apt package, a winget id) converged on presence and was never upgraded, and nothing refreshed the managers themselves. A Mac converged months earlier still ran the formulae it first installed, on a Homebrew checkout of the same age.
+
+The `system-upgrade` converge step, which runs after `tools`, refreshes the manager's index (`brew update`, `apt-get update`, `winget source update`). It then upgrades the catalog's system entries that the manager reports outdated, and cleans up after the manager (`brew cleanup`, `brew autoremove`, `apt-get autoremove`).
+
+This does not contradict decision 2's ban on unattended upgrades. That ban protects a pin: an install that resolves "newest" on its own drifts from the version the owner committed. A system entry has no pin, so it has nothing to drift from, and leaving it alone only produces staleness without limit.
+
+Pinned entries keep the rule. They move when a reviewed commit bumps the pin, and #3284 automates those bump PRs with Renovate.
+
+Scope:
+- The catalog's entries are the upgrade's targets. Their dependencies follow the manager.
+- Housekeeping is manager-wide, but it removes only what the manager itself calls unneeded.
+- A package outside the catalog is never upgraded by name.
+- The step never prompts. Apt upgrades only when `sudo -n` works; otherwise the step skips and names why.
+
