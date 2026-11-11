@@ -25,6 +25,19 @@ owner: manu
 
 - The helper keeps both ends rather than one: PR-Agent on #3322 showed that quoting only the tail would hide a startup failure's cause, which `confirmLaunched` relies on.
 
+## Review dispositions
+
+First review (nan/glm5.3-flash, FAIL) at 64da07dc:
+
+1. Major, rune-boundary property untested: applied. `TestHeadAndTailCutsOnRuneBoundaries` puts both cut points inside a rune and refuses U+FFFD in the quote; a byte-cutting `headAndTail` fails it (mutation checked).
+2. Major, a missing second signature quoted nothing: applied. The not-found branch for the second signer goes through the same hint; `TestArchiveGateQuotesADeadSecondSigner`, which fails with the wrap removed (mutation checked).
+3. Minor, a relaunch that dies before tmux starts its command quotes the previous attempt's stderr: declined. That failure is the tmux command's own, and the launcher reports it directly at launch; archive is not where it surfaces.
+4. Minor, the whole transcript was read to keep 800 bytes: applied. `readEnds` reads a small file whole and a large one by its first and last 4 KiB; `TestReviewerLastWordsQuotesBothEndsOfALongFile`.
+5. Minor, invalid UTF-8 in the input reaches the quote: applied. `headAndTail` passes its result through `strings.ToValidUTF8`; covered in `TestHeadAndTailCutsOnRuneBoundaries`.
+6. Minor, quoted output can contain a line that looks like the truncation notice: declined. The quote reproduces what the reviewer wrote; escaping it would change that.
+
+None of these touches `proposal.md`, `tasks.md` or `features.json`.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: an error message change; #1511 holds the measurement.

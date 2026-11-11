@@ -69,19 +69,19 @@ func withTurnCapHint(err error, repoRoot, specID, specDir string, slot ReviewSlo
 	return err
 }
 
-// ReviewerLastWords quotes the end of what a reviewer wrote, from its stderr
-// first and then its transcript, and reports whether there was anything to
-// quote. The end, because that is where a run writes how it finished.
+// ReviewerLastWords quotes the start and end of what a reviewer wrote, from
+// its stderr first and then its transcript, and reports whether there was
+// anything to quote.
 func ReviewerLastWords(transcript string) (string, bool) {
 	for _, src := range []struct{ label, path string }{
 		{"stderr", StderrPath(transcript)},
 		{"transcript", transcript},
 	} {
-		b, err := os.ReadFile(src.path)
+		raw, err := readEnds(src.path)
 		if err != nil {
 			continue
 		}
-		out := strings.TrimSpace(string(b))
+		out := strings.TrimSpace(raw)
 		if out == "" {
 			continue
 		}
@@ -90,22 +90,56 @@ func ReviewerLastWords(transcript string) (string, bool) {
 	return "", false
 }
 
+// endWindow is how much of each end of a long file readEnds reads: a
+// transcript can be very large, and only quoteHalf bytes of each end are kept.
+const (
+	quoteHalf = 400
+	endWindow = 4096
+)
+
+// readEnds reads a file whole when it is small, and otherwise only its first
+// and last endWindow bytes, joined: enough for headAndTail to cut from.
+func readEnds(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	st, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	if st.Size() <= 2*endWindow {
+		b, err := io.ReadAll(f)
+		return string(b), err
+	}
+	head := make([]byte, endWindow)
+	tail := make([]byte, endWindow)
+	if _, err := f.ReadAt(head, 0); err != nil {
+		return "", err
+	}
+	if _, err := f.ReadAt(tail, st.Size()-endWindow); err != nil && err != io.EOF {
+		return "", err
+	}
+	return string(head) + string(tail), nil
+}
+
 // headAndTail keeps the start of a long output, where a startup failure names
-// its cause, and its end, where a run writes how it finished, cut on rune
-// boundaries so a multi-byte character is never split.
+// its cause, and its end, where a run writes how it finished. It cuts on rune
+// boundaries and replaces any invalid byte a killed process left behind, so
+// the quote is valid UTF-8.
 func headAndTail(out, label, path string) string {
-	const half = 400
-	if len(out) <= 2*half {
-		return out
+	if len(out) > 2*quoteHalf {
+		head, tail := quoteHalf, len(out)-quoteHalf
+		for head > 0 && !utf8.RuneStart(out[head]) {
+			head--
+		}
+		for tail < len(out) && !utf8.RuneStart(out[tail]) {
+			tail++
+		}
+		out = out[:head] + fmt.Sprintf("\n… (truncated; full %s at %s)\n", label, path) + out[tail:]
 	}
-	head, tail := half, len(out)-half
-	for head > 0 && !utf8.RuneStart(out[head]) {
-		head--
-	}
-	for tail < len(out) && !utf8.RuneStart(out[tail]) {
-		tail++
-	}
-	return out[:head] + fmt.Sprintf("\n… (truncated; full %s at %s)\n", label, path) + out[tail:]
+	return strings.ToValidUTF8(out, "\uFFFD")
 }
 
 // piTurnCap reads a pi --mode json transcript and reports how many turns ran

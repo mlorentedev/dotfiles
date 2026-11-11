@@ -238,3 +238,48 @@ func TestReviewerLastWordsQuotesTheEnd(t *testing.T) {
 		t.Error("no transcript and no stderr must report nothing to quote")
 	}
 }
+
+// Cut points inside multi-byte runes at both ends: "a" puts every rune start
+// of the é run on an odd index, the trailing "b" makes the length even, so
+// byte 400 and byte len-400 both fall mid-rune. A byte cut fails this.
+func TestHeadAndTailCutsOnRuneBoundaries(t *testing.T) {
+	out := "a" + strings.Repeat("é", 1000) + "b"
+	if utf8.RuneStart(out[quoteHalf]) || utf8.RuneStart(out[len(out)-quoteHalf]) {
+		t.Fatal("fixture: both cut points must fall inside a rune")
+	}
+	if got := headAndTail(out, "stderr", "/x"); !utf8.ValidString(got) || strings.ContainsRune(got, utf8.RuneError) {
+		t.Errorf("a rune was split: %q", got)
+	}
+	if got := headAndTail("ok \xc3", "stderr", "/x"); !utf8.ValidString(got) {
+		t.Errorf("a truncated last rune must not reach the quote: %q", got)
+	}
+}
+
+// A long transcript, read by its ends only, is still quoted from both.
+func TestReviewerLastWordsQuotesBothEndsOfALongFile(t *testing.T) {
+	transcript := filepath.Join(t.TempDir(), "t.jsonl")
+	body := "first line\n" + strings.Repeat("x", 3*endWindow) + "\nlast line"
+	if err := os.WriteFile(transcript, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	words, ok := ReviewerLastWords(transcript)
+	if !ok || !strings.Contains(words, "first line") || !strings.Contains(words, "last line") {
+		t.Errorf("want both ends quoted, got %q", words)
+	}
+}
+
+// A missing second signature is refused with the same quote as a missing first.
+func TestArchiveGateQuotesADeadSecondSigner(t *testing.T) {
+	repoRoot, specDir := archiveCapFixture(t, 460, false)
+	if err := WriteReviewRequestIn(specDir, SecondSigner, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash", "basebasebase", ""); err != nil {
+		t.Fatal(err)
+	}
+	quota := `{"event":"result","result":{"status":"ERROR","error":"second signer quota reached"}}`
+	if err := os.WriteFile(TranscriptPathIn(repoRoot, "X", SecondSigner), []byte(quota+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := checkSignature(repoRoot, "X", specDir, SecondSigner, nil)
+	if err == nil || !strings.Contains(err.Error(), "second signer quota reached") {
+		t.Errorf("the second signer's refusal must quote it: %v", err)
+	}
+}
