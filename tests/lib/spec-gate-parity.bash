@@ -36,23 +36,25 @@ spec_gate_both() {
     # The dotf leg runs first, so the script's run is the last `run` and its
     # status and output are what the caller asserts on.
     local dotf_status="" dotf_output=""
-    local sum="${GITHUB_STEP_SUMMARY:-}" dotf_sum="$BATS_TEST_TMPDIR/dotf-summary.md" pre_sum="$BATS_TEST_TMPDIR/pre-summary.md"
-    if [ -n "$sum" ]; then
-        rm -f "$dotf_sum"
-        cat "$sum" >"$pre_sum" 2>/dev/null || : >"$pre_sum"
-        flags+=(--summary "$dotf_sum")
-    fi
+    # Each side writes its step summary to a file of this call's own: on a CI
+    # runner GITHUB_STEP_SUMMARY is the job's real summary, shared by every test.
+    local sum="${GITHUB_STEP_SUMMARY:-}" dotf_sum="$BATS_TEST_TMPDIR/dotf-summary.md" sh_sum="$BATS_TEST_TMPDIR/script-summary.md"
+    : >"$dotf_sum"
+    : >"$sh_sum"
+    flags+=(--summary "$dotf_sum")
     if [ -z "$skip" ] && [ -n "$base" ] && [ -n "$head" ]; then
         _spec_gate_event "$BATS_TEST_TMPDIR/spec-event.json"
         local bin="$BATS_TEST_TMPDIR/git-only"
         mkdir -p "$bin"
         [ -e "$bin/git" ] || ln -s "$(command -v git)" "$bin/git"
-        run env -u GH_TOKEN -u GITHUB_TOKEN -u GITHUB_STEP_SUMMARY PATH="$bin" "$DOTF_BIN" gate spec \
+        run env -u GH_TOKEN -u GITHUB_TOKEN PATH="$bin" "$DOTF_BIN" gate spec \
             --event "$BATS_TEST_TMPDIR/spec-event.json" --base "$base" --head "$head" \
             ${flags[@]+"${flags[@]}"}
         dotf_status="$status" dotf_output="$output"
     fi
-    run_both_shells "$SPEC_GATE_SCRIPT" ${a[@]+"${a[@]}"} || return 1
+    GITHUB_STEP_SUMMARY="$sh_sum" run_both_shells "$SPEC_GATE_SCRIPT" ${a[@]+"${a[@]}"} || return 1
+    # A caller that named a summary file reads the script's table from it.
+    [ -z "$sum" ] || cat "$sh_sum" >>"$sum"
     # A flag this helper does not know is only safe to skip when the script
     # rejects it too; one it accepts means the dotf leg is missing a case.
     if [ "$skip" = unknown ] && [ "$status" != 2 ]; then
@@ -65,9 +67,9 @@ spec_gate_both() {
         return 1
     fi
     [ -n "$dotf_status" ] || return 0
-    if [ -n "$sum" ] && ! { cat "$pre_sum" "$dotf_sum" "$dotf_sum" 2>/dev/null | cmp -s - "$sum"; }; then
+    if ! { cat "$dotf_sum" "$dotf_sum" | cmp -s - "$sh_sum"; }; then
         printf 'script and dotf gate spec wrote different step summaries\n--- script (both shells)\n%s\n--- dotf\n%s\n' \
-            "$(cat "$sum")" "$(cat "$dotf_sum" 2>/dev/null)"
+            "$(cat "$sh_sum")" "$(cat "$dotf_sum")"
         return 1
     fi
     if [ "$dotf_status" != "$status" ] ||
