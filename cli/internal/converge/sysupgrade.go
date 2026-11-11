@@ -354,25 +354,83 @@ func (r systemUpgrade) aptBehind([]sysTarget) (func(sysTarget) bool, error) {
 	return func(t sysTarget) bool { return behind[t.key()] }, nil
 }
 
-// wingetBehind reads `winget upgrade`'s table and matches a catalog id as a
-// whole column, without regard to case, as managerLists does. A table cut to
-// the console width ends an id with an ellipsis: that column matches the ids
-// it is a prefix of.
+// wingetBehind reads `winget upgrade`'s table and matches a catalog id against
+// the Id column alone, without regard to case, as managerLists does. A table
+// cut to the console width ends an id with an ellipsis: that cell matches the
+// ids it is a prefix of. The column is found by its header's position, because
+// a Name cell may hold spaces and an ellipsis of its own, and a name that is
+// a prefix of a catalog id must not read as that id. A listing with no header
+// (no package is outdated) matches nothing.
 func (r systemUpgrade) wingetBehind([]sysTarget) (func(sysTarget) bool, error) {
 	out, err := r.run("winget", "upgrade", "--accept-source-agreements")
-	listing := strings.ToLower(string(out))
-	if err != nil && !strings.Contains(listing, "no installed package") {
+	listing := string(out)
+	if err != nil && !strings.Contains(strings.ToLower(listing), "no installed package") {
 		return nil, fmt.Errorf("winget upgrade: %w", err)
 	}
+	ids := wingetIDs(listing)
 	return func(t sysTarget) bool {
 		id := strings.ToLower(t.pkg)
-		for _, col := range strings.Fields(listing) {
-			if col == id || strings.HasSuffix(col, "…") && strings.HasPrefix(id, strings.TrimSuffix(col, "…")) {
+		for _, cell := range ids {
+			if cell == id || strings.HasSuffix(cell, "…") && strings.HasPrefix(id, strings.TrimSuffix(cell, "…")) {
 				return true
 			}
 		}
 		return false
 	}, nil
+}
+
+// wingetIDs returns the lower-cased Id cell of every row under the table's
+// header. The header is the line whose fields include "Id" (winget does not
+// translate it); the cell spans from that header's column to the next
+// header's, counted in runes so a name with an ellipsis or an accent does not
+// shift it.
+func wingetIDs(listing string) []string {
+	lines := strings.Split(strings.ReplaceAll(listing, "\r", ""), "\n")
+	for i, line := range lines {
+		start, end := wingetIDColumn([]rune(line))
+		if start < 0 {
+			continue
+		}
+		var ids []string
+		for _, row := range lines[i+1:] {
+			runes := []rune(row)
+			if len(runes) <= start || strings.Trim(row, "-─ ") == "" {
+				continue
+			}
+			stop := min(end, len(runes))
+			if end < 0 {
+				stop = len(runes)
+			}
+			if cell := strings.TrimSpace(string(runes[start:stop])); cell != "" {
+				ids = append(ids, strings.ToLower(strings.Fields(cell)[0]))
+			}
+		}
+		return ids
+	}
+	return nil
+}
+
+// wingetIDColumn finds the "Id" header in a line: its first rune, and the
+// first rune of the header after it (-1 when Id is the last). It answers -1,
+// -1 for a line that is not the header.
+func wingetIDColumn(line []rune) (start, end int) {
+	start, end = -1, -1
+	inField := false
+	for i, c := range line {
+		switch {
+		case c == ' ':
+			inField = false
+		case !inField:
+			inField = true
+			if start >= 0 {
+				return start, i
+			}
+			if i+2 <= len(line) && string(line[i:i+2]) == "Id" && (i+2 == len(line) || line[i+2] == ' ') {
+				start = i
+			}
+		}
+	}
+	return start, end
 }
 
 func (r systemUpgrade) isRoot() bool {
