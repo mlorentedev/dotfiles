@@ -28,6 +28,13 @@ owner: manu
 - The turn-cap pool lookup moved into `runnerOf`, shared by the archive hint and the stub, so pi's turn cap still names itself once a stub exists.
 - `VerifyReviewProducedIn` reports the stub as the refusal it is, not as a malformed file the reviewer wrote.
 
+## Review dispositions
+
+Independent review: nan/deepseek-v4-flash, PASS at d50586cb, six Minors, all THEORETICAL or SPECULATIVE.
+
+- Help text, startup-window message, malformed request swallowed, deadline status dropped, start-failure branch untested: deferred to #3346, so the signed review stays current.
+- Reviewer output quoted into a committed file: kept as designed; bounded to 400 bytes per end, and the same bytes already reach the terminal (#989) and the archive refusal (#3322).
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: the rule (a detached launcher writes the failure where people look) is the spec itself, and #1511 records the measurement
