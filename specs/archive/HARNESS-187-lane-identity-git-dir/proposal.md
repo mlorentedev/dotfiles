@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-187-lane-identity-git-dir"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-11"
 issue: "mlorentedev/dotfiles#3261"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
