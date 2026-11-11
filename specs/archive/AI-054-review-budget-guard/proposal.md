@@ -1,7 +1,7 @@
 ---
 id: "AI-054-review-budget-guard"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-10"
 issue: "mlorentedev/dotfiles#3281"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
