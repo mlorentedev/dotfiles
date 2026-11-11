@@ -28,6 +28,16 @@ owner: manu
 - The widening lives in `ResolveReviewBaseDetail`, so the recorded `base_sha` is the widened base, and the archive gate needs no change.
 - The work before the spec folder counts as own through a third rule in `OwnCommitsWidened`, not through the scope line alone: the fix the widening exists to include often names no issue.
 
+## Review dispositions
+
+The first review (nan/mimo-v2.6-flash, PASS-WITH-GAPS, three Minors) at 6a18a191:
+
+1. Prompt rule text under widening (Minor, real): applied. `writeOwnCommits` names the third rule ("or come before the spec folder on this branch"), and the closing line no longer lists only two rules. Test: `TestReviewPromptNamesTheWidenedOwnRule`.
+2. `forkPoint` stops at the first existing ref whose merge-base fails (Minor, speculative): applied. It tries the next ref instead; the failure mode stays the safe one.
+3. No committed tests for the stale-ref and rename-plus-widen compositions (Minor): applied. `TestReviewBaseWidensPastAStaleOriginRef` and `TestReviewBaseWidensAfterTracingARename`.
+
+None of these touches `proposal.md`, `tasks.md` or `features.json`.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: the spec, its tests and the resolver's doc comment carry the rule (widen only, never later); there is no operating gotcha beyond it.

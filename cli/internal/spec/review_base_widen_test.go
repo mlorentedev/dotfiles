@@ -107,3 +107,55 @@ func TestOwnCommitsCountTheWorkBeforeTheSpec(t *testing.T) {
 		t.Fatalf("own = %v of %d, want %v of 2", got, set.RangeSize, want)
 	}
 }
+
+// Local main ahead of a stale origin/main, the spec in the later commit: the
+// base widens to the stale fork, which is wider and hides nothing.
+func TestReviewBaseWidensPastAStaleOriginRef(t *testing.T) {
+	repoRoot := initQuietRepo(t)
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	stale := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	git(t, repoRoot, "update-ref", "refs/remotes/origin/main", stale)
+	writeAndCommit(t, repoRoot, "landed, not fetched", "other.go")
+	traced := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	writeAndCommit(t, repoRoot, "squash of the spec (#9)", widenSpec+"/proposal.md", "x.go")
+
+	got := ResolveReviewBaseDetail(repoRoot, filepath.Join(repoRoot, widenSpec))
+	if got.SHA != stale || got.WidenedFrom != traced {
+		t.Fatalf("base = %s widened from %q, want %s widened from %s", got.SHA, got.WidenedFrom, stale, traced)
+	}
+}
+
+// The BUG-108 rename trace runs first; the widening applies to the base it
+// traced, not to the parent of the rename.
+func TestReviewBaseWidensAfterTracingARename(t *testing.T) {
+	repoRoot := initQuietRepo(t)
+	writeAndCommit(t, repoRoot, "base", "README.md")
+	fork := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	git(t, repoRoot, "update-ref", "refs/remotes/origin/main", fork)
+	git(t, repoRoot, "checkout", "-q", "-b", "fix")
+	writeAndCommit(t, repoRoot, "fix(x): stop the leak", "x.go")
+	traced := trim(git(t, repoRoot, "rev-parse", "HEAD"))
+	writeAndCommit(t, repoRoot, "add the spec", "specs/X-166-old/proposal.md")
+	git(t, repoRoot, "mv", "specs/X-166-old", widenSpec)
+	git(t, repoRoot, "commit", "-qm", "rename the spec")
+
+	specDir := filepath.Join(repoRoot, widenSpec)
+	got := ResolveReviewBaseDetail(repoRoot, specDir)
+	if got.SHA != fork || got.WidenedFrom != traced {
+		t.Fatalf("base = %s widened from %q, want %s widened from %s", got.SHA, got.WidenedFrom, fork, traced)
+	}
+	if names := SpecFolderNames(repoRoot, specDir); !slices.Equal(names, []string{widenSpec, "specs/X-166-old"}) {
+		t.Errorf("folder names = %v, want both names traced", names)
+	}
+}
+
+// The prompt's own-commit rule names the work before the spec folder, so the
+// listed fix does not contradict the rule printed above it.
+func TestReviewPromptNamesTheWidenedOwnRule(t *testing.T) {
+	scope := ReviewScope{BaseSHA: "fork", WidenedFrom: "traced",
+		Own: OwnCommitSet{RangeSize: 1, Commits: []OwnCommit{{SHA: "abc", Subject: "fix(x): stop the leak"}}}}
+	prompt := ReviewPromptForScope(FirstSigner, "X-166-a", "/r", "rev", "run", "skill", scope)
+	if !contains(prompt, "or come before the spec folder on this branch") {
+		t.Errorf("the own-commit rule must name the widened rule:\n%s", prompt)
+	}
+}

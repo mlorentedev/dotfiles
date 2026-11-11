@@ -251,7 +251,7 @@ func forkPoint(repoRoot string) string {
 		}
 		out, err := exec.Command("git", "-C", repoRoot, "merge-base", "HEAD", ref).Output()
 		if err != nil {
-			return ""
+			continue
 		}
 		return strings.TrimSpace(string(out))
 	}

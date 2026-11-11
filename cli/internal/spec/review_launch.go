@@ -376,14 +376,17 @@ func writeOwnCommits(b *strings.Builder, scope ReviewScope) {
 	if scope.OwnIssue > 0 {
 		rule += fmt.Sprintf(", or reference #%d", scope.OwnIssue)
 	}
+	if scope.WidenedFrom != "" {
+		rule += ", or come before the spec folder on this branch"
+	}
 	fmt.Fprintf(b, "The spec's own commits in that range, %d of %d, derived by the launcher from git\n"+
 		"(they %s):\n\n", len(own.Commits), own.RangeSize, rule)
 	for _, c := range own.Commits {
 		fmt.Fprintf(b, "- %s %s\n", c.SHA[:min(12, len(c.SHA))], c.Subject)
 	}
 	fmt.Fprintf(b, "\nThe other commits in the range are other work that merged in between. Start from\n"+
-		"these; read another commit only where it interacts with them. A slice that neither\n"+
-		"touches the folder nor names the issue is not listed, so the range stays the whole change.\n\n")
+		"these; read another commit only where it interacts with them. A slice none of those\n"+
+		"rules matches is not listed, so the range stays the whole change.\n\n")
 }
 
 // ReviewPromptIn is ReviewPrompt for one signer's slot. The second signer is
