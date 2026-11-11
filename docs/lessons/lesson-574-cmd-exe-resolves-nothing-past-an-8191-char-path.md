@@ -27,8 +27,8 @@ own and is unaffected, so the two layers disagreed about the same binary.
 
 The gate joins the three without repeats (`Join-PathEntries`; first spelling wins, compared case- and
 trailing-slash-insensitively). The same runner PATH became 120 entries and 5727 characters, and the gate went
-from five FAILs to none. A real box past the limit is #3285: doctor should report the length instead of
-per-tool "not recognized" rows.
+from five FAILs to none. On a real box, doctor's "Core tools in PATH" section now FAILs a PATH past the limit and counts its repeated
+entries (#3285): one row instead of a "not recognized" per tool.
 
 When a Windows command is "not recognized" but `Get-Command` finds it, check `$env:PATH.Length` before the
 install. Rebuilding PATH from the registry has to deduplicate, never concatenate.

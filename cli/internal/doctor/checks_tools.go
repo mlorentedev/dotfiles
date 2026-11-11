@@ -29,6 +29,7 @@ var posixOnlyTools = map[string]bool{"zsh": true, "direnv": true, "wget": true}
 // to avoid double-reporting — the consolidation the two twins never did.
 func checkCoreTools(sys *System, c *Contract, rep *Report) {
 	rep.Section("Core tools in PATH")
+	checkCmdPathLength(sys, rep)
 	covered := contractBinaryNames(c)
 	win := sys.GOOS == "windows"
 	for _, tool := range coreTools {
