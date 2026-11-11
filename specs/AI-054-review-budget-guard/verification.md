@@ -104,14 +104,14 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 ## Findings on the PR, before the pooled review (2026-11-11)
 
 The PR-Agent review on #3289 (openai/deepseek-v4-flash) and an independent advisory
-audit (an Anthropic session on another checkout, no signature, mutation battery on
+audit (an advisory pass on another checkout, unsigned, with a mutation battery on
 copies of the tree) came back before `dotf spec review` ran. Dispositions:
 
 | Finding | Class | Disposition |
 |---|---|---|
-| A step's `CONFIG__CUSTOM_MODEL_MAX_TOKENS` is never read, so a step window of 160000 passes against the toml's 200000 (`prbudget.go:230`) | REAL | **applied**, `da794f16`. Reproduced first: `dotf pr reproduce --probe <window 200000 -> 160000 on the drawn step> --defect-when-passes -- dotf harness check --repo-root .` -> `reproduced (exit 0, defect when the check passes)` on `9bf05c5c`. The step is now measured against its own window; `TestCheckReviewBudget_AStepThatLowersItsOwnWindowIsMeasuredAgainstIt`. |
-| The job ceiling counts one route probe; `route.go` probes the drawn Anthropic model and, on a risky PR, the risk model too, so the worst case is 25 + 6 + 3 + 3 = 37, equal to the 37-minute job | audit, Major | **applied**, `da794f16`. The bats test reads the probed models from `harness/reviewer-pool.json` (`True 38 25 6 3`, red at 37 with `False 37 25 6 3`); the job is 38; lesson 573, the runbook, the workflow comment and this spec carry the corrected sum. |
-| Three `prbudget.go` mutants survive `go test`: first output cap instead of the largest, toml absent beside a workflow, `max_model_tokens` absent | audit, Minor | **applied**, `da794f16`: three tests anchor them. |
+| A step's `CONFIG__CUSTOM_MODEL_MAX_TOKENS` is never read, so a step window of 160000 passes against the toml's 200000 (`prbudget.go:230`) | REAL | **applied**, `f4cc8828`. Reproduced first: `dotf pr reproduce --probe <window 200000 -> 160000 on the drawn step> --defect-when-passes -- dotf harness check --repo-root .` -> `reproduced (exit 0, defect when the check passes)` on `9bf05c5c`. The step is now measured against its own window; `TestCheckReviewBudget_AStepThatLowersItsOwnWindowIsMeasuredAgainstIt`. |
+| The job ceiling counts one route probe; `route.go` probes the drawn Anthropic model and, on a risky PR, the risk model too, so the worst case is 25 + 6 + 3 + 3 = 37, equal to the 37-minute job | audit, Major | **applied**, `f4cc8828`. The bats test reads the probed models from `harness/reviewer-pool.json` (`True 38 25 6 3`, red at 37 with `False 37 25 6 3`); the job is 38; lesson 573, the runbook, the workflow comment and this spec carry the corrected sum. |
+| Three `prbudget.go` mutants survive `go test`: first output cap instead of the largest, toml absent beside a workflow, `max_model_tokens` absent | audit, Minor | **applied**, `f4cc8828`: three tests anchor them. |
 | Zero reserve when no step declares an output cap or declares an expression (`prbudget.go:227`); a step at exactly its ceiling passes (`need <= have`) | THEORETICAL / audit | **ticketed** #3301 |
 | The streamed NaN step's `ai_timeout` bounds the gap between chunks, not the answer (`prbudget.go:284`); client `num_retries` unset upstream multiplies the handler's attempts | THEORETICAL / audit | **ticketed** #3302, measurement first |
 | A token override at the job or workflow `env:` level is invisible to the guard | audit, Minor | **ticketed** #3299 |
