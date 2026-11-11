@@ -25,6 +25,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - `features.json`: f1..f5 all PASS, run one by one from `cli/` on `437eb1ed` and again on the final head; f1's test now also asserts the second `InitLanes` returns `0`.
 - Static: `go build ./... && go vet ./... && GOOS=windows go vet ./...` clean; `golangci-lint run ./...` and `GOOS=windows golangci-lint run ./...` at the pinned 2.12.2 report `0 issues` (cache clean refused, another session held the cache; no finding to dismiss); `shellcheck -s sh` and `sh -n` on the guard clean; `dotf lessons fmt` formatted 0 files.
 - Manual smoke test: the record's lifecycle (`worktree move`, `gc`, `repair`, `remove`, `rm -rf` + `prune`, re-create, `clean -fdx`) was measured on a scratch repository before the spec was written; the Go tests repeat the `move` leg. Not re-run on a live lane: this box's lanes are provisioned by the release binary and get their record when `dotf lane init` runs after the release.
+- Full suite: `cd cli && go test ./... -count=1` -> every package `ok` on `5dca2592` (no FAIL line; 2026-11-11), run twice: before and after the preflight change.
 - No regressions in existing test suite: yes. Case 10 of the guard test changed meaning by design (proposal, Risks).
 
 ## Decisions made during implementation
