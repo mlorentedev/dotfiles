@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/doctor"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
@@ -30,7 +31,9 @@ repo and runs 'dotf converge' from it (which runs the setup script last on
 Linux and Windows) — but ONLY via a clean fast-forward, and ONLY when HEAD moved.
 On a day HEAD did not move it runs one step instead, 'dotf converge --only
 system-upgrade', which keeps the catalog's unpinned system packages current
-(brew, apt, winget); a full converge already includes that step.
+(brew, apt, winget); a full converge already includes that step. A step that
+skips (offline, apt without sudo -n) is recorded as upgrade-skipped with the
+reason and exits 0.
 
 The checkout's DOTF_VERSION pin is part of being up to date. When the running
 dotf is not that version (after a fast-forward, or when the checkout was
@@ -74,7 +77,7 @@ Env:
 				Converge: func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
 				Pin:      func() (string, error) { return pinnedDotfVersion(repo) },
 				Install:  func(pin string) error { return runInstaller(c, repo, pin) },
-				Upgrade:  func() error { return runConverge(c.OutOrStdout(), repo, false, []string{"system-upgrade"}) },
+				Upgrade:  func() (string, error) { return runSystemUpgrade(c.OutOrStdout(), repo) },
 			})
 			c.Println(out.Message)
 			if err != nil {
@@ -87,6 +90,20 @@ Env:
 	cmd.Flags().StringVar(&homes.config, "config-home", "", "absolute XDG_CONFIG_HOME for this run (the Windows task passes it)")
 	cmd.Flags().StringVar(&homes.state, "state-home", "", "absolute XDG_STATE_HOME for this run (the Windows task passes it)")
 	return cmd
+}
+
+// runSystemUpgrade converges the system-upgrade step alone and returns its
+// skip reason, "" when the step ran. A converge whose step skipped exits 0, so
+// without the reason a quiet day that upgrades nothing would read as one that
+// did.
+func runSystemUpgrade(w io.Writer, repo string) (string, error) {
+	rep, err := runConvergeReport(w, repo, false, []string{"system-upgrade"})
+	for _, e := range rep.Entries {
+		if e.Name == "system-upgrade" && e.Status == converge.StatusSkipped {
+			return e.Detail, err
+		}
+	}
+	return "", err
 }
 
 // updateHomes are the XDG homes a scheduler hands `dotf update` as flags.

@@ -38,13 +38,14 @@ import (
 // checkout's DOTF_VERSION (after the fast-forward, so it is the new one), ""
 // when unpinned. Install runs the checkout's installer for that version, which
 // replaces the dotf binary and converges with the new one. Upgrade runs only
-// the system-upgrade converge step; nil runs nothing.
+// the system-upgrade converge step and returns the step's skip reason, "" when
+// it ran; nil runs nothing.
 type Deps struct {
 	Git      func(args ...string) (string, error)
 	Converge func() error
 	Pin      func() (string, error)
 	Install  func(pin string) error
-	Upgrade  func() error
+	Upgrade  func() (skipped string, err error)
 }
 
 // Config is the resolved run configuration. The converge run is captured by the
@@ -61,7 +62,7 @@ var releaseVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 // Outcome classifies a run for the caller to log. Every Outcome except the
 // setup-failure path is returned with a nil error.
 type Outcome struct {
-	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|ff-failed|updated|reinstalled|converge-failed|install-failed|upgrade-failed
+	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|ff-failed|updated|reinstalled|converge-failed|install-failed|upgrade-failed|upgrade-skipped
 	Message  string // human-readable line
 	Upstream string // the upstream branch, once resolved (e.g. origin/main)
 	Detail   string // multi-line evidence for the status (the dirtying paths), printed after Message
@@ -124,9 +125,15 @@ func upgradeQuietDay(d Deps, msg, note string) (Outcome, error) {
 	if d.Upgrade == nil {
 		return skip(StatusCurrent, msg+note)
 	}
-	if err := d.Upgrade(); err != nil {
+	skipped, err := d.Upgrade()
+	if err != nil {
 		return Outcome{Status: StatusUpgradeFailed, Message: msg + "; the system-upgrade step failed — see the report above" + note},
 			fmt.Errorf("system-upgrade: %w", err)
+	}
+	if skipped != "" {
+		// A skip exits 0 inside converge too: the record is the one place a
+		// machine that never upgrades (apt without sudo -n) can show it.
+		return skip(StatusUpgradeSkipped, msg+"; the system-upgrade step skipped: "+skipped+note)
 	}
 	return Outcome{Status: StatusCurrent, Message: msg + "; system-upgrade step converged" + note}, nil
 }
@@ -176,6 +183,9 @@ const (
 	// StatusUpgradeFailed is Run's alone: the checkout was current and the
 	// system-upgrade step failed.
 	StatusUpgradeFailed = "upgrade-failed"
+	// StatusUpgradeSkipped is Run's alone: the checkout was current and the
+	// system-upgrade step skipped (a failed refresh, apt without sudo -n).
+	StatusUpgradeSkipped = "upgrade-skipped"
 	// StatusBehind is Assess's answer for a clean checkout its upstream
 	// strictly contains: Sync would fast-forward it. Sync itself never
 	// returns it.

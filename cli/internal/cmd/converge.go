@@ -75,6 +75,13 @@ func newConvergeCmd() *cobra.Command {
 // last.json, which a plan or an --only run leaves alone. `dotf converge` and
 // `dotf update` both run through here.
 func runConverge(w io.Writer, repo string, plan bool, only []string) error {
+	_, err := runConvergeReport(w, repo, plan, only)
+	return err
+}
+
+// runConvergeReport is runConverge that also hands back the run's report, for
+// a caller that branches on one step's outcome (`dotf update` on a quiet day).
+func runConvergeReport(w io.Writer, repo string, plan bool, only []string) (converge.Report, error) {
 	if self, err := executable(); err == nil {
 		ensureSelfOnPath(self)
 	}
@@ -102,7 +109,7 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	if len(only) > 0 {
 		var serr error
 		if reg, serr = converge.Select(reg, only); serr != nil {
-			return serr
+			return converge.Report{}, serr
 		}
 	}
 	pr := newConvergePrinter(out, reg, paint, terminal)
@@ -111,9 +118,9 @@ func runConverge(w io.Writer, repo string, plan bool, only []string) error {
 	rep, err := converge.RunObserved(reg, e, plan, pr)
 	pr.finish(rep)
 	if plan {
-		return err
+		return rep, err
 	}
-	return saveConvergeReport(w, out, rl, rep, err, len(only) == 0)
+	return rep, saveConvergeReport(w, out, rl, rep, err, len(only) == 0)
 }
 
 // ensureSelfOnPath puts the directory of self, the running dotf, first on this

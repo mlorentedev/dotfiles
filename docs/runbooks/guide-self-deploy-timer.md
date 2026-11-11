@@ -27,7 +27,8 @@ Once a day the timer runs `dotf update` (the Go port of the former
 
 Every skip exits 0 (benign). Only a converge that runs and fails exits non-zero, and so does a failed
 `system-upgrade` step on a quiet day (record status `upgrade-failed`). A refresh that fails offline, or apt
-without `sudo -n`, is a skip inside the step and exits 0.
+without `sudo -n`, is a skip inside the step: it exits 0 and is recorded as `upgrade-skipped` with the reason, so
+`dotf doctor` can show that a machine is not upgrading.
 
 ```mermaid
 flowchart TB
@@ -39,7 +40,7 @@ flowchart TB
     FF -- no --> S3["skip — diverged (exit 0)"]
     FF -- yes --> M{HEAD moved?}
     M -- no --> UP["dotf converge --only system-upgrade"]
-    UP --> OK2(["status current (exit 0)"]) & UF(["upgrade-failed (exit ≠0)"])
+    UP --> OK2(["current, or upgrade-skipped with the reason (exit 0)"]) & UF(["upgrade-failed (exit ≠0)"])
     M -- yes --> SETUP["dotf converge (setup script last)"]
     SETUP --> OK([exit 0]) & ERR(["exit ≠0 — only real failure"])
 ```
