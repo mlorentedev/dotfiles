@@ -1,7 +1,7 @@
 ---
 id: "BUG-168-review-error-stub"
 type: spec
-status: verifying
+status: archived
 created: "2026-11-11"
 issue: "mlorentedev/dotfiles#1511"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

@@ -43,7 +43,7 @@ Independent review: nan/deepseek-v4-flash, PASS at d50586cb, six Minors, all THE
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-168-review-error-stub/` -> `specs/archive/BUG-168-review-error-stub/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-168-review-error-stub/` -> `specs/archive/BUG-168-review-error-stub/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
