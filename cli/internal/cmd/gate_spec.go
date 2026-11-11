@@ -13,9 +13,10 @@ import (
 )
 
 type gateSpecOpts struct {
-	event, base, head string
-	threshold         int
-	explain           bool
+	event, base, head  string
+	adjacency, summary string
+	threshold          int
+	explain            bool
 }
 
 func newGateSpecCmd() *cobra.Command {
@@ -33,7 +34,11 @@ func newGateSpecCmd() *cobra.Command {
     unless it carries "skip-sdd" and a "## SDD skip rationale" section.
 
 A dependency bot's pull request labelled "dependencies" skips the second
-check. The diff is git diff base...head in the current directory.`,
+check. The diff is git diff base...head in the current directory.
+
+With --adjacency, it first lists the other open issues that name a production
+file the pull request changes. The list is advisory and never changes the
+exit status.`,
 		Args: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return guardUsage(c, "gate spec takes no arguments")
@@ -54,6 +59,8 @@ check. The diff is git diff base...head in the current directory.`,
 	cmd.Flags().StringVar(&o.head, "head", "", "head of the pull request, e.g. HEAD (required)")
 	cmd.Flags().IntVar(&o.threshold, "threshold", 50, "production lines from which a spec is required")
 	cmd.Flags().BoolVar(&o.explain, "explain", false, "print the line count per file")
+	cmd.Flags().StringVar(&o.adjacency, "adjacency", "", "open-issue feed, one \"<number><TAB><title and body>\" per line, for the advisory adjacency report")
+	cmd.Flags().StringVar(&o.summary, "summary", "", "Markdown file to append the adjacency table to, e.g. $GITHUB_STEP_SUMMARY")
 	return cmd
 }
 
@@ -76,6 +83,7 @@ func runGateSpec(stdout, stderr io.Writer, o gateSpecOpts) error {
 		return withExitCode(2, errors.New("not in a git repo"))
 	}
 	g := &specGate{o: o, pr: pr, slug: repoSlug(), out: stdout, err: stderr}
+	g.reportAdjacency()
 	if err := g.archiveOnMerge(); err != nil {
 		return err
 	}

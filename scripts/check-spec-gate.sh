@@ -559,7 +559,7 @@ _report_adjacent_issues() {
     done <<< "$rows"
     printf '       One of these may describe the same defect on an input shape this\n'
     printf '       change does not cover. Fold it in, or record why it is separate,\n'
-    printf '       before merging (HARNESS-063).\n'
+    printf '       before merging.\n'
 
     _emit_adjacency_ci_artifacts "$rows"
     return 0

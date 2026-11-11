@@ -15,8 +15,9 @@ SPEC_GATE_SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-spec-gate.sh"
 #
 # The dotf leg runs with no token and a PATH holding git alone, so a gh call
 # cannot succeed and would show as a disagreement (AC3). The adjacency report
-# is PR 3's: a run that asks for it, or for --help, skips the dotf leg; a
-# flag the helper does not map fails unless the script rejects it too.
+# and its step summary are compared too: dotf writes the table to its own
+# --summary file, which must equal what each shell appended. --help skips the
+# dotf leg; a flag the helper does not map fails unless the script rejects it.
 # shellcheck disable=SC2154  # bats' run assigns status and output
 spec_gate_both() {
     local base="" head="" skip=""
@@ -27,13 +28,20 @@ spec_gate_both() {
             --head-ref) head="$2"; shift 2 ;;
             --threshold) flags+=(--threshold "$2"); shift 2 ;;
             --explain) flags+=(--explain); shift ;;
-            --adjacency-issues | --help) skip=1; shift ;;
+            --adjacency-issues) flags+=(--adjacency "$2"); shift 2 ;;
+            --help) skip=1; shift ;;
             *) skip=unknown; shift ;;
         esac
     done
     # The dotf leg runs first, so the script's run is the last `run` and its
     # status and output are what the caller asserts on.
     local dotf_status="" dotf_output=""
+    # Each side writes its step summary to a file of this call's own: on a CI
+    # runner GITHUB_STEP_SUMMARY is the job's real summary, shared by every test.
+    local sum="${GITHUB_STEP_SUMMARY:-}" dotf_sum="$BATS_TEST_TMPDIR/dotf-summary.md" sh_sum="$BATS_TEST_TMPDIR/script-summary.md"
+    : >"$dotf_sum"
+    : >"$sh_sum"
+    flags+=(--summary "$dotf_sum")
     if [ -z "$skip" ] && [ -n "$base" ] && [ -n "$head" ]; then
         _spec_gate_event "$BATS_TEST_TMPDIR/spec-event.json"
         local bin="$BATS_TEST_TMPDIR/git-only"
@@ -44,7 +52,9 @@ spec_gate_both() {
             ${flags[@]+"${flags[@]}"}
         dotf_status="$status" dotf_output="$output"
     fi
-    run_both_shells "$SPEC_GATE_SCRIPT" ${a[@]+"${a[@]}"} || return 1
+    GITHUB_STEP_SUMMARY="$sh_sum" run_both_shells "$SPEC_GATE_SCRIPT" ${a[@]+"${a[@]}"} || return 1
+    # A caller that named a summary file reads the script's table from it.
+    [ -z "$sum" ] || cat "$sh_sum" >>"$sum"
     # A flag this helper does not know is only safe to skip when the script
     # rejects it too; one it accepts means the dotf leg is missing a case.
     if [ "$skip" = unknown ] && [ "$status" != 2 ]; then
@@ -57,6 +67,11 @@ spec_gate_both() {
         return 1
     fi
     [ -n "$dotf_status" ] || return 0
+    if ! { cat "$dotf_sum" "$dotf_sum" | cmp -s - "$sh_sum"; }; then
+        printf 'script and dotf gate spec wrote different step summaries\n--- script (both shells)\n%s\n--- dotf\n%s\n' \
+            "$(cat "$sh_sum")" "$(cat "$dotf_sum")"
+        return 1
+    fi
     if [ "$dotf_status" != "$status" ] ||
         { [ "$status" != 2 ] && [ "$(_spec_gate_common "$dotf_output")" != "$(_spec_gate_common "$output")" ]; }; then
         printf 'script (%s) and dotf gate spec (%s) disagree\n--- script\n%s\n--- dotf\n%s\n' \

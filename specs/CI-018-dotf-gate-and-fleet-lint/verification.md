@@ -12,7 +12,7 @@ owner: manu
 ## Evidence
 
 - [x] AC1 (knowledge half) -> PR 1, `tests/check-knowledge-gate.bats` (45 cases through both gates)
-- [ ] AC2 -> PR 2a (parsers), PR 2b (`tests/check-spec-gate.bats` 30 and `tests/spec-gate-archive.bats` 35 through the parity shim), PR 3 (adjacency)
+- [ ] AC2 -> PR 2a (parsers), PR 2b (`tests/check-spec-gate.bats` 30 and `tests/spec-gate-archive.bats` 35 through the parity shim), PR 3 (`tests/spec-gate-adjacency.bats` 15 through the shim, step summary compared)
 - [x] AC3 (knowledge half) -> PR 1, the no-network trap in `_dotf_gate`
 - [ ] AC4 -> PR 4 and PR 5
 - [ ] AC5 -> PR 5

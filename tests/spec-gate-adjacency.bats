@@ -5,9 +5,12 @@
 # described the shape the fix did not cover, sat open on the board.
 
 load 'lib/both-shells'
+load 'lib/dotf-bin'
+load 'lib/spec-gate-parity'
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    dotf_bin_resolve "$BATS_FILE_TMPDIR/dotf" || return 1
     REPO_FIXTURE="/tmp/bats_adjacency_$$_${BATS_TEST_NUMBER:-0}"
     mkdir -p "$REPO_FIXTURE"
     cd "$REPO_FIXTURE" || exit 1
@@ -53,7 +56,7 @@ _write_849_feed() {
     _replay_851_diff
     _write_849_feed
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature \
             --adjacency-issues "$REPO_FIXTURE/adjacency.tsv"
     [[ "$output" == *"849"* ]] || false
@@ -69,7 +72,7 @@ _write_849_feed() {
         'An unrelated-looking title with no filename at all, but the body cites `scripts/knowledge-crystallize.ps1` in a code span.' \
         > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"777"* ]] || false
 }
@@ -78,7 +81,7 @@ _write_849_feed() {
     _replay_851_diff
     printf '%s\t%s\n' 900 'OPS-001: rotate the age key on the Windows box, see sensitive/env-mapping.conf' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"900"* ]] || false
 }
@@ -87,7 +90,7 @@ _write_849_feed() {
     _replay_851_diff
     printf '%s\t%s\n' 850 'BUG-060: crystallize appends past the handoff block in scripts/knowledge-crystallize.sh' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"#850"* ]] || false
 }
@@ -108,7 +111,7 @@ _write_849_feed() {
         printf '%s\t%s\n' 333 'BUG-999: scripts/real-change.sh mishandles the second input shape'
     } > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"111"* ]] || false
     [[ "$output" != *"222"* ]] || false
@@ -119,10 +122,10 @@ _write_849_feed() {
     _replay_851_diff
     _write_849_feed
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+        spec_gate_both --base-ref main --head-ref feature
     local without_status="$status"
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature \
             --adjacency-issues "$REPO_FIXTURE/adjacency.tsv"
     [ "$status" -eq "$without_status" ]
@@ -133,7 +136,7 @@ _write_849_feed() {
     # no file, and the gate must behave exactly as it did before this change.
     _replay_851_diff
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues /nonexistent/feed.tsv
     [ "$status" -ne 2 ]
     [[ "$output" != *"Adjacent open issues"* ]] || false
@@ -149,7 +152,7 @@ _write_849_feed() {
     # it is an intentional, in-scope addition to this path, not a regression.
     _replay_851_diff
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
+        spec_gate_both --base-ref main --head-ref feature --explain
     local stripped
     stripped=$(printf '%s\n' "$output" \
         | sed '/^       If this already archived a spec/,/^       be set by hand for a one-off check/d' | cat -s)
@@ -162,7 +165,7 @@ _write_849_feed() {
     _commit "nested Makefile"
     printf '%s\t%s\n' 444 'DX-001: the Makefile is slow to start' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"444"* ]] || false
 }
@@ -177,7 +180,7 @@ _write_849_feed() {
         printf '%s\t%s\n' 556 'OPS-003: the config file is read twice'
     } > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"555"* ]] || false
     [[ "$output" == *"556"* ]] || false
@@ -189,7 +192,7 @@ _write_849_feed() {
     _commit "dotted name"
     printf '%s\t%s\n' 666 'BUG-1: aXb.sh fails' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"666"* ]] || false
 }
@@ -207,7 +210,7 @@ _write_849_feed() {
     _commit "rename"
     printf '%s\t%s\n' 777 'BUG-2: scripts/old-name.sh drops the last line' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"777"* ]] || false
 }
@@ -218,7 +221,7 @@ _write_849_feed() {
     _commit "percent"
     printf '%s\t%s\n' 888 'BUG-3: scripts/100%.sh breaks' > feed.tsv
     GITHUB_ACTIONS=true SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"::warning title=Adjacent open issues::#888 (scripts/100%25.sh)"* ]] || false
 }
@@ -229,13 +232,13 @@ _write_849_feed() {
     _commit "pipe"
     printf '%s\t%s\n' 999 'BUG-4: scripts/a|b.sh breaks' > feed.tsv
     GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     grep -qF '| #999 | `scripts/a\|b.sh` |' "$REPO_FIXTURE/summary.md"
 }
 
 @test "adjacency: --help documents the flag" {
-    run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --help
+    spec_gate_both --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"--adjacency-issues"* ]] || false
 }
