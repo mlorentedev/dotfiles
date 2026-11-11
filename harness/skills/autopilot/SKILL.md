@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 45a6c51f72b13f85
+generated_sha: 3c211670face8ef9
 id: autopilot-skill
 type: skill
 status: active
@@ -118,14 +118,18 @@ A ticket is pilot-eligible only if ALL hold:
   # 2. The board itself, by field — this is the query the run actually picks FROM.
   #    Filter on the server with --query: the board holds every repository's items, and a
   #    client-side filter over a --limit window reads only the OLDEST items (dotfiles#2704).
-  gh project item-list 1 --owner mlorentedev --format json --limit 500 \
-    --query 'repo:mlorentedev/<repo> status:Backlog is:open type:spec,bug,chore' \
-  | jq -c '
-      if (.items | length) < .totalCount
+  #    Capture gh first: piped straight into jq, a failed gh (no --query on an old gh, an
+  #    expired token, the network) gives jq empty input, which exits 0 and reads as an empty queue.
+  board=$(gh project item-list 1 --owner mlorentedev --format json --limit 500 \
+    --query 'repo:mlorentedev/<repo> status:Backlog is:open type:spec,bug,chore') \
+    || { echo "pre-flight: gh project item-list failed"; exit 1; }       # -> reason: preflight-failed
+  printf '%s' "$board" | jq -c '
+      if (.totalCount | type) != "number" then error("pre-flight: no totalCount, so truncation cannot be ruled out")
+      elif (.items | length) < .totalCount
       then error("pre-flight truncated: \(.items | length) of \(.totalCount) items read")  # never pick from a partial list
       else .items end
       | sort_by([(.priority // "P3"), .content.number])                  # P0<P1<P2<P3, then issue number asc
-      | .[0:3]'                                                          # bounded look-ahead
+      | .[0:3]' || exit 1                                                 # -> reason: preflight-failed
   ```
   *Verified live 2026-11-10:* `gh project item-list` exposes `status`, `priority`, `type`, `repository` (full URL) and `content.{number,title,type,url}`, and under `--query` its `totalCount` counts the filtered items, so `returned < totalCount` is the truncation signal (lesson 088). The earlier form fetched `--limit 200` of a 4,891-item board and filtered in `jq`: for dotfiles it saw 54 open items, the newest #462, while 442 were open (dotfiles#2704). Both failures look the same from inside the run: a short or empty list, then `queue-empty` at minute zero. A truncated pre-flight is a stop, not a smaller queue: end with `reason: preflight-failed` and say the list was truncated.
 - **Three vetoes, in order; take the first survivor:** (1) **already attempted** — `git log --oneline "$BASE..$BRANCH" --grep="Item: #<N>"` is non-empty; (2) **out of scope** — the item's paths are not a subset of `scope.write_paths`, or its diff exceeds `scope.max_loc` → record `parked(scope-violation)` so the operator sees what was out of bounds; (3) **WIP limit** — `dotf spec init` refuses (ADR-043); a refusal is a stop, not a retry.
@@ -168,7 +172,8 @@ if [ -z "$WT_DIR" ]; then
   if [ -f .dotf/lane.json ]; then
     # `lane switch` takes the branch as an argument; `lane claim` takes the lease `worktree add --issue` would
     dotf lane init && dotf lane switch "$BRANCH" &&
-      ( cd "$(resolve_wt)" && dotf lane claim "$ISSUE_NUM" )
+      lane_dir="$(resolve_wt)" && [ -n "$lane_dir" ] &&
+      ( cd "$lane_dir" && dotf lane claim "$ISSUE_NUM" )
   else
     dotf worktree add "$SLUG" -b "$BRANCH" --issue "$ISSUE_NUM"
   fi
