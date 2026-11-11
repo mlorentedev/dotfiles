@@ -133,10 +133,38 @@ them on purpose: the `AI-054` fixture comment, the `// Five:` rationale on
 `AStepThatLowersItsOwnWindowIsMeasuredAgainstIt`. See `tasks.md` for the
 retention bar applied to every deletion in this PR.
 
+## Round 4 review - PASS
+
+Reviewer `nan/glm5.3-flash`, verdict PASS against `5247b12e`, all six criteria
+verified with named tests and the mutation battery re-run by the reviewer rather
+than trusted from this file. Rubric: Correctness A, Verification A, Scope A,
+Reliability A, Maintainability B, Handoff B. No Blockers.
+
+Findings, all out of scope and dispositioned rather than fixed here:
+
+| Finding | Severity | Disposition |
+| --- | --- | --- |
+| `declaresStreaming` matches key presence, so a falsy value also earns the caveat | Minor (theoretical) | Tracked on #3302. The caveat is an annotation; under-reporting a stream is the safe direction. |
+| A cap of `"0"` or `"-5"` is a number but is reported as "cannot read as a number" | Minor (theoretical) | Tracked on #3302. Fail-closed either way, and `checkTokenClip` rejects the toml one line earlier. |
+| A step missing both `CONFIG__AI_TIMEOUT` and `timeout-minutes` reports only the first gap | Minor (theoretical) | Tracked on #3302. The second surfaces once the first is fixed. |
+| `features.json` f6 still says "19/19 guard tests PASS" | Minor (stale prose) | Left as written. `features.json` is in the review's contract set, so editing it now would stale the verdict for a number that `verification.md` already states correctly (20/20). Accurate at `06f3100b`, one commit stale at `5247b12e`. |
+| `review-round3.md` is a PENDING review that signed nothing | Minor (housekeeping) | Deleted. A stalled run's provisional record is indistinguishable from a live verdict to a later session reading the folder by name. |
+
+Two consecutive `agy` runs stalled inside a `run_command` deep into the review
+(rounds 1 and 3, at ~25 minutes of tool use each); both `nan/glm5.3-flash` runs
+completed. Round 4 was launched with `--reviewer nan/glm5.3-flash` rather than a
+random draw for that reason, which is the flag's documented purpose.
+
 ## What this does not prove
 
 - The streamed step's actual wall clock. The line now says it is a lower bound;
   measuring it is #3302.
 - The workflow/job-level `CONFIG__MAX_MODEL_TOKENS` expression skip, still open
-  on #3301.
+  on #3299.
 - Anything about the bats job-ceiling test, which this PR does not touch.
+
+## Promotion candidates
+
+- [ ] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-584-a-guard-that-defaults-an-unreadable-measurement-to-zero-measures-nothing.md
+- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the guard's fail-closed contract already lives in the PR-review budget design; this restores two of its branches rather than deciding anything new.
+- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: a measurement that will not parse is a gap, not a zero, observed in one repo so far and short of the Regla del 3 gate.
