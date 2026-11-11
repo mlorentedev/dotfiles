@@ -11,36 +11,25 @@ owner: manu
 
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
-
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] AC1 -> `TestSystemUpgrade*Darwin*Plan` (74192f21); on the owner's Mac: `dotf converge --plan --only system-upgrade` -> `index refreshed (brew update); catalog entries up to date`, `0 to change`
+- [x] AC2 -> `TestSystemUpgrade*Darwin*Apply` (74192f21), second run asserted changed=0 with no upgrade or housekeeping argv; on the Mac: apply -> `0 changed, 1 ok`, then plan -> `0 to change`
+- [x] AC3 -> `TestSystemUpgrade*OutsideCatalog` (table over darwin/linux/windows). Mutation `isBehind(t) || true` failed 9 tests, reverted
+- [x] AC4 -> `TestSystemUpgrade*Linux*` (no sudo: skip with reason; sudo: `--only-upgrade` on catalog packages; root: bare)
+- [x] AC5 -> `TestSystemUpgrade*Windows*` (per-id upgrade, one failure isolated, Probe names it)
+- [x] AC6 -> `TestSystemUpgrade*Refresh*` on all three OSes
+- [x] AC7 -> af71fcc7: `packages.json` `$comment`, ADR-036 amendment 2026-11-10; 02586d37: `catalog.go`, `system.go`, runbook
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- `cd cli && go build ./... && go vet ./... && GOOS=windows go vet ./...` -> ok; `go test ./...` -> every package ok; `golangci-lint run` -> `0 issues.`
+- Manual smoke test (owner's Mac, 2026-11-10): plan, apply and re-plan of `--only system-upgrade`. Nothing in the catalog (or outside it) was outdated, so the apply path upgraded nothing. The upgrade-with-packages path is covered by the fake-runner tests only until the next outdated formula appears.
+- `brew outdated --json=v2` shape checked against the real brew (`formulae`/`casks` arrays). The `apt list --upgradable` and `winget upgrade` listings are unit-tested against assumed formats; Linux and Windows acceptance is a real run after the release (`dotf vm windows`, a Linux box with `sudo -n`).
+- No regressions in the existing suite: yes
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
-
-## Promotion candidates
-
-Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
-
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
-
-## Archive checklist
-
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/TOOL-036-system-package-upgrade/` -> `specs/archive/TOOL-036-system-package-upgrade/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- Production runner `converge.ExecManager` returns stdout only (stderr appended to the error on failure): `tools.ExecRunner` merges stderr into stdout, and a brew `Warning:` or apt's "no stable CLI interface" notice would corrupt the parse.
+- A failed winget id fails the step at Reconcile (Changes = the ones upgraded); Probe re-lists independently.
+- Housekeeping failure is a note in Detail, not a step failure.
+- Linux skips the whole step (refresh included) without root, since `apt-get update` needs root too.
+- `needs_sudo` casks and brew-pinned formulae are excluded per entry and named, so Probe can converge.
