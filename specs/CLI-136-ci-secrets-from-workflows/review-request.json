@@ -1,7 +1,7 @@
 {
-  "reviewed_sha": "6d0a0a6aaa3edbe09e4554df6fa1ea2dc2542dd3",
-  "reviewer": "nan/deepseek-v4-flash",
-  "requested_at": "2026-11-11T04:20:13Z",
+  "reviewed_sha": "c42cb3dba5d642ea9d6f1495ba7726e8691276f3",
+  "reviewer": "agy/gemini-3.8-flash-high",
+  "requested_at": "2026-11-11T04:34:12Z",
   "review_digest_before": "",
   "base_sha": "fd6bd4d6ba121005ade422ca26b5f3453981c0ca",
   "contract_digests": {

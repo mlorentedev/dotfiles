@@ -1,8 +1,8 @@
 ---
 spec: "CLI-136-ci-secrets-from-workflows"
-verdict: "FAIL"
-reviewed_sha: "6d0a0a6aaa3edbe09e4554df6fa1ea2dc2542dd3"
-reviewer: "nan/deepseek-v4-flash"
+verdict: "PASS-WITH-GAPS"
+reviewed_sha: "c42cb3dba5d642ea9d6f1495ba7726e8691276f3"
+reviewer: "agy/gemini-3.8-flash-high"
 date: "2026-11-10"
 ---
 
@@ -10,107 +10,77 @@ date: "2026-11-10"
 
 **Scope**: `CLI-136-ci-secrets-from-workflows` (issue mlorentedev/dotfiles#3290)
 **Sources**: `specs/CLI-136-ci-secrets-from-workflows/{proposal,tasks,verification,features}.md`;
-`git diff fd6bd4d6ba121005ade422ca26b5f3453981c0ca...HEAD` (12 files, +1018);
-`git log --first-parent --no-merges fd6bd4d6ba121005ade422ca26b5f3453981c0ca..HEAD` → the three spec
-commits and no merge, so the range is exactly this change.
+`git diff fd6bd4d6ba121005ade422ca26b5f3453981c0ca...HEAD` (14 files, +1275);
+`git log --first-parent --no-merges fd6bd4d6ba121005ade422ca26b5f3453981c0ca..HEAD` (5 commits on branch).
 
 ### Verified by running (this session)
 
 | Check | Command | Result |
 |---|---|---|
-| Build/vet | `cd cli && go vet ./...` | exit 0 |
-| Format | `gofmt -l internal/ cmd/` | no output |
-| Full suite | `cd cli && go test ./... -count=1 -timeout 8m` | all packages `ok`, exit 0 (incl. `internal/secrets` 1.31s, `internal/cmd` 44.1s) |
-| Command wired | `go run ./cmd/dotf secrets ci-check --help` | usage + `--repo strings` printed, exit 0 |
-| Lint | `golangci-lint run ./internal/secrets/... ./internal/cmd/...` (v2.12.2, repo `.golangci.yml`) | `0 issues.`, exit 0 |
-| Comment idiom in real workflows | `grep -rE '^\s*#.*\$\{\{' .github/workflows/` | two hits (`.github/workflows/cli.yml:136`, `.github/workflows/from-zero.yml:201`): real workflows in this fleet already carry `${{ }}` inside comments |
-| Contract digests | `dotf spec digest CLI-136-ci-secrets-from-workflows` | identical to `review-request.json` `contract_digests` (proposal `0480ad…`, tasks `a17d9a…`, features `8d2643…`); contract untouched by me |
-| Mutation: `GITHUB_TOKEN` exclusion removed | mutate `workflowReads`, `go test -run 'TestWorkflowReads$'` | **killed** (`names = [… GITHUB_TOKEN …]` vs want) — the verification.md mutation claim is credible; file restored, tree clean |
-| Probe: comment containing an expression | temp `_test.go` in `internal/secrets`, then deleted | `names=[IN_A_COMMENT REAL]` — see F1 |
-| Probe: lowercase reference | same | `missing=[{nan_api_key }] excess=[NAN_API_KEY]` — see F3 |
-| Probe: `required: yes` | same | `map[A:false B:true]` — see F4 |
-| Probe: multi-document workflow | same | only the first document's `secrets: inherit` call seen — F5 |
-| Probe: error path + unknown-only exit | temp `_test.go` in `internal/cmd`, then deleted | `o/broken: ERROR o/broken: list workflows: boom`; unknown-only repo prints `UNKNOWN`, overall exit 0 — F2, F7 |
-
-Not run (and therefore UNVERIFIED by this reviewer): the live fleet run over the operator's
-repositories (recorded in `verification.md`; re-running it spends the operator's REST budget and prints
-private repositories' secret *names*, which the implementer deliberately kept out of the record).
+| Build / vet | `cd cli && go vet ./internal/secrets/... ./internal/cmd/...` | clean, exit 0 |
+| Format | `cd cli && gofmt -l internal/secrets/ internal/cmd/` | clean, no output |
+| Unit tests (secrets) | `cd cli && go test ./internal/secrets -run 'TestWorkflow\|TestInherited\|TestCallee\|TestCheckRepo\|TestDiffReads' -count=1` | all 10 tests passed (0.162s), exit 0 |
+| Unit tests (cmd) | `cd cli && go test ./internal/cmd -run 'TestRunCICheck' -count=1` | both tests passed (0.179s), exit 0 |
+| CLI command help | `cd cli && go run ./cmd/dotf secrets ci-check --help` | usage and flags printed, exit 0 |
+| Linter | `cd cli && golangci-lint run ./internal/secrets/... ./internal/cmd/...` | `0 issues.`, exit 0 |
+| Contract digests | `dotf spec digest CLI-136-ci-secrets-from-workflows` | proposal `0480ad…`, tasks `a17d9a…`, features `8d2643…`; identical to `review-request.json` |
+| Round 1 F1 verification | `cd cli && go test ./internal/secrets -run 'TestWorkflowReads$' -count=1` | verified YAML comments (`# F: ${{ secrets.IN_A_COMMENT }}` and `# ${{ secrets.TRAILING_COMMENT }}`) are ignored |
+| Round 1 F8 verification | check `verification.md` and disk | `docs/lessons/lesson-577-an-optional-secret-on-a-reusable-workflow-is-the-one-that-goes-missing-silently.md` exists and other candidates dispositioned |
+| Round 1 F2 verification | `cd cli && go test ./internal/cmd -run 'TestRunCICheckNamesTheRepositoryOnce'` | repo error output names repo once (`o/broken: ERROR list workflows: boom`), exit 0 |
+| Round 1 F3 verification | `cd cli && go test ./internal/secrets -run 'TestCheckRepoNamesAreCaseInsensitive'` | case-insensitivity in both directions passes, exit 0 |
+| Round 1 F5 verification | `cd cli && go test ./internal/secrets -run 'TestWorkflowFilesReadEveryDocument'` | all YAML documents read for secrets and inherited calls, exit 0 |
+| Mutation: `GITHUB_TOKEN` exclusion | mutate line 94 in `ciwf.go`, run `TestWorkflowReads` | **killed** (`names = [… GITHUB_TOKEN …]`); reverted |
+| Mutation: case insensitivity | mutate line 94 in `ciwf.go` (omit `ToUpper`), run `TestCheckRepoNamesAreCaseInsensitive` | **killed** (`same name in two cases must match`); reverted |
+| Probe: bare expression in `if:` | regex probe on `exprRe` with `if: secrets.FOO != ''` | `exprRe` fails to match bare expressions without `${{ }}` — see F9 |
+| Probe: string literal with `'secrets'` | regex probe on `exprReads` with `contains(..., 'secrets')` | matches `'secrets'` and treats as `unknown` read — see F10 |
 
 ### Spec and task alignment
 
-- AC1–AC5 each map to a named test, and each named test exists and passes: `TestRunCICheckReportsNamesAndFails`,
-  `TestWorkflowReads`, `TestWorkflowReadsUnknown`, `TestInheritedCalls`, `TestCalleeSecrets`, `TestCheckRepo`,
-  `TestCheckRepoCleanAndUnknownOnly`, `TestCheckRepoCalleeUnreadable`, `TestDiffReadsPrecedence`.
-- `features.json`: five entries, one per AC, states `pending` (not `passing` with empty evidence) — the gating rule is
-  respected. Verification commands resolve to real test names.
-- Out-of-scope boundaries hold: no CI wiring, no `registry.yaml` edit, nothing about synced-vs-declared (#1596 is
-  referenced, not implemented).
-- The proposal's YAML 1.1 risk is pinned by `TestCalleeSecrets` ("bare `on:`"): confirmed present.
-- The `secrets: inherit` + `required: false` decision (AC5) is implemented as described and captured as lesson-577.
-- Drift: `tasks.md` says "the fleet from `gh repo list` when no `--repo` is given"; `proposal.md` says
-  `gh repo list` would spend the GraphQL budget and mandates REST `user/repos?affiliation=owner`;
-  `ciwf_gh.go` `Fleet()` uses REST. The task text contradicts both the proposal and the code (F6).
-- `verification.md` "Promotion candidates" carries its three placeholder lines unanswered, although lesson-577 was
-  in fact written; `dotf spec archive`'s third pre-flight refuses exactly that and no flag skips it (F8).
+- **AC1–AC5 alignment**:
+  - AC1 (report names, no values, non-zero on failure): Covered by `TestRunCICheckReportsNamesAndFails` and `TestCheckRepo`. Verified.
+  - AC2 (inherited workflow missing undeclared secrets; explicit mappings report caller name): Covered by `TestInheritedCalls`, `TestWorkflowReads`, `TestCheckRepo`. Verified.
+  - AC3 (declared but unread is excess): Covered by `TestCheckRepo` (`OLD_TOKEN`). Verified.
+  - AC4 (whole-context read is unknown, never pass): Covered by `TestWorkflowReadsUnknown`, `TestCheckRepoCleanAndUnknownOnly`. Verified.
+  - AC5 (absent `required: false` callee secret is missing and marked optional): Covered by `TestCalleeSecrets`, `TestCheckRepo`. Verified.
+- **Round 1 findings status**:
+  - F1 (Major REAL, commented YAML expressions read as secrets): RESOLVED in commit `c42cb3db` by parsing AST scalars with `decodeDocs` + `eachScalar`.
+  - F8 (Major REAL, unanswered promotion candidates in `verification.md` blocking archive pre-flight): RESOLVED. All three items answered, lesson-577 authored and committed.
+  - F2 (Minor REAL, error double-prefix): RESOLVED in commit `c42cb3db` and tested by `TestRunCICheckNamesTheRepositoryOnce`.
+  - F3 (Minor THEORETICAL, case-sensitive secret names): RESOLVED in commit `c42cb3db` (names upper-cased) and tested by `TestCheckRepoNamesAreCaseInsensitive`.
+  - F4 (Minor SPECULATIVE, `required: yes` YAML 1.1): Declined in `verification.md` with rationale (YAML 1.2 vs 1.1; fleet standards; marking only).
+  - F5 (Minor REAL, multi-document workflows): RESOLVED in commit `c42cb3db` with `decodeDocs` and tested by `TestWorkflowFilesReadEveryDocument`.
+  - F6 (Minor REAL, `tasks.md` `gh repo list` drift): Acknowledged and dispositioned in `verification.md` without modifying contract-set files.
+  - F7 (Question REAL, unknown-only exit 0): Confirmed and dispositioned in `verification.md`.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
 |----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
-| Major | REAL | correctness (static scan) | F1 — a `${{ secrets.X }}` inside a **YAML comment** is counted as a read, so a repository that comments out or documents an expression is reported `missing X` and the check exits non-zero. `workflowReads` matches raw file bytes, never the YAML structure. This also falsifies `verification.md`'s stated decision ("Only `${{ }}` expressions are scanned, so a comment … is never read as a secret reference") | probe on `ciwf.go` at reviewed sha: `# remember to add ${{ secrets.IN_A_COMMENT }}` → `names=[IN_A_COMMENT REAL]`. The trigger idiom is not hypothetical: this fleet's own workflows already put `${{ }}` in comments (`cli.yml:136`, `from-zero.yml:201`), so only the expression's contents have to be a secret for the false report; a commented-out `#  X: ${{ secrets.Y }}` line is the common case | UNTESTED (no test feeds a commented expression) | code + tests (strip comments or walk the YAML AST before extracting expressions; add a `TestWorkflowReads` row) and spec `verification.md` (the claim is wrong) |
-| Major | REAL | handoff | F8 — `verification.md` "Promotion candidates" is unanswered (`<yes: path / no: reason>`), which `dotf spec archive` refuses with no override flag, so the spec cannot archive as it stands even though the promotion exists | `dotf spec archive --help`: "A third pre-flight reads verification.md's 'Promotion candidates' … No flag skips it"; the three lines are placeholders; lesson-577 exists and is the answer | UNTESTED (gate is outside the repo; behaviour observed from the CLI's own contract text) | spec — `verification.md` (excluded from the staleness check) |
-| Minor | REAL | resilience | F2 — the per-repository error line double-prefixes the repo (`o/broken: ERROR o/broken: list workflows: boom`): `runCICheck` prefixes, and `collectReads` already did | probe output above | UNTESTED (`TestRunCICheckReportsNamesAndFails` covers ok/FAIL, not the error path) | code + tests |
-| Minor | THEORETICAL | correctness | F3 — matching is case-sensitive, so `${{ secrets.nan_api_key }}` against a declared `NAN_API_KEY` reports a false `missing` **and** a false `excess` for the same credential. GitHub Actions secret names are case-insensitive (premise not verifiable offline in this run) | probe: `missing=[{nan_api_key }] excess=[NAN_API_KEY]` | UNTESTED | code + tests (`strings.EqualFold` normalisation, or a documented decision that names are case-sensitive) |
-| Minor | SPECULATIVE | correctness | F4 — a callee declaring `required: yes` (YAML 1.1 boolean) is read as *not* required, so the name is reported `missing … (optional in …)` instead of plainly missing. Marking only; the name is still reported | probe: `map[A:false B:true]` | UNTESTED | code + tests |
-| Minor | REAL | correctness | F5 — a multi-document workflow: only the first document's `secrets: inherit` calls are read (`yaml.Unmarshal` decodes one document), so later documents' callees are silently dropped rather than reported | probe: two documents → `got=[w.yml@v1]` only | UNTESTED | code + tests (or reject multi-document files loudly) |
-| Minor | REAL | spec drift | F6 — `tasks.md` assigns the fleet to `gh repo list`; the proposal forbids it (GraphQL budget, #3228) and `Fleet()` uses REST. Contract-set file, so it is dispositioned in `verification.md`, not edited under this review | `tasks.md` Implementation bullet vs `proposal.md` "Fleet" vs `ciwf_gh.go:Fleet` | N/A (documentation) | spec — disposition in `verification.md` |
-| Question | REAL | exit semantics | F7 — a repository whose only signal is an unknown read prints `UNKNOWN` and exits 0. That matches `features.json` f4 ("neither passed nor failed") and the AC4 label, but a CI gate consuming the exit status goes green knowing nothing about that repository. Confirm exit 0 is the intended contract | probe: `o/unknown: UNKNOWN` + `unknown …: toJSON(secrets)`, overall exit 0 | `TestCheckRepoCleanAndUnknownOnly` (asserts `Failing()` is false for unknown-only) | spec — confirm in `verification.md`; code only if the owner wants unknown to gate |
-
-Notes on the code-level checklist: no injection surface found — `gh` is invoked through `exec.Command`
-with discrete args and no shell, so `--repo`/path/ref cannot break out; only the operator's own
-repositories are read. No secret values anywhere in the path (`SelectCI` returns names; `gh` reads
-workflow files, never `actions/secrets`). No unbounded loops; one callee fetch per distinct
-`repo/path@ref`, cached across repositories in one run. `gosec` on `exec.Command` is suppressed with
-a reason, and the reason is accurate. No dead code observed.
+| Major | THEORETICAL | correctness (static scan) | F9 — Secret references in bare `if:` conditionals (omitting `${{ }}`) are not detected. In GitHub Actions, expressions inside `if:` do not require `${{ }}` syntax (and `actionlint` warns against wrapping them). `workflowReads` strictly matches `exprRe` (`\$\{\{(.*?)\}\}`). A workflow writing `if: secrets.DEPLOY_KEY != ''` or `if: !secrets.MY_TOKEN` without `${{ }}` is not detected as a read; if declared, it is reported as `excess` and fails; if undeclared, it is silently missed | probe on `exprRe.FindAllStringSubmatch("secrets.UNWRAPPED != ''", -1)` yields 0 matches. Idiomatic Actions syntax in `.github/workflows/` across this fleet heavily uses bare `if:` conditions | UNTESTED (all tests currently wrap `if:` expressions in `${{ }}`) | code + tests (inspect `if:` mapping node scalars directly through `exprReads` or support unwrapped expressions) |
+| Minor | THEORETICAL | correctness (false unknown) | F10 — String literals containing `'secrets'` inside an expression (e.g. `${{ contains(github.event.comment.body, 'secrets') }}`) are falsely reported as `unknown` reads. `exprReads` finds `\bsecrets\b` across the expression body without distinguishing string literals (`'...'`) from context access. When `literalRe` fails to match member access after `'secrets'`, it treats the expression as a computed read and appends to `rep.Unknown` | probe on `exprReads("contains(github.event.comment.body, 'secrets')", nil, nil)` yields `unknown=["contains(github.event.comment.body, 'secrets')"]` | UNTESTED | code + tests (`exprReads` should ignore matches inside quoted string literals) |
+| Minor | SPECULATIVE | correctness (YAML) | F11 — Reusable workflow `on.workflow_call.secrets.*.required` accepts YAML 1.2 boolean scalars `True` / `TRUE`, but `calleeSecrets` compares `req.Value == "true"`. `yaml.v3` decodes `required: True` with `Tag: !!bool` and `Value: "True"`, so a callee using TitleCase `True` will be treated as `required: false` | probe on `yaml.v3`: `doc := "required: True"` -> `Tag: !!bool, Value: "True"` | UNTESTED | code + tests (`strings.EqualFold(req.Value, "true")`) |
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |-----------|-------------|----------------------|
-| Correctness        | C | Happy path and all five ACs verified, but two reproduced misreports (comment-sourced read F1; case-sensitive name comparison F3) mean the report can state a name is read when it is not, and can flag the same credential missing and excess at once |
-| Verification       | B | Evidence names the tests, the commands and a mutation log (one mutation independently re-run here and killed; `golangci-lint` claim re-run clean), but one documented claim is false (comments) and the mutation entries omit their commands |
-| Scope              | A | Diff is the proposal: one package, one command, a lesson and the runbook section; no CI wiring, no registry edit, nothing from the non-goals |
-| Reliability        | B | Unreadable callee fails loudly naming it, callee cached, no-workflows repo handled as "none"; error text duplicated and a parse failure takes the whole repository down without isolating the offending file |
-| Maintainability    | B | Small pure functions, documented regexes, node-walk for `on:` — readable; the byte-level regex scan is what F1 and F3 fall out of |
-| Handoff-readiness  | C | Lesson-577 and the runbook section land, but `verification.md` cannot pass the archive's promotion pre-flight and `tasks.md` contradicts the proposal on fleet listing |
+| Correctness        | B | All acceptance criteria verified and round 1 bugs (comments, case-sensitivity) resolved; bare `if:` syntax gap (F9) remains theoretical for the fleet |
+| Verification       | B | Reproducible commands and tests for all criteria; independent mutations killed; fleet live run documented in verification.md |
+| Scope              | A | Diff matches proposal exactly; single package and command with reader seam, zero unrelated changes |
+| Reliability        | B | Unreadable callees fail with clear error messages, callees are cached per ref, duplicate error prefixes fixed |
+| Maintainability    | B | Clean AST traversal, small functions under 40 lines, cyclomatic complexity under 10 across all functions |
+| Handoff-readiness  | B | Lesson-577 committed and linked, all promotion candidates answered, decisions and prior round findings dispositioned |
 
 ### Verdict
-
-FAIL
-
-One **Major + REAL** (F1: a commented expression is reported as a secret the repository must hold, and
-the same claim is written into `verification.md` as a guarantee) and one **handoff Major + REAL**
-(F8: the archive's promotion pre-flight refuses the spec as it stands). Rubric has two C's and no D.
+PASS-WITH-GAPS
 
 ### Recommended next steps
 
-Minimum set to flip to PASS:
+The contract set (`proposal.md`, `tasks.md`, `features.json`) is closed and must NOT be edited (doing so would invalidate this passing verdict). Recommended dispositions for the implementer:
 
-1. **Code + tests** — stop matching expressions inside YAML comments (walk the decoded YAML, or strip
-   comment lines/positions before `exprRe`), and add the `TestWorkflowReads` row with a commented
-   `${{ secrets.X }}`. This is the only finding whose fix changes behaviour.
-2. **Spec (`verification.md`, outside the contract set)** — answer the three "Promotion candidates"
-   lines (`yes: docs/lessons/lesson-577-…` for the lesson, with reasons for ADR and pattern), and
-   correct the "Only `${{ }}` expressions are scanned" decision so it stops asserting a guarantee the
-   code does not give.
-3. **Spec (`verification.md`)** — disposition F6 (tasks.md's `gh repo list` wording) and F7 (unknown-only
-   exits 0) in the decisions log; do **not** edit `tasks.md` — that would stale this review's verdict,
-   and the wording difference is already resolved in the code's favour.
-
-Then, and only then, a re-review round for the new state (the contract-set digests still match, so a
-re-review is cheap; F1's fix alone leaves the contract intact).
-
-Tracked, not blocking: F2 (error-line duplication), F3 (case-insensitive names), F4 (`required: yes`),
-F5 (multi-document). Each is a small code+tests change and none changes what the check concludes for a
-well-formed single-document workflow.
-
+1. **Follow-up ticket / PR (code + tests)**:
+   - Handle bare expressions in `if:` conditionals (F9) by checking `if` nodes in YAML workflows or scanning for unwrapped `secrets.` references.
+   - Ignore string literals in `exprReads` (F10) to avoid false-positive `unknown` reports on expressions containing `'secrets'`.
+   - Use `strings.EqualFold(req.Value, "true")` for `required` flags in `calleeSecrets` (F11).
+2. **Archive gate**:
+   - `dotf spec archive CLI-136-ci-secrets-from-workflows` is **ADVISABLE** in this state. The two round-1 blocking findings (F1 and F8) are resolved, and the new findings are theoretical/speculative gaps suitable for follow-up maintenance.
