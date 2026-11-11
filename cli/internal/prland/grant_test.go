@@ -36,7 +36,7 @@ func TestTheRepositoryGrantIsExactlyTheDecidedOne(t *testing.T) {
 	want := grant{
 		Grant:      "prs-the-agent-opened",
 		Conditions: []string{"ci-green", "no-conflicts", "reviewer-triaged"},
-		Excluded:   []string{"release-please"},
+		Excluded:   []string{"release-please", "path:harness/", "path:.github/"},
 		Merge:      "squash --match-head-commit",
 		Disclose:   "who reviewed, or that no review ran, in the triage comment",
 	}
@@ -60,6 +60,31 @@ func TestDecideRefusesForEveryDeclaredCondition(t *testing.T) {
 		mutate(&f)
 		if len(Decide(f)) == 0 {
 			t.Errorf("%s: Decide lands a PR that breaks it", name)
+		}
+	}
+}
+
+// The owner lands agent records and CI (#3288): this repository's own grant,
+// read as Decide reads it, refuses a PR that changes either, and still lets a
+// CLI change through.
+func TestTheRepositoryGrantLeavesHarnessAndCIToTheOwner(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", GrantFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var g grant
+	if err := yaml.Unmarshal(raw, &g); err != nil {
+		t.Fatal(err)
+	}
+	for file, refused := range map[string]bool{
+		"harness/skills/autopilot/SKILL.md": true,
+		".github/workflows/ci.yml":          true,
+		"cli/internal/spec/review.go":       false,
+	} {
+		f := readyFacts()
+		f.Excluded, f.Files = g.Excluded, []string{file}
+		if got := len(Decide(f)) > 0; got != refused {
+			t.Errorf("%s: refused = %v, want %v (%v)", file, got, refused, Decide(f))
 		}
 	}
 }

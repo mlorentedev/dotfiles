@@ -13,5 +13,7 @@ conditions:
   - reviewer-triaged    # a `## Review triage` comment disposes every reviewer finding
 excluded:
   - release-please      # cutting a release stays the owner's
+  - path:harness/       # agent records and skills: the owner lands them (#3288)
+  - path:.github/       # CI, workflows and this grant: the owner lands them (ADR-047, ADR-054)
 merge: squash --match-head-commit
 disclose: who reviewed, or that no review ran, in the triage comment
