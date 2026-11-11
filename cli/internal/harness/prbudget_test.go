@@ -289,12 +289,16 @@ func TestCheckReviewBudget_AnAnswerCapItCannotReadIsAGapNotAPass(t *testing.T) {
           CONFIG__AI_TIMEOUT: "360"
           CONFIG__MAX_OUTPUT_TOKENS: "` + raw + `"
 `
-		n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, step))
+		repo := budgetRepo(t, budgetTomlFixed, step)
+		n, text := budgetProblemText(t, repo)
 		if n == 0 || !strings.Contains(text, "cannot read as a number") {
 			t.Errorf("an unreadable answer cap %q must be a gap, got %d:\n%s", raw, n, text)
 		}
-		if strings.Contains(text, "OK -> prompt clip") {
-			t.Errorf("no clip may be reported OK while the reserve is unreadable (%q):\n%s", raw, text)
+		// All the lines, not just the problems: the clip line this asserts the
+		// absence of is an OK line, and budgetProblemText drops exactly those,
+		// so the assertion could never fail (#3301 review).
+		if all := budgetAllText(t, repo); strings.Contains(all, "OK -> prompt clip") {
+			t.Errorf("no clip may be reported OK while the reserve is unreadable (%q):\n%s", raw, all)
 		}
 	}
 }
