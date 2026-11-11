@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // HARNESS-142 AC4: the reviewer works in the review worktree, on both runners.
@@ -146,5 +149,76 @@ func TestReviewLaunchRemovesTheWorktreeWhenTmuxFails(t *testing.T) {
 	}
 	if _, err := os.Stat(tree); !os.IsNotExist(err) {
 		t.Errorf("the review worktree outlived a failed launch: %v", err)
+	}
+}
+
+// A reviewer that dies on startup never reaches deadline, which is what removes
+// the worktree, so the launcher removes it (#3223): otherwise it waits out a
+// lease of deadline plus the margin with nothing running in it.
+func TestReviewLaunchRemovesTheWorktreeWhenTheReviewerDiesOnStartup(t *testing.T) {
+	root := makeRepo(t)
+	tree := stubReviewTree(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	stubLaunch(t, false)
+
+	if _, _, err := execute(t, "spec", "review", "AI-001-x"); err == nil {
+		t.Fatal("a launch whose reviewer died on startup succeeded")
+	}
+	if _, err := os.Stat(tree); !os.IsNotExist(err) {
+		t.Errorf("the review worktree outlived a reviewer that died on startup: %v", err)
+	}
+}
+
+// The same premise as TestReviewWorktreeDropsAVerdictTheCallerRotated, out of
+// real git rather than a stubbed createReviewTree (#3223): `git worktree add
+// --detach` does check HEAD's committed verdict out into the review worktree,
+// and the copy-in of the caller's folder, which rotated it aside, drops it.
+func TestReviewWorktreeDropsACommittedVerdictOutOfRealGit(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	callerSpec := filepath.Join(repo, "specs", "AI-001-x")
+	if err := os.MkdirAll(callerSpec, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"proposal.md": "# AI-001-x\n", "review.md": "---\nverdict: PASS\n---\n"} {
+		if err := os.WriteFile(filepath.Join(callerSpec, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git := func(args ...string) string {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = repo
+		out, err := c.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("add", "specs")
+	git("commit", "-q", "-m", "the previous round's verdict")
+	head := git("rev-parse", "HEAD")
+	// The caller rotates the verdict aside before the launch.
+	if err := os.Remove(filepath.Join(callerSpec, "review.md")); err != nil {
+		t.Fatal(err)
+	}
+
+	tree, err := planReviewTree(repo, "AI-001-x", spec.FirstSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := createReviewTree(tree, head, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = removeReviewTree(tree.path) })
+	treeSpec := filepath.Join(tree.path, "specs", "AI-001-x")
+	if _, err := os.Stat(filepath.Join(treeSpec, "review.md")); err != nil {
+		t.Fatalf("the premise does not hold: git did not check the committed verdict out: %v", err)
+	}
+	if err := mirrorSpecFolder(callerSpec, treeSpec); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(treeSpec, "review.md")); !os.IsNotExist(err) {
+		t.Errorf("the worktree kept the committed verdict the caller rotated aside: %v", err)
 	}
 }

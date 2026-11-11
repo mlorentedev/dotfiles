@@ -288,7 +288,10 @@ commit and the tree. --initial is refused for any other spec.`,
 			}
 
 			if useTmux {
-				return launchDetached(cmd, tree.path, launch, slot, session, transcript, id, chosen, entries)
+				finish := func() {
+					finishLeftoverReviewTree(cmd.ErrOrStderr(), filepath.Join(treeSpec, slot.Review), tree.path, specDir)
+				}
+				return launchDetached(cmd, tree.path, launch, slot, session, transcript, id, chosen, entries, finish)
 			}
 
 			cmd.Printf("\n")
@@ -537,14 +540,17 @@ func recordReviewRequest(cmd *cobra.Command, repoRoot, specDir, id string, slot 
 
 // launchDetached starts the review in its tmux session and confirms the
 // runner came up. A detached launch can only report that the runner STARTED;
-// how it ends is read later, from the slot's verdict.
+// how it ends is read later, from the slot's verdict. A reviewer that dies on
+// startup never reached deadline, which removes the worktree, so finish does it
+// instead (#3223).
 func launchDetached(cmd *cobra.Command, treeRoot string, launch []string, slot spec.ReviewSlot, session, transcript, id string,
-	chosen spec.ReviewerEntry, entries []spec.ReviewerEntry) error {
+	chosen spec.ReviewerEntry, entries []spec.ReviewerEntry, finish func()) error {
 	cmd.Printf("Session:    %s\n\n", session)
 	if err := runCommand(treeRoot, launch); err != nil {
 		return errors.Join(fmt.Errorf("starting the tmux session: %w", err), removeReviewTree(treeRoot))
 	}
 	if err := confirmLaunched(slot, session, transcript, id, chosen, entries); err != nil {
+		finish()
 		return err
 	}
 	cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
