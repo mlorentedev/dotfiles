@@ -11,32 +11,28 @@ owner: manu
 
 ## Evidence
 
-Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
-
-- [ ] Criterion 1 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 2 -> commit `<hash>` / test `<name>`
-- [ ] Criterion 3 -> commit `<hash>` / test `<name>`
+- [x] AC1 -> commit `c36eb7b5` / `TestDeadlineWritesAnErrorStubWhenTheRunSignedNothing` (exit 0, exit 3, deadline; stub reaches the caller's folder through the copy-back), `TestWriteErrorStubRecordsTheRunThatSignedNothing` (both slots), `TestWriteErrorStubWithoutOutputOrRequest`
+- [x] AC2 -> commit `c36eb7b5` / `TestWriteErrorStubLeavesAnExistingReviewFile` (PENDING and PASS), `TestDeadlineKeepsTheReviewersOwnFile`
+- [x] AC3 -> commit `c36eb7b5` / `TestParseReviewRefusesAnErrorVerdictByName`, `TestVerifyReviewProducedReportsAnErrorStub`
+- [x] AC4 -> commit `c36eb7b5` / `TestStoppedRunRecordNamesAnErrorStub`; `TestSpecDeadlineStopsAStalledRunAndNamesTheLastCall` now expects the ERROR record
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite: `cd cli && go build ./... && go vet ./... && go test ./...` -> all ok; `golangci-lint run ./...` and `GOOS=windows golangci-lint run ./...` -> 0 issues; `GOOS=windows go vet ./...` clean
+- Mutation: making `WriteErrorStub` write over an existing file fails `TestWriteErrorStubLeavesAnExistingReviewFile`; the deadline tests failed before the stub was wired
+- No regressions in existing test suite: yes
 
 ## Decisions made during implementation
 
-Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
-
--
--
+- The stub is written by `spec deadline`, which already sees how every run ends and does the copy-back, rather than by the transcript sink, which sees only stdout.
+- The turn-cap pool lookup moved into `runnerOf`, shared by the archive hint and the stub, so pi's turn cap still names itself once a stub exists.
+- `VerifyReviewProducedIn` reports the stub as the refusal it is, not as a malformed file the reviewer wrote.
 
 ## Promotion candidates
 
-Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
-
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? no: the rule (a detached launcher writes the failure where people look) is the spec itself, and #1511 records the measurement
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: a fourth verdict value following PENDING's precedent, not a new architecture
+- [x] New pattern candidate for `00_meta/patterns/`? no: single-project
 
 ## Archive checklist
 
