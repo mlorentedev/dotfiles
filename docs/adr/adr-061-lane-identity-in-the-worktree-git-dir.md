@@ -91,6 +91,9 @@ was this ambiguity, not a missing feature.
    (#3293). A main checkout is decided by `git dir == common dir`, never by
    reading: the common dir already holds `dotf lane next`'s prompt directory
    under the same name (#3320), and a directory at the record path is no record.
+   The audit behind `dotf lane doctor` (#3262) enumerates the admin dirs under
+   the common dir and reads each record through the same function, so the two
+   cannot disagree about what a record is.
 
 ## Consequences
 

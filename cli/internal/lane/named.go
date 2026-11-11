@@ -236,6 +236,10 @@ func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool
 	return true, err
 }
 
+// errNotAWorktree marks the one refusal of assertWorktreeOf whose repair is to
+// move the directory aside: nothing of any repository's stands there.
+var errNotAWorktree = errors.New("not a git worktree")
+
 // assertWorktreeOf refuses a lanePath that is not a linked worktree of the
 // repository whose common dir is repoCommonDir: a plain directory, a worktree
 // of another repository, a main checkout, or a directory inside some
@@ -247,7 +251,7 @@ func assertWorktreeOf(absRepo, repoCommonDir, lanePath string) error {
 		return err
 	}
 	if gitDir == "" {
-		return fmt.Errorf("%s exists but is not a git worktree; move it aside, or run `git worktree repair` if it was one", lanePath)
+		return fmt.Errorf("%s exists but is %w; move it aside, or run `git worktree repair` if it was one", lanePath, errNotAWorktree)
 	}
 	if !samePath(commonDir, repoCommonDir) {
 		return fmt.Errorf("%s is a worktree of %s, not of %s; two repositories share a basename under this WORKTREE_ROOT", lanePath, repoOf(commonDir), absRepo)

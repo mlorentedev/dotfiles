@@ -177,7 +177,8 @@ same merge would block every existing session container on every seat at once.
    The commit itself is allowed: it lands from a lane or before the guard sees a
    marker in the main checkout's history. If rule 6 blocks it, claim a lane with
    `dotf lane switch chore/<issue>-arm-lane-guard` and commit there.
-4. Confirm the guard is live (section 7).
+4. Confirm the guard is live (section 7), and that the marker and the lanes
+   agree: `dotf lane doctor` prints nothing and exits 0 (section 7.6).
 5. Announce the change: from that merge onward, commits in third-party session
    roots and on `main` in this repository are refused.
 
@@ -275,6 +276,53 @@ grep -nE 'copilot-worktrees|feat-lane-primary|fast-track-lane' git-hooks/lib/lan
 
 Expected: no matches. If that changes, policy has leaked back into the script.
 
+### 7.6 Audit the marker against the lanes
+
+```sh
+dotf lane doctor; echo "exit=$?"
+```
+
+Expected on a coherent repository: no output, `exit=0`. A repository without the
+marker, or a marker whose lanes are not provisioned on this machine, prints one
+line and exits 0: the marker is committed and travels with every clone, the lanes
+are per machine. Any incoherence prints one `ERROR`/`FIX` pair per finding on
+stdout and exits 1; the audit repairs nothing, the FIX line names the command
+that does. Exit 2 means the audit could not run: not a git repository, an
+empty `WORKTREE_ROOT`, or a worktree registry that cannot be read; the reason
+is on stderr.
+
+It reports, in this order and stopping at the first group that fires:
+
+1. The marker: it does not parse, carries an unknown key, a `version` other than
+   1, an empty `canonical_lanes` or `third_party_roots`, an entry that is empty,
+   duplicated, carries `/` or `\` or starts with a drive prefix, or a
+   `canonical_lanes` that differs from the set `dotf lane init` writes.
+2. Each declared lane, read from git's own registry of linked worktrees
+   (`<repo>/.git/worktrees/*/`, where the identity record lives): registered at
+   a path that no longer exists (moved or deleted by hand: `git worktree repair`
+   or `git worktree prune`), at a path other than its canonical one (`git
+   worktree move` back), recorded in more than one worktree, absent, a directory
+   that is not this repository's worktree, a worktree without the record (rule
+   5b does not fire there), or a lease missing, naming another lane or in a
+   state the lanes do not use. A plain directory at a lane path is moved aside
+   and pruned; a worktree of another repository there (two clones sharing a
+   basename, #3318) is left to its owner. Measured 2026-11-11 on a scratch
+   pair: from the repository whose registration of that path is stale,
+   `git worktree prune` keeps the entry while the other `.git` file exists,
+   `git worktree remove --force` refuses, and **`git worktree repair <path>`
+   rewrites the other repository's `.git` file to point here**, hijacking its
+   worktree. The FIX names the stale admin dir to delete by hand instead.
+3. Any worktree whose record names a lane the marker does not declare.
+
+The registry, not `git worktree list` or the canonical path, is what survives a
+rename by hand (lesson 582). The Go tests that pin each shape:
+
+```sh
+cd cli
+go test ./internal/lane/... -count=1 -timeout 30m -run 'TestAuditLanes_' -v
+go test ./internal/cmd/... -count=1 -run 'TestLaneDoctor' -v
+```
+
 ## 8. Known limits
 
 - **The guard is a guardrail, not an enforcement boundary.** `git commit
@@ -291,11 +339,20 @@ Expected: no matches. If that changes, policy has leaked back into the script.
 - **Lanes are still located by path.** `dotf lane init` finds a lane at
   `<WORKTREE_ROOT>/<repo basename>/<lane>`, so two repositories sharing a basename
   collide there. The second init refuses loudly instead of adopting the first's
-  lanes; a layout that lets both coexist is a follow-up.
+  lanes, and `dotf lane doctor` run from the second reports each lane path as
+  the first's with a FIX that touches nothing of the first's; a layout that lets
+  both coexist is the follow-up (#3318).
 - **The parser fails closed on syntax and open on semantics.** A malformed marker
   still arms the guard (the file exists) but yields empty lists, so rules 4 and 5a
   do not apply; rule 5b reads the record independently of the lists and still
   fires. `dotf lane init` owns the file format; do not hand-edit it beyond
-  `third_party_roots`.
+  `third_party_roots`. `dotf lane doctor` (7.6) is the detector: it names the
+  field, the guard stays silent.
+- **`dotf lane doctor` reads the main checkout's marker only.** The guard reads
+  `$top/.dotf/lanes.json` first, so a lane checked out on a branch whose copy of
+  the marker differs is guarded by that copy. An older branch legitimately
+  carries an older marker, so the audit does not compare the copies; a corrupt
+  lane-local copy is found by running `dotf lane doctor` from that lane after
+  merging the branch. The audit is also not yet a `dotf doctor` sweep entry (#3327).
 - **Rule 6 blocks `main`/`master` only.** A repository whose default branch is
   named otherwise relies on rules 4 and 5.
