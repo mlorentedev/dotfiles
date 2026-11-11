@@ -908,19 +908,54 @@ func HomeRunners(home string) (run, stdout Runner) {
 // gitExecPath asks git where its helpers live; Git Bash is found from it.
 var gitExecPath = func() ([]byte, error) { return exec.Command("git", "--exec-path").Output() }
 
-// findGitBash locates Git for Windows' bash from `git --exec-path`. reason is
+// gitStandardRoots lists where Git for Windows installs: the machine root
+// winget and the installer use, and the per-user root. A converge that installs
+// git and then syncs tools in the same process holds a PATH captured before git
+// existed, so `git --exec-path` cannot find it (#3328); these roots do not
+// depend on the PATH.
+var gitStandardRoots = func() []string {
+	return gitRootsFrom(os.Getenv("ProgramFiles"), os.Getenv("LocalAppData"))
+}
+
+// gitRootsFrom derives the install roots from the two environment values, and
+// skips one that is unset rather than searching a root-relative path.
+func gitRootsFrom(programFiles, localAppData string) []string {
+	var roots []string
+	if programFiles != "" {
+		roots = append(roots, filepath.Join(programFiles, "Git"))
+	}
+	if localAppData != "" {
+		roots = append(roots, filepath.Join(localAppData, "Programs", "Git"))
+	}
+	return roots
+}
+
+// findGitBash locates Git for Windows' bash from `git --exec-path`, then from
+// the standard install roots when git is not on this process's PATH. reason is
 // empty when bash was found, and otherwise says why not, in words an operator
 // can act on.
 func findGitBash(execPath func() ([]byte, error)) (bash, reason string) {
 	out, err := execPath()
-	if err != nil {
-		return "", fmt.Sprintf("Git Bash not found: `git --exec-path` failed (%v); install Git for Windows", err)
+	if err == nil {
+		var ok bool
+		if bash, ok = GitBash(string(out)); ok {
+			return bash, ""
+		}
+		reason = "Git Bash not found under " + filepath.Dir(filepath.Dir(bash)) + "; reinstall Git for Windows"
+	} else {
+		reason = fmt.Sprintf("Git Bash not found: `git --exec-path` failed (%v); install Git for Windows", err)
 	}
-	bash, ok := GitBash(string(out))
-	if !ok {
-		return bash, "Git Bash not found under " + filepath.Dir(filepath.Dir(bash)) + "; reinstall Git for Windows"
+	roots := gitStandardRoots()
+	for _, root := range roots {
+		candidate := filepath.Join(root, "bin", "bash.exe")
+		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
+			return candidate, ""
+		}
 	}
-	return bash, ""
+	if len(roots) > 0 {
+		reason += " (also looked under " + strings.Join(roots, ", ") + ")"
+	}
+	return bash, reason
 }
 
 // batsRuntimeNote names a missing Git Bash when bats is what failed its pin on

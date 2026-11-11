@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1421,6 +1422,11 @@ func TestBatsRuntimeNote_NamesAMissingGitBash(t *testing.T) {
 		return []byte(filepath.Join(withBash, "mingw64", "libexec", "git-core") + "\n"), nil
 	}
 	notUnder := func() ([]byte, error) { return []byte(execPath + "\n"), nil }
+	// The standard roots are the host's: on a Windows runner Git is really
+	// there, and the cases below mean "nowhere".
+	old := gitStandardRoots
+	gitStandardRoots = func() []string { return nil }
+	t.Cleanup(func() { gitStandardRoots = old })
 	noGit := func() ([]byte, error) { return nil, errors.New(`exec: "git": executable file not found in %PATH%`) }
 	for _, tc := range []struct {
 		name     string
@@ -1439,6 +1445,74 @@ func TestBatsRuntimeNote_NamesAMissingGitBash(t *testing.T) {
 			got := batsRuntimeNote(tc.goos, tc.missing, tc.execPath)
 			if tc.want == "" && got != "" || !strings.Contains(got, tc.want) {
 				t.Errorf("batsRuntimeNote = %q, want it to contain %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// A from-zero converge installs git and syncs tools in one process, whose PATH
+// was captured before git existed: `git --exec-path` fails, yet Git Bash is at
+// its standard install root. The lookup finds it there and, when it is nowhere,
+// names every root it searched (#3328).
+func TestFindGitBash_FallsBackToTheStandardInstallRoots(t *testing.T) {
+	noGit := func() ([]byte, error) { return nil, errors.New(`exec: "git": executable file not found in %PATH%`) }
+	old := gitStandardRoots
+	t.Cleanup(func() { gitStandardRoots = old })
+
+	empty := t.TempDir()
+	installed := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(installed, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(installed, "bin", "bash.exe")
+	if err := os.WriteFile(want, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	gitStandardRoots = func() []string { return []string{empty, installed} }
+	if got, reason := findGitBash(noGit); reason != "" || got != want {
+		t.Errorf("findGitBash = (%q, %q), want (%q, \"\")", got, reason, want)
+	}
+
+	gitStandardRoots = func() []string { return []string{empty} }
+	_, reason := findGitBash(noGit)
+	for _, part := range []string{"`git --exec-path` failed", "also looked under " + empty} {
+		if !strings.Contains(reason, part) {
+			t.Errorf("reason %q lacks %q", reason, part)
+		}
+	}
+
+	// git on the PATH still wins over a root.
+	gitRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(gitRoot, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	onPath := filepath.Join(gitRoot, "bin", "bash.exe")
+	if err := os.WriteFile(onPath, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitStandardRoots = func() []string { return []string{installed} }
+	viaGit := func() ([]byte, error) {
+		return []byte(filepath.Join(gitRoot, "mingw64", "libexec", "git-core") + "\n"), nil
+	}
+	if got, reason := findGitBash(viaGit); reason != "" || got != onPath {
+		t.Errorf("findGitBash via git = (%q, %q), want (%q, \"\")", got, reason, onPath)
+	}
+}
+
+func TestGitRootsFrom(t *testing.T) {
+	for _, tc := range []struct {
+		name, programFiles, localAppData string
+		want                             []string
+	}{
+		{"both set", "P", "L", []string{filepath.Join("P", "Git"), filepath.Join("L", "Programs", "Git")}},
+		{"only the machine root", "P", "", []string{filepath.Join("P", "Git")}},
+		{"only the user root", "", "L", []string{filepath.Join("L", "Programs", "Git")}},
+		{"neither", "", "", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := gitRootsFrom(tc.programFiles, tc.localAppData); !slices.Equal(got, tc.want) {
+				t.Errorf("gitRootsFrom(%q, %q) = %q, want %q", tc.programFiles, tc.localAppData, got, tc.want)
 			}
 		})
 	}
