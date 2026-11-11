@@ -1,0 +1,31 @@
+# Which pull-request diffs are code, for the jobs that run on Windows and macOS
+# (CI-013, #3149). A dorny/paths-filter file, read with
+# `predicate-quantifier: some-with-excludes`: a changed file is code unless one
+# of the exclusions below matches it. A diff of exclusions only is documentation,
+# and the OS replicas of cli/test and cli-smoke do not start for it.
+#
+# The exclusions are the docs-only set. tests/ci-path-filtering.bats reads them
+# from here and fails when a tracked top-level entry is neither in ci.yml's
+# `code` allow-list nor excluded here, so the two stay complements. Each line
+# carries the reason it cannot change what a test checks.
+code:
+  - '**'
+  # Prose. check-doc-paths and lessons-fmt run in pre-commit, docs-drift on the
+  # push to main.
+  - '!docs/**'
+  # Spec records. Archive PRs are the common case; the spec-id guard runs on the
+  # push to main.
+  - '!specs/**'
+  # Prose.
+  - '!README.md'
+  # Written by release-please.
+  - '!CHANGELOG.md'
+  # Legal text.
+  - '!LICENSE'
+  # Prose.
+  - '!SECURITY.md'
+  # Reviewer config, read by no test.
+  - '!.coderabbit.yaml'
+  # Release tooling. A release PR's content was tested on main.
+  - '!release-please-config.json'
+  - '!.release-please-manifest.json'

@@ -7,6 +7,10 @@
 # cli-gate reported green (lesson 322: an allow-list path filter treats every
 # unlisted path as safe to skip). The workflow is parsed, not grepped, for the
 # reason tests/ci-path-filtering.bats gives.
+#
+# CI-013 (#3149) narrows only the Windows replica: on a documentation-only pull
+# request the job runs on Linux alone, and Linux still runs every Go test. None
+# of the files #1888 names is in the docs-only set (.github/filters/code.yml).
 
 setup() {
     CLI_YML="$BATS_TEST_DIRNAME/../.github/workflows/cli.yml"
@@ -26,7 +30,8 @@ EOF
     run _yaml '
 job = wf["jobs"]["test"]
 print("if:", job.get("if"), "needs:", job.get("needs"))
-sys.exit(1 if "if" in job or "needs" in job else 0)'
+# `needs: changes` is for the OS list (CI-013); a condition would skip Linux too.
+sys.exit(1 if "if" in job or job.get("needs") not in (None, "changes", ["changes"]) else 0)'
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
