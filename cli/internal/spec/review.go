@@ -42,6 +42,10 @@ const (
 	// (CLI-094) and the run was stopped before it signed. It is never a passing
 	// verdict and the gate refuses it by name.
 	VerdictPending Verdict = "PENDING"
+	// VerdictError marks a review file the launcher wrote because the run
+	// ended without one (BUG-168, #1511): nothing was reviewed. Like PENDING it
+	// is never a passing verdict and the gate refuses it by name.
+	VerdictError Verdict = "ERROR"
 )
 
 // Blocks reports whether this verdict must stop an archive. Anything that is
@@ -183,6 +187,9 @@ func parseReviewAs(content, name string) (Review, error) {
 	}
 	if r.Verdict == VerdictPending {
 		return r, fmt.Errorf("%s is a provisional, unsigned record (verdict: PENDING): the run that wrote it was stopped before it signed a verdict, so it cannot be archived; run the review again", name)
+	}
+	if r.Verdict == VerdictError {
+		return r, fmt.Errorf("%s records a review that ended without a verdict (verdict: ERROR): its body says how the run ended and what the reviewer wrote; run the review again", name)
 	}
 	if r.Verdict != VerdictPass && r.Verdict != VerdictPassWithGaps && r.Verdict != VerdictFail {
 		return r, fmt.Errorf("%s has an unrecognized verdict %q (want PASS, PASS-WITH-GAPS or FAIL)", name, r.Verdict)
