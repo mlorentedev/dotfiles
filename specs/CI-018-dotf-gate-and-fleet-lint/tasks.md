@@ -27,7 +27,7 @@ owner: manu
 - [x] [AC1] `gate.ReadEvent`: body, labels, author; a null body is empty; no `pull_request` is `ErrNoPR`
 - [x] [AC1] `gate.StripMarkup`: one left-to-right pass over fences, HTML comments and code spans, reporting an unclosed fence
 - [x] [AC1] `gate.JudgeKnowledge` and `dotf gate knowledge`, with `--summary` and `--explain`
-- [x] [AC3] The shim runs dotf with no token and a `gh` that records any call
+- [x] [AC3] The shim runs dotf with no token and a PATH holding git alone
 
 ## PR 2: `dotf gate spec` core
 

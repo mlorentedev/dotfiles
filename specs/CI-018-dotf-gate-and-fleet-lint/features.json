@@ -15,7 +15,7 @@
   },
   {
     "id": "CI-018-dotf-gate-and-fleet-lint-f3",
-    "behavior": "The gates make no network call: no token, and a gh on PATH that records any call",
+    "behavior": "The gates make no network call: no token, and a PATH holding git alone",
     "verification": "bats tests/check-knowledge-gate.bats",
     "state": "pending",
     "evidence": ""

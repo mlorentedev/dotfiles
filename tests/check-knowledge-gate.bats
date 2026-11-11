@@ -72,18 +72,14 @@ if "SDD_PR_BODY" in os.environ:
           "user": {"login": os.environ.get("SDD_PR_AUTHOR", "")}}
 json.dump({"pull_request": pr} if pr else {}, open(sys.argv[1], "w"))
 PY
-    # No network (AC3): no token, and a gh that records any call. Every case
-    # then proves the gate judged from the event file alone.
-    local trap="$BATS_TEST_TMPDIR/no-gh"
-    mkdir -p "$trap"
-    printf '#!/bin/sh\ntouch "%s/called"\nexit 97\n' "$trap" >"$trap/gh"
-    chmod +x "$trap/gh"
-    run env -u GH_TOKEN -u GITHUB_TOKEN PATH="$trap:$PATH" \
+    # No network (AC3): no token, and a PATH holding git alone, so a gh call
+    # cannot succeed and would surface as a verdict that differs from the
+    # shell gate's. A link, not a stub: nothing stands in for a real tool.
+    local bin="$BATS_TEST_TMPDIR/git-only"
+    mkdir -p "$bin"
+    [ -e "$bin/git" ] || ln -s "$(command -v git)" "$bin/git"
+    run env -u GH_TOKEN -u GITHUB_TOKEN PATH="$bin" \
         "$DOTF_BIN" gate knowledge --event "$event" --base main --head feature "$@"
-    if [ -e "$trap/called" ]; then
-        echo "dotf gate knowledge called gh"
-        return 1
-    fi
 }
 
 # A body whose Lesson line is $1; ADR and Runbook are reasoned nones.
