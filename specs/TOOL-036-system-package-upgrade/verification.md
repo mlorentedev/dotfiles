@@ -33,3 +33,4 @@ owner: manu
 - Housekeeping failure is a note in Detail, not a step failure.
 - Linux skips the whole step (refresh included) without root, since `apt-get update` needs root too.
 - `needs_sudo` casks and brew-pinned formulae are excluded per entry and named, so Probe can converge.
+- winget prints a fixed-width table, and a Name cell can contain text that looks like a catalog id. The id match therefore reads the Id column alone. Its start is taken from the header line, and the columns are counted in runes, so a non-ASCII name does not shift the slice. The release needs this fix as well as #3287: it landed separately in PR 1b, after #3287 merged at 6debd6ae.
