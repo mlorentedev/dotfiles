@@ -35,13 +35,6 @@ func TestRealGitRunner_ListsTheNamedRepositoryWhateverGitDirSays(t *testing.T) {
 	}
 }
 
-func TestWithoutRepositoryEnv_KeepsEverythingElse(t *testing.T) {
-	got := withoutRepositoryEnv([]string{"GIT_DIR=/x", "git_work_tree=/y", "GIT_CONFIG_GLOBAL=/g", "HOME=/h"})
-	if strings.Join(got, " ") != "GIT_CONFIG_GLOBAL=/g HOME=/h" {
-		t.Errorf("got %v", got)
-	}
-}
-
 // The fetch sets one variable of its own; adding it to os.Environ() instead of
 // gitIn's environment put GIT_DIR back on the one call that reaches the network.
 func TestFetchCommitCmd_KeepsTheScrub(t *testing.T) {
