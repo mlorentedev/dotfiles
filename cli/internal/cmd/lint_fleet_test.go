@@ -92,3 +92,79 @@ func TestLintFleetAsksForTheDefaultBranch(t *testing.T) {
 		t.Errorf("--default-branch master: exit %d", code)
 	}
 }
+
+// fleetDir lays out one checkout per entry under a directory, each with a
+// .git directory and one workflow.
+func fleetDir(t *testing.T, repos map[string]string) string {
+	t.Helper()
+	fleet := t.TempDir()
+	for name, body := range repos {
+		dir := filepath.Join(fleet, name)
+		writeWorkflow(t, dir, body)
+		if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return fleet
+}
+
+const (
+	cleanWorkflow  = "on: push\njobs: {}\n"
+	dirtyWorkflow  = "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - run: true\n"
+	brokenWorkflow = "jobs: [unclosed"
+)
+
+// --fleet checks every checkout under a directory and names each finding's
+// checkout; one it cannot read fails the run without hiding the others, and
+// a directory that is not a checkout is not read.
+func TestLintFleetOverCheckouts(t *testing.T) {
+	fleet := fleetDir(t, map[string]string{"clean": cleanWorkflow, "dirty": dirtyWorkflow, "broken": brokenWorkflow})
+	writeWorkflow(t, filepath.Join(fleet, "not-a-checkout"), brokenWorkflow)
+	out, code := runLintFleetCmd(t, "--fleet", fleet)
+	if code != 2 || !strings.Contains(out, "[ERROR] broken: ") ||
+		!strings.Contains(out, "dirty/.github/workflows/ci.yml:3: fleet/timeout") ||
+		strings.Contains(out, "not-a-checkout") || strings.Contains(out, "[OK]") {
+		t.Errorf("fleet: exit %d, %q", code, out)
+	}
+}
+
+func TestLintFleetExitCodesOverCheckouts(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		repos map[string]string
+		code  int
+		ok    bool
+	}{
+		{"clean", map[string]string{"a": cleanWorkflow, "b": cleanWorkflow}, 0, true},
+		{"findings", map[string]string{"a": cleanWorkflow, "b": dirtyWorkflow}, 1, false},
+		// An unread checkout and no finding is not a clean fleet.
+		{"unread", map[string]string{"a": cleanWorkflow, "b": brokenWorkflow}, 2, false},
+		{"empty", nil, 2, false},
+	} {
+		out, code := runLintFleetCmd(t, "--fleet", fleetDir(t, c.repos))
+		if code != c.code || strings.Contains(out, "[OK]") != c.ok {
+			t.Errorf("%s: exit %d, %q", c.name, code, out)
+		}
+	}
+}
+
+func TestLintFleetRefusesSingleRepositoryFlags(t *testing.T) {
+	fleet := fleetDir(t, map[string]string{"a": cleanWorkflow})
+	for _, extra := range [][]string{{"--dir", "."}, {"--default-branch", "main"}} {
+		if _, code := runLintFleetCmd(t, append([]string{"--fleet", fleet}, extra...)...); code != 2 {
+			t.Errorf("--fleet with %v: exit %d, want 2", extra, code)
+		}
+	}
+}
+
+// --fleet refuses --default-branch, so an unknown one names the remedies
+// that apply to a fleet instead.
+func TestLintFleetUnknownDefaultBranchHint(t *testing.T) {
+	fleet := fleetDir(t, map[string]string{"a": "on:\n  push:\n    branches: [main]\njobs: {}\n"})
+	var out bytes.Buffer
+	deps := lintFleetDeps{branchOf: func(string) string { return "" }}
+	code := ExitCode(runLintFleetAll(&out, &out, deps, fleet, ""))
+	if code != 2 || !strings.Contains(out.String(), "git remote set-head origin --auto") || strings.Contains(out.String(), ": pass --default-branch") {
+		t.Errorf("exit %d, %q", code, out.String())
+	}
+}

@@ -2,9 +2,11 @@ package fleetlint
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -39,8 +41,7 @@ func fixture(t *testing.T, rule, kind string) string {
 // Each bad fixture trips its own rule once and no other; each good fixture,
 // which holds the near misses the exemptions exist for, trips nothing.
 func TestRuleFixtures(t *testing.T) {
-	for _, rule := range []string{RuleTimeout, RuleSHAPin, RulePersistCredentials, RuleNoSecretsInherit,
-		RuleCancelInProgress, RuleOSOnPullRequest, RuleSkipCache, RuleBranchFilter} {
+	for _, rule := range slices.Sorted(maps.Keys(rules)) {
 		name := strings.TrimPrefix(rule, "fleet/")
 		t.Run(name, func(t *testing.T) {
 			bad, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": fixture(t, name, "bad")})
@@ -309,5 +310,88 @@ func TestOSOnPullRequestReadsTheMatrix(t *testing.T) {
 		if err != nil || len(got) != c.want {
 			t.Errorf("%s: got %v, %v, want %d finding(s)", name, got, err, c.want)
 		}
+	}
+}
+
+// An exception that covers nothing, or names a rule that does not exist, is a
+// finding: neither silences anything, and both would read as declared.
+func TestStaleAndUnknownExceptionsAreFindings(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{
+		".github/workflows/ci.yml": twoFindings,
+		ExceptionsPath: `exceptions:
+  - rule: fleet/timeout
+    path: .github/workflows/ci.yml
+    reason: the job is a one-shot
+    issue: "#1"
+  - rule: fleet/timeout
+    path: .github/workflows/gone.yml
+    reason: the job is a one-shot
+    issue: "#1"
+  - rule: fleet/sha-pinned
+    path: .github/workflows/ci.yml
+    reason: a typo of the rule id
+    issue: "#1"
+`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s []string
+	for _, f := range got {
+		s = append(s, f.String())
+	}
+	want := []string{
+		".github/lint-exceptions.yml:6: fleet/exception: exception for fleet/timeout on .github/workflows/gone.yml matches no finding; remove it",
+		".github/lint-exceptions.yml:10: fleet/exception: exception names fleet/sha-pinned, which is not a fleet rule",
+		".github/workflows/ci.yml:6: fleet/sha-pin: owner/setup@v4 is not pinned by a full commit SHA",
+	}
+	if strings.Join(s, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(s, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// The rules an exception may name are the rules with fixtures: TestRuleFixtures
+// walks the list, so a rule left out of it would go untested and its own
+// exceptions would read as unknown.
+func TestEveryRuleMayBeExcepted(t *testing.T) {
+	dirs, err := os.ReadDir("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range dirs {
+		if !rules["fleet/"+d.Name()] {
+			t.Errorf("fleet/%s has fixtures and cannot be excepted", d.Name())
+		}
+	}
+	if len(dirs) != len(rules) {
+		t.Errorf("%d fixture directories, %d rules", len(dirs), len(rules))
+	}
+}
+
+func TestReposAreTheCheckoutsUnderADirectory(t *testing.T) {
+	dir := repo(t, map[string]string{
+		"b/.git/HEAD": "ref: refs/heads/main\n",
+		"a/.git":      "gitdir: /elsewhere\n",
+		"notes/x.md":  "not a checkout\n",
+		"file":        "",
+	})
+	got, err := Repos(dir)
+	if err != nil || strings.Join(got, ",") != "a,b" {
+		t.Errorf("got %v, %v, want a,b", got, err)
+	}
+	if _, err := Repos(filepath.Join(dir, "missing")); err == nil {
+		t.Error("a missing directory: want an error")
+	}
+}
+
+// A checkout linked in from elsewhere is read, not skipped as clean.
+func TestReposFollowSymlinks(t *testing.T) {
+	elsewhere := repo(t, map[string]string{"real/.git/HEAD": "ref: refs/heads/main\n"})
+	dir := t.TempDir()
+	if err := os.Symlink(filepath.Join(elsewhere, "real"), filepath.Join(dir, "linked")); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+	if got, err := Repos(dir); err != nil || strings.Join(got, ",") != "linked" {
+		t.Errorf("got %v, %v, want linked", got, err)
 	}
 }
