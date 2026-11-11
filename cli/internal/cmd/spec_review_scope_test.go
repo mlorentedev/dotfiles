@@ -31,7 +31,7 @@ func TestReviewRangeRefusesWhenTheOwnCommitsCannotBeListed(t *testing.T) {
 	t.Cleanup(func() { resolveReviewBase, headSHAOf, ownCommitsOf = prevBase, prevHead, prevOwn })
 	resolveReviewBase = func(string, string) spec.ReviewBase { return spec.ReviewBase{SHA: "basebasebase"} }
 	headSHAOf = func(string) string { return "headheadhead" }
-	ownCommitsOf = func(string, string, string, string, int) (spec.OwnCommitSet, error) {
+	ownCommitsOf = func(string, string, string, string, string, int) (spec.OwnCommitSet, error) {
 		return spec.OwnCommitSet{}, errors.New("git broke")
 	}
 	_, _, err := reviewRange(t.TempDir(), t.TempDir(), "X-001-a", false)
@@ -73,7 +73,7 @@ func TestReviewRangeMatchesTheSpecsOwnIssue(t *testing.T) {
 	resolveReviewBase = func(string, string) spec.ReviewBase { return spec.ReviewBase{SHA: "basebasebase"} }
 	headSHAOf = func(string) string { return "headheadhead" }
 	var got int
-	ownCommitsOf = func(_, _, _, _ string, issue int) (spec.OwnCommitSet, error) {
+	ownCommitsOf = func(_, _, _, _, _ string, issue int) (spec.OwnCommitSet, error) {
 		got = issue
 		return spec.OwnCommitSet{RangeSize: 2, Commits: make([]spec.OwnCommit, 1)}, nil
 	}
@@ -102,5 +102,37 @@ func TestSpecIssueNumberFallsBackToTheFolderAndSaysWhy(t *testing.T) {
 	scope := spec.ReviewScope{BaseSHA: "abc", OwnFolderOnly: "proposal.md names no issue", Own: spec.OwnCommitSet{RangeSize: 3, Commits: make([]spec.OwnCommit, 1)}}
 	if got, want := describeScope(scope), "git diff abc...HEAD (1 of 3 commits are the spec's own; folder rule only: proposal.md names no issue)"; got != want {
 		t.Errorf("describeScope = %q, want %q", got, want)
+	}
+}
+
+// BUG-166 (#3258): a base widened to the fork point says so on the launch line,
+// and the widened range reaches the own-commit listing with its traced base.
+func TestReviewScopeSaysTheBaseWasWidened(t *testing.T) {
+	prevBase, prevHead, prevOwn := resolveReviewBase, headSHAOf, ownCommitsOf
+	t.Cleanup(func() { resolveReviewBase, headSHAOf, ownCommitsOf = prevBase, prevHead, prevOwn })
+	resolveReviewBase = func(string, string) spec.ReviewBase {
+		return spec.ReviewBase{SHA: "forkforkfork", WidenedFrom: "tracedtraced0000"}
+	}
+	headSHAOf = func(string) string { return "headheadhead" }
+	var gotWidened string
+	ownCommitsOf = func(_, _, _, widenedFrom, _ string, _ int) (spec.OwnCommitSet, error) {
+		gotWidened = widenedFrom
+		return spec.OwnCommitSet{RangeSize: 2, Commits: make([]spec.OwnCommit, 2)}, nil
+	}
+	scope, _, err := reviewRange(t.TempDir(), t.TempDir(), "X-001-a", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotWidened != "tracedtraced0000" {
+		t.Errorf("own commits listed with widenedFrom %q, want the traced base", gotWidened)
+	}
+	want := "git diff forkforkfork...HEAD (2 of 2 commits are the spec's own; folder rule only: proposal.md is unreadable; base widened from tracedtraced to where the branch left the default branch)"
+	if got := describeScope(scope); got != want {
+		t.Errorf("describeScope = %q, want %q", got, want)
+	}
+	var b strings.Builder
+	b.WriteString(spec.ReviewPromptForScope(spec.FirstSigner, "X-001-a", "/r", "rev", "run", "skill", scope))
+	if !strings.Contains(b.String(), "tracedtraced") {
+		t.Errorf("the prompt must name the traced base the scope was widened from:\n%s", b.String())
 	}
 }

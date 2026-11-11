@@ -355,6 +355,11 @@ func writeReviewScope(b *strings.Builder, scope ReviewScope) {
 			"`git log --first-parent --no-merges %s..HEAD` lists the commits made on the branch\n"+
 			"itself, not those a merge brought in (a sub-branch merged into it is a merge too).\n"+
 			"Judge what the spec names first, and the rest only where it interacts.\n\n", scope.BaseSHA, scope.BaseSHA)
+		if scope.WidenedFrom != "" {
+			fmt.Fprintf(b, "The spec folder was first committed after %s; the launcher widened the base to\n"+
+				"where the branch left the default branch, because the work before the spec folder is\n"+
+				"the spec's too: a fix committed before its spec is in this range on purpose.\n\n", scope.WidenedFrom)
+		}
 		writeOwnCommits(b, scope)
 	}
 }
@@ -371,14 +376,17 @@ func writeOwnCommits(b *strings.Builder, scope ReviewScope) {
 	if scope.OwnIssue > 0 {
 		rule += fmt.Sprintf(", or reference #%d", scope.OwnIssue)
 	}
+	if scope.WidenedFrom != "" {
+		rule += ", or come before the spec folder on this branch"
+	}
 	fmt.Fprintf(b, "The spec's own commits in that range, %d of %d, derived by the launcher from git\n"+
 		"(they %s):\n\n", len(own.Commits), own.RangeSize, rule)
 	for _, c := range own.Commits {
 		fmt.Fprintf(b, "- %s %s\n", c.SHA[:min(12, len(c.SHA))], c.Subject)
 	}
 	fmt.Fprintf(b, "\nThe other commits in the range are other work that merged in between. Start from\n"+
-		"these; read another commit only where it interacts with them. A slice that neither\n"+
-		"touches the folder nor names the issue is not listed, so the range stays the whole change.\n\n")
+		"these; read another commit only where it interacts with them. A slice none of those\n"+
+		"rules matches is not listed, so the range stays the whole change.\n\n")
 }
 
 // ReviewPromptIn is ReviewPrompt for one signer's slot. The second signer is

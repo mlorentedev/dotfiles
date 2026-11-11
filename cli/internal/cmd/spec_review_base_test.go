@@ -23,7 +23,9 @@ func withReviewBase(t *testing.T, base spec.ReviewBase, head string) {
 	resolveReviewBase = func(string, string) spec.ReviewBase { return base }
 	headSHAOf = func(string) string { return head }
 	prevOwn := ownCommitsOf
-	ownCommitsOf = func(string, string, string, string, int) (spec.OwnCommitSet, error) { return spec.OwnCommitSet{}, nil }
+	ownCommitsOf = func(string, string, string, string, string, int) (spec.OwnCommitSet, error) {
+		return spec.OwnCommitSet{}, nil
+	}
 	t.Cleanup(func() { ownCommitsOf = prevOwn })
 	t.Cleanup(func() { resolveReviewBase, headSHAOf = prevBase, prevHead })
 }
