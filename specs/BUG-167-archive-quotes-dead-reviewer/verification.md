@@ -38,6 +38,12 @@ First review (nan/glm5.3-flash, FAIL) at 64da07dc:
 
 None of these touches `proposal.md`, `tasks.md` or `features.json`.
 
+Second review (nan/glm5.3-flash, PASS) at a450087f, three Minors:
+
+1. An unreadable reviewer pool skips the quote: declined. The archive gate already fails closed on a missing or unreadable tracked pool (`TestArchiveFailsClosedWhenATrackedPoolGoesMissing`), so that refusal is the one a user sees.
+2. `readEnds` does not re-stat between `Stat` and `ReadAt`: declined. Transcripts are append-only, and the reviewer marked it surface-only.
+3. The round-one decline of finding 6 stands, as the review records.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? no: an error message change; #1511 holds the measurement.
