@@ -46,7 +46,7 @@ None of these touches `proposal.md`, `tasks.md` or `features.json`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-166-review-base-widen/` -> `specs/archive/BUG-166-review-base-widen/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-166-review-base-widen/` -> `specs/archive/BUG-166-review-base-widen/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
