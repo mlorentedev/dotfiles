@@ -118,9 +118,11 @@ Get-ScheduledTask -TaskName DotfilesSelfUpdate
 Get-ScheduledTaskInfo -TaskName DotfilesSelfUpdate   # LastRunTime / LastTaskResult
 ```
 
-Run it once by hand with `dotf update`. On a clean, current checkout it changes nothing, unless the
-installed `dotf` is not the checkout's `DOTF_VERSION` pin: then it runs the installer, which
-installs the pin and converges.
+Run it once by hand with `dotf update`. On a clean, current checkout whose installed `dotf` matches
+the `DOTF_VERSION` pin, it still runs the system-upgrade step (step 5 above), which upgrades any
+outdated catalog package on the real machine. Preview that first with
+`dotf converge --plan --only system-upgrade`. When the installed `dotf` is not the pin, it runs the
+installer instead, which installs the pin and converges.
 
 ## Diagnose
 
