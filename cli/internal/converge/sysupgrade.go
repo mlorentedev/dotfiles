@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
+	"golang.org/x/text/width"
 )
 
 // systemUpgrade keeps the catalog's system packages current (TOOL-036, ADR-036
@@ -382,26 +383,22 @@ func (r systemUpgrade) wingetBehind([]sysTarget) (func(sysTarget) bool, error) {
 // wingetIDs returns the lower-cased Id cell of every row under the table's
 // header. The header is the line whose fields include "Id" (winget does not
 // translate it); the cell spans from that header's column to the next
-// header's, counted in runes so a name with an ellipsis or an accent does not
-// shift it.
+// header's. Columns are display cells, not bytes or runes: winget pads by
+// display width, so a CJK or fullwidth character in a name or a localized
+// header fills two of them.
 func wingetIDs(listing string) []string {
 	lines := strings.Split(strings.ReplaceAll(listing, "\r", ""), "\n")
 	for i, line := range lines {
-		start, end := wingetIDColumn([]rune(line))
+		start, end := wingetIDColumn(line)
 		if start < 0 {
 			continue
 		}
 		var ids []string
 		for _, row := range lines[i+1:] {
-			runes := []rune(row)
-			if len(runes) <= start || strings.Trim(row, "-─ ") == "" {
+			if strings.Trim(row, "-─ ") == "" {
 				continue
 			}
-			stop := min(end, len(runes))
-			if end < 0 {
-				stop = len(runes)
-			}
-			if cell := strings.TrimSpace(string(runes[start:stop])); cell != "" {
+			if cell := strings.TrimSpace(cellAt(row, start, end)); cell != "" {
 				ids = append(ids, strings.ToLower(strings.Fields(cell)[0]))
 			}
 		}
@@ -410,12 +407,13 @@ func wingetIDs(listing string) []string {
 	return nil
 }
 
-// wingetIDColumn finds the "Id" header in a line: its first rune, and the
-// first rune of the header after it (-1 when Id is the last). It answers -1,
-// -1 for a line that is not the header.
-func wingetIDColumn(line []rune) (start, end int) {
+// wingetIDColumn finds the "Id" header in a line: the display column it
+// starts at, and the column of the header after it (-1 when Id is the last).
+// It answers -1, -1 for a line that is not the header.
+func wingetIDColumn(line string) (start, end int) {
 	start, end = -1, -1
 	inField := false
+	col := 0
 	for i, c := range line {
 		switch {
 		case c == ' ':
@@ -423,14 +421,39 @@ func wingetIDColumn(line []rune) (start, end int) {
 		case !inField:
 			inField = true
 			if start >= 0 {
-				return start, i
+				return start, col
 			}
-			if i+2 <= len(line) && string(line[i:i+2]) == "Id" && (i+2 == len(line) || line[i+2] == ' ') {
-				start = i
+			if rest := line[i:]; strings.HasPrefix(rest, "Id") && (len(rest) == 2 || rest[2] == ' ') {
+				start = col
 			}
 		}
+		col += cellWidth(c)
 	}
 	return start, end
+}
+
+// cellAt returns the runes of row that start within display columns
+// [start, end); end < 0 reads to the end of the row.
+func cellAt(row string, start, end int) string {
+	var b strings.Builder
+	col := 0
+	for _, c := range row {
+		if col >= start && (end < 0 || col < end) {
+			b.WriteRune(c)
+		}
+		col += cellWidth(c)
+	}
+	return b.String()
+}
+
+// cellWidth is the number of terminal columns a rune fills: two for East
+// Asian wide and fullwidth characters, one otherwise.
+func cellWidth(c rune) int {
+	switch width.LookupRune(c).Kind() {
+	case width.EastAsianWide, width.EastAsianFullwidth:
+		return 2
+	}
+	return 1
 }
 
 func (r systemUpgrade) isRoot() bool {

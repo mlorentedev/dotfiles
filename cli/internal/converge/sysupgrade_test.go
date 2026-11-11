@@ -529,3 +529,18 @@ func TestSystemUpgradeWindowsMatchesOnlyTheIdColumn(t *testing.T) {
 		t.Error("a listing with no header matches nothing")
 	}
 }
+
+// winget pads its table by display width: a CJK or fullwidth character fills
+// two columns, so counting runes would cut into the Id cell of its row.
+func TestSystemUpgradeWindowsIdColumnCountsDisplayWidth(t *testing.T) {
+	listing := strings.Join([]string{
+		"名前                Id                  Version Available Source",
+		"----------------------------------------------------------------",
+		"記録アプリ          Git.Git             1.0     2.0       winget",
+		"Plain name          eza-community.eza   0.1     0.2       winget",
+	}, "\n")
+	want := []string{"git.git", "eza-community.eza"}
+	if ids := wingetIDs(listing); strings.Join(ids, ",") != strings.Join(want, ",") {
+		t.Fatalf("ids = %q, want %q", ids, want)
+	}
+}
