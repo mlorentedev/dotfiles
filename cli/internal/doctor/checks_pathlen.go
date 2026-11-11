@@ -34,7 +34,7 @@ func checkCmdPathLength(sys *System, rep *Report) {
 		n, cmdPathLimit)
 	entries, repeated := windowsPathRepeats(raw)
 	if len(repeated) > 0 {
-		msg += fmt.Sprintf(" %d of its %d entries repeat an earlier one (%s); remove them from the Machine or User Path",
+		msg += fmt.Sprintf(" %d of its %d entries repeat an earlier one (%s); find where they are added: the Machine or User Path itself, or a script that rebuilds PATH from them on top of an inherited PATH that already holds both",
 			countRepeats(repeated), entries, nameRepeats(repeated))
 	} else {
 		msg += " Shorten the Machine or User Path"

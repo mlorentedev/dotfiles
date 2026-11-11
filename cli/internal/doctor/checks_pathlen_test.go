@@ -37,7 +37,7 @@ func TestCheckCmdPathLength(t *testing.T) {
 			windowsPath(220, 1) + `;C:\HOSTEDTOOLCACHE\windows\tool000\bin\`, "1 of its 221 entries repeat an earlier one", "", true},
 		{"names the repeated entries, first spelling, capped at five", "windows",
 			windowsPath(220, 1) + `;C:\HOSTEDTOOLCACHE\windows\tool000\bin\;c:\hostedtoolcache\windows\tool000\bin`,
-			`2 of its 222 entries repeat an earlier one (C:\hostedtoolcache\windows\tool000\bin); remove`, "", true},
+			`2 of its 222 entries repeat an earlier one (C:\hostedtoolcache\windows\tool000\bin); find where they are added`, "", true},
 		{"tripled PATH names five and counts the rest", "windows", windowsPath(100, 3),
 			`(C:\hostedtoolcache\windows\tool000\bin, C:\hostedtoolcache\windows\tool001\bin, C:\hostedtoolcache\windows\tool002\bin, C:\hostedtoolcache\windows\tool003\bin, C:\hostedtoolcache\windows\tool004\bin, and 95 more)`, "", true},
 		// cmd.exe's limit is in UTF-16 units; len() counts UTF-8 bytes, which
