@@ -52,6 +52,6 @@ Second review (nan/glm5.3-flash, PASS) at a450087f, three Minors:
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved to `specs/archive/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved to `specs/archive/`
 - [ ] Bitácora ticket updated (Refs #1511; the issue stays open for options A and B)
