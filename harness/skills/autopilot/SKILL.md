@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 3c211670face8ef9
+generated_sha: 25584991f3026ee6
 id: autopilot-skill
 type: skill
 status: active
@@ -92,12 +92,15 @@ When the operator says (any variant): *"Me voy a ausentar / a dormir / a trabaja
 
    A missing or malformed envelope parks the run (`envelope-invalid`) — never a default for an authority field. Widening the envelope, the filter or the budget is the one move that voids the grant.
 
-   **Host precondition — the failure everyone forgets.** The dominant real case for "I'm going to sleep" is a laptop whose lid closes. Arm with a wake-lock, or state in the report that the window was not covered:
+   **Host precondition — the failure everyone forgets.** The dominant real case for "I'm going to sleep" is a laptop whose lid closes. Arm with a wake-lock bounded by the envelope's `expires_at`, or state in the report that the window was not covered:
    ```bash
-   caffeinate -i -w $$ &                      # macOS
+   # macOS: start it with the harness's background-job mechanism, never a bare `&`
+   PIDFILE="${TMPDIR:-/tmp}/autopilot-${RUN_ID}.caffeinate.pid"
+   caffeinate -i -t "$SECONDS_UNTIL_EXPIRY" & echo $! > "$PIDFILE"; wait
    systemd-inhibit --what=idle:sleep -- <cmd> # Linux
    powercfg /change standby-timeout-ac 0      # Windows
    ```
+   Let `-t` end it at expiry. To disarm early, kill the recorded PID and nothing else: `kill "$(cat "$PIDFILE")"`. **Never `pkill -f caffeinate`, nor any pattern**: every session on the host arms the same command line, so a pattern kills their wake locks too (dotfiles lesson 592). `caffeinate -w $$` does not fit an agent either: `$$` is the shell of one tool call, which lives only as long as that call, and a bare `&` job dies with it.
 
    Defaults when the operator gave no numbers: 3–5 tickets, 30 min per ticket, and `merge: standing-grant` only where `.github/merge-grant.yml` exists (otherwise `never`). **Ask degrades to deny:** in unattended mode any ambiguity, missing input or interactive prompt degrades to **Deny / Escalate / Parked**, never to silent approval ("idle is not authorization").
 
@@ -132,7 +135,7 @@ A ticket is pilot-eligible only if ALL hold:
       | .[0:3]' || exit 1                                                 # -> reason: preflight-failed
   ```
   *Verified live 2026-11-10:* `gh project item-list` exposes `status`, `priority`, `type`, `repository` (full URL) and `content.{number,title,type,url}`, and under `--query` its `totalCount` counts the filtered items, so `returned < totalCount` is the truncation signal (lesson 088). The earlier form fetched `--limit 200` of a 4,891-item board and filtered in `jq`: for dotfiles it saw 54 open items, the newest #462, while 442 were open (dotfiles#2704). Both failures look the same from inside the run: a short or empty list, then `queue-empty` at minute zero. A truncated pre-flight is a stop, not a smaller queue: end with `reason: preflight-failed` and say the list was truncated.
-- **Three vetoes, in order; take the first survivor:** (1) **already attempted** — `git log --oneline "$BASE..$BRANCH" --grep="Item: #<N>"` is non-empty; (2) **out of scope** — the item's paths are not a subset of `scope.write_paths`, or its diff exceeds `scope.max_loc` → record `parked(scope-violation)` so the operator sees what was out of bounds; (3) **WIP limit** — `dotf spec init` refuses (ADR-043); a refusal is a stop, not a retry.
+- **Three vetoes, in order; take the first survivor:** (1) **already attempted** — `git log --oneline "$BASE..$BRANCH" --grep="Item: #<N>"` is non-empty; (2) **out of scope** — the item's paths are not a subset of `scope.write_paths`, or its diff exceeds `scope.max_loc` → record `parked(scope-violation)` so the operator sees what was out of bounds; (3) **WIP limit, checked before the work exists** — count the active specs (`ls specs/ | grep -vc README.md` on the base) and judge whether the item needs one, by the gate's own count (insertions **plus** deletions of production lines against the SDD threshold, not the executable lines you add). At the ADR-043 limit, an item that will need a spec is ineligible now: `dotf spec init` refuses, a refusal is a stop, not a retry, and a refusal after the fix is written parks finished work (dotfiles#3263, 2026-11-11: 66 gate lines, 33 added, 10 of 10 specs active).
 - **When the eligible set is empty, the run ENDS — it does not widen.** Not another repo, not another status, not past `Priority`; and never `gh issue create` / `dotf spec init` to manufacture work *for the queue*: a run rewarded for motion produces motion. This does not forbid filing a defect or follow-up **found while working an item** (detect→ticket, `new-ticket` non-interactive mode): that is debt recorded, not work invented, and the run must file it rather than drop it. It ends with `reason: queue-empty` and says so.
 - **No Path Contention:** Check open PRs and branches (`gh pr list --state open`, `git branch -r`) to ensure no peer session is editing the same files/subsystems.
 - **Atomic Claim:** Self-assign the ticket to lease it:
