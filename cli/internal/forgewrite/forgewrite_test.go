@@ -265,3 +265,13 @@ func TestLoadHostsRefusesAnEmptyAgentSecret(t *testing.T) {
 		t.Errorf("an owner with an empty agent secret must be refused, got %v", err)
 	}
 }
+
+func TestLoadHostsRefusesCaseVariantOwners(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "hosts.json")
+	if err := os.WriteFile(p, []byte(`{"hosts":{"g.example":{"kind":"gitea","secret":"S","agent_secrets":{"personal":"A","Personal":"B"}}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadHosts(p); err == nil || !strings.Contains(err.Error(), "twice") {
+		t.Errorf("owners differing only by case must be refused, got %v", err)
+	}
+}
