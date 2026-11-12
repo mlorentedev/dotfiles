@@ -174,10 +174,10 @@ func TestCheckReviewBudget_TheClipMustLeaveSlackNotJustFit(t *testing.T) {
 }
 
 func TestCheckReviewBudget_RetryFalseHalvesTheAttempts(t *testing.T) {
-	// Three models, 120 s each: one attempt fits a 6 minute ceiling, two do not.
+	// Three models, 120 s each: one attempt fits a 7 minute ceiling, two do not.
 	declared := `      - name: PR-Agent
         uses: docker://pragent/pr-agent@sha256:0000
-        timeout-minutes: 6
+        timeout-minutes: 7
         env:
           CONFIG__FALLBACK_MODELS: ["a", "b", "c"]
           CONFIG__AI_TIMEOUT: "120"
@@ -186,18 +186,18 @@ func TestCheckReviewBudget_RetryFalseHalvesTheAttempts(t *testing.T) {
 `
 	undeclared := `      - name: PR-Agent
         uses: docker://pragent/pr-agent@sha256:0000
-        timeout-minutes: 6
+        timeout-minutes: 7
         env:
           CONFIG__FALLBACK_MODELS: ["a", "b", "c"]
           CONFIG__AI_TIMEOUT: "120"
           CONFIG__MAX_OUTPUT_TOKENS: "40000"
 `
 	if n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, declared)); n != 0 {
-		t.Errorf("one attempt of 360 s fits 360 s; got %d:\n%s", n, text)
+		t.Errorf("one attempt of 360 s fits 420 s; got %d:\n%s", n, text)
 	}
 	if n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, undeclared)); n == 0 ||
 		!strings.Contains(text, "2 attempts") {
-		t.Errorf("two attempts of 360 s do not fit 360 s; got %d:\n%s", n, text)
+		t.Errorf("two attempts of 360 s do not fit 420 s; got %d:\n%s", n, text)
 	}
 }
 
@@ -323,7 +323,7 @@ func TestCheckReviewBudget_AStreamedStepIsReportedAsALowerBound(t *testing.T) {
 	// prove less. The line says so rather than reading as coverage.
 	streamed := `      - name: PR-Agent
         uses: docker://pragent/pr-agent@sha256:0000
-        timeout-minutes: 12
+        timeout-minutes: 13
         env:
           CONFIG__AI_TIMEOUT: "120"
           CONFIG__MAX_OUTPUT_TOKENS: "40000"
@@ -420,5 +420,39 @@ func TestCheckReviewBudget_AnUnparseableFileFailsClosed(t *testing.T) {
 	writeFile(t, filepath.Join(brokenWorkflow, filepath.FromSlash(prAgentWorkflowFile)), "jobs:\n  review: [\n")
 	if n, text := budgetProblemText(t, brokenWorkflow); n == 0 || !strings.Contains(text, prAgentWorkflowFile) {
 		t.Fatalf("want a problem naming the unparseable workflow, got %d:\n%s", n, text)
+	}
+}
+
+// budgetStepCeiling is one Anthropic step: no fallbacks, the default two
+// attempts, so its attempts need 2 x aiTimeout seconds.
+func budgetStepCeiling(minutes, aiTimeout int) string {
+	return `      - name: PR-Agent on Anthropic, drawn first
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: ` + strconv.Itoa(minutes) + `
+        env:
+          CONFIG__FALLBACK_MODELS: "[]"
+          CONFIG__AI_TIMEOUT: "` + strconv.Itoa(aiTimeout) + `"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+`
+}
+
+// #3352: attempts that exactly fill the step's ceiling leave nothing for the
+// docker pull, the start-up or the publication, all of which run on the same
+// clock. Equality is the case the guard exists for, so it is a gap; one second
+// less is the smallest configuration that passes.
+func TestCheckReviewBudget_AttemptsThatExactlyFillTheCeilingAreAGap(t *testing.T) {
+	n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, budgetStepCeiling(12, 360)))
+	if n != 1 || !strings.Contains(text, "720 s in a 720 s ceiling") {
+		t.Fatalf("720 s of attempts in a 720 s ceiling must be one gap, got %d:\n%s", n, text)
+	}
+	var detail []string
+	for _, l := range checkReviewBudget(budgetRepo(t, budgetTomlFixed, budgetStepCeiling(12, 360))) {
+		detail = append(detail, l.Detail...)
+	}
+	if !strings.Contains(strings.Join(detail, "\n"), "at least 13") {
+		t.Errorf("the fix must name a ceiling that passes, 13 minutes:\n%s", strings.Join(detail, "\n"))
+	}
+	if n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, budgetStepCeiling(12, 359))); n != 0 {
+		t.Errorf("718 s of attempts in a 720 s ceiling must pass, got %d:\n%s", n, text)
 	}
 }
