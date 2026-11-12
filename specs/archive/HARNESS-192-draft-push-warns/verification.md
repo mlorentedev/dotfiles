@@ -39,6 +39,12 @@ Round 1 (`nan/qwen3.8-flash`, on `71fc476e`): FAIL, one Major, three Minor, one 
 - Speculative (a `--pr-draft` flag instead of an env var): declined. The gate's whole PR context is environment variables read by both tiers and by the parity helper; a flag for one of them would be a second convention for the same thing. The `unset` makes the inherited case unreachable, which is what the flag would have bought.
 - Question (the stub `gh` never applies `--jq`, so deleting `draft` from the projection is caught only by the `--jq` test): accepted as is, the property is pinned by that test; the stub records the adapter's argv, not the filter's effect, by design.
 
+Round 2 (`nan/glm5.3-flash`, on `0a05fc03`): PASS, one Minor, one question, one speculative note. Dispositions:
+
+- Minor (the `tasks.md` box "PR opened referencing this spec folder" was unticked while #3380 was open): bookkeeping lag; left unticked because `dotf spec archive` holds `tasks.md` to the reviewed digest, and #3380 (open, body names the folder) is the record.
+- Question (#3380 was marked ready by the owner during the review, so this change's own waiver did not cover a further fix push): no further fix was needed; the archive commit carries the spec out of the active set, which is the gate's ordinary green path.
+- Speculative (on a draft the archive check continues into the later checks instead of ending the run): recorded, no action; both tiers agree (parity) and a PR touching a spec is LOC-exempt.
+
 ## Decisions made during implementation
 
 - The waiver rides on an environment variable, not on the event's `draft` field: CI's adapters never set the variable, so the merge-time refusal cannot weaken, and a PR marked ready without a push cannot carry a stale green.
@@ -54,7 +60,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-192-draft-push-warns/` -> `specs/archive/HARNESS-192-draft-push-warns/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-192-draft-push-warns/` -> `specs/archive/HARNESS-192-draft-push-warns/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
