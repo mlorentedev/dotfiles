@@ -45,3 +45,7 @@ Armed 2026-11-12T11:26Z (the owner's go-ahead was 07:48Z; the arming turn waited
 - #3408 (#3114): reusing `LinkedWorktrees` brought the issue's 69-line prototype to 37, under the threshold, no label needed. PR-Agent's THEORETICAL that the `done main` test could not fail was right: it now adds a linked worktree and asserts the not-found error, proven red with the lookup widened (`e5ef10c0`). Landed at `e5ef10c0`; #3114 closed, worktree removed.
 - #3416 (#3360): option A, `sweepOne`/`sweepLane`/`SweepReport.record`, 121 gate lines under the owner's `skip-sdd` (asked and answered in session). PR-Agent: no key issues. Landed at `c70d6089`; #3360 closed, worktree removed.
 - Still parked: #3307, #3327 (spec slot), #3318 (ADR). Filed this run: #3395.
+
+## Correction: head SHAs versus the squash commits on main
+
+The entries above name each PR's head commit. `dotf pr land` squashes, so main carries a different SHA for each: #3397 head `c74072b4`, on main as `eb4d3788`; #3398 head `510656f5`, on main as `79791e38`; #3400 head `ce332d91`, on main as `f70dfb02`; #3407 head `434dd963`, on main as `f28c4370`; #3408 head `e5ef10c0`, on main as `965645b5`; #3416 head `c70d6089`, on main as `85f63e37`. Main after the last landing: `85f63e37`.
