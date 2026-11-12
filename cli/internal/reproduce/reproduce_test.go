@@ -357,3 +357,86 @@ func TestRunWithAnInvertedCheck(t *testing.T) {
 		})
 	}
 }
+
+// #3333: a check that fails before it reaches the code under test fails on
+// the clean head too. Only the pair (fails with the probe, passes without it)
+// says the probe found the defect, so a probe run also runs the check on the
+// clean head, and a check that reads the same both ways is could-not-run.
+func TestRunWithAProbeNeedsTheCleanHeadAsItsControl(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		check    []string
+		inverted bool
+		want     State
+		control  State
+	}{
+		{"fails with and without the probe", []string{"git", "grep", "-q", "three", "--", "a.txt"}, false, CouldNotRun, Reproduced},
+		{"passes with and without the probe, inverted", []string{"git", "status"}, true, CouldNotRun, Reproduced},
+		{"fails only with the probe", []string{"git", "grep", "-q", "one", "--", "a.txt"}, false, Reproduced, DidNotReproduce},
+		{"passes only with the probe, inverted", []string{"git", "grep", "-q", "two", "--", "a.txt"}, true, Reproduced, DidNotReproduce},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newRepo(t)
+			probe := probeFor(t, dir, "two\n")
+			got, err := Run(context.Background(), Options{Dir: dir, Command: tc.check, Probe: probe, DefectWhenPasses: tc.inverted})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got.State != tc.want || got.Control != tc.control {
+				t.Errorf("State, Control = %q, %q, want %q, %q (output %q)", got.State, got.Control, tc.want, tc.control, got.Output)
+			}
+			if tc.want == CouldNotRun {
+				for _, want := range []string{
+					"the check read " + string(tc.control) + " on the clean head too (exit ",
+					"the probe did not change its reading, so the exit is not evidence of the defect",
+					"\nWith the probe:\n",
+					"\nOn the clean head:\n",
+				} {
+					if !strings.Contains(got.Output, want) {
+						t.Errorf("the output lacks %q:\n%s", want, got.Output)
+					}
+				}
+			}
+			if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
+				t.Errorf("the tree was not left clean:\n%s", st)
+			}
+		})
+	}
+}
+
+// A control that cannot run is no control: the probe's reading stands
+// unconfirmed, and the message must not claim the two runs read the same.
+func TestRunWithAProbeSaysWhenTheControlCouldNotRun(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("needs sh")
+	}
+	dir := newRepo(t)
+	probe := probeFor(t, dir, "exit 3\n")
+	got, err := Run(context.Background(), Options{Dir: dir, Command: []string{"sh", "a.txt"}, Probe: probe})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got.State != CouldNotRun || got.Control != CouldNotRun || got.ControlExit != 127 {
+		t.Fatalf("State, Control, ControlExit = %q, %q, %d, want %q, %q, 127 (output %q)", got.State, got.Control, got.ControlExit, CouldNotRun, CouldNotRun, got.Output)
+	}
+	if !strings.Contains(got.Output, "the check could not run on the clean head (exit 127)") {
+		t.Errorf("the output does not say the control could not run:\n%s", got.Output)
+	}
+	if strings.Contains(got.Output, "on the clean head too") {
+		t.Errorf("the output claims the two runs read the same:\n%s", got.Output)
+	}
+}
+
+// A refutation needs no control: the check passed with the probe applied, and
+// a second run could only cost time.
+func TestRunWithAProbeRunsNoControlForARefutation(t *testing.T) {
+	dir := newRepo(t)
+	probe := probeFor(t, dir, "two\n")
+	got, err := Run(context.Background(), Options{Dir: dir, Command: []string{"git", "grep", "-q", "two", "--", "a.txt"}, Probe: probe})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got.State != DidNotReproduce || got.Control != "" {
+		t.Errorf("State, Control = %q, %q, want %q and no control", got.State, got.Control, DidNotReproduce)
+	}
+}
