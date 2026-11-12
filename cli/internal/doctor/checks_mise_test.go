@@ -25,7 +25,7 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		if err != nil {
 			t.Fatal(err)
 		}
-		writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, "")))
+		writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, nil)))
 	}
 	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
 		"mise which jq":    "/m/jq\n",
