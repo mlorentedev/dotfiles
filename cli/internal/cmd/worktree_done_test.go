@@ -416,14 +416,24 @@ func TestWorktreeDoneResolvesARenamedBranch(t *testing.T) {
 }
 
 // The branch lookup covers linked worktrees only: `done main` must never
-// resolve to the main checkout, whatever branch it has out.
+// resolve to the main checkout, whatever branch it has out. A linked worktree
+// exists so the lookup has candidates, and the assertion is on the resolution
+// (the not-found error that lists what was tried), not on removal failing
+// later for some other reason.
 func TestWorktreeDoneMainNeverResolvesToTheMainCheckout(t *testing.T) {
 	repo := worktreeTestRepo(t)
+	if out, err := executeWorktree(t, "add", "demo", "--repo", repo); err != nil {
+		t.Fatalf("add: %v\n%s", err, out)
+	}
 	t.Chdir(t.TempDir())
-	if _, err := executeWorktree(t, "done", "main", "--repo", repo); err == nil {
-		t.Fatal("done main succeeded")
+	_, err := executeWorktree(t, "done", "main", "--repo", repo)
+	if err == nil || !strings.Contains(err.Error(), `no worktree "main"`) {
+		t.Fatalf("done main: got %v, want the not-found error", err)
 	}
 	if _, err := os.Stat(filepath.Join(repo, ".git")); err != nil {
 		t.Errorf("the main checkout was touched: %v", err)
+	}
+	if _, err := os.Stat(rootWorktree("demo")); err != nil {
+		t.Errorf("the linked worktree was touched: %v", err)
 	}
 }
