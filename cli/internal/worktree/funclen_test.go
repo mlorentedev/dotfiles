@@ -39,12 +39,13 @@ func packageFile(t *testing.T, name string) string {
 }
 
 // The park path grew past the under-40-line limit three times before a review
-// noticed (#3265); this pins the extraction so it does not grow back.
+// noticed (#3265), and the sweep loop once more (#3360); this pins both
+// extractions so they do not grow back.
 func TestParkPathFunctionsStayUnderTheLimit(t *testing.T) {
 	const limit = 40
 	for file, names := range map[string][]string{
 		"done.go":  {"Park"},
-		"sweep.go": {"parkSingleNamedLane"},
+		"sweep.go": {"parkSingleNamedLane", "SweepWithRunner", "sweepOne"},
 	} {
 		lines := funcLines(t, packageFile(t, file))
 		for _, name := range names {
