@@ -37,3 +37,11 @@ Armed 2026-11-12T11:26Z (the owner's go-ahead was 07:48Z; the arming turn waited
 ## Disarm
 
 **run lanes-20261112t1126z — ended queue-exhausted after 4 iterations / 11:26Z to 12:09Z (go-ahead at 07:48Z; 3h38m lost to the usage limit before arming) — 3 done, 1 parked with work, 4 parked without an attempt, 3 merged, 0 unmerged.** Merged on main: #3397 (`c74072b4`), #3398 (`510656f5`), #3400 (`ce332d91`). Waiting on a human: the #3265 A/B (its branch `refactor/3265-park-path-under-40` at `5893c19c` exists only in the local worktree `refactor-3265-park-path-under-40`, push denied), and the four A/B parks above; #3360 waits on #3265. Filed: #3395. Host: the wake-lock held for the window. Nothing irreversible is pending; the three merges are the irreversible part and all are on main.
+
+## Post-disarm, with the owner back
+
+- Owner's answers: #3265 and #3114 under `skip-sdd` (no contract change), #3307 direction 1 (lease next to the identity record, ADR + spec) and #3327 option A (the whole seat, spec), both waiting on a spec slot; the one free slot went to the review run's BUG-170 (#3243) with the owner's confirmation. Decisions recorded on each issue.
+- #3407 (#3265): pushed under the owner's `skip-sdd`; PR-Agent found two REAL (the guards passed exactly 40 lines against AGENTS.md's under-40; reproduced by grep on `c06f5a17`, fixed to `>=`) and one THEORETICAL (branch deletion moved between the prompt removal and the claim release in the sweep's park; now last, the order `Park` has) plus a harness-compliance REAL on the body (per-file breakdown added, reproduced the same way). Landed at `434dd963` with the fix head unreviewed (disclosed); #3265 closed, worktree removed.
+- #3408 (#3114): reusing `LinkedWorktrees` brought the issue's 69-line prototype to 37, under the threshold, no label needed. PR-Agent's THEORETICAL that the `done main` test could not fail was right: it now adds a linked worktree and asserts the not-found error, proven red with the lookup widened (`e5ef10c0`). Landed at `e5ef10c0`; #3114 closed, worktree removed.
+- #3416 (#3360): option A, `sweepOne`/`sweepLane`/`SweepReport.record`, 121 gate lines under the owner's `skip-sdd` (asked and answered in session). PR-Agent: no key issues. Landed at `c70d6089`; #3360 closed, worktree removed.
+- Still parked: #3307, #3327 (spec slot), #3318 (ADR). Filed this run: #3395.
