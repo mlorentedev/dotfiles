@@ -364,3 +364,13 @@ func TestCheckMemoryBudgetStillRefusesPastTheByteBudget(t *testing.T) {
 		t.Errorf("the byte refusal changed:\n%s", err)
 	}
 }
+
+// A write past both budgets gets the byte message: the byte check runs first,
+// as verification.md records (MEMORY-018 review, finding 3).
+func TestCheckMemoryBudgetNamesTheByteBudgetWhenBothAreCrossed(t *testing.T) {
+	both := lineBudgetMemory(MemoryLineBudget+1) + strings.Repeat("y", MemoryByteBudget)
+	err := CheckMemoryBudget("", both)
+	if err == nil || !strings.Contains(err.Error(), "bytes, past the 25000") || strings.Contains(err.Error(), "lines, past") {
+		t.Errorf("a write past both budgets must get the byte message, got: %v", err)
+	}
+}

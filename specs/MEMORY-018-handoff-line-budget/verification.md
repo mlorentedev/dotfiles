@@ -26,3 +26,19 @@ owner: manu
 - The byte check runs first. A write past both budgets gets the byte message, which is unchanged. Each budget refuses only a write that grows the file in its own measure, so a file over one budget can still be rewritten in place.
 - `lineCount` counts a trailing unterminated line, because a 200-line read sees it.
 - Once a release carries this, the dotfiles MEMORY.md (217 lines) refuses every handoff write that adds a line until threads are archived. The refusal names them. That is the intended pressure, the same as the byte cap.
+
+## Review dispositions
+
+The review, by nan/deepseek-v4-flash at `27e4d097`, gave PASS-WITH-GAPS.
+
+1. Minor: `handoff-write --help` described only the byte budget. Applied: the help now names both budgets and the hold-or-shrink allowance.
+2. Minor: ADR-056 described one refusal rule. Applied: Decision 8 records the line budget and the order the two are checked in, and the PR's Knowledge section names the ADR.
+3. Minor: no test fixed which message a write past both budgets gets. Applied: `TestCheckMemoryBudgetNamesTheByteBudgetWhenBothAreCrossed`.
+4. Minor: no `## Promotion candidates` section. Applied: added below.
+5. Question: with MEMORY.md at 217 lines, every handoff write that adds a line fails until threads are archived. Accepted, as the proposal's Risks says. The owner is told in the PR body and the run report. Automatic archiving is #3393.
+
+## Promotion candidates
+
+- [x] Lesson for the repo's `docs/lessons/`? no: the reason is in the constant's comment and ADR-056 Decision 8
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-056-a-handoff-thread-is-stored-in-its-own-file.md
+- [x] New pattern candidate for `00_meta/patterns/`? no: specific to this tool's MEMORY.md budget
