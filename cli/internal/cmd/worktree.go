@@ -515,8 +515,9 @@ func resolveDoneTarget(args []string, worktreePath, repoDir string) (string, err
 // was given. A bare name is also a slug, naming any of worktree.SlugCandidates:
 // the legacy <repo>-wt-<slug> sibling, or the worktree under WORKTREE_ROOT. A
 // name that resolves to more than one directory is refused, naming each, rather
-// than guessed. When it names none, the error lists every path it tried and the
-// linked worktrees it knows (#3109).
+// than guessed. A name that is no directory is last read as a branch some linked
+// worktree has checked out (#3114). When it names none, the error lists every
+// path it tried and the linked worktrees it knows (#3109).
 func resolveDoneArg(arg, repoDir string) (string, error) {
 	asPath, err := filepath.Abs(arg)
 	if err != nil {
@@ -527,6 +528,9 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 			return worktreeAt(asPath)
 		}
 		if p := branchUnderRoot(arg, repoDir); p != "" && isDirectory(p) {
+			return worktreeAt(p)
+		}
+		if p := worktreeOfBranch(arg, repoDir); p != "" {
 			return worktreeAt(p)
 		}
 		return "", fmt.Errorf("no worktree at %s%s", asPath, knownWorktreesNote(repoDir))
@@ -548,6 +552,9 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 	}
 	switch len(found) {
 	case 0:
+		if p := worktreeOfBranch(arg, repoDir); p != "" {
+			return worktreeAt(p)
+		}
 		return "", fmt.Errorf("%w%s", doneNotFound(arg, tried, wtRoot), knownWorktreesNote(repoDir))
 	case 1:
 		return worktreeAt(found[0])
@@ -568,6 +575,32 @@ func branchUnderRoot(arg, repoDir string) string {
 		return ""
 	}
 	return worktree.ResolveWorktreePath(wtRoot, filepath.Base(filepath.Clean(root)), arg)
+}
+
+// worktreeOfBranch reads arg as the branch some linked worktree has checked out
+// and returns that worktree's path, or "" when none has it. A branch renamed
+// after add no longer shares a name with its directory, but git knows where it
+// is (#3114). The main checkout is never a candidate, so `done main` names no
+// worktree; a path or slug that exists always wins over this reading.
+func worktreeOfBranch(arg, repoDir string) string {
+	root, err := resolveCommandRepoRoot(repoDir)
+	if err != nil {
+		return ""
+	}
+	porcelain, err := listWorktrees(root)
+	if err != nil {
+		return ""
+	}
+	linked, err := worktree.LinkedWorktrees(porcelain)
+	if err != nil {
+		return ""
+	}
+	for _, w := range linked {
+		if w.Branch != "" && w.Branch == arg {
+			return w.Path
+		}
+	}
+	return ""
 }
 
 // doneNotFound names every path done tried, and says when the root itself was
