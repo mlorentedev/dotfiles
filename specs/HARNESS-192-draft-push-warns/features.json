@@ -16,9 +16,9 @@
   {
     "id": "HARNESS-192-draft-push-warns-f3",
     "behavior": "AC3: the pre-push adapter hands the gate SDD_PR_DRAFT=true for a draft, false for a ready PR or a missing field, unset with no PR, and its --jq expression carries draft",
-    "verification": "bats tests/spec-gate-prepush.bats -f 'a draft PR hands the gate|a PR that is ready|the --jq expression|a failed lookup falls through'",
+    "verification": "bats tests/spec-gate-prepush.bats -f 'a draft PR hands the gate|a PR that is ready|the --jq expression|a failed lookup falls through|a stray SDD_PR_DRAFT'",
     "state": "verified",
-    "evidence": "PASS on 1a0d45e9 (4 tests, 2026-11-12): the stub gate logs SDD_PR_DRAFT=[true] for draft:true, [false] for draft:false and for an answer without the field, [<unset>] on a failed lookup; the --jq expression read from the script maps the REST shape to {labels, body, author, draft}"
+    "evidence": "PASS on 1a0d45e9 (4 tests, 2026-11-12): the stub gate logs SDD_PR_DRAFT=[true] for draft:true, [false] for draft:false and for an answer without the field, [<unset>] on a failed lookup; the --jq expression read from the script maps the REST shape to {labels, body, author, draft}; PASS on 0590276c (6 more tests): a stray SDD_PR_DRAFT=true in the caller's environment reaches the gate as [<unset>] on each fall-through path (missing gh, missing jq, detached HEAD, failed lookup, no open PR) and as [false] for a resolved PR that is ready"
   },
   {
     "id": "HARNESS-192-draft-push-warns-f4",
