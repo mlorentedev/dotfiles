@@ -259,8 +259,9 @@ func laneRecords(commonDir string) (map[string][]laneRecord, []Finding, error) {
 // its canonical path, and whether the worktree there is this repository's and
 // carries its record and lease. One finding per lane, the first that applies.
 func auditLane(absRepo, commonDir, name, expected string, records []laneRecord) []Finding {
+	records, broken := located(records)
 	switch {
-	case len(records) == 1 && records[0].path == "":
+	case len(records) == 0 && broken:
 		return nil // already reported by laneRecords: the admin dir's gitdir is unreadable
 	case len(records) > 1:
 		paths := make([]string, 0, len(records))
@@ -292,6 +293,20 @@ func auditLane(absRepo, commonDir, name, expected string, records []laneRecord) 
 		return []Finding{{name, err.Error(), strangerFix(err, "")}}
 	}
 	return []Finding{{name, "the worktree at " + expected + " carries no identity record, so guard rule 5b does not fire there", "dotf lane init"}}
+}
+
+// located drops the registrations laneRecords already reported (an unreadable
+// gitdir leaves no path to audit) and says whether it dropped any, so a broken
+// twin neither pads the duplicate list with a blank path nor gets diagnosed
+// twice.
+func located(records []laneRecord) ([]laneRecord, bool) {
+	kept := records[:0:0]
+	for _, r := range records {
+		if r.path != "" {
+			kept = append(kept, r)
+		}
+	}
+	return kept, len(kept) != len(records)
 }
 
 // strangerDirFix repairs a directory at a lane path that is not this
