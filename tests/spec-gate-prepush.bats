@@ -46,6 +46,7 @@ setup() {
     printf 'SDD_LABELS=[%s]\n' "${SDD_LABELS-<unset>}"
     printf 'SDD_PR_AUTHOR=[%s]\n' "${SDD_PR_AUTHOR-<unset>}"
     printf 'SDD_PR_BODY=[%s]\n' "${SDD_PR_BODY-<unset>}"
+    printf 'SDD_PR_DRAFT=[%s]\n' "${SDD_PR_DRAFT-<unset>}"
 } >> "$GATE_LOG"
 exit "${STUB_GATE_RC:-0}"
 STUB
@@ -166,6 +167,7 @@ teardown() {
     grep -qF 'SDD_LABELS=[<unset>]' "$GATE_LOG"
     grep -qF 'SDD_PR_BODY=[<unset>]' "$GATE_LOG"
     grep -qF 'SDD_PR_AUTHOR=[<unset>]' "$GATE_LOG"
+    grep -qF 'SDD_PR_DRAFT=[<unset>]' "$GATE_LOG"
 }
 
 @test "spec-gate-prepush: missing gh falls through without invoking it" {
@@ -203,8 +205,27 @@ STUB
     expr=$(sed -n "s/.*--jq '\([^']*\)'.*/\1/p" "$SCRIPTS_DIR/spec-gate-prepush.sh")
     [ "$(printf '%s\n' "$expr" | grep -c .)" -eq 1 ]
     [ -z "$(printf '[]' | jq -r "$expr")" ]
-    rest='[{"body":"first","labels":[{"name":"skip-sdd","id":7}],"user":{"login":"manu"}},{"body":"second","labels":[],"user":{"login":"x"}}]'
-    [ "$(printf '%s' "$rest" | jq -c "$expr")" = '{"labels":[{"name":"skip-sdd"}],"body":"first","author":{"login":"manu"}}' ]
+    rest='[{"body":"first","labels":[{"name":"skip-sdd","id":7}],"user":{"login":"manu"},"draft":true},{"body":"second","labels":[],"user":{"login":"x"},"draft":false}]'
+    [ "$(printf '%s' "$rest" | jq -c "$expr")" = '{"labels":[{"name":"skip-sdd"}],"body":"first","author":{"login":"manu"},"draft":true}' ]
+}
+
+@test "spec-gate-prepush: a draft PR hands the gate SDD_PR_DRAFT=true (#3364)" {
+    export STUB_PR_JSON='{"labels":[],"body":"Closes #1","author":{"login":"mlorentedev"},"draft":true}'
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[true]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: a PR that is ready, or an answer without the field, hands the gate SDD_PR_DRAFT=false" {
+    export STUB_PR_JSON='{"labels":[],"body":"Closes #1","author":{"login":"mlorentedev"},"draft":false}'
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[false]' "$GATE_LOG"
+    : > "$GATE_LOG"
+    export STUB_PR_JSON='{"labels":[],"body":"Closes #1","author":{"login":"mlorentedev"}}'
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[false]' "$GATE_LOG"
 }
 
 @test "spec-gate-prepush: a null body and no labels become empty, not the string null" {

@@ -15,6 +15,9 @@
 #   SDD_LABELS     Comma-separated PR labels
 #   SDD_PR_BODY    PR body text
 #   SDD_PR_AUTHOR  PR author login (gates the "dependencies" bot skip)
+#   SDD_PR_DRAFT   "true" when the PR is a draft: an archive-on-merge violation
+#                  is then a warning, not a refusal (the pre-push adapter sets
+#                  it; CI never does, so the merge stays refused, #3364)
 #
 # Exit:
 #   0  OK (under threshold OR spec folder present OR valid skip)
@@ -70,6 +73,8 @@ Env:
   SDD_LABELS     Comma-separated PR labels (CI sets this; locally optional)
   SDD_PR_BODY    PR body text (CI sets this; locally optional)
   SDD_PR_AUTHOR  PR author login; gates the "dependencies" skip to bot authors
+  SDD_PR_DRAFT   "true" on a draft PR: archive-on-merge warns instead of failing
+                 (set by the pre-push adapter only; CI keeps the refusal)
 
 Exit codes:
   0  OK
@@ -104,6 +109,7 @@ fi
 SDD_LABELS="${SDD_LABELS:-}"
 SDD_PR_BODY="${SDD_PR_BODY:-}"
 SDD_PR_AUTHOR="${SDD_PR_AUTHOR:-}"
+SDD_PR_DRAFT="${SDD_PR_DRAFT:-}"
 
 _has_label() {
     case ",${SDD_LABELS}," in
@@ -411,6 +417,20 @@ _check_archive_on_merge() {
 [FAIL] "skip-archive" label present but the "## Archive skip rationale" section is empty or missing in the PR body.
 EOF
         exit 1
+    fi
+
+    # A draft is still under review, and the push may carry the fix a review
+    # round needs CI to prove (#3364). The invariant is about the merge, so
+    # here it is a warning; CI's spec-gate never sets SDD_PR_DRAFT and refuses.
+    if [[ "$SDD_PR_DRAFT" == "true" ]]; then
+        {
+            printf '[WARN] SDD archive-on-merge: this draft PR closes an issue whose spec is still active:\n'
+            while IFS= read -r v; do [[ -n "$v" ]] && printf '         %s\n' "$v"; done <<< "$violations"
+            printf '       The push goes through; spec-gate in CI refuses the merge until the spec is\n'
+            printf '       archived in this PR. Before marking it ready, run:\n'
+            while IFS= read -r v; do [[ -n "$v" ]] && printf '         dotf spec archive %s\n' "${v%% *}"; done <<< "$violations"
+        } >&2
+        return 0
     fi
 
     {

@@ -23,6 +23,9 @@
 # offline) additionally prints one line naming the failure (#2710). Once a PR exists for the
 # branch, local pre-push becomes as strict as CI: archive-on-merge and the
 # label-gated skips now apply locally too, not only after push.
+# One deliberate difference: a draft PR's archive-on-merge violation is a
+# warning here and a refusal in CI (#3364), since the invariant is about the
+# merge and a draft may need the push to prove a review fix.
 #
 # No token required: `gh` uses the developer's own local auth, unlike
 # spec-gate-pr.sh's CI run, which is the one that needs GH_TOKEN.
@@ -76,7 +79,7 @@ branch=${branch#refs/heads/}
 head_ref=$(jq -rn --arg b "$branch" '$b | @uri')
 errf=$(mktemp)
 if meta=$(gh api "repos/{owner}/{repo}/pulls?head={owner}:${head_ref}&state=open&per_page=1" \
-        --jq '.[0] // empty | {labels: [.labels[] | {name}], body, author: {login: .user.login}}' 2>"$errf"); then
+        --jq '.[0] // empty | {labels: [.labels[] | {name}], body, author: {login: .user.login}, draft}' 2>"$errf"); then
     rc=0
 else
     rc=$?
@@ -100,6 +103,10 @@ fi
 SDD_LABELS=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
 SDD_PR_BODY=$(printf '%s' "$meta" | jq -r '.body // ""')
 SDD_PR_AUTHOR=$(printf '%s' "$meta" | jq -r '.author.login // ""')
-export SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR
+# A draft is still under review: the gate warns about an unarchived spec
+# instead of refusing the push, and CI's spec-gate, which never reads this
+# flag, keeps the refusal at merge time (#3364). Anything but `true` is false.
+SDD_PR_DRAFT=$(printf '%s' "$meta" | jq -r 'if .draft == true then "true" else "false" end')
+export SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR SDD_PR_DRAFT
 
 _run_gate "$@"
