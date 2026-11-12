@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/gate"
-	"io"
-	"os"
 )
 
 // The gate's verdicts, in the order scripts/check-spec-gate.sh reaches them

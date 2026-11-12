@@ -35,13 +35,22 @@
 
 set -euo pipefail
 
+# This adapter is the only writer of the draft waiver. SDD_PR_BODY and the
+# label variables inherited from the caller only ever make the gate stricter
+# (the documented `SDD_PR_BODY=... git push` escape), but an inherited
+# SDD_PR_DRAFT=true turns a refusal into a warning, so a stray value from a
+# profile would waive the archive-on-merge check on every push that resolves
+# no PR, and the warning would then describe a draft PR that does not exist.
+# Dropped here, before any fall-through path can hand it to the gate.
+unset SDD_PR_DRAFT
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 usage() {
     cat <<'EOF'
 Usage: spec-gate-prepush.sh [args forwarded to check-spec-gate.sh]
 
-Resolves the labels/body/author of the open PR for the branch being pushed
+Resolves the labels/body/author/draft state of the open PR for the branch being pushed
 live via `gh`, when one exists, then forwards every argument to check-spec-gate.sh. Falls through to
 running the gate with no PR context (today's local behaviour) when `gh`/`jq`
 are unavailable, the developer is unauthenticated, or no PR is open yet for

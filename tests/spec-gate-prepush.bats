@@ -228,6 +228,59 @@ STUB
     grep -qF 'SDD_PR_DRAFT=[false]' "$GATE_LOG"
 }
 
+# An inherited SDD_PR_DRAFT=true is the one value that WEAKENS the gate (a
+# refusal becomes a warning), so the adapter owns it: every path that runs the
+# gate without a resolved PR hands it unset, whatever the caller exported. One
+# test per fall-through path, since each returns from a different line.
+@test "spec-gate-prepush: a stray SDD_PR_DRAFT is dropped when gh is missing" {
+    export SDD_PR_DRAFT=true
+    rm -f "$FIX/bin/gh"
+    PATH="$FIX/bin" run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[<unset>]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: a stray SDD_PR_DRAFT is dropped when jq is missing" {
+    export SDD_PR_DRAFT=true
+    PATH="$FIX/bin" run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[<unset>]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: a stray SDD_PR_DRAFT is dropped on a detached HEAD" {
+    export SDD_PR_DRAFT=true
+    unset PRE_COMMIT_REMOTE_BRANCH
+    git init -q "$FIX/repo"
+    cd "$FIX/repo" || return 1
+    git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+    git checkout -q --detach
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[<unset>]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: a stray SDD_PR_DRAFT is dropped when the lookup fails" {
+    export SDD_PR_DRAFT=true STUB_GH_RC=1
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[<unset>]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: a stray SDD_PR_DRAFT is dropped when no PR is open" {
+    export SDD_PR_DRAFT=true STUB_PR_JSON=''
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[<unset>]' "$GATE_LOG"
+}
+
+@test "spec-gate-prepush: a stray SDD_PR_DRAFT does not outrank a resolved PR that is ready" {
+    export SDD_PR_DRAFT=true
+    export STUB_PR_JSON='{"labels":[],"body":"Closes #1","author":{"login":"mlorentedev"},"draft":false}'
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_PR_DRAFT=[false]' "$GATE_LOG"
+}
+
 @test "spec-gate-prepush: a null body and no labels become empty, not the string null" {
     export STUB_PR_JSON='{"labels":[],"body":null,"author":{"login":"dependabot[bot]"}}'
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD
