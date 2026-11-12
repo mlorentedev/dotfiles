@@ -368,7 +368,7 @@ that prohibition stands unchanged.
 inside a declared budget, is a different plane. The bill-shock rationale does not apply — both
 pools are flat subscriptions and per-token spend (OpenRouter) is escalation-only, never a default.
 *(Amended 2026-11-12, #3341: NaN is metered by credits; the delegated plane's bill-shock bound is the
-low tier's no-credit binding and the shared reserve, see that amendment.)*
+low tier's no-credit binding and NaN's own `402`, see that amendment.)*
 The silent-quality-drop rationale **does** apply and is honoured by §4: the top tier never
 degrades silently.
 
@@ -433,10 +433,13 @@ instead:
    `qwen3.6` today. Moving it to a credit-spending model is a change to this ADR, not a map edit.
    High-volume delegated work (lookups, summaries, crons) lands on the low tier, so it never
    drains the pool.
-2. **Mid and top on NaN spend credits by design.** The shared reserve in `model-map.json` (the NaN
-   pool's concurrency held back for interactive use) and NaN's own `402` are the backstop. A `402`
-   is a provider failure and advances the chain like any other (§4); it never degrades the top
-   tier silently.
+2. **Mid and top on NaN spend credits by design, and nothing in `dotf` meters them.** The
+   shared reserve in `model-map.json` bounds concurrency, not credits. The bound on credits is
+   NaN's own `402` when the pool is empty. A `402` is a refusal of that pool, so it must advance
+   the chain like a 429 does, never stop it and never degrade the top tier silently. Today hive
+   reads a `402` as *task failed* and the chain stops; mlorentedev/hive#573 classifies it as
+   *pool unavailable*. Where every member of a chain is NaN, the advance ends in
+   `chain_exhausted`, which is the loud stop.
 
 **Rejected.** A credit budget kept by `dotf` (counting tokens against published rates): NaN exposes
 no balance API, so the count would be our own estimate of a number only NaN's dashboard knows, and
@@ -445,8 +448,8 @@ it buys little while the low tier is already free, and it makes routing depend o
 that NaN changes without notice.
 
 **Consequences.** ADR-011's bill-shock rationale is now partly live for the delegated plane, bounded
-by rule 1. hive's equivalent premise (its ADR-021 spend cap) is decided separately in
-mlorentedev/hive#573.
+by rule 1. hive's equivalent premise (its ADR-021 spend cap) and the `402` classification are
+decided in mlorentedev/hive#573.
 
 ## Options Considered
 
