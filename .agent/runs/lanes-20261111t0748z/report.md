@@ -94,3 +94,13 @@ Answer #3263: A or B. Everything else in this line of work (#3265, the #3293 ide
 
 - `ci.yml` on main at `9431209a` (run 43065883128): `test` and `integration` failed on the Azure apt mirror again (`Temporary failure resolving 'azure.archive.ubuntu.com'` in "Install zsh"; the container build's `apt-get update` likewise), the #3339 signature, not the change: the same head passed both jobs on PR #3338's attempt 6 at 17:02Z. One `rerun --failed` issued; the evidence is on #3339.
 - Rerun (attempt 2) of run 43065883128 green: main at `9431209a` passes `test` and `integration`. Nothing landed by this run is red on main.
+
+### Post-disarm: #3263 reopened on the spec route (2026-11-12)
+
+The owner chose A for #3263 (spec, never `skip-sdd`) and A for #3293 (a provenance record per worktree, the ADR-061 shape; recorded on the issue, nothing built, waits for a WIP slot).
+
+- `HARNESS-191-sweep-skip-reason` opened over the WIP limit (`--over-wip-limit`, reason in its frontmatter), filled and verified; PR #3355 (draft) from `fix/3263-sweep-skip-reason`; #3263 In Progress on the board.
+- Review round 1 (`e02600e0`): FAIL, two REAL Majors. F1: the command test compared an OS-separator path with git's slash path, red on `test (windows-latest)` only. F2: lesson 584 was already taken on `main` (landed by another PR between the lesson's commit and this push), `hygiene` and `knowledge-gate` red. Six Minors. All applied on `4ced9f9f` except the `SweepWithRunner` length, ticketed as #3360 (on the board; option A folds it into #3265). Dispositions in `verification.md`.
+- A nil landing reader is unreachable in production: the real runner reaches it in `list.go` and panics before `laneLanded`; the guard added there is tested through the mock runner.
+- Review round 2 launched on `94cb2f6f`; its verdict decides the archive. The push of the fixes is held by the pre-push archive-on-merge gate until the spec archives, so fixes and archive reach the PR in one push.
+- Both pre-existing queue entries (#3354, #3353) belong to other threads on this host with their own worktrees; not touched here.
