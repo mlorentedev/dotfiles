@@ -22,7 +22,7 @@ owner: manu
 - [x] [AC1] [AC2] [AC3] Red: the four `TestParkSingleNamedLane_Outcomes` subtests read a reason from `parkSingleNamedLane` and assert it (dirty tree, forge error, refused detach, parked lane with no reason); `TestSweepReportsALaneItDidNotPark` asserts `LaneSkips` through `SweepWithRunner` on a real repository with a held index lock
 - [x] [AC1] [AC2] [AC3] [AC4] Green: `parkSingleNamedLane` returns `(parked, why)`; `laneLanded` carries the landing decision; `gitFailure` keeps git's first line; `SweepReport.LaneSkips`; the loop appends on a non-park; `cmd/worktree.go` prints `LaneSkips` with the other skips
 - [x] [AC4] `TestWorktreeSweepPrintsWhyALaneWasNotParked`: the printed line through the real command, on a lane landed by ancestry with a held index lock
-- [x] Lesson 584: the push gate counts insertions plus deletions; judge the WIP limit before the work exists
+- [x] Lesson 585: the push gate counts insertions plus deletions; judge the WIP limit before the work exists
 
 ## Closing
 

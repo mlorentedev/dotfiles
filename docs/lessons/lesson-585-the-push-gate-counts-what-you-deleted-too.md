@@ -1,5 +1,5 @@
 ---
-id: "lesson-584-the-push-gate-counts-what-you-deleted-too"
+id: "lesson-585-the-push-gate-counts-what-you-deleted-too"
 type: lesson
 status: active
 title: "The push gate counts what you deleted too"

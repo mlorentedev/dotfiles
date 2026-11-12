@@ -25,7 +25,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - `features.json` f1..f4 verified on `babfb894` (the rebased tip); each regex was run under `-v` to confirm it selects its subtests (1, 2, 2 and 2 tests).
 - Manual smoke test: none beyond the command test, which runs `dotf worktree sweep` on a real repository with a lane landed by ancestry and a held index lock.
 - No regressions in existing test suite: yes.
-- Production lines: 33 added executable lines in `sweep.go` and `cmd/worktree.go`; the pre-push SDD gate counts 66 (insertions plus deletions), which is why this spec exists (lesson 584).
+- Production lines: 33 added executable lines in `sweep.go` and `cmd/worktree.go`; the pre-push SDD gate counts 66 (insertions plus deletions), which is why this spec exists (lesson 585).
 - Commit anchors: the branch was rebased onto `main` once (after #3338 landed) before the review; the test names above survive the rebase and every one re-ran green on `babfb894`.
 
 ## Decisions made during implementation
@@ -37,7 +37,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-584-the-push-gate-counts-what-you-deleted-too.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-585-the-push-gate-counts-what-you-deleted-too.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: an additive report field and a refactor inside one function change no structural invariant
 - [x] New pattern candidate for `00_meta/patterns/`? no: the gate-count lesson went into the autopilot skill's eligibility veto in the vault, which is where it recurs
 
