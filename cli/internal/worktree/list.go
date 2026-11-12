@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/forgewrite"
+	"github.com/mlorentedev/dotfiles/cli/internal/gitenv"
 )
 
 type GitRunner interface {
@@ -427,28 +428,6 @@ func ListAll(parentDir string, heads LandedHeads) ([]Info, error) {
 // point every call at another repository's worktrees (#3122).
 func gitIn(dir string, args ...string) *exec.Cmd {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-	cmd.Env = withoutRepositoryEnv(os.Environ())
+	cmd.Env = gitenv.WithoutRepository(os.Environ())
 	return cmd
-}
-
-// repositoryEnv names the variables that fix which repository git reads.
-var repositoryEnv = map[string]bool{
-	"GIT_ALTERNATE_OBJECT_DIRECTORIES": true,
-	"GIT_COMMON_DIR":                   true,
-	"GIT_DIR":                          true,
-	"GIT_INDEX_FILE":                   true,
-	"GIT_OBJECT_DIRECTORY":             true,
-	"GIT_PREFIX":                       true,
-	"GIT_WORK_TREE":                    true,
-}
-
-func withoutRepositoryEnv(environ []string) []string {
-	clean := make([]string, 0, len(environ))
-	for _, entry := range environ {
-		key, _, _ := strings.Cut(entry, "=")
-		if !repositoryEnv[strings.ToUpper(key)] {
-			clean = append(clean, entry)
-		}
-	}
-	return clean
 }
