@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -188,6 +189,39 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	}
 	if out, err := runLaneGuardInDir(t, script, parkedWT); err != nil {
 		t.Fatalf("expected commit in ACTIVE named lane on feature branch to pass, got err=%v out=%s", err, out)
+	}
+
+	// 6b. A detached linked worktree without a lease is blocked, and the message
+	// names that state and that path, never "the main checkout" (#3324).
+	scratchWT := filepath.Join(t.TempDir(), "scratch", "lane-repo", "scratch-wt")
+	if err := os.MkdirAll(filepath.Dir(scratchWT), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "-C", laneRepo, "worktree", "add", "--detach", scratchWT, "HEAD").CombinedOutput(); err != nil {
+		t.Fatalf("worktree add scratch: %v\n%s", err, string(out))
+	}
+	out, err := runLaneGuardInDir(t, script, scratchWT)
+	if err == nil || !strings.Contains(out, "without a lease at") || !strings.Contains(out, "scratch-wt") {
+		t.Fatalf("expected a detached linked worktree without a lease to be blocked with its own path and state, got err=%v out=%s", err, out)
+	}
+	if strings.Contains(out, "main checkout") {
+		t.Fatalf("a linked worktree is not the main checkout; the message must not say so:\n%s", out)
+	}
+	// The parenthesised repository is the main root, not the scratch path and
+	// not empty: git answers with the physical path, so compare base names.
+	root := regexp.MustCompile(`repository \((.*)\)\.`).FindStringSubmatch(out)
+	if root == nil || root[1] == "" || filepath.Base(root[1]) != "lane-repo" || strings.Contains(root[1], "scratch-wt") {
+		t.Fatalf("expected the message to name the main repository root in parentheses, got:\n%s", out)
+	}
+	// 6c. The main checkout on a detached HEAD keeps its own wording.
+	detachedMain := filepath.Join(t.TempDir(), "detached-main")
+	initGitRepoForLaneGuard(t, detachedMain, "main")
+	writeLanesMarkerFixture(t, detachedMain)
+	if out, err := exec.Command("git", "-C", detachedMain, "checkout", "--detach").CombinedOutput(); err != nil {
+		t.Fatalf("checkout --detach: %v\n%s", err, string(out))
+	}
+	if out, err := runLaneGuardInDir(t, script, detachedMain); err == nil || !strings.Contains(out, "at the main checkout") {
+		t.Fatalf("expected a detached HEAD at the main checkout to be blocked with the main-checkout message, got err=%v out=%s", err, out)
 	}
 
 	// 7. Commit inside copilot-worktrees/ for a .dotf/lanes.json repo -> blocked (m4).
