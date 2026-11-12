@@ -1,5 +1,5 @@
 ---
-id: "lesson-592-nothing-to-triage-is-not-a-review-that-found-nothing"
+id: "lesson-593-nothing-to-triage-is-not-a-review-that-found-nothing"
 type: lesson
 status: active
 title: "Nothing to triage is not a review that found nothing"

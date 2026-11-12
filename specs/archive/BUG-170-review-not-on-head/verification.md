@@ -31,7 +31,7 @@ owner: manu
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-592-nothing-to-triage-is-not-a-review-that-found-nothing.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-593-nothing-to-triage-is-not-a-review-that-found-nothing.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: it applies the existing pr-stewardship rule ("a notice that no review ran leaves the PR unreviewed") to the queue, with the owner's decision recorded in proposal.md
 - [x] New pattern candidate for `00_meta/patterns/`? no: the cross-project form is already the pr-stewardship rule
 
