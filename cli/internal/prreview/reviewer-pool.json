@@ -72,7 +72,7 @@
         "model": "openai/deepseek-v4-flash",
         "weight": 25
       },
-      "why": "1M context and a mandatory reasoning chain — roughly 4x slower than qwen3.6 on trivial prompts, which is the correct trade for a gate that runs once per spec. Exercised: BUG-074 round 3 re-ran the mutation battery itself rather than trusting the spec's table."
+      "why": "1M context and a mandatory reasoning chain — roughly 4x slower than qwen3.6 on trivial prompts, which is the correct trade for a gate that runs once per spec. Exercised: BUG-074 round 3 re-ran the mutation battery itself rather than trusting the spec's table. Under the `dotf spec review` harness it completes where a quota death leaves nothing: kubelab OPS-024 (2026-09-05, #1511), a full FAIL review with three Majors, minutes after another member died on its quota; BUG-168 (2026-11-11), PASS with both of the spec's mutations reproduced."
     },
     {
       "id": "agy/gemini-3.8-flash-high",
