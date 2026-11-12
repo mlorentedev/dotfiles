@@ -415,12 +415,13 @@ The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows
   - bats: `git --exec-path` found no git, which the catalog installed earlier in the same process, so Git Bash was not found (#3328)
   - opencode: not running at its pin; the cause is not diagnosed, the converge log stayed in the guest (#3329)
   - AC4 stays open. The pins row below is blocked on #3328 and #3329 as well as the release
-- PR B will also need these, each outside this run's reach (the envelope froze them):
-  - an ADR-036 amendment, with `tests/versions-conf.bats` test 11, which says opencode's pin lives in packages.json
-  - `tests/ci-npm-cli-cache.bats` test 6, and the CI npm cache step it checks, in `.github/workflows`
-  - `tests/copilot-config.bats` test 27, which asserts copilot is a packages.json catalog tool
-  - `TestCheckVersionMatch` in `cli/internal/doctor/checks_test.go`, which reads the checkout's packages.json instead of its own fixture
-  - the npm installer in `install.go`, deleted only after the release, so the released dotf still understands every machine's catalog
+- Measured 2026-11-12 on a clean Windows 11 Arm64 guest with the released dotf 0.80.0 (`dotf vm windows --ref feat/mise-npm-pins --keep`, no `--dotf`; the ref carries the four pins, the four catalog deletions and `vcredist` ahead of mise). The tools step ran 46 min and failed on one tool only: `after mise install, not running at their pin: bats`. `bw`, `copilot`, `opencode` and `yarn` passed the running-at-pin check, which closes #3329 on the guest and #2438's npm CLIs. The second converge was not reached, so `changed=0` is not shown. The converge log stayed in the guest (a `--keep` guest takes no `exec`), so the bats cause is not read: #2346 is still where it is tracked, and #3328's fallback did not make bats run
+- PR B carries, in this change: the ADR-036 amendment, `tests/versions-conf.bats` test 11, `tests/copilot-config.bats` test 11, the CI npm cache cut to pi (`.github/workflows/ci.yml`) with `tests/ci-npm-cli-cache.bats`, and `TestCheckVersionMatch`'s fixture. The npm installer in `install.go` stays until the release carries the pins, so the released dotf still understands every machine's catalog
+- PR B also needs these, each in a file the run's envelope froze, so they are left to the owner (the failing assertions were read, all expect the old catalog):
+  - `tests/opencode.bats` tests 1 and 2: opencode is a `packages.json` npm tool and `versions.conf` carries no pin
+  - `tests/setup-linux.bats` parity tests for yarn, "neither setup twin npm-installs a tool packages.json owns" and "npm-global-scan": the last two fail loudly ("packages.json owns no npm tool, so the check would be vacuous"), so they need another fixture or a skip while the catalog holds no npm tool
+  - `tests/setup-windows.bats` tests for copilot, yarn and opencode, which assert a catalog npm entry
+  - `tests/packages-json.bats` test 3, which does not know `winget_arch` on a `system` entry (shared with the `vcredist` entry's own change)
 - Open: copilot has its own `copilot update`; no environment switch for it is known yet, so it is not in `ownUpdaterOff`. The catalog's npm install had the same exposure
 
 ## Closing
