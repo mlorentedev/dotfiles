@@ -1,0 +1,36 @@
+version: 1
+run_id: "ci-gate-20261112T0745Z"
+armed_by: manu
+armed_at: 2026-11-12T07:45:00Z
+expires_at: 2026-11-12T19:45:00Z
+objective: "Close CI-018 (#3147): land mlorentedev/ci-workflows#99 (ADR-001 links the fleet-lint runbook), tick AC5, run the independent spec review, archive the spec and close #3147."
+worktree: /Users/manu/Projects/worktrees/dotfiles/chore-autopilot-ci-gate-20261112t0745z
+branch: chore/autopilot-ci-gate-20261112t0745z
+scope:
+  write_paths: ["cli/internal/fleetlint/**", "cli/internal/gate/**", "cli/internal/cmd/lint_fleet*", "cli/internal/cmd/gate*", "tests/**", "docs/lessons/**", "docs/adr/**", "docs/runbooks/**", "specs/CI-018-dotf-gate-and-fleet-lint/**", "specs/CI-017-*/**", "specs/archive/CI-018-*/**", ".github/workflows/ci.yml", ".agent/runs/ci-gate-20261112T0745Z/**"]
+  external_write_paths: ["mlorentedev/ci-workflows: docs/adr/adr-001-one-ci-standard-for-every-forge.md (PR #99 only)"]
+  vault_paths: ["10_projects/dotfiles/memory/MEMORY.md", "10_projects/dotfiles/memory/threads/**"]
+  frozen_paths: ["harness/**", "**/AGENTS.md", ".agent/unattended.yml", "scripts/**", "setup-*.sh", "setup-*.ps1", "versions.conf", "specs/**/review.md", "forge/branch-protection.json", ".github/merge-grant.yml", ".github/workflows/release*.yml", "cli/internal/cmd/gate_spec_rules.go"]
+  max_files: 20
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, actionlint, python3, caffeinate]
+queue:
+  source: bitacora
+  filter: "in order: (1) CI-018 close: ci-workflows#99 triage and land under that repo's grant, AC5, dotf spec review by an independent reviewer, archive, close #3147. (2) Fleet adoption: one issue per repository with findings from `dotf lint fleet --fleet ~/Projects`, in that repository (Gitea repositories on Gitea), listing only its own findings; never name a private or Gitea repository in a public artifact; skip repos whose issue already exists; dotfiles itself is covered by #3335/#3336. (3) #3306 CI-017: spec init, implement, draft PR touching .github/workflows/ci.yml, never merged by the run. Defects found along the line are filed, not worked unless they block it."
+  max_items: 6
+  explicit_grants:
+    - "Owner approved 2026-11-12: CI-017 may write .github/workflows/ci.yml as a draft PR the owner lands; the branch protection flip stays the owner's."
+    - "Owner approved 2026-11-12: adoption issues are one per repository, in that repository."
+  held_for_owner:
+    - "Any PR touching .github/**, branch protection, or a release: #3335, #3336, the CI-017 PR."
+    - "#3328 needs a clean Windows guest; the VMs belong to the ts-bridge and feat-worktree-one-root sessions tonight: deferred, not parked."
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 120
+  max_consecutive_failures: 2
+  note: "A GitHub rate-limit 403 waits for the reset and does not count as a failure; state reads use gh api REST."
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
