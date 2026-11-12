@@ -25,7 +25,7 @@ Armed 2026-11-12T11:26Z (the owner's go-ahead was 07:48Z; the arming turn waited
 ## Iteration 4: #3320 (the prompt directory's own name)
 
 - Branch `fix/3320-prompt-dir-name`, worktree `fix-3320-prompt-dir-name`. `PromptDirName = "dotf-lane-prompts"`, a one-time move of a legacy `dotf-lane` prompt directory (a regular file under the old name is left alone; both present, the new wins), `lane next` resolves through it; four tests. `git grep` outside the lane package finds no other reader of the old name (`.dotf-lane-prompt.md` is a different artifact).
-- PR #3400: PR-Agent on `3b7c91ed` found one REAL, a dry `lane next` moved the directory. Reproduced with `dotf pr reproduce` (exit 1 on `cd91fa52`, the red test `TestLaneNext_DryRunLeavesTheLegacyPromptDirectoryAlone`), fixed on `ce332d91`: `PromptDir(commonDir, migrate)` with `lane next` passing `!dryRun`. The THEORETICAL race (two movers, the loser's rename fails) applied in the same commit: a rename failing with ENOENT while the new directory exists resolves to it. Triage posted; landing waits on the checks and any reviewer output for `ce332d91`.
+- PR #3400: PR-Agent on `3b7c91ed` found one REAL, a dry `lane next` moved the directory. Reproduced with `dotf pr reproduce` (exit 1 on `cd91fa52`, the red test `TestLaneNext_DryRunLeavesTheLegacyPromptDirectoryAlone`), fixed on `ce332d91`: `PromptDir(commonDir, migrate)` with `lane next` passing `!dryRun`. The THEORETICAL race (two movers, the loser's rename fails) applied in the same commit: a rename failing with ENOENT while the new directory exists resolves to it. Triage posted on `3b7c91ed` and disclosed that the fix head was unreviewed; every check green on `ce332d91`, no reviewer ran on it in the window, scoped queue clear; landed with `dotf pr land` at `ce332d91` under the standing grant. #3320 closed by the merge; board Done; worktree and branch removed.
 
 ## Parked without an attempt (one ERROR/WHY/FIX comment each, board Blocked)
 
@@ -33,3 +33,7 @@ Armed 2026-11-12T11:26Z (the owner's go-ahead was 07:48Z; the arming turn waited
 - #3307: the lease's home (next to the identity record, ADR-061 territory, or re-created on switch) is a design choice.
 - #3327: `dotf doctor` sweep entry; the two options measure different things and `cli/internal/doctor` is written by two peers tonight.
 - #3318: needs the ADR extending ADR-061 the issue itself asks for.
+
+## Disarm
+
+**run lanes-20261112t1126z — ended queue-exhausted after 4 iterations / 11:26Z to 12:09Z (go-ahead at 07:48Z; 3h38m lost to the usage limit before arming) — 3 done, 1 parked with work, 4 parked without an attempt, 3 merged, 0 unmerged.** Merged on main: #3397 (`c74072b4`), #3398 (`510656f5`), #3400 (`ce332d91`). Waiting on a human: the #3265 A/B (its branch `refactor/3265-park-path-under-40` at `5893c19c` exists only in the local worktree `refactor-3265-park-path-under-40`, push denied), and the four A/B parks above; #3360 waits on #3265. Filed: #3395. Host: the wake-lock held for the window. Nothing irreversible is pending; the three merges are the irreversible part and all are on main.
