@@ -95,7 +95,17 @@ jobs:
       # intermittently.
       GITHUB_TOKEN: ${{ github.token }}
     steps:
+      # Detached at the commit under test. On a push the default checkout is a
+      # `main` branch tracking origin/main, and converge's checkout step then
+      # fast-forwards it to whatever main holds at that second: the first
+      # converge tests a later commit than the one pushed, and the second
+      # reports a change whenever main moved again in between (#3375, twice on
+      # 2026-11-12). A detached HEAD has no upstream, so the step skips and
+      # both converges read one tree. A pull request already checks out its
+      # merge ref detached, so it keeps the default.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event_name == 'pull_request' && '' || github.sha }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
