@@ -421,6 +421,7 @@ The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows
   - `tests/opencode.bats` tests 1 and 2: opencode is a `packages.json` npm tool and `versions.conf` carries no pin
   - `tests/setup-linux.bats` parity tests for yarn, "neither setup twin npm-installs a tool packages.json owns" and "npm-global-scan": the last two fail loudly ("packages.json owns no npm tool, so the check would be vacuous"), so they need another fixture or a skip while the catalog holds no npm tool
   - `tests/setup-windows.bats` tests for copilot, yarn and opencode, which assert a catalog npm entry
+  - `tests/verify-setup.bats` "the npm catalog installs into ~/.local as the user" (the `integration` job): it expects `bw`, `yarn`, `opencode` and `copilot` in `~/.local/bin`, and mise puts them behind its own shims. The next test, copilot's config, passes, so the tool is on PATH
   - `tests/packages-json.bats` test 3, which does not know `winget_arch` on a `system` entry (shared with the `vcredist` entry's own change)
 - Open: copilot has its own `copilot update`; no environment switch for it is known yet, so it is not in `ownUpdaterOff`. The catalog's npm install had the same exposure
 
