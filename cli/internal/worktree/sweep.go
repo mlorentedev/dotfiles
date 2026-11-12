@@ -394,7 +394,9 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 }
 
 func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (parked bool, why string) {
-	if isDirty(info.Path, runner) {
+	if dirt, err := runner.Dirt(info.Path); err != nil {
+		return false, "its state could not be read: " + err.Error()
+	} else if dirt.Any() {
 		return false, "has uncommitted changes or untracked files"
 	}
 	if landed, why := laneLanded(repoRoot, info, runner, landedHeads); !landed {
@@ -453,14 +455,15 @@ func gitFailure(out []byte, err error) string {
 // LandedHeads, or gh); a landing nobody could confirm is reported as such,
 // never resolved to "not landed".
 func laneLanded(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (bool, string) {
-	if isMerged(repoRoot, info.Branch, runner) {
-		return true, ""
-	}
+	merged := isMerged(repoRoot, info.Branch, runner)
 	heads := landedHeads
-	if heads == nil {
+	if !merged && heads == nil {
 		heads = mergedPRHeads
 	}
 	if heads == nil {
+		if merged {
+			return true, ""
+		}
 		// No reader at all: nothing can say the work landed, so it did not.
 		return false, "its landing could not be decided"
 	}

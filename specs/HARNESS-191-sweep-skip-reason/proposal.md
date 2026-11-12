@@ -23,7 +23,7 @@ wip_override: "owner chose the spec route on 2026-11-11 for a fix already writte
 ## What
 
 - `SweepReport` carries `LaneSkips` (`lane_skips`, omitted when empty): one entry per named lane that reached the park path and was not parked, with its path and the reason.
-- The reason is one of: `has uncommitted changes or untracked files`; the landing reason `branchLanding` already produces (`could not check for a merged pull request: …`, `not landed: neither an ancestor of the base nor the head of a merged pull request`, `its tip could not be read`) or `its landing could not be decided` when it produces none; `its lease could not be written: <err>`; `git refused to detach it: <git's first stderr line>`.
+- The reason is one of: `its state could not be read: <err>` when git's status could not be read; `has uncommitted changes or untracked files`; the landing reason `branchLanding` already produces (`could not check for a merged pull request: …`, `not landed: neither an ancestor of the base nor the head of a merged pull request`, `its tip could not be read`) or `its landing could not be decided` when it produces none; `its lease could not be written: <err>`; `git refused to detach it: <git's first stderr line>`.
 - `dotf worktree sweep` prints each entry as `  - skipped: <path>: <reason>`, the line the session and merge-unknown skips already use, before the totals.
 - The landing decision lives in `laneLanded`, apart from the parking it gates; `parkSingleNamedLane` returns the verdict and the reason together. The parking itself is unchanged: on a refused detach the lane's lease is restored and its branch kept.
 

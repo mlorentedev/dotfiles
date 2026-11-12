@@ -82,6 +82,18 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		}
 	})
 
+	t.Run("a lane whose state cannot be read is not parked", func(t *testing.T) {
+		repo, info, _ := parkLaneFixture(t)
+		runner := &MockSweepRunner{MockGitRunner: MockGitRunner{DirtyErrors: map[string]error{info.Path: errors.New("status timed out")}}}
+
+		parked, why := parkSingleNamedLane(repo, info, runner, nil)
+		if parked {
+			t.Fatal("parked a lane whose state could not be read")
+		}
+		if why != "its state could not be read: status timed out" {
+			t.Errorf("why = %q, want the status error, not a dirty tree", why)
+		}
+	})
 	t.Run("a lane with no landing reader is not parked", func(t *testing.T) {
 		repo, info, _ := parkLaneFixture(t)
 		mergedPRHeads = nil
