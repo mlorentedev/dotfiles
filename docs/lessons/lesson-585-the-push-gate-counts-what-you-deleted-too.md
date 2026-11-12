@@ -25,10 +25,12 @@ been read before the first line was written.
 
 ## Solution
 
-Size a change the way the gate will: `git diff --stat <base> -- <production files>` and read the
-total, or run the gate's own check before writing anything. When the total will cross the
-threshold, check the active-spec count on the base branch first; at the limit, the item is not
-ready to start, whatever its size, because the spec it needs cannot be opened. The autopilot
+Size a change the way the gate will: `git diff --stat <base>...HEAD -- <production files>` (the
+merge base, so a base that moved on does not count) and read the total, or run the gate's own
+check, `dotf gate spec --explain` with its `--base` and `--head`, on the committed changes. When the total will cross the
+threshold, check the active-spec count on the base branch first; at the limit, the spec the item
+needs opens only with `dotf spec init --over-wip-limit "<reason>"`, which records the reason in
+its frontmatter, so the item is not ready to start until that reason exists. The autopilot
 skill's third eligibility veto now says so.
 
 ## Related

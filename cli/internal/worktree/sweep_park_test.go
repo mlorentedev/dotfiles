@@ -278,3 +278,31 @@ func TestSweepReportNamesLaneSkipsOnTheWire(t *testing.T) {
 		t.Errorf("empty report still carries lane_skips: %s", out)
 	}
 }
+
+// A dirty named lane is stopped by Classify before the park path, so the
+// sweep loop itself records its reason (CodeRabbit on #3355).
+func TestSweepReportsADirtyLaneItDidNotPark(t *testing.T) {
+	withHostProcessInside(t, false)
+	repo, info, tip := parkLaneFixture(t)
+	if err := os.WriteFile(filepath.Join(info.Path, "wip.txt"), []byte("not yet\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot:    repo,
+		LockPath:    filepath.Join(t.TempDir(), "sweep.lock"),
+		LandedHeads: func(_, _ string) ([]string, error) { return []string{tip}, nil },
+	}, &RealSweepRunner{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Reaped) != 0 {
+		t.Fatalf("reaped %v: want nothing", report.Reaped)
+	}
+	if len(report.LaneSkips) != 1 || !samePath(report.LaneSkips[0].Path, info.Path) || !strings.Contains(report.LaneSkips[0].Reason, "uncommitted") {
+		t.Errorf("LaneSkips = %+v: want %s with the dirty tree as the reason", report.LaneSkips, info.Path)
+	}
+	if got := laneState(t, info.Path); got != "ACTIVE" {
+		t.Errorf("state = %q, want ACTIVE", got)
+	}
+}

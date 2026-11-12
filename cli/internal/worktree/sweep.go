@@ -365,6 +365,11 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 		}
 		if !candidate {
 			report.SkippedCount++
+			// A dirty named lane never reaches parkSingleNamedLane: Classify
+			// stops it here, so this is where its reason is recorded.
+			if info.State == StateDirty && info.Metadata != nil && info.Metadata.Lane != "" {
+				report.LaneSkips = append(report.LaneSkips, SessionSkip{Path: info.Path, Reason: info.StateReason})
+			}
 			if info.PRMergedUnknown != "" && (info.State == StateUnmerged || info.State == StateOrphan) {
 				report.MergeUnknownSkips = append(report.MergeUnknownSkips, SessionSkip{Path: info.Path, Reason: info.StateReason})
 			}
