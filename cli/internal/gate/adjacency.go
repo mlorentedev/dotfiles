@@ -108,3 +108,12 @@ func StripControl(s string) string {
 		return r
 	}, s)
 }
+
+// commandBreaker splits the markers the runner reads as workflow commands.
+var commandBreaker = strings.NewReplacer("::", ": :", "##[", "## [")
+
+// BreakCommands makes an issue title safe to print on its own stdout line.
+// The runner trims leading whitespace before it reads a command, so a title
+// that starts with "::error::" would become an annotation, and "##[" is the
+// legacy form (#3389). Only the printed copy is changed, never what is matched.
+func BreakCommands(s string) string { return commandBreaker.Replace(s) }

@@ -84,3 +84,17 @@ func TestAdjacentIssuesStripsControlCharacters(t *testing.T) {
 		t.Fatalf("AdjacentIssues = %+v", got)
 	}
 }
+
+func TestBreakCommands(t *testing.T) {
+	cases := map[string]string{
+		"::error::x":   ": :error: :x",
+		"a ##[error]b": "a ## [error]b",
+		"plain: title": "plain: title",
+		":::":          ": ::",
+	}
+	for in, want := range cases {
+		if got := BreakCommands(in); got != want {
+			t.Errorf("BreakCommands(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

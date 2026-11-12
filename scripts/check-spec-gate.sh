@@ -541,6 +541,12 @@ _summary_cell() {
     printf '%s' "$1" | sed -e 's/|/\\|/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
 }
 
+# A title printed on its own stdout line: the runner trims leading whitespace and
+# reads "::cmd::" (or the legacy "##[cmd]") as a workflow command (#3389).
+_break_commands() {
+    printf '%s' "$1" | sed -e 's/::/: :/g' -e 's/##\[/## [/g'
+}
+
 # The CI-only half of the report: a workflow annotation and a step-summary table.
 # Split out of _report_adjacent_issues to keep it under the 40-line function rule
 # (#2709); #2407 ports this script to Go, so the split is deliberately minimal.
@@ -558,7 +564,9 @@ _emit_adjacency_ci_artifacts() {
                 if [[ -z "$num" ]]; then continue; fi
                 # shellcheck disable=SC2016  # backticks are markdown code spans
                 # for the step-summary table, not command substitution.
-                printf '| #%s | `%s` | %.88s |\n' "$num" "$(_summary_cell "$file_path")" "$(_summary_cell "$haystack")"
+                # Clip before escaping: an entity cut in half would show on the page.
+                printf '| #%s | `%s` | %s |\n' "$num" "$(_summary_cell "$file_path")" \
+                    "$(_summary_cell "$(printf '%.88s' "$haystack")")"
             done <<< "$rows"
         } >> "$GITHUB_STEP_SUMMARY"
     fi
@@ -585,7 +593,7 @@ _report_adjacent_issues() {
     while IFS=$'\t' read -r num file_path haystack; do
         if [[ -z "$num" ]]; then continue; fi
         printf '         #%-6s names %s\n' "$num" "$file_path"
-        printf '                 %.88s\n' "$haystack"
+        printf '                 %.88s\n' "$(_break_commands "$haystack")"
     done <<< "$rows"
     printf '       One of these may describe the same defect on an input shape this\n'
     printf '       change does not cover. Fold it in, or record why it is separate,\n'

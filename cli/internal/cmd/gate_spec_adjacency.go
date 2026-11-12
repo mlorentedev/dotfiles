@@ -39,7 +39,7 @@ func (g *specGate) reportAdjacency() {
 	}
 	_, _ = fmt.Fprintln(g.out, "[INFO] Adjacent open issues (advisory — this does not gate the PR):")
 	for _, r := range rows {
-		_, _ = fmt.Fprintf(g.out, "         #%-6s names %s\n                 %s\n", r.Issue, r.Match, gate.Clip(r.Text, 88))
+		_, _ = fmt.Fprintf(g.out, "         #%-6s names %s\n                 %s\n", r.Issue, r.Match, gate.Clip(gate.BreakCommands(r.Text), 88))
 	}
 	_, _ = fmt.Fprint(g.out, "       One of these may describe the same defect on an input shape this\n"+
 		"       change does not cover. Fold it in, or record why it is separate,\n"+
@@ -59,12 +59,13 @@ func (g *specGate) summarizeAdjacency(rows []gate.Adjacent) {
 		return
 	}
 	// The summary is rendered as markdown with inline HTML, so a title's angle
-	// brackets would reach the page as tags (#3389).
+	// brackets would reach the page as tags (#3389). Clip before escaping: an
+	// entity cut in half would show on the page.
 	esc := strings.NewReplacer("|", `\|`, "<", "&lt;", ">", "&gt;").Replace
 	var b strings.Builder
 	b.WriteString("\n### Adjacent open issues (advisory)\n\n| Issue | Names | Title |\n|---|---|---|\n")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "| #%s | `%s` | %s |\n", r.Issue, esc(r.Match), gate.Clip(esc(r.Text), 88))
+		fmt.Fprintf(&b, "| #%s | `%s` | %s |\n", r.Issue, esc(r.Match), esc(gate.Clip(r.Text, 88)))
 	}
 	_ = appendText(g.o.summary, b.String()) // advisory: a summary it cannot write is silence
 }

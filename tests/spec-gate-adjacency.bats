@@ -256,6 +256,38 @@ _write_849_feed() {
     grep -qF 'breaks ::error::injected [31m' "$REPO_FIXTURE/summary.md"
 }
 
+# The runner trims leading whitespace before it reads a workflow command, so the
+# report's indentation does not protect a title that starts with one (#3389).
+@test "adjacency: workflow-command syntax in an issue title is broken on stdout" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    {
+        printf '%s\t%s\n' 903 '::error::scripts/tool.sh broke'
+        printf '%s\t%s\n' 904 'BUG-7: scripts/tool.sh ##[error]legacy'
+    } > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"#903"* && "$output" == *"#904"* ]] || false
+    printf '%s\n' "$output" > out.txt
+    refute_grep '^[[:space:]]*::' out.txt
+    refute_grep_fixed '##[' out.txt
+}
+
+# Escaping lengthens the cell, so clipping after it could cut an entity in half
+# and the page would show "&l". Clip the title first, then escape it.
+@test "adjacency: a summary cell is clipped before it is escaped" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 905 "scripts/tool.sh $(printf 'x%.0s' {1..70})<b>tail" > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qE 'x&lt;b \|$' "$REPO_FIXTURE/summary.md"
+}
+
 @test "adjacency: angle brackets in an issue title are escaped in the step summary" {
     mkdir -p scripts
     printf 'line %d\n' {1..60} > scripts/tool.sh
