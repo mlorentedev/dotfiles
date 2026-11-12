@@ -127,10 +127,17 @@ func LoadHosts(path string) (Hosts, error) {
 		if c.Kind != KindGitea || c.Secret == "" {
 			return nil, fmt.Errorf("%s: host %q needs kind %q and a secret id", path, h, KindGitea)
 		}
+		seen := map[string]string{}
 		for owner, s := range c.AgentSecrets {
 			if s == "" {
 				return nil, fmt.Errorf("%s: host %q names owner %q in agent_secrets without a secret id", path, h, owner)
 			}
+			// Owners compare case-insensitively, so two keys differing only by
+			// case would make the pick depend on map order.
+			if prev, dup := seen[strings.ToLower(owner)]; dup {
+				return nil, fmt.Errorf("%s: host %q names owner %q twice in agent_secrets (%q and %q)", path, h, owner, prev, owner)
+			}
+			seen[strings.ToLower(owner)] = owner
 		}
 	}
 	return doc.Hosts, nil
