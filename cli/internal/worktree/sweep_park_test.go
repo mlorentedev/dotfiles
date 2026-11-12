@@ -1,9 +1,11 @@
 package worktree
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -80,6 +82,48 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		}
 	})
 
+	t.Run("a lane with no landing reader is not parked", func(t *testing.T) {
+		repo, info, _ := parkLaneFixture(t)
+		mergedPRHeads = nil
+		t.Cleanup(func() { mergedPRHeads = ghMergedPRHeads })
+
+		// The mock answers "not merged" without asking the forge; the real
+		// runner would reach the nil reader first (list.go) and panic.
+		parked, why := parkSingleNamedLane(repo, info, &MockSweepRunner{}, nil)
+		if parked {
+			t.Fatal("parked a lane whose landing no reader could decide")
+		}
+		if why != "its landing could not be decided" {
+			t.Errorf("why = %q, want the undecided landing", why)
+		}
+		if got := laneState(t, info.Path); got != "ACTIVE" {
+			t.Errorf("state = %q, want ACTIVE", got)
+		}
+	})
+	t.Run("a lane whose lease cannot be written is not parked", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("a read-only directory does not refuse a write here")
+		}
+		repo, info, tip := parkLaneFixture(t)
+		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
+		// The lease is written in place, so the file itself refuses.
+		lease := filepath.Join(info.Path, MetadataFileName)
+		if err := os.Chmod(lease, 0o444); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(lease, 0o644) })
+
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
+			t.Fatal("parked a lane whose lease could not be written")
+		}
+		if !strings.HasPrefix(why, "its lease could not be written: ") || !strings.Contains(why, "permission denied") {
+			t.Errorf("why = %q, want the lease write's error", why)
+		}
+		if got := runGitParkTest(t, info.Path, "symbolic-ref", "--short", "HEAD"); got != "feat/lane-a" {
+			t.Errorf("HEAD = %q, want the lane's branch", got)
+		}
+	})
 	t.Run("a lane whose landing cannot be checked is not parked", func(t *testing.T) {
 		repo, info, _ := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return nil, errors.New("forge unreachable") }
@@ -171,11 +215,29 @@ func TestSweepReportsALaneItDidNotPark(t *testing.T) {
 	if len(report.Reaped) != 0 {
 		t.Fatalf("reaped %v: want nothing", report.Reaped)
 	}
+	// Two skips: the main checkout, never a candidate, and the lane.
+	if report.SkippedCount != 2 {
+		t.Errorf("SkippedCount = %d, want 2 (the main checkout and the lane)", report.SkippedCount)
+	}
 	if len(report.LaneSkips) != 1 || !samePath(report.LaneSkips[0].Path, info.Path) ||
 		!strings.Contains(report.LaneSkips[0].Reason, "detach") || !strings.Contains(report.LaneSkips[0].Reason, "index.lock") {
 		t.Errorf("LaneSkips = %+v: want %s with the refused detach as the reason", report.LaneSkips, info.Path)
 	}
 	if got := laneState(t, info.Path); got != "ACTIVE" {
 		t.Errorf("state = %q, want ACTIVE", got)
+	}
+}
+
+// The JSON name is the wire contract the report's readers hold on to.
+func TestSweepReportNamesLaneSkipsOnTheWire(t *testing.T) {
+	out, err := json.Marshal(SweepReport{LaneSkips: []SessionSkip{{Path: "p", Reason: "r"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"lane_skips":[{"path":"p","reason":"r"}]`; !strings.Contains(string(out), want) {
+		t.Errorf("report = %s, want %s", out, want)
+	}
+	if out, _ = json.Marshal(SweepReport{}); strings.Contains(string(out), "lane_skips") {
+		t.Errorf("empty report still carries lane_skips: %s", out)
 	}
 }

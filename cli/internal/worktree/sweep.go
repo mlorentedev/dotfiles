@@ -453,12 +453,16 @@ func gitFailure(out []byte, err error) string {
 // LandedHeads, or gh); a landing nobody could confirm is reported as such,
 // never resolved to "not landed".
 func laneLanded(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (bool, string) {
+	if isMerged(repoRoot, info.Branch, runner) {
+		return true, ""
+	}
 	heads := landedHeads
-	if !isMerged(repoRoot, info.Branch, runner) && heads == nil {
+	if heads == nil {
 		heads = mergedPRHeads
 	}
 	if heads == nil {
-		return true, ""
+		// No reader at all: nothing can say the work landed, so it did not.
+		return false, "its landing could not be decided"
 	}
 	_, _, landed, why := branchLanding(repoRoot, info.Path, heads)
 	if !landed && why == "" {

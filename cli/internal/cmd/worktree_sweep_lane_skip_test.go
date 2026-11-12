@@ -63,8 +63,10 @@ func TestWorktreeSweepPrintsWhyALaneWasNotParked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "skipped: " + physical + ": git refused to detach it: "
-	if !strings.Contains(out, want) || !strings.Contains(out, "index.lock") {
+	// git prints every path with forward slashes, on Windows too; compare
+	// both sides in that form so the separator is not what the test checks.
+	want := "skipped: " + filepath.ToSlash(physical) + ": git refused to detach it: "
+	if got := filepath.ToSlash(out); !strings.Contains(got, want) || !strings.Contains(got, "index.lock") {
 		t.Errorf("sweep output lacks %q with git's reason:\n%s", want, out)
 	}
 	if strings.Contains(out, "reaped 1") {
