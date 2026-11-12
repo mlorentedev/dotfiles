@@ -419,41 +419,16 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 	if landed, why := laneLanded(repoRoot, info, runner, landedHeads); !landed {
 		return false, why
 	}
-	laneName := filepath.Base(info.Path)
-	createdAt := time.Now()
-	issueNum := 0
-	if info.Metadata != nil {
-		if info.Metadata.Lane != "" {
-			laneName = info.Metadata.Lane
-		}
-		if !info.Metadata.CreatedAt.IsZero() {
-			createdAt = info.Metadata.CreatedAt
-		}
-		issueNum = info.Metadata.Issue
-	}
 	// Write State="PARKED" before checkout --detach / branch delete (M-CODE-2).
-	if err := SaveMetadata(info.Path, Metadata{
-		Lane:      laneName,
-		State:     string(StateParked),
-		CreatedAt: createdAt,
-		ReapOK:    false,
-	}); err != nil {
+	parkedMeta, issueNum := parkedLease(info.Path, info.Metadata)
+	if err := SaveMetadata(info.Path, parkedMeta); err != nil {
 		return false, "its lease could not be written: " + err.Error()
 	}
-	baseRef := resolveBaseRef(repoRoot)
-	if baseRef == "" {
-		baseRef = "HEAD"
-	}
-	if out, err := gitIn(info.Path, "checkout", "--detach", baseRef).CombinedOutput(); err != nil {
-		if info.Metadata != nil {
-			_ = SaveMetadata(info.Path, *info.Metadata)
-		}
+	if _, out, err := detachAtBase(repoRoot, info.Path, false, info.Metadata); err != nil {
 		return false, "git refused to detach it: " + gitFailure(out, err)
 	}
-	_ = os.Remove(filepath.Join(info.Path, ".dotf-lane-prompt.md"))
+	releaseParkedLane(repoRoot, info.Path, info.Branch, issueNum)
 	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
-	releaseIssueClaimRefs(repoRoot, issueNum)
-	archiveBranchMemoryThread(repoRoot, info.Branch)
 	return true, ""
 }
 
