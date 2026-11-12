@@ -83,6 +83,25 @@ type Host struct {
 	Kind   Kind   `json:"kind"`
 	Secret string `json:"secret"`
 	API    string `json:"api,omitempty"`
+	// AgentSecrets maps an owner to the registry secret an agent session
+	// writes with there, so what an agent opens is authored by the agents'
+	// account rather than the operator's (#3316). An owner absent here keeps
+	// Secret in every session.
+	AgentSecrets map[string]string `json:"agent_secrets,omitempty"`
+}
+
+// SecretFor names the registry secret a write to owner uses: the owner's
+// agent secret in an agent session, the host's secret otherwise. Owners
+// compare case-insensitively, as forges resolve them.
+func (h Host) SecretFor(owner string, agent bool) string {
+	if agent {
+		for o, s := range h.AgentSecrets {
+			if strings.EqualFold(o, owner) {
+				return s
+			}
+		}
+	}
+	return h.Secret
 }
 
 // Hosts is forge/hosts.json: the forges dotf may write to besides github.com.
@@ -107,6 +126,11 @@ func LoadHosts(path string) (Hosts, error) {
 	for h, c := range doc.Hosts {
 		if c.Kind != KindGitea || c.Secret == "" {
 			return nil, fmt.Errorf("%s: host %q needs kind %q and a secret id", path, h, KindGitea)
+		}
+		for owner, s := range c.AgentSecrets {
+			if s == "" {
+				return nil, fmt.Errorf("%s: host %q names owner %q in agent_secrets without a secret id", path, h, owner)
+			}
 		}
 	}
 	return doc.Hosts, nil

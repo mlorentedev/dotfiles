@@ -233,3 +233,35 @@ func TestGitHubCommentSendsBodyOnStdinNotArgs(t *testing.T) {
 		t.Errorf("the body did not travel on stdin: %s", gotStdin)
 	}
 }
+
+// #3316: an agent session writes to an owner with that owner's agent token;
+// a human session, and an agent on an owner with none, keep the host's token.
+func TestHostSecretFor(t *testing.T) {
+	h := Host{Kind: KindGitea, Secret: "OPERATOR", AgentSecrets: map[string]string{"personal": "AGENT"}}
+	cases := []struct {
+		owner string
+		agent bool
+		want  string
+	}{
+		{"personal", true, "AGENT"},
+		{"Personal", true, "AGENT"},
+		{"personal", false, "OPERATOR"},
+		{"client", true, "OPERATOR"},
+		{"client", false, "OPERATOR"},
+	}
+	for _, c := range cases {
+		if got := h.SecretFor(c.owner, c.agent); got != c.want {
+			t.Errorf("SecretFor(%q, agent=%v) = %q, want %q", c.owner, c.agent, got, c.want)
+		}
+	}
+}
+
+func TestLoadHostsRefusesAnEmptyAgentSecret(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "hosts.json")
+	if err := os.WriteFile(p, []byte(`{"hosts":{"g.example":{"kind":"gitea","secret":"S","agent_secrets":{"personal":""}}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadHosts(p); err == nil || !strings.Contains(err.Error(), "personal") {
+		t.Errorf("an owner with an empty agent secret must be refused, got %v", err)
+	}
+}
