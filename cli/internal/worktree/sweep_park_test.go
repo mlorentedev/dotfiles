@@ -1,9 +1,11 @@
 package worktree
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -69,8 +71,8 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		repo, info, tip := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
 
-		if !parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
-			t.Fatal("did not park a lane whose tip is the head of a merged pull request")
+		if parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads); !parked {
+			t.Fatalf("did not park a lane whose tip is the head of a merged pull request: %s", why)
 		}
 		if got := laneState(t, info.Path); got != "PARKED" {
 			t.Errorf("state = %q, want PARKED", got)
@@ -80,12 +82,95 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		}
 	})
 
+	t.Run("a lane whose state cannot be read is not parked", func(t *testing.T) {
+		repo, info, _ := parkLaneFixture(t)
+		runner := &MockSweepRunner{MockGitRunner: MockGitRunner{DirtyErrors: map[string]error{info.Path: errors.New("status timed out")}}}
+
+		parked, why := parkSingleNamedLane(repo, info, runner, nil)
+		if parked {
+			t.Fatal("parked a lane whose state could not be read")
+		}
+		if why != "its state could not be read: status timed out" {
+			t.Errorf("why = %q, want the status error, not a dirty tree", why)
+		}
+	})
+	t.Run("a lane with no landing reader is not parked", func(t *testing.T) {
+		repo, info, _ := parkLaneFixture(t)
+		mergedPRHeads = nil
+		t.Cleanup(func() { mergedPRHeads = ghMergedPRHeads })
+
+		// The mock answers "not merged" without asking the forge; the real
+		// runner would reach the nil reader first (list.go) and panic.
+		parked, why := parkSingleNamedLane(repo, info, &MockSweepRunner{}, nil)
+		if parked {
+			t.Fatal("parked a lane whose landing no reader could decide")
+		}
+		if why != "its landing could not be decided" {
+			t.Errorf("why = %q, want the undecided landing", why)
+		}
+		if got := laneState(t, info.Path); got != "ACTIVE" {
+			t.Errorf("state = %q, want ACTIVE", got)
+		}
+	})
+	t.Run("a lane whose lease cannot be written is not parked", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("a read-only directory does not refuse a write here")
+		}
+		repo, info, tip := parkLaneFixture(t)
+		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
+		// The lease is written in place, so the file itself refuses.
+		lease := filepath.Join(info.Path, MetadataFileName)
+		if err := os.Chmod(lease, 0o444); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(lease, 0o644) })
+
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
+			t.Fatal("parked a lane whose lease could not be written")
+		}
+		if !strings.HasPrefix(why, "its lease could not be written: ") || !strings.Contains(why, "permission denied") {
+			t.Errorf("why = %q, want the lease write's error", why)
+		}
+		if got := runGitParkTest(t, info.Path, "symbolic-ref", "--short", "HEAD"); got != "feat/lane-a" {
+			t.Errorf("HEAD = %q, want the lane's branch", got)
+		}
+	})
+	t.Run("a merged branch does not park a lane whose HEAD moved past it", func(t *testing.T) {
+		// isMerged answers for the branch; branchLanding answers for the
+		// worktree's HEAD. When the caller names landed heads, the second
+		// answer is still required, as it was before laneLanded existed.
+		repo, info, tip := parkLaneFixture(t)
+		runGitParkTest(t, repo, "merge", "--ff-only", "feat/lane-a")
+		runGitParkTest(t, repo, "push", "origin", "main")
+		runGitParkTest(t, info.Path, "checkout", "--detach")
+		if err := os.WriteFile(filepath.Join(info.Path, "later.txt"), []byte("more\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		runGitParkTest(t, info.Path, "add", "later.txt")
+		runGitParkTest(t, info.Path, "commit", "-m", "past the merged tip")
+		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
+
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
+			t.Fatal("parked a lane whose HEAD is not landed because its branch is")
+		}
+		// branchLanding gives a detached HEAD no reason of its own; the
+		// fallback names the undecided landing rather than an empty string.
+		if why != "its landing could not be decided" {
+			t.Errorf("why = %q, want the undecided landing", why)
+		}
+	})
 	t.Run("a lane whose landing cannot be checked is not parked", func(t *testing.T) {
 		repo, info, _ := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return nil, errors.New("forge unreachable") }
 
-		if parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
 			t.Fatal("parked a lane although nothing could say it landed")
+		}
+		if !strings.Contains(why, "could not check for a merged pull request") || !strings.Contains(why, "forge unreachable") {
+			t.Errorf("reason %q does not say the landing could not be checked, nor why", why)
 		}
 		if got := laneState(t, info.Path); got != "ACTIVE" {
 			t.Errorf("state = %q, want ACTIVE", got)
@@ -101,8 +186,12 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
 			t.Fatal("parked a lane holding an untracked file")
+		}
+		if !strings.Contains(why, "uncommitted") {
+			t.Errorf("reason %q does not name the dirty tree", why)
 		}
 		if got := laneState(t, info.Path); got != "ACTIVE" {
 			t.Errorf("state = %q, want ACTIVE", got)
@@ -121,8 +210,12 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads) {
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
 			t.Fatal("reported a lane as parked although its checkout could not detach")
+		}
+		if !strings.Contains(why, "detach") || !strings.Contains(why, "index.lock") {
+			t.Errorf("reason %q does not name the refused detach and git's error", why)
 		}
 		if got := laneState(t, info.Path); got == "PARKED" {
 			t.Error("state left PARKED on a lane that is still on its branch")
@@ -131,4 +224,85 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 			t.Errorf("HEAD = %q, want the lane's branch", got)
 		}
 	})
+}
+
+// The part of #3263 that #3310 left open: a lane sweep did not park was one
+// more in the skipped count, and the reason parkSingleNamedLane had already
+// computed was dropped. The report names the lane and the reason.
+func TestSweepReportsALaneItDidNotPark(t *testing.T) {
+	withHostProcessInside(t, false)
+	repo, info, tip := parkLaneFixture(t)
+	// Landed on main, so sweep classifies the lane as parkable; the held
+	// index lock then makes the detach fail while status still reads clean.
+	runGitParkTest(t, repo, "merge", "--ff-only", "feat/lane-a")
+	runGitParkTest(t, repo, "push", "origin", "main")
+	gitDir := runGitParkTest(t, info.Path, "rev-parse", "--absolute-git-dir")
+	if err := os.WriteFile(filepath.Join(gitDir, "index.lock"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot:    repo,
+		LockPath:    filepath.Join(t.TempDir(), "sweep.lock"),
+		LandedHeads: func(_, _ string) ([]string, error) { return []string{tip}, nil },
+	}, &RealSweepRunner{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Reaped) != 0 {
+		t.Fatalf("reaped %v: want nothing", report.Reaped)
+	}
+	// Two skips: the main checkout, never a candidate, and the lane.
+	if report.SkippedCount != 2 {
+		t.Errorf("SkippedCount = %d, want 2 (the main checkout and the lane)", report.SkippedCount)
+	}
+	if len(report.LaneSkips) != 1 || !samePath(report.LaneSkips[0].Path, info.Path) ||
+		!strings.Contains(report.LaneSkips[0].Reason, "detach") || !strings.Contains(report.LaneSkips[0].Reason, "index.lock") {
+		t.Errorf("LaneSkips = %+v: want %s with the refused detach as the reason", report.LaneSkips, info.Path)
+	}
+	if got := laneState(t, info.Path); got != "ACTIVE" {
+		t.Errorf("state = %q, want ACTIVE", got)
+	}
+}
+
+// The JSON name is the wire contract the report's readers hold on to.
+func TestSweepReportNamesLaneSkipsOnTheWire(t *testing.T) {
+	out, err := json.Marshal(SweepReport{LaneSkips: []SessionSkip{{Path: "p", Reason: "r"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"lane_skips":[{"path":"p","reason":"r"}]`; !strings.Contains(string(out), want) {
+		t.Errorf("report = %s, want %s", out, want)
+	}
+	if out, _ = json.Marshal(SweepReport{}); strings.Contains(string(out), "lane_skips") {
+		t.Errorf("empty report still carries lane_skips: %s", out)
+	}
+}
+
+// A dirty named lane is stopped by Classify before the park path, so the
+// sweep loop itself records its reason (CodeRabbit on #3355).
+func TestSweepReportsADirtyLaneItDidNotPark(t *testing.T) {
+	withHostProcessInside(t, false)
+	repo, info, tip := parkLaneFixture(t)
+	if err := os.WriteFile(filepath.Join(info.Path, "wip.txt"), []byte("not yet\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot:    repo,
+		LockPath:    filepath.Join(t.TempDir(), "sweep.lock"),
+		LandedHeads: func(_, _ string) ([]string, error) { return []string{tip}, nil },
+	}, &RealSweepRunner{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Reaped) != 0 {
+		t.Fatalf("reaped %v: want nothing", report.Reaped)
+	}
+	if len(report.LaneSkips) != 1 || !samePath(report.LaneSkips[0].Path, info.Path) || !strings.Contains(report.LaneSkips[0].Reason, "uncommitted") {
+		t.Errorf("LaneSkips = %+v: want %s with the dirty tree as the reason", report.LaneSkips, info.Path)
+	}
+	if got := laneState(t, info.Path); got != "ACTIVE" {
+		t.Errorf("state = %q, want ACTIVE", got)
+	}
 }

@@ -461,7 +461,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 					report.UninspectableProcesses)
 			}
 
-			for _, skips := range [][]worktree.SessionSkip{report.SessionSkips, report.MergeUnknownSkips} {
+			for _, skips := range [][]worktree.SessionSkip{report.SessionSkips, report.MergeUnknownSkips, report.LaneSkips} {
 				for _, s := range skips {
 					c.Printf("  - skipped: %s: %s\n", s.Path, s.Reason)
 				}
