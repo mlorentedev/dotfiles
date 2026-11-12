@@ -12,7 +12,7 @@ owner: manu
 ## Evidence
 
 - [x] AC1 -> PR 1, test `ci.yml: ci-gate runs under always(), needs every other job, and uses the pinned gate composite` in `tests/workflow-job-names.bats`, and `tests/lib/check-workflow-contexts.py` (rule 3)
-- [ ] AC2 -> PR 1's own CI run: `ci-gate` reports
+- [x] AC2 -> PR 1's own CI run on 6929dd90: `ci-gate` reported success with its eight needs green (#3387). The failure path is the composite's, covered by ci-workflows `tests/gate.bats`
 - [ ] AC3 -> PR 2 (owner)
 - [ ] AC4 -> PR 2
 

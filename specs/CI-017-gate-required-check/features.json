@@ -10,8 +10,8 @@
     "id": "CI-017-gate-required-check-f2",
     "behavior": "On a pull request ci-gate reports and fails when a need failed or was cancelled",
     "verification": "gh api repos/mlorentedev/dotfiles/commits/$(git rev-parse HEAD)/check-runs --jq '.check_runs[]|select(.name==\"ci-gate\")|.conclusion' | grep -qx success",
-    "state": "pending",
-    "evidence": ""
+    "state": "passing",
+    "evidence": "2026-11-12: ci-gate success on 6929dd90 (#3387)"
   },
   {
     "id": "CI-017-gate-required-check-f3",

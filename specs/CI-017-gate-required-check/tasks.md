@@ -21,7 +21,7 @@ owner: manu
 - [x] `proposal.md` complete; the open questions are the owner's and do not block PR 1
 - [x] [AC1] Failing test: `tests/workflow-job-names.bats` "ci.yml: ci-gate runs under always(), needs every other job, and uses the pinned gate composite"
 - [x] [AC1] The `ci-gate` job in `.github/workflows/ci.yml`; the test and `tests/lib/check-workflow-contexts.py` pass
-- [ ] [AC2] On the PR: `ci-gate` reports and its result follows its needs
+- [x] [AC2] On the PR: `ci-gate` reports and its result follows its needs (6929dd90, success)
 
 ## PR 2: protection and the Windows skip (owner, after `ci-gate` reports on main)
 
