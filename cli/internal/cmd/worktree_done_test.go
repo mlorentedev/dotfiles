@@ -389,3 +389,41 @@ func TestWorktreeDoneListsTheWorktreesItKnowsForAnUnknownName(t *testing.T) {
 		}
 	}
 }
+
+// A branch renamed after add no longer shares a name with its directory, but
+// git knows where it is checked out: done takes the branch and removes that
+// worktree, with and without a slash in the new name (#3114).
+func TestWorktreeDoneResolvesARenamedBranch(t *testing.T) {
+	for _, renamed := range []string{"fix/demo-renamed", "demorenamed"} {
+		t.Run(renamed, func(t *testing.T) {
+			repo := worktreeTestRepo(t)
+			if out, err := executeWorktree(t, "add", "demo", "--repo", repo); err != nil {
+				t.Fatalf("add: %v\n%s", err, out)
+			}
+			wt := rootWorktree("demo")
+			if out, err := exec.Command("git", "-C", wt, "branch", "-m", renamed).CombinedOutput(); err != nil {
+				t.Fatalf("git branch -m: %v\n%s", err, out)
+			}
+			t.Chdir(t.TempDir())
+			if out, err := executeWorktree(t, "done", renamed, "--repo", repo); err != nil {
+				t.Fatalf("done %s: %v\n%s", renamed, err, out)
+			}
+			if _, err := os.Stat(wt); !os.IsNotExist(err) {
+				t.Errorf("%s still exists (stat err %v)", wt, err)
+			}
+		})
+	}
+}
+
+// The branch lookup covers linked worktrees only: `done main` must never
+// resolve to the main checkout, whatever branch it has out.
+func TestWorktreeDoneMainNeverResolvesToTheMainCheckout(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	t.Chdir(t.TempDir())
+	if _, err := executeWorktree(t, "done", "main", "--repo", repo); err == nil {
+		t.Fatal("done main succeeded")
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".git")); err != nil {
+		t.Errorf("the main checkout was touched: %v", err)
+	}
+}
