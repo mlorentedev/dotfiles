@@ -92,12 +92,17 @@ Env:
 	return cmd
 }
 
-// runSystemUpgrade converges the system-upgrade step alone and returns its
-// skip reason, "" when the step ran. A converge whose step skipped exits 0, so
-// without the reason a quiet day that upgrades nothing would read as one that
-// did.
+// quietDaySteps are the converge steps a day the checkout did not move still
+// runs: the package upgrade, and the weekly cache-gc, which keeps its own
+// cadence and so has no trigger of its own (#3367).
+var quietDaySteps = []string{"system-upgrade", "cache-gc"}
+
+// runSystemUpgrade converges the quiet-day steps and returns the
+// system-upgrade step's skip reason, "" when the step ran. A converge whose
+// step skipped exits 0, so without the reason a quiet day that upgrades
+// nothing would read as one that did.
 func runSystemUpgrade(w io.Writer, repo string) (string, error) {
-	rep, err := runConvergeReport(w, repo, false, []string{"system-upgrade"})
+	rep, err := runConvergeReport(w, repo, false, quietDaySteps)
 	return systemUpgradeSkip(rep), err
 }
 

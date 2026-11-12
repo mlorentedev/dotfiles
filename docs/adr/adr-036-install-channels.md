@@ -148,3 +148,17 @@ Scope:
 - A package outside the catalog is never upgraded by name.
 - The step never prompts. Apt upgrades only when `sudo -n` works; otherwise the step skips and names why.
 
+
+## Amendment 2026-11-12 (#3367)
+
+**dotf collects the caches its tools fill, weekly, and only with each tool's own collection that keeps what is in use.**
+
+The `cache-gc` converge step runs once a week. It uses age-based or unreferenced-only collection: `uv cache prune`, `pre-commit gc`, `npm cache verify`, Docker build cache and dangling images older than a week, and `limactl prune --keep-referred`. It then runs `fstrim` inside the colima VM, so the host's disk file shrinks. It never clears a cache outright: a cold cache costs a rebuild or a re-download that the disk saving does not repay.
+
+Left out on purpose:
+- Go's build cache, which trims entries unused for five days on its own.
+- Homebrew, whose `brew cleanup` the step above already runs.
+- Tagged Docker images, a re-pull away.
+- Browser and application caches, which belong to their apps.
+
+The quiet day of `dotf update`, which the 2026-11-10 amendment gave to `system-upgrade`, now runs `system-upgrade` and `cache-gc`. A stamp under the state dir keeps the weekly cadence, so the step needs no trigger of its own.

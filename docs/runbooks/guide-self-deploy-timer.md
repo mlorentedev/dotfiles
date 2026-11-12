@@ -21,12 +21,13 @@ Once a day the timer runs `dotf update` (the Go port of the former
 2. `git fetch`es; skips on a network failure.
 3. Fast-forwards `main` **only** if it can; skips on diverged/non-ff history.
 4. Runs `dotf converge` **only if `HEAD` actually moved**. Its last step re-runs the setup script.
-5. On a day `HEAD` did not move, runs one step instead: `dotf converge --only system-upgrade`, which refreshes
-   brew, apt or winget and upgrades the catalog's outdated unpinned system packages (TOOL-036). A full converge
-   already includes that step, so it never runs twice.
+5. On a day `HEAD` did not move, runs two steps instead: `dotf converge --only system-upgrade,cache-gc`.
+   `system-upgrade` refreshes brew, apt or winget and upgrades the catalog's outdated unpinned system packages
+   (TOOL-036). `cache-gc` keeps its own weekly cadence (below), so on most days it reports `not due`. A full
+   converge already includes both steps, so neither runs twice.
 
 Every skip exits 0 (benign). Only a converge that runs and fails exits non-zero, and so does a failed
-`system-upgrade` step on a quiet day (record status `upgrade-failed`). A refresh that fails offline, or apt
+`system-upgrade` or `cache-gc` step on a quiet day (record status `upgrade-failed`). A refresh that fails offline, or apt
 without `sudo -n`, is a skip inside the step: it exits 0 and is recorded as `upgrade-skipped` with the reason, so
 `dotf doctor` can show that a machine is not upgrading.
 
@@ -39,11 +40,37 @@ flowchart TB
     F -- yes --> FF{fast-forward possible?}
     FF -- no --> S3["skip — diverged (exit 0)"]
     FF -- yes --> M{HEAD moved?}
-    M -- no --> UP["dotf converge --only system-upgrade"]
+    M -- no --> UP["dotf converge --only system-upgrade,cache-gc"]
     UP --> OK2(["current, or upgrade-skipped with the reason (exit 0)"]) & UF(["upgrade-failed (exit ≠0)"])
     M -- yes --> SETUP["dotf converge (setup script last)"]
     SETUP --> OK([exit 0]) & ERR(["exit ≠0 — only real failure"])
 ```
+
+### Weekly cache maintenance (`cache-gc`)
+
+The `cache-gc` step (#3367) runs each present tool's own garbage collection once a week, and only the
+kind that keeps what is in use:
+
+| Tool | Command | What it removes |
+|---|---|---|
+| uv (cache not in use) | `uv cache prune` | entries no environment refers to, leftover temp dirs |
+| pre-commit | `pre-commit gc` | hook repos no config uses |
+| npm | `npm cache verify` | unreferenced cache data |
+| docker (daemon answering) | `docker builder prune -f --filter until=168h`, `docker image prune -f --filter until=168h` | build cache and dangling images older than a week; tagged images are kept |
+| lima | `limactl prune --keep-referred` | downloads no instance or template refers to |
+| colima (running) | `colima ssh -- sudo fstrim -a` | hands the blocks Docker freed back to the host's disk file |
+
+A tool not on PATH is left out, and a daemon that is not running skips its pruners with the reason.
+`uv cache prune` needs uv's cache lock to itself, and every running `uvx` holds it shared for as long
+as it runs: an MCP server an agent session started holds it for days. The step tries the lock first
+and skips uv as `cache in use` instead of waiting out uv's five-minute lock timeout (#3370). A
+pruner that fails fails the step and leaves it due, so the next daily run retries it. The stamp is
+`$XDG_STATE_HOME/dotfiles/cache-gc/last-run`; delete it to make the step due now. The step's detail
+records the free space on the home volume before and after. Left out on purpose: Go's build cache trims
+itself, `system-upgrade` already runs `brew cleanup`, and browser and app caches belong to their apps.
+
+Preview with `dotf converge --plan --only cache-gc`; run it now with `dotf converge --only cache-gc`.
+On a machine without the `self-deploy` role it runs only when someone runs `dotf converge`.
 
 ## Enable / disable
 
