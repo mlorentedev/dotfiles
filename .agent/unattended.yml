@@ -1,0 +1,25 @@
+version: 1
+run_id: "review-20261112T1121Z"
+armed_by: manu
+armed_at: 2026-11-12T11:21:40Z
+expires_at: 2026-11-12T23:21:00Z
+objective: "Close the merge-gate holes in the review path: pr triage-queue and pr land must not read a head without a review as clear (#3243), then #3352, #3227, #3333 as slots allow."
+scope:
+  write_paths: ["cli/internal/prreview/**", "cli/internal/prland/**", "cli/internal/reproduce/**", "cli/internal/mem/**", "cli/internal/harness/prbudget*", "cli/internal/cmd/pr*", "cli/internal/cmd/mem*", "specs/**", "docs/lessons/**", "docs/runbooks/**", "tests/**", ".agent/runs/review-20261112T1121Z/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "cli/internal/worktree/**", "cli/internal/lane/**", ".agent/unattended.yml"]
+  max_files: 12
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, golangci-lint, bats, shellcheck, make]
+queue:
+  source: bitacora
+  filter: "issues #3352, #3243, #3227, #3333 in that order (split agreed with the lanes run; the lanes items stay with that run). Before a claim: no claim comment on the issue and no remote branch naming its number; otherwise skip it. Spec slots: WIP limit 10; #3243 changes an exit contract and needs a spec; one spec open at a time."
+  max_items: 4
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 90
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
