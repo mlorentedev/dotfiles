@@ -279,6 +279,7 @@ W2's leftover cleanup reached only a non-amd64 Linux host, so the eza and gh dow
 
 - [x] [AC9] Failing tests, then `ParseMisePins`: both markers, sorted; a package with no `PYTHON_VERSION` under `# mise: cli` is an error; a near-miss names both markers
 - [x] [AC9] Failing tests, then the sync: the packages file is written before `mise install` and named by `python.default_packages_file` under `[settings]`; a Python already at its pin gets the packages through pip, once; a failed pip and a pip that installs nothing are errors naming the package; a package below its pin is missing
+- [x] [AC9] #3363: failing tests, then the sync renders the packages as the `python` tool's `postinstall` (`python -m pip install … pkg==ver`) instead of `python.default_packages_file`, which mise 2026.11 deprecates with a warning on every invocation; it removes the packages file an older sync wrote, after the new config is written; a second sync has nothing to do
 - [x] [AC9] Failing tests, then doctor's Python section: the shell's `python3` (`python` on Windows) below 3.11, or absent, fails; a package missing or below its pin fails; the remedy is the sync, the PATH when mise already has a Python that clears the floor, or "install one" when nothing pins it
 - [x] `checkMiseTools` reports packages missing from mise's Python, and `--fix` runs the sync: one owner for mise's config and installs
 - [x] The dead `~/Applications/python-<ver>` layout leaves doctor (`versionedHomes`, `versionMatches`, `toolHomeVars`) and the rc files: nothing installs it
