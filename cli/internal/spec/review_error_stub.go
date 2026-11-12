@@ -41,7 +41,7 @@ func WriteErrorStub(review, transcript, ended string) (bool, error) {
 	specDir := filepath.Dir(review)
 	specID := filepath.Base(specDir)
 	slot := slotOfReview(filepath.Base(review))
-	req, _, _ := ReadReviewRequestIn(specDir, slot)
+	req, _, reqErr := ReadReviewRequestIn(specDir, slot)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nspec: %q\nverdict: %s\nreviewer: %q\nreviewed_sha: %q\ndate: %q\n---\n\n",
@@ -51,6 +51,11 @@ func WriteErrorStub(review, transcript, ended string) (bool, error) {
 		"Nothing was reviewed, and `dotf spec archive` refuses this file. "+
 		"Run `dotf spec review %s%s` again, or choose another member with `--reviewer`.\n\n",
 		slot.Review, specID, slot.Flag())
+	if reqErr != nil {
+		// Loud, as the request's own reader is: an empty reviewer with no
+		// reason looks like a launcher bug, not a damaged sidecar.
+		fmt.Fprintf(&b, "The launch request could not be read, so the reviewer and commit above are empty: %v\n\n", reqErr)
+	}
 	fmt.Fprintf(&b, "## How the run ended\n\n%s\n", ended)
 	if hint := TurnCapHint(runnerOf(filepath.Dir(filepath.Dir(specDir)), req.Reviewer), transcript); hint != "" {
 		fmt.Fprintf(&b, "\n%s\n", hint)

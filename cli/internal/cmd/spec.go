@@ -673,8 +673,9 @@ not a verdict. Otherwise the command's own exit status passes through.
 
 With --stall-timeout and --transcript the run is also stopped when the
 transcript has not changed for that long. That run exits 125, and stderr names
-the last tool call the transcript recorded. With --review, a stopped run also
-says whether review.md holds a provisional record or was not rewritten.
+the last tool call the transcript recorded. With --review, a run that leaves
+no review file gets one with verdict ERROR, saying how the run ended and what
+the reviewer wrote; a stopped run also says what the review file holds.
 
 With --review, every path the run left changed outside the review's own spec
 folder is named on stderr, since a reviewer's only sanctioned output is
@@ -891,7 +892,7 @@ func confirmLaunched(slot spec.ReviewSlot, session, transcript, specID string, c
 			}
 		}
 		return fmt.Errorf("the review died on startup — tmux session %q is already gone.\n%s\n"+
-			"Nothing was reviewed and %s was not written; re-run with --foreground to watch it fail live.%s",
+			"Nothing was reviewed: %s, if the run left one, records verdict ERROR; re-run with --foreground to watch it fail live.%s",
 			session, reviewerLastWords(transcript), slot.Review, nextAdvice)
 	}
 	return nil
