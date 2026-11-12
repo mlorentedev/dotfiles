@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/diskfree"
+
 	"github.com/mlorentedev/dotfiles/cli/internal/agy"
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
@@ -91,6 +93,9 @@ type Options struct {
 	// system-upgrade step and returns stdout; ExecManager in production. Unset,
 	// that step is skipped.
 	SystemRun tools.Runner
+	// CacheRun runs the cache tools (uv, npm, docker …) for the cache-gc step;
+	// ExecManager in production. Unset, that step is skipped.
+	CacheRun tools.Runner
 	// PwshRun runs pwsh for the pwsh-modules step; tools.ExecRunner in
 	// production. Unset, that step is skipped.
 	PwshRun pwsh.Runner
@@ -128,6 +133,7 @@ func Registry(o Options) []Reconciler {
 		recordsHarness{run: o.RunHarnessDeploy, preview: HarnessPreview, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs, registered: o.RegisteredPath},
 		systemUpgrade{run: o.SystemRun, has: onPath},
+		cacheGC{run: o.CacheRun, has: onPath, free: diskfree.Free},
 		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},

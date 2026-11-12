@@ -127,8 +127,9 @@ func upgradeQuietDay(d Deps, msg, note string) (Outcome, error) {
 	}
 	skipped, err := d.Upgrade()
 	if err != nil {
-		// err already names the step (converge: system-upgrade: ...).
-		return Outcome{Status: StatusUpgradeFailed, Message: msg + "; the system-upgrade step failed — see the report above" + note}, err
+		// err already names the step (converge: system-upgrade: ... or
+		// converge: cache-gc: ...).
+		return Outcome{Status: StatusUpgradeFailed, Message: msg + "; the system-upgrade or cache-gc step failed — see the report above" + note}, err
 	}
 	if skipped != "" {
 		// A skip exits 0 inside converge too: the record is the one place a
