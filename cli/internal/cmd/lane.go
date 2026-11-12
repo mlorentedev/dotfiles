@@ -252,9 +252,13 @@ func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, erro
 		return lane.Outcome{}, fmt.Errorf("lane next: prompt template: %w", err)
 	}
 	parent := filepath.Dir(common)
+	promptDir, err := lane.PromptDir(common, !dryRun)
+	if err != nil {
+		return lane.Outcome{}, fmt.Errorf("lane next: %w", err)
+	}
 	opts := lane.Options{
 		Agent: agent, DryRun: dryRun, Config: cfg, Template: string(tmpl),
-		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: selfBinary(c), GitDir: common,
+		Parent: parent, PromptDir: promptDir, Dotf: selfBinary(c), GitDir: common,
 		WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
 		Claims:       laneClaimer(cfg, top, parent),
 		Fetch: func() error {
