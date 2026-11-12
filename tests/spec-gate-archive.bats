@@ -163,8 +163,10 @@ run_gate() { spec_gate_both --base-ref main --head-ref feature; }
 
 @test "AC9: CI's adapter never hands the gate the draft flag, so the merge-time refusal stays" {
     # The waiver is a push-time courtesy. If spec-gate-pr.sh ever exported
-    # SDD_PR_DRAFT, a draft PR could merge with its spec active.
-    run grep -c 'SDD_PR_DRAFT' "$SCRIPTS_DIR/spec-gate-pr.sh"
+    # SDD_PR_DRAFT, a draft PR could merge with its spec active. The pin
+    # matches an assignment or an export, not a mention, so a comment in that
+    # script saying it deliberately leaves the variable alone stays green.
+    run grep -cE 'SDD_PR_DRAFT=|export[[:space:]].*SDD_PR_DRAFT' "$SCRIPTS_DIR/spec-gate-pr.sh"
     [ "$output" = "0" ]
 }
 
