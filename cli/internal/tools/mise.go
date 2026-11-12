@@ -201,6 +201,10 @@ func RenderMiseConfig(tools []MiseTool, pythonPackages string, latest ...string)
 		if runtime.GOOS == "windows" && name == "bats" {
 			name = `"npm:bats"`
 		}
+		if pkg, ok := npmBuildScripts[name]; ok {
+			fmt.Fprintf(&b, "%s = { version = %q, allow_builds = [%q] }\n", name, v, pkg)
+			continue
+		}
 		fmt.Fprintf(&b, "%s = %q\n", name, v)
 	}
 	// mise is pinned in packages.json; its update notice says `mise self-update`,
@@ -259,6 +263,18 @@ var npmBackend = map[string]string{
 	"copilot":  "npm:@github/copilot",
 	"opencode": "npm:opencode-ai",
 	"yarn":     "npm:yarn",
+}
+
+// npmBuildScripts names, by short name, the npmBackend CLIs whose package needs
+// its install script to be usable, and the package that may run it. mise's npm
+// backend installs with --ignore-scripts=true, and opencode-ai's postinstall is
+// what replaces its 479-byte bin/opencode.exe placeholder with the platform
+// binary: without it the placeholder is no valid Windows program and the tool
+// never runs at its pin (#3329, measured on a clean Windows 11 Arm64 guest).
+// allow_builds names the one package instead of lifting --ignore-scripts for
+// the whole tree.
+var npmBuildScripts = map[string]string{
+	"opencode": "opencode-ai",
 }
 
 // aliasBackend is the backend a tool's short name is routed to, if any.

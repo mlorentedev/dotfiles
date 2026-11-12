@@ -108,7 +108,7 @@ func TestRenderMiseConfig_RoutesNpmCLIsToTheNpmBackend(t *testing.T) {
 		{"bw", "2026.5.0"}, {"copilot", "1.0.81"}, {"jq", "1.8.2"}, {"opencode", "1.16.2"}, {"yarn", "1.22.22"},
 	}, ""))
 	for _, want := range []string{
-		"bw = \"2026.5.0\"\n", "copilot = \"1.0.81\"\n", "opencode = \"1.16.2\"\n", "yarn = \"1.22.22\"\n",
+		"bw = \"2026.5.0\"\n", "copilot = \"1.0.81\"\n", "yarn = \"1.22.22\"\n",
 		"bw = \"npm:@bitwarden/cli\"\n", "copilot = \"npm:@github/copilot\"\n",
 		"opencode = \"npm:opencode-ai\"\n", "yarn = \"npm:yarn\"\n",
 	} {
@@ -121,6 +121,22 @@ func TestRenderMiseConfig_RoutesNpmCLIsToTheNpmBackend(t *testing.T) {
 	}
 	if out := string(RenderMiseConfig([]MiseTool{{"jq", "1.8.2"}}, "")); strings.Contains(out, "npm:") {
 		t.Errorf("no npm alias without an npm CLI:\n%s", out)
+	}
+}
+
+// opencode-ai ships a placeholder binary that its postinstall replaces, and
+// mise's npm backend skips install scripts: only that package may run its own,
+// and no other tool is opened (#3329).
+func TestRenderMiseConfig_LetsOpencodeRunItsInstallScript(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"opencode", "1.16.2"}, {"copilot", "1.0.81"}}, ""))
+	if !strings.Contains(out, `opencode = { version = "1.16.2", allow_builds = ["opencode-ai"] }`+"\n") {
+		t.Errorf("opencode lacks its build allowance:\n%s", out)
+	}
+	if !strings.Contains(out, "copilot = \"1.0.81\"\n") || strings.Count(out, "allow_builds") != 1 {
+		t.Errorf("only opencode may run an install script:\n%s", out)
+	}
+	if latest := string(RenderMiseConfig([]MiseTool{{"opencode", "1.16.2"}}, "", "opencode")); !strings.Contains(latest, `version = "latest", allow_builds`) {
+		t.Errorf("a latest-tracked opencode keeps the allowance:\n%s", latest)
 	}
 }
 
