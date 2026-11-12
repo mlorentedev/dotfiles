@@ -67,6 +67,13 @@ Windows proof for F1:
 |---|---|---|
 | `564f4a2c` | 43143382318, job 130935507892 | pass (`cli-gate` pass; `hygiene` 43143382465 and `knowledge-gate` 43143382438 pass on the same head) |
 
+Round 3 (`review.md`, verdict PASS on `14541186`):
+
+| Finding | Disposition | Where |
+|---|---|---|
+| Minor REAL: `parkSingleNamedLane` 46 lines, `SweepWithRunner` 77 | ticketed | #3265 and #3360, as the review says |
+| Minor REAL: `tasks.md` "PR opened" unticked while #3355 exists | declined | ticking it after the review would stale the contract digest; the PR is the evidence |
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-585-the-push-gate-counts-what-you-deleted-too.md
@@ -75,7 +82,7 @@ Windows proof for F1:
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-191-sweep-skip-reason/` -> `specs/archive/HARNESS-191-sweep-skip-reason/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-191-sweep-skip-reason/` -> `specs/archive/HARNESS-191-sweep-skip-reason/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3263 closes with #3355
+- [x] Promotions above executed (if any): lesson 585 in this PR
