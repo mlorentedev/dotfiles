@@ -53,7 +53,7 @@ func AdjacentIssues(feed string, files, closed []string) []Adjacent {
 	var out []Adjacent
 	for _, line := range strings.Split(feed, "\n") {
 		num, text, _ := strings.Cut(strings.Trim(line, "\t"), "\t")
-		text = strings.Trim(text, "\t")
+		text = StripControl(strings.Trim(text, "\t"))
 		if num == "" || text == "" || skip[num] {
 			continue
 		}
@@ -94,3 +94,26 @@ func Clip(s string, n int) string {
 	}
 	return s[:n]
 }
+
+// StripControl replaces every ASCII control character with a space. Issue
+// titles are written by anyone who can open an issue, and the report prints them
+// to stdout, where the runner reads workflow commands, and to the step summary:
+// a carriage return would end one command and start another (#3389). The feed
+// is line-based, so a newline never arrives; a tab does, and becomes a space.
+func StripControl(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, s)
+}
+
+// commandBreaker splits the markers the runner reads as workflow commands.
+var commandBreaker = strings.NewReplacer("::", ": :", "##[", "## [")
+
+// BreakCommands makes an issue title safe to print on its own stdout line.
+// The runner trims leading whitespace before it reads a command, so a title
+// that starts with "::error::" would become an annotation, and "##[" is the
+// legacy form (#3389). Only the printed copy is changed, never what is matched.
+func BreakCommands(s string) string { return commandBreaker.Replace(s) }
