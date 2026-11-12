@@ -10,3 +10,6 @@ Coordination: feat-vm-linux-exec-3c (no guest, no mise.go tonight); feat-worktre
 | 1 | feat/mise-npm-pins-v2 5fb56675 | pushed | rebased on main b00a4642 (0.80.0); a force-push to the old name was denied, so the work is under a new name and the old branch is left as it was |
 | 1 | PR B content | committed | four pins + four catalog deletions + vcredist + doctor fallback and `pinSource` label + ADR-036 amendment + guards: versions-conf test 11, copilot-config test 11, ci-npm-cli-cache (pi only, key without packages.json) + ci.yml cache step + TestCheckVersionMatch fixture |
 | 1 | pre-guest verification | green | `go test ./...`, `GOOS=windows go vet ./...`, golangci-lint 0 issues, 45 bats ok; mutation-checked: a bw path back in the cache, and a copilot catalog entry |
+| 2 | vcredist before mise (#3396) | draft PR #3399 | parked `scope-violation`: tests/packages-json.bats test 3 needs one jq clause (`or (.source.winget_arch \| type == "object")`), a file outside write_paths; the clause is in the PR body and on #3396 for the owner. Go order test passes |
+| 2 | guest run on feat/mise-npm-pins | running | started 11:34Z, still in the first converge at 11:43Z |
+| 2 | full bats sweep | running | 396 of ~1200 ok at 11:42Z; packages-json test 3 expected red on PR B (same cause as #3399) |
