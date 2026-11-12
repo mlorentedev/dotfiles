@@ -1,6 +1,6 @@
 # Run ci-gate-20261112T0745Z
 
-Objective: close CI-018 (#3147). Envelope: `.agent/unattended.yml` at 6c5c5296. Result: **objective met**, #3147 closed by #3391.
+Objective: close CI-018 (#3147). Envelope: `.agent/unattended.yml` at 6c5c5296. Result: **objective met**, #3147 closed by #3391. Ended about 12:00Z with `reason: queue-empty`: all three queue items done; defects found were filed, not worked, as the filter says.
 
 ## Done
 
@@ -18,6 +18,11 @@ Objective: close CI-018 (#3147). Envelope: `.agent/unattended.yml` at 6c5c5296. 
 - #3328: deferred, the guests were claimed tonight by other sessions.
 
 ## Notes
+
+- First daytime pickup: #3389 (P2), the adjacency annotation injection, in `cli/internal/gate`. Not worked tonight because the envelope files defects rather than working them.
+- The CI-018 review transcript (`review-transcript.jsonl`, untracked) went away with its worktree; `review.md` and `review-request.json` are on main.
+- #3387 triaged: no review ran on the draft.
+- Vault `MEMORY.md` is 223 lines, over the 200-line read cap; #3227 (the cap) is another session's tonight.
 
 - Board fields not set on #3388-#3390: `dotf forge issue create --board` failed with `unknown owner type` and a GraphQL rate limit; the issues were created through REST and the repository's add-to-project workflow places them.
 - A usage-limit pause stopped the run from about 08:50Z to 11:20Z.
