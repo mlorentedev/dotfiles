@@ -237,6 +237,36 @@ _write_849_feed() {
     grep -qF '| #999 | `scripts/a\|b.sh` |' "$REPO_FIXTURE/summary.md"
 }
 
+# Issue titles are writable by anyone who can open an issue (#3389). The feed is
+# line-based, so a newline cannot pass, but a carriage return can: it would end
+# a workflow command early and start another on the runner's side.
+@test "adjacency: control characters in an issue title reach no output" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 901 $'BUG-5: scripts/tool.sh breaks\r::error::injected\033[31m' > feed.tsv
+    GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"#901"* ]] || false
+    [[ "$output" != *$'\r'* ]] || false
+    [[ "$output" != *$'\033'* ]] || false
+    ! grep -q $'[\r\033]' "$REPO_FIXTURE/summary.md" || false
+    grep -qF 'breaks ::error::injected [31m' "$REPO_FIXTURE/summary.md"
+}
+
+@test "adjacency: angle brackets in an issue title are escaped in the step summary" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 902 'BUG-6: scripts/tool.sh <img src=x onerror=alert(1)> breaks' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF '&lt;img src=x onerror=alert(1)&gt; breaks' "$REPO_FIXTURE/summary.md"
+    ! grep -qF '<img' "$REPO_FIXTURE/summary.md" || false
+}
+
 @test "adjacency: --help documents the flag" {
     spec_gate_both --help
     [ "$status" -eq 0 ]

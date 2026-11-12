@@ -514,6 +514,10 @@ _adjacent_open_issues() {
     while IFS=$'\t' read -r num haystack; do
         if [[ -z "$num" || -z "${haystack:-}" ]]; then continue; fi
         if printf '%s\n' "$closed" | grep -qxF "$num"; then continue; fi
+        # Titles are written by anyone who can open an issue: a carriage return
+        # would end a workflow command and start another (#3389). Every ASCII
+        # control character, tab included, becomes a space before any output.
+        haystack=$(printf '%s' "$haystack" | tr '\001-\037\177' ' ')
         while IFS= read -r file_path; do
             if [[ -z "$file_path" ]]; then continue; fi
             if [[ "$haystack" == *"$file_path"* ]]; then
@@ -529,6 +533,12 @@ _adjacent_open_issues() {
         done <<< "$files"
     done < "$feed"
     return 0
+}
+
+# A step-summary table cell: a pipe would split the cell, and the summary renders
+# inline HTML, so angle brackets in an issue title would reach it as tags (#3389).
+_summary_cell() {
+    printf '%s' "$1" | sed -e 's/|/\\|/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
 }
 
 # The CI-only half of the report: a workflow annotation and a step-summary table.
@@ -548,7 +558,7 @@ _emit_adjacency_ci_artifacts() {
                 if [[ -z "$num" ]]; then continue; fi
                 # shellcheck disable=SC2016  # backticks are markdown code spans
                 # for the step-summary table, not command substitution.
-                printf '| #%s | `%s` | %.88s |\n' "$num" "${file_path//|/\\|}" "${haystack//|/\\|}"
+                printf '| #%s | `%s` | %.88s |\n' "$num" "$(_summary_cell "$file_path")" "$(_summary_cell "$haystack")"
             done <<< "$rows"
         } >> "$GITHUB_STEP_SUMMARY"
     fi

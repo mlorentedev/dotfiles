@@ -62,3 +62,25 @@ func TestClip(t *testing.T) {
 		t.Errorf("mid-rune cut: got %q", got)
 	}
 }
+
+func TestStripControl(t *testing.T) {
+	cases := map[string]string{
+		"plain title":         "plain title",
+		"a\r::error::b":       "a ::error::b",
+		"tab\there":           "tab here",
+		"esc\x1b[31m del\x7f": "esc [31m del ",
+		"ñandú <b>":           "ñandú <b>",
+	}
+	for in, want := range cases {
+		if got := StripControl(in); got != want {
+			t.Errorf("StripControl(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestAdjacentIssuesStripsControlCharacters(t *testing.T) {
+	got := AdjacentIssues("7\tscripts/x.sh breaks\r::error::y\n", []string{"scripts/x.sh"}, nil)
+	if len(got) != 1 || got[0].Text != "scripts/x.sh breaks ::error::y" {
+		t.Fatalf("AdjacentIssues = %+v", got)
+	}
+}

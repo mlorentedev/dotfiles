@@ -58,7 +58,9 @@ func (g *specGate) summarizeAdjacency(rows []gate.Adjacent) {
 	if g.o.summary == "" {
 		return
 	}
-	esc := func(s string) string { return strings.ReplaceAll(s, "|", `\|`) }
+	// The summary is rendered as markdown with inline HTML, so a title's angle
+	// brackets would reach the page as tags (#3389).
+	esc := strings.NewReplacer("|", `\|`, "<", "&lt;", ">", "&gt;").Replace
 	var b strings.Builder
 	b.WriteString("\n### Adjacent open issues (advisory)\n\n| Issue | Names | Title |\n|---|---|---|\n")
 	for _, r := range rows {
