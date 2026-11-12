@@ -3,6 +3,7 @@ package converge
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -542,5 +543,39 @@ func TestSystemUpgradeWindowsIdColumnCountsDisplayWidth(t *testing.T) {
 	want := []string{"git.git", "eza-community.eza"}
 	if ids := wingetIDs(listing); strings.Join(ids, ",") != strings.Join(want, ",") {
 		t.Fatalf("ids = %q, want %q", ids, want)
+	}
+}
+
+// exitCoder stands in for *exec.ExitError: the step reads the code, not the text.
+type exitCoder struct{ code int }
+
+func (e exitCoder) Error() string { return fmt.Sprintf("exit status %d", e.code) }
+func (e exitCoder) ExitCode() int { return e.code }
+
+// winget localizes its messages, so "nothing outdated" is read from the exit
+// code. Measured with winget 1.11.510 on Windows 11 (#3343): the bare listing
+// exits 0 with nothing upgradable, and 0x8A150014 (NO_APPLICATIONS_FOUND) is
+// the code winget gives when a query matches no installed package.
+func TestSystemUpgradeWindowsNoUpgradesIsNotAFailure(t *testing.T) {
+	for name, listing := range map[string]string{
+		"translated": "Es wurde kein installiertes Paket gefunden, das den Eingabekriterien entspricht.",
+		"empty":      "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newPkgFake(nil)
+			f.fail["winget upgrade --accept-source-agreements"] = fmt.Errorf("%w: %s", exitCoder{0x8A150014}, listing)
+			behind, err := upgradeStep(f).wingetBehind(nil)
+			if err != nil {
+				t.Fatalf("nothing outdated read as a failure: %v", err)
+			}
+			if behind(sysTarget{pkg: "Git.Git"}) {
+				t.Error("nothing is behind")
+			}
+		})
+	}
+	f := newPkgFake(nil)
+	f.fail["winget upgrade --accept-source-agreements"] = fmt.Errorf("%w: No installed package found matching input criteria.", exitCoder{0x8A15002B})
+	if _, err := upgradeStep(f).wingetBehind(nil); err == nil {
+		t.Error("another winget error, English text or not, is still a failure")
 	}
 }

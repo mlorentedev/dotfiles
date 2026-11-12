@@ -362,13 +362,16 @@ func (r systemUpgrade) aptBehind([]sysTarget) (func(sysTarget) bool, error) {
 // a Name cell may hold spaces and an ellipsis of its own, and a name that is
 // a prefix of a catalog id must not read as that id. A listing with no header
 // (no package is outdated) matches nothing.
+//
+// "Nothing outdated" is read from the exit code, never from the text, which
+// winget translates (#3343). winget 1.11 exits 0 for it; wingetNoneFound is
+// the code winget gives when a query matches no installed package.
 func (r systemUpgrade) wingetBehind([]sysTarget) (func(sysTarget) bool, error) {
 	out, err := r.run("winget", "upgrade", "--accept-source-agreements")
-	listing := string(out)
-	if err != nil && !strings.Contains(strings.ToLower(listing), "no installed package") {
+	if err != nil && !isExitCode(err, wingetNoneFound) {
 		return nil, fmt.Errorf("winget upgrade: %w", err)
 	}
-	ids := wingetIDs(listing)
+	ids := wingetIDs(string(out))
 	return func(t sysTarget) bool {
 		id := strings.ToLower(t.pkg)
 		for _, cell := range ids {
@@ -378,6 +381,17 @@ func (r systemUpgrade) wingetBehind([]sysTarget) (func(sysTarget) bool, error) {
 		}
 		return false
 	}, nil
+}
+
+// wingetNoneFound is APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND.
+const wingetNoneFound uint32 = 0x8A150014
+
+// isExitCode reports whether err carries the process exit code want. Windows
+// codes are HRESULTs, so the comparison is on the low 32 bits: an int holding
+// one is positive on a 64-bit build and would be negative on a 32-bit one.
+func isExitCode(err error, want uint32) bool {
+	var ec interface{ ExitCode() int }
+	return errors.As(err, &ec) && uint32(ec.ExitCode()) == want //nolint:gosec // the truncation is the point
 }
 
 // wingetIDs returns the lower-cased Id cell of every row under the table's
