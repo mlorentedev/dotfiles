@@ -13,14 +13,14 @@ owner: manu
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [x] AC1 (dirty lane not parked, reason names the dirty tree) -> red `9a52fd06`, green `6c186810` / `TestParkSingleNamedLane_Outcomes/a lane with an untracked file is not parked`
+- [x] AC1 (dirty lane not parked, reason names the dirty tree) -> red `67e45595`, green `27e6d3ba` / `TestParkSingleNamedLane_Outcomes/a lane with an untracked file is not parked`
 - [x] AC2 (forge error carried; landed heads park) -> same commits / `TestParkSingleNamedLane_Outcomes/a lane whose landing cannot be checked is not parked`, `…/a squash-merged lane parks when the landed heads name its tip`
 - [x] AC3 (refused detach keeps state and branch, git's first line in the reason) -> same commits / `TestParkSingleNamedLane_Outcomes/a lane git refuses to detach keeps its state`, `TestSweepReportsALaneItDidNotPark`
-- [x] AC4 (`LaneSkips` in the report, one printed line per entry) -> `6c186810` and the command test commit / `TestSweepReportsALaneItDidNotPark`, `TestWorktreeSweepPrintsWhyALaneWasNotParked`
+- [x] AC4 (`LaneSkips` in the report, one printed line per entry) -> `27e6d3ba` and `5a74c5c0` / `TestSweepReportsALaneItDidNotPark`, `TestWorktreeSweepPrintsWhyALaneWasNotParked`
 
 ## Test status
 
-- Touched packages: `cd cli && go test ./internal/worktree/ ./internal/cmd/ -count=1` -> ok, ok (2026-11-11, on `6c186810` and again after the lesson and the command test).
+- Touched packages: `cd cli && go test ./internal/worktree/ ./internal/cmd/ -count=1` -> ok, ok (2026-11-11, on `27e6d3ba` and again after the lesson and the command test).
 - `go vet ./internal/worktree/ ./internal/cmd/` and `GOOS=windows go vet` on the same packages clean; `golangci-lint run` (2.12.2, the pin, cache cleaned first) 0 issues on both `GOOS`.
 - `features.json` f1..f4 verified on `babfb894` (the rebased tip); each regex was run under `-v` to confirm it selects its subtests (1, 2, 2 and 2 tests).
 - Manual smoke test: none beyond the command test, which runs `dotf worktree sweep` on a real repository with a lane landed by ancestry and a held index lock.
