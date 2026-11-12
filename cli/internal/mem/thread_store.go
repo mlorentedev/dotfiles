@@ -17,6 +17,12 @@ import (
 // loaded").
 const MemoryByteBudget = 25_000
 
+// MemoryLineBudget is the other half of what a session start reads: Claude
+// Code loads the first 200 lines of MEMORY.md, so a file under the byte budget
+// still loses its newest threads past this line (#3227, measured at 224 lines
+// and 20.7 KB).
+const MemoryLineBudget = 200
+
 // threadsDir holds one file per thread beside MEMORY.md (MEMORY-008, ADR-056).
 // The file is the thread; its entry in MEMORY.md is derived from it.
 const threadsDir = "threads"
@@ -186,25 +192,47 @@ func threadText(block, memoryDir string) string {
 	return block
 }
 
-// CheckMemoryBudget refuses a write that takes MEMORY.md past MemoryByteBudget,
-// naming the threads to archive, least recently updated first, and how to
-// archive each. Only a write that grows the file is refused: one that shrinks or
-// holds a file already past the budget passes, or no such file could ever be
-// brought back under it.
+// CheckMemoryBudget refuses a write that takes MEMORY.md past MemoryByteBudget
+// or MemoryLineBudget, naming the threads to archive, least recently updated
+// first, and how to archive each. Only a write that grows the file in the
+// measure it is over is refused: one that shrinks or holds a file already past
+// a budget passes, or no such file could ever be brought back under it.
 //
 // Only a thread with a date is suggested. One with none cannot be called old:
 // the pre-thread block and some live threads carry no Updated line, and naming
 // them first would archive work nobody had finished (#1477).
 func CheckMemoryBudget(before, after string) error {
-	if len(after) <= MemoryByteBudget || len(after) <= len(before) {
+	var headline string
+	switch {
+	case len(after) > MemoryByteBudget && len(after) > len(before):
+		headline = fmt.Sprintf("this write takes MEMORY.md to %d bytes, past the %d a session start reads", len(after), MemoryByteBudget)
+	case lineCount(after) > MemoryLineBudget && lineCount(after) > lineCount(before):
+		headline = fmt.Sprintf("this write takes MEMORY.md to %d lines, past the %d a session start loads", lineCount(after), MemoryLineBudget)
+	default:
 		return nil
 	}
+	return budgetRefusal(headline, after)
+}
+
+// lineCount is how many lines a reader that stops after N lines sees: every
+// newline ends one, and text after the last newline is one more.
+func lineCount(s string) int {
+	n := strings.Count(s, "\n")
+	if s != "" && !strings.HasSuffix(s, "\n") {
+		n++
+	}
+	return n
+}
+
+// budgetRefusal is the error both budgets give: what crossed, then the
+// threads to archive.
+func budgetRefusal(headline, after string) error {
 	dated, undated := threadsByAge(after)
 	if len(dated) > 3 {
 		dated = dated[:3]
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "this write takes MEMORY.md to %d bytes, past the %d a session start reads, so the newest thread would be the one cut off; archive threads first, then write again.", len(after), MemoryByteBudget)
+	fmt.Fprintf(&b, "%s, so the newest thread would be the one cut off; archive threads first, then write again.", headline)
 	if len(dated) == 0 {
 		b.WriteString(" No thread carries a date, so none is suggested: choose by hand.")
 	} else {

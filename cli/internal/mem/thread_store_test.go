@@ -295,3 +295,72 @@ func TestTheBudgetRefusalSuggestsOnlyDatedThreadsAndHowToArchiveEach(t *testing.
 		t.Errorf("with no dated thread the refusal must say so and suggest none: %v", err)
 	}
 }
+
+// lineBudgetMemory is a handoff section with two dated threads, padded with
+// short lines to n lines in all: far under the byte budget, so only the line
+// budget can refuse it (#3227).
+func lineBudgetMemory(n int) string {
+	head := "## Session Handoff\n\n### thread: new\n\n> Updated: 2026-11-10<br>\n\n### thread: old\n\n> Updated: 2026-09-01<br>\n"
+	have := strings.Count(head, "\n")
+	return head + strings.Repeat("-\n", n-have)
+}
+
+func TestCheckMemoryBudgetRefusesAWritePastTheLineCap(t *testing.T) {
+	over := lineBudgetMemory(MemoryLineBudget + 1)
+	if len(over) >= MemoryByteBudget {
+		t.Fatalf("the fixture is %d bytes, so the byte budget could be the one refusing", len(over))
+	}
+	err := CheckMemoryBudget(lineBudgetMemory(MemoryLineBudget), over)
+	if err == nil {
+		t.Fatal("a write past the line cap passed")
+	}
+	msg := err.Error()
+	for _, want := range []string{
+		fmt.Sprintf("%d lines", MemoryLineBudget+1),
+		fmt.Sprintf("the %d a session start loads", MemoryLineBudget),
+		"  old (2026-09-01): move its block from MEMORY.md to archive/",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("the refusal lacks %q:\n%s", want, msg)
+		}
+	}
+	if o, n := strings.Index(msg, "  old ("), strings.Index(msg, "  new ("); o < 0 || n < 0 || o > n {
+		t.Errorf("the refusal does not name the dated threads oldest first:\n%s", msg)
+	}
+}
+
+func TestCheckMemoryBudgetLetsAFilePastTheLineCapShrink(t *testing.T) {
+	past := lineBudgetMemory(MemoryLineBudget + 20)
+	if err := CheckMemoryBudget(past, lineBudgetMemory(MemoryLineBudget+19)); err != nil {
+		t.Errorf("a write that lowers the line count was refused: %v", err)
+	}
+	// Same line count, more bytes: an entry rewritten in place must pass.
+	if err := CheckMemoryBudget(past, strings.Replace(past, "> Updated: 2026-11-10", "> Updated: 2026-11-12 and later", 1)); err != nil {
+		t.Errorf("a write that holds the line count was refused: %v", err)
+	}
+	if err := CheckMemoryBudget(past, past+"-\n"); err == nil {
+		t.Error("a write that grows a file already past the line cap passed")
+	}
+}
+
+func TestCheckMemoryBudgetPassesAFileAtTheLineCap(t *testing.T) {
+	if err := CheckMemoryBudget("", lineBudgetMemory(MemoryLineBudget)); err != nil {
+		t.Errorf("a file of exactly %d lines was refused: %v", MemoryLineBudget, err)
+	}
+	// A last line without a newline is still a line a 200-line read sees.
+	unterminated := strings.TrimSuffix(lineBudgetMemory(MemoryLineBudget), "\n") + "\nlast"
+	if err := CheckMemoryBudget("", unterminated); err == nil {
+		t.Errorf("%d lines and an unterminated one passed", MemoryLineBudget)
+	}
+}
+
+func TestCheckMemoryBudgetStillRefusesPastTheByteBudget(t *testing.T) {
+	short := "## Session Handoff\n\n### thread: old\n\n> Updated: 2026-09-01<br>\n" + strings.Repeat("y", MemoryByteBudget)
+	err := CheckMemoryBudget("", short)
+	if err == nil {
+		t.Fatal("a short write past the byte budget passed")
+	}
+	if !strings.Contains(err.Error(), "bytes, past the 25000 a session start reads") {
+		t.Errorf("the byte refusal changed:\n%s", err)
+	}
+}
