@@ -143,3 +143,20 @@ func TestVerifyReviewProducedReportsAnErrorStub(t *testing.T) {
 		t.Errorf("err = %v, want the ERROR refusal and no 'malformed'", err)
 	}
 }
+
+// #3346: a damaged launch request is named in the stub, not dropped silently;
+// the stub is still written, since it is still a run that signed nothing.
+func TestWriteErrorStubNamesADamagedRequest(t *testing.T) {
+	review, transcript := stubSpec(t, FirstSigner)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(review), FirstSigner.Request), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wrote, err := WriteErrorStub(review, transcript, "exited 0")
+	if err != nil || !wrote {
+		t.Fatalf("wrote=%v err=%v, want a stub", wrote, err)
+	}
+	raw, _ := os.ReadFile(review)
+	if !strings.Contains(string(raw), "review-request.json is not valid JSON") {
+		t.Errorf("the stub must name the damaged request:\n%s", raw)
+	}
+}

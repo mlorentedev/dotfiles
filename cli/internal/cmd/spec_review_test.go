@@ -465,3 +465,21 @@ func TestSpecReviewFallbackRecordsItsReason(t *testing.T) {
 		t.Fatalf("want the fallback and its reason recorded, got %+v found=%v err=%v", req, found, err)
 	}
 }
+
+// #3346: `spec deadline` has already left an ERROR record by the time the
+// session is gone, so the startup-death message must not say the review file
+// was not written.
+func TestSpecReviewStartupDeathNamesTheErrorRecord(t *testing.T) {
+	root := makeRepo(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	stubLaunch(t, false)
+
+	_, _, err := execute(t, "spec", "review", "AI-001-x")
+	if err == nil {
+		t.Fatal("a launch whose session is already gone must fail")
+	}
+	if strings.Contains(err.Error(), "was not written") || !strings.Contains(err.Error(), "verdict ERROR") {
+		t.Errorf("err = %v, want it to name the ERROR record and not claim nothing was written", err)
+	}
+}

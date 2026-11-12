@@ -64,3 +64,19 @@ func TestDeadlineKeepsTheReviewersOwnFile(t *testing.T) {
 		t.Errorf("review.md = %q (err %v), want the reviewer's PENDING file untouched\n%s", raw, err, stderr)
 	}
 }
+
+// #3346: a reviewer that cannot be started still leaves the ERROR record,
+// saying it could not be started.
+func TestDeadlineWritesAnErrorStubWhenTheReviewerCannotStart(t *testing.T) {
+	_, callerSpec, tree := reviewWorktree(t)
+	review := filepath.Join(tree, "specs", "AI-001-x", "review.md")
+	_, stderr, err := execute(t, "spec", "deadline", "1m", "--review", review,
+		"--worktree", tree, "--copy-back", callerSpec, "--", filepath.Join(t.TempDir(), "no-such-reviewer"))
+	if err == nil {
+		t.Fatalf("a reviewer that cannot start must fail the run\n%s", stderr)
+	}
+	raw, rerr := os.ReadFile(filepath.Join(callerSpec, "review.md"))
+	if rerr != nil || !strings.Contains(string(raw), "verdict: ERROR") || !strings.Contains(string(raw), "could not be started") {
+		t.Errorf("review.md = %q (err %v), want an ERROR record saying the reviewer could not be started\n%s", raw, rerr, stderr)
+	}
+}
