@@ -32,6 +32,10 @@ them.
 **Amended 2026-10-13:** the Orca backend is withdrawn and herdr does not replace it as an executor.
 See *Amendment 2026-10-13 (ADR-044, #1586)*.
 
+**Amended 2026-11-12:** NaN is no longer a flat subscription; it bills from one credit pool. Routing
+stays cost-blind, and the low tier's NaN binding must be a model that spends no credits. See
+*Amendment 2026-11-12 (NaN credit pool, #3341)*.
+
 ## Date
 
 2026-08-09
@@ -60,7 +64,8 @@ three up to it, not inventing it.
 
 **2. The pools are two paid subscriptions, not a cheap tier and an expensive one.** Claude and NaN
 are both flat subscriptions, so marginal cost is zero on both and routing between them is never a
-cost decision. NaN is a GPU cluster serving open models over an **OpenAI-compatible** API —
+cost decision. *(Amended 2026-11-12, #3341: NaN now bills from one credit pool; see that
+amendment.)* NaN is a GPU cluster serving open models over an **OpenAI-compatible** API —
 *"if something accepts a base URL + API key, it works with NaN"* — which also means **Claude Code
 cannot reach NaN without a gateway**, since it speaks the Anthropic Messages format.
 
@@ -362,6 +367,8 @@ that prohibition stands unchanged.
 **Scope clarification:** an orchestrator selecting a tier and a pool for a *delegated* subtask,
 inside a declared budget, is a different plane. The bill-shock rationale does not apply — both
 pools are flat subscriptions and per-token spend (OpenRouter) is escalation-only, never a default.
+*(Amended 2026-11-12, #3341: NaN is metered by credits; the delegated plane's bill-shock bound is the
+low tier's no-credit binding and NaN's own `402`, see that amendment.)*
 The silent-quality-drop rationale **does** apply and is honoured by §4: the top tier never
 degrades silently.
 
@@ -408,6 +415,41 @@ operator watches is cockpit use, and allowed: `dotf worktree add --agent` opens 
 herdr, starts the agent and submits its prompt, then returns saying the prompt was submitted and
 nothing about how the agent did. It is not a backend of the seam, and no caller reads its exit
 status as the task's result.
+
+## Amendment 2026-11-12 (NaN credit pool, #3341)
+
+In 2026-11 NaN replaced per-model monthly quotas with one credit pool per account: 7,000 credits a
+billing period on the inference plan, 20,000 on premium, then purchased packs, and `402` when the
+pool is empty. Each chat model spends credits at its own per-token rate. `qwen3.6` and `gemma4`
+spend none (`ai/nan/README.md`). §2's premise, that both pools are flat subscriptions with zero
+marginal cost, no longer holds for NaN. The pool is shared by PR-Agent, opencode, pi, Hermes and
+`dotf agent`.
+
+**Decision.** Routing stays cost-blind. A tier is chosen for capability, never for price, and the
+orchestrator does not weigh credit rates between members of a tier. Two rules bound the spend
+instead:
+
+1. **The low tier's NaN binding spends no credits.** `harness/model-map.json` `tiers.low.nan` is
+   `qwen3.6` today. Moving it to a credit-spending model is a change to this ADR, not a map edit.
+   High-volume delegated work (lookups, summaries, crons) lands on the low tier, so it never
+   drains the pool.
+2. **Mid and top on NaN spend credits by design, and nothing in `dotf` meters them.** The
+   shared reserve in `model-map.json` bounds concurrency, not credits. The bound on credits is
+   NaN's own `402` when the pool is empty. A `402` is a refusal of that pool, so it must advance
+   the chain like a 429 does, never stop it and never degrade the top tier silently. Today hive
+   reads a `402` as *task failed* and the chain stops; mlorentedev/hive#573 classifies it as
+   *pool unavailable*. Where every member of a chain is NaN, the advance ends in
+   `chain_exhausted`, which is the loud stop.
+
+**Rejected.** A credit budget kept by `dotf` (counting tokens against published rates): NaN exposes
+no balance API, so the count would be our own estimate of a number only NaN's dashboard knows, and
+every consumer of the key would need the same counter. A credit-rate tie-breaker inside a tier:
+it buys little while the low tier is already free, and it makes routing depend on a rate table
+that NaN changes without notice.
+
+**Consequences.** ADR-011's bill-shock rationale is now partly live for the delegated plane, bounded
+by rule 1. hive's equivalent premise (its ADR-021 spend cap) and the `402` classification are
+decided in mlorentedev/hive#573.
 
 ## Options Considered
 
