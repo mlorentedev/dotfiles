@@ -24,6 +24,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/diskfree"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -135,6 +136,9 @@ type System struct {
 	// state (secrets.BWServeDaemon.Status's own contract) — only a genuinely
 	// unparseable response surfaces as err. CLI-024-secrets-bw-serve, AC4.
 	BWServeStatus func() (string, error)
+	// DiskFree is the space the user may still write on the volume holding
+	// a path; diskfree.Free in production. Nil skips the disk check.
+	DiskFree func(path string) (uint64, error)
 	// BWServeReadable asks whether the daemon will serve a read, WITHOUT calling
 	// GET /status (secrets.BWServeClient.Readable): secrets.BWServeAbsent,
 	// BWServeRefused or BWServeReady. Any check that gates a read on the daemon
@@ -296,6 +300,7 @@ func realSystem() *System {
 		GOARCH:          runtime.GOARCH, //nolint:forbidigo // the production wiring of the seam
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
+		DiskFree:        diskfree.Free,
 		BWServeStatus: func() (string, error) {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},

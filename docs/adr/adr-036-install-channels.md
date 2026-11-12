@@ -161,4 +161,4 @@ Left out on purpose:
 - Tagged Docker images, a re-pull away.
 - Browser and application caches, which belong to their apps.
 
-The quiet day of `dotf update`, which the 2026-11-10 amendment gave to `system-upgrade`, now runs `system-upgrade` and `cache-gc`. A stamp under the state dir keeps the weekly cadence, so the step needs no trigger of its own.
+The quiet day of `dotf update`, which the 2026-11-10 amendment gave to `system-upgrade`, now runs `system-upgrade` and `cache-gc`. A stamp under the state dir keeps the weekly cadence, so the step needs no trigger of its own. A home volume under 20 GiB free makes the step due inside the week, and `dotf doctor` warns at the same threshold, naming the step as the remedy.

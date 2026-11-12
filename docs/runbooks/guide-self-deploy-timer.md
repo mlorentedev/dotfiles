@@ -65,7 +65,9 @@ A tool not on PATH is left out, and a daemon that is not running skips its prune
 as it runs: an MCP server an agent session started holds it for days. The step tries the lock first
 and skips uv as `cache in use` instead of waiting out uv's five-minute lock timeout (#3370). A
 pruner that fails fails the step and leaves it due, so the next daily run retries it. The stamp is
-`$XDG_STATE_HOME/dotfiles/cache-gc/last-run`; delete it to make the step due now. The step's detail
+`$XDG_STATE_HOME/dotfiles/cache-gc/last-run`; delete it to make the step due now. A home volume with
+less than 20 GiB free makes the step due whatever the stamp says, and `dotf doctor` warns under the
+same threshold (section *Disk space*), naming `dotf converge --only cache-gc` as the remedy. The step's detail
 records the free space on the home volume before and after. Left out on purpose: Go's build cache trims
 itself, `system-upgrade` already runs `brew cleanup`, and browser and app caches belong to their apps.
 

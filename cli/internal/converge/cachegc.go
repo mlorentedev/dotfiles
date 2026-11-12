@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/diskfree"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -79,20 +80,39 @@ func (r cacheGC) Reconcile(e Env, dryRun bool) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if last, ok := r.lastRun(stamp); ok && r.clock().Sub(last) < gcCadence {
-		return Result{Detail: fmt.Sprintf("not due: last run %s, next after %s",
-			last.Format(time.DateOnly), last.Add(gcCadence).Format(time.DateOnly))}, nil
+	before, freeErr := r.freeSpace(e.Home)
+	why, due := r.due(stamp, before, freeErr)
+	if !due {
+		return Result{Detail: why}, nil
 	}
 	if dryRun {
-		return Result{Opaque: true, Detail: "due: would run " + strings.Join(plannedCommands(present), ", ")}, nil
+		return Result{Opaque: true, Detail: "due (" + why + "): would run " + strings.Join(plannedCommands(present), ", ")}, nil
 	}
-	return r.prune(e, stamp, present)
+	return r.prune(stamp, present, before, freeErr, e.Home)
+}
+
+// due says whether the step runs now, and why. A home volume under
+// diskfree.Low makes it due whatever the stamp says: a disk filling up is the
+// reason the step exists, and it must not wait out the week. That also makes
+// `dotf converge --only cache-gc` the remedy doctor can name for a low disk.
+func (r cacheGC) due(stamp string, free uint64, freeErr error) (string, bool) {
+	if freeErr == nil && free < diskfree.Low {
+		return "free space " + gib(free) + " is under " + gib(diskfree.Low), true
+	}
+	last, ok := r.lastRun(stamp)
+	if !ok {
+		return "no previous run recorded", true
+	}
+	if r.clock().Sub(last) >= gcCadence {
+		return "last run " + last.Format(time.DateOnly), true
+	}
+	return fmt.Sprintf("not due: last run %s, next after %s",
+		last.Format(time.DateOnly), last.Add(gcCadence).Format(time.DateOnly)), false
 }
 
 // prune runs every present pruner, and writes the stamp only when none failed,
 // so a failure is retried by the next daily run instead of a week later.
-func (r cacheGC) prune(e Env, stamp string, present []gcPruner) (Result, error) {
-	before, beforeErr := r.freeSpace(e.Home)
+func (r cacheGC) prune(stamp string, present []gcPruner, before uint64, beforeErr error, home string) (Result, error) {
 	var ran, skipped []string
 	var failed []error
 	for _, p := range present {
@@ -115,7 +135,7 @@ func (r cacheGC) prune(e Env, stamp string, present []gcPruner) (Result, error) 
 	if len(skipped) > 0 {
 		detail += "; skipped " + strings.Join(skipped, ", ")
 	}
-	if after, err := r.freeSpace(e.Home); err == nil && beforeErr == nil {
+	if after, err := r.freeSpace(home); err == nil && beforeErr == nil {
 		detail += "; free on the home volume " + freeDelta(before, after)
 	}
 	if len(failed) > 0 {

@@ -161,6 +161,27 @@ func TestCacheGC_ApplyRunsEveryPresentPrunerInOrderAndWritesTheStamp(t *testing.
 	}
 }
 
+// A disk short of space makes the step due whatever the stamp says: it is the
+// reason the step exists, and doctor names this step as the remedy.
+func TestCacheGC_LowDiskIsDueInsideTheWeek(t *testing.T) {
+	state := t.TempDir()
+	writeStamp(t, state, gcNow.Add(-24*time.Hour))
+	f := newGCFake("npm")
+	f.free = []uint64{5 << 30, 6 << 30}
+	res, err := f.step(state).Reconcile(Env{Home: state}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(f.log, "npm cache verify") || !strings.Contains(res.Detail, "+1.0 GiB") {
+		t.Errorf("low disk must run the pruners, got %q, %q", f.log, res.Detail)
+	}
+	f.free = []uint64{5 << 30}
+	plan, _ := f.step(state).Reconcile(Env{Home: state}, true)
+	if !plan.Opaque || !strings.Contains(plan.Detail, "under 20.0 GiB") {
+		t.Errorf("the plan names the low disk as the reason, got %q", plan.Detail)
+	}
+}
+
 // A daemon that does not answer is a skip of its pruners, never a failure: the
 // step runs unattended, and Docker stopped is an ordinary state.
 func TestCacheGC_DockerOrColimaNotRunningSkipsTheirPruners(t *testing.T) {
