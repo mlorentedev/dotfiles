@@ -212,6 +212,20 @@ func isDirty(path string, runner SweepRunner) bool {
 	return err != nil || dirt.Any()
 }
 
+// laneHeldByDirt reports whether a named lane is dirty and would otherwise
+// have reached the park decision: Classify answers StateDirty before it looks
+// at the lease, so a lane in use with a live lease, a lane younger than the
+// park age or a parked lane is dirty too, and none of those is a lane sweep
+// declined to park (#3372).
+func laneHeldByDirt(info Info, now time.Time) bool {
+	if info.State != StateDirty || info.Metadata == nil || info.Metadata.Lane == "" {
+		return false
+	}
+	return !strings.EqualFold(info.Metadata.State, string(StateParked)) &&
+		!info.Metadata.LeaseExpiresAt.After(now) &&
+		now.Sub(info.Metadata.CreatedAt) >= 15*time.Minute
+}
+
 func isMerged(repoRoot, branch string, runner SweepRunner) bool {
 	merged, err := runner.IsPRMerged(repoRoot, branch)
 	return err == nil && merged
@@ -365,9 +379,7 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 		}
 		if !candidate {
 			report.SkippedCount++
-			// A dirty named lane never reaches parkSingleNamedLane: Classify
-			// stops it here, so this is where its reason is recorded.
-			if info.State == StateDirty && info.Metadata != nil && info.Metadata.Lane != "" {
+			if laneHeldByDirt(info, now) {
 				report.LaneSkips = append(report.LaneSkips, SessionSkip{Path: info.Path, Reason: info.StateReason})
 			}
 			if info.PRMergedUnknown != "" && (info.State == StateUnmerged || info.State == StateOrphan) {

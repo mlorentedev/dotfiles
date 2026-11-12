@@ -306,3 +306,32 @@ func TestSweepReportsADirtyLaneItDidNotPark(t *testing.T) {
 		t.Errorf("state = %q, want ACTIVE", got)
 	}
 }
+
+// A dirty lane whose lease is live is simply in use: Classify calls it dirty
+// before it reads the lease, and that must not read as a lane sweep declined
+// to park (#3372).
+func TestSweepDoesNotReportADirtyLaneWithALiveLease(t *testing.T) {
+	withHostProcessInside(t, false)
+	repo, info, tip := parkLaneFixture(t)
+	if err := SaveMetadata(info.Path, Metadata{Lane: "lane-a", State: "ACTIVE", CreatedAt: time.Now().Add(-2 * time.Hour), LeaseExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(info.Path, "wip.txt"), []byte("in use\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := SweepWithRunner(SweepOptions{
+		RepoRoot:    repo,
+		LockPath:    filepath.Join(t.TempDir(), "sweep.lock"),
+		LandedHeads: func(_, _ string) ([]string, error) { return []string{tip}, nil },
+	}, &RealSweepRunner{}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.LaneSkips) != 0 {
+		t.Errorf("LaneSkips = %+v: a lane with a live lease is in use, not declined", report.LaneSkips)
+	}
+	if len(report.Reaped) != 0 {
+		t.Errorf("reaped %v: want nothing", report.Reaped)
+	}
+}
