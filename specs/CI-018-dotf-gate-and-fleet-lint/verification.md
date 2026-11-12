@@ -23,7 +23,7 @@ owner: manu
 - PR 1: `go test ./...`, `go vet ./...`, `GOOS=windows go vet ./...`, `golangci-lint run` and the Windows lint -> clean
 - PR 2b: `bats tests/check-spec-gate.bats tests/spec-gate-archive.bats` -> 1..65; mutations: a verdict message (24 red), the archived-at-head check removed (6 red)
 - PR 1 mutations: a changed problem message (3 cases red), `escaped` inverted (3 cases red)
-- Closing, 2026-11-12 on main at 5854b97c: `bats tests/check-knowledge-gate.bats` 1..45, `tests/check-spec-gate.bats` 1..30, `tests/spec-gate-archive.bats` 1..35, `tests/spec-gate-adjacency.bats` 1..15, no failures; `go test ./internal/fleetlint/` 18 tests ok; `go test ./internal/cmd/ -run LintFleet` 7 tests ok
+- Closing, 2026-11-12 at dd4009de (the reviewed commit; main was 5854b97c): `bats tests/check-knowledge-gate.bats` 1..45, `tests/check-spec-gate.bats` 1..30, `tests/spec-gate-archive.bats` 1..35, `tests/spec-gate-adjacency.bats` 1..15, no failures; `go test ./internal/fleetlint/` 18 tests ok; `go test ./internal/cmd/ -run LintFleet` 7 tests ok
 - Adoption, 2026-11-12: the eight rules run against each default-branch tip of the owner's 14 other repositories gave 4 to 57 findings each; one issue per repository, in that repository (ci-workflows#8 lists them)
 - PR 5b: `go test ./...`, both vets and both lints clean; mutations, each red: the stale-exception check, the unknown-rule check, the `.git` test in `Repos`, the `[OK]` line on an incomplete run, the checkout prefix, a failed checkout counted, the empty-fleet error
 
@@ -32,6 +32,15 @@ owner: manu
 - The parity harness compares output except on exit 2: the shell gate reports an unset variable, `dotf` an event with no pull request, and both mean the wiring is wrong.
 - The tokenizer for paths is compiled POSIX (leftmost-longest), matching the shell gate's `grep -oE`.
 - `--fleet` refuses `--default-branch`: the checkouts it reads do not share one default branch, so each is checked against its own origin/HEAD.
+
+## Review dispositions
+
+Independent review by nan/qwen3.8-flash (pool draw), verdict PASS WITH GAPS, seven Minor findings:
+
+- YAML anchors and merge keys not resolved; exception paths exact and duplicates collapsed; `fleet/branch-filter` ignores `pull_request_target`: ticketed, #3388
+- Adjacency output does not strip `\r` or escape HTML from issue titles: ticketed, #3389 (P2, the annotation is a workflow-command channel)
+- `repoSlug()` on trailing-slash and mirror URLs; `git diff -z` against the script's quoted paths: ticketed, #3390
+- Closing evidence named main's commit rather than the reviewed one: applied, the line above now names dd4009de, where the reviewer re-ran the same counts
 
 ## Promotion candidates
 
