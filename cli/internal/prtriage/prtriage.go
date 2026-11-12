@@ -123,6 +123,13 @@ type PR struct {
 	// Files is the diff's file list, or nil when it was not read. Only a PR
 	// the queue would otherwise report has it read (see fetchWith).
 	Files []string `json:"files,omitempty"`
+	// Draft PRs are not asking to land, so their head review holds nothing.
+	Draft bool `json:"draft,omitempty"`
+	// HeadSHA is the commit the PR would land, and HeadReview what the review
+	// check reads on it: a conclusion, a status while it runs, ReviewAbsent,
+	// or "" when it was not read (#3243).
+	HeadSHA    string `json:"head_sha,omitempty"`
+	HeadReview string `json:"head_review,omitempty"`
 }
 
 // Status is the verdict for one pull request.
@@ -132,6 +139,10 @@ type Status struct {
 	Reviewer string    // who produced the untriaged output
 	At       time.Time // when they produced it
 	Reason   string    // human-readable, always set
+	// HeadUnreviewed is set when the PR is held only because no review covers
+	// its head (#3243): there is no reviewer output to triage, so `pr land`
+	// refuses it for the review itself rather than as untriaged output.
+	HeadUnreviewed bool
 
 	// Unclassified are the inline findings, newer than the last triage, that a
 	// classifying reviewer left without a declared class (TOOL-017 AC3). They

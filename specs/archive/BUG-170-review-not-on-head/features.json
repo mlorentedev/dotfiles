@@ -1,0 +1,23 @@
+[
+  {
+    "id": "BUG-170-review-not-on-head-f1",
+    "behavior": "triage-queue lists a non-draft PR whose newest review check on the head is not success, repo-wide and with --pr",
+    "verification": "cd cli && go test ./internal/prtriage/ -run 'ReviewOnHead'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-170-review-not-on-head-f2",
+    "behavior": "a draft or an exempt diff is not listed for its head review",
+    "verification": "cd cli && go test ./internal/prtriage/ -run 'ReviewOnHead.*(Draft|Exempt)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-170-review-not-on-head-f3",
+    "behavior": "pr land refuses a skipped or absent review check under either name",
+    "verification": "cd cli && go test ./internal/prland/ ./internal/prtriage/ -run 'ReviewDidNotRun|IsReviewCheck'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
