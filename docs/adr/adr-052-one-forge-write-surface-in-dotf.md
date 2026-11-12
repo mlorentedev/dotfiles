@@ -66,3 +66,12 @@ Clause 4 keys `forge/hosts.json` by host, so two owners on one host share a writ
 The split between that token and the organization-scoped one is by scope, not by identity. The default is the narrower token, which has no `write:organization`. The broader one is kept for the operations that need its scope. Keying the map by owner would route routine issue writes to the broader token, so the map stays keyed by host. Clause 4's "the wrong forge's token" still holds between forges; within one forge, the scope a write needs decides the token.
 
 The forge cannot say which account a token belongs to, because no token holds `read:user`. The registry records what was measured instead.
+
+## Amendment (2026-11-11, #3316): an agent session writes as the agents' account where the owner has one
+
+The amendment above keeps one write token per host. That token is a PAT on the operator's account (kubelab#2578), so everything an agent opened through `dotf forge` was attributed to the operator. The operator decided on 2026-11-11 to route agents by owner, without adding a token.
+
+- A host may declare `agent_secrets`, a map from owner to a registry secret. In an agent session (the markers `dotf secrets` already reads), a write to a listed owner uses that owner's secret. Every other write, human or agent, uses the host's `secret`, as before.
+- `gitea.kubelab.live` (and its `forge` alias) maps `personal` to `GITEA_KUBELAB_AGENT_TOKEN`, the agents' account kubelab mints (ADR-062, 2026-11-03 amendment). That account is a collaborator only where a repository lists it under `writers:`, which today is every `personal/` repository. A new `personal/` repository needs that entry before agents can write to it; the forge answers 404, never a fallback to the operator's token.
+- The client organization has no entry: the agents' account has no access there, so agent writes on it stay on the operator's token. Moving them is a kubelab grant decision, not a routing one.
+- The previous amendment's point stands: no route ever selects the organization-scoped token. The map is still keyed by host first; the owner only refines it inside one host.

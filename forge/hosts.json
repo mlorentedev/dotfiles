@@ -1,8 +1,8 @@
 {
-  "$comment": "Forges dotf may write to besides github.com (TOOL-030). The secret is a registry id; the token is read at call time and never printed. The boards map names the GitHub Project that dotf forge issue create --board places cards on.",
+  "$comment": "Forges dotf may write to besides github.com (TOOL-030). The secret is a registry id; the token is read at call time and never printed. agent_secrets maps an owner to the token an agent session writes with there (#3316); other owners and human sessions use secret. The boards map names the GitHub Project that dotf forge issue create --board places cards on.",
   "hosts": {
-    "gitea.kubelab.live": { "kind": "gitea", "secret": "GITEA_KUBELAB_TOKEN" },
-    "forge": { "kind": "gitea", "secret": "GITEA_KUBELAB_TOKEN", "api": "https://gitea.kubelab.live" }
+    "gitea.kubelab.live": { "kind": "gitea", "secret": "GITEA_KUBELAB_TOKEN", "agent_secrets": { "personal": "GITEA_KUBELAB_AGENT_TOKEN" } },
+    "forge": { "kind": "gitea", "secret": "GITEA_KUBELAB_TOKEN", "api": "https://gitea.kubelab.live", "agent_secrets": { "personal": "GITEA_KUBELAB_AGENT_TOKEN" } }
   },
   "boards": {
     "github.com": { "owner": "mlorentedev", "number": 1 }
