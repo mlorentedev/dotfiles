@@ -136,6 +136,31 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 			t.Errorf("HEAD = %q, want the lane's branch", got)
 		}
 	})
+	t.Run("a merged branch does not park a lane whose HEAD moved past it", func(t *testing.T) {
+		// isMerged answers for the branch; branchLanding answers for the
+		// worktree's HEAD. When the caller names landed heads, the second
+		// answer is still required, as it was before laneLanded existed.
+		repo, info, tip := parkLaneFixture(t)
+		runGitParkTest(t, repo, "merge", "--ff-only", "feat/lane-a")
+		runGitParkTest(t, repo, "push", "origin", "main")
+		runGitParkTest(t, info.Path, "checkout", "--detach")
+		if err := os.WriteFile(filepath.Join(info.Path, "later.txt"), []byte("more\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		runGitParkTest(t, info.Path, "add", "later.txt")
+		runGitParkTest(t, info.Path, "commit", "-m", "past the merged tip")
+		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
+
+		parked, why := parkSingleNamedLane(repo, info, &RealSweepRunner{}, heads)
+		if parked {
+			t.Fatal("parked a lane whose HEAD is not landed because its branch is")
+		}
+		// branchLanding gives a detached HEAD no reason of its own; the
+		// fallback names the undecided landing rather than an empty string.
+		if why != "its landing could not be decided" {
+			t.Errorf("why = %q, want the undecided landing", why)
+		}
+	})
 	t.Run("a lane whose landing cannot be checked is not parked", func(t *testing.T) {
 		repo, info, _ := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return nil, errors.New("forge unreachable") }
