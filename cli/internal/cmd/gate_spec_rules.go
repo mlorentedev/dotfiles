@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -93,7 +95,29 @@ func (g *specGate) archiveOnMerge() error {
 		}
 		return g.fail(1, "[FAIL] \"skip-archive\" label present but the \"## Archive skip rationale\" section is empty or missing in the PR body.\n")
 	}
+	// A draft is still under review, and the push may carry the fix a review
+	// round needs CI to prove (#3364). The invariant is about the merge, so
+	// at push time it is a warning. Only the pre-push adapter sets the
+	// variable; the event's own draft field is deliberately not read, so CI
+	// keeps the refusal until the spec is archived in the PR.
+	if os.Getenv("SDD_PR_DRAFT") == "true" {
+		_, _ = io.WriteString(g.err, archiveDraftWarning(violations))
+		return nil
+	}
 	return g.fail(1, archiveViolation(violations))
+}
+
+func archiveDraftWarning(violations []string) string {
+	var b strings.Builder
+	b.WriteString("[WARN] SDD archive-on-merge: this draft PR closes an issue whose spec is still active:\n")
+	for _, v := range violations {
+		fmt.Fprintf(&b, "         %s\n", v)
+	}
+	b.WriteString("       The push goes through; spec-gate in CI refuses the merge until the spec is\n       archived in this PR. Before marking it ready, run:\n")
+	for _, v := range violations {
+		fmt.Fprintf(&b, "         dotf spec archive %s\n", strings.SplitN(v, " ", 2)[0])
+	}
+	return b.String()
 }
 
 // archivedAtHead asks the head tree, not the diff: a move can surface as a
