@@ -122,3 +122,12 @@ A second opinion on the landed change found that `885839c9`'s last commit, appli
 - CI 27/27 green on `98a22323`. PR-Agent reviewed, no findings beyond the verification. CodeRabbit's only comment was a "Review limit reached" notice: no review ran, disclosed in the triage; merged with one reviewer.
 - **#3374 landed** with `dotf pr land` -> main `6057dd60`; #3372 closed, Done on the board; worktree and branch removed.
 - Main on `ec724137`: `cli`, `CI`, `cli-smoke`, `Repo hygiene`, `release-please` green; `from-zero` still running. Main on `6057dd60`: `cli-smoke`, `Repo hygiene`, `release-please` green, `cli` (43150074590) and `CI` (43150074581) running. Its `from-zero` run (43150074675) was cancelled while queued, not by the `ec724137` run: the workflow's concurrency group on `main` has `cancel-in-progress` false, so it keeps one pending run and a newer push replaces it; #3371 (`8d01584f`) replaced this one and #3373 (`510a3a34`) replaced that, so the pending run on `510a3a34` (43150232030) is the one that covers the #3374 change.
+
+### Post-land: main CI settled
+
+- `6057dd60`: `cli` (43150074590) and `CI` (43150074581) green. `from-zero` on `510a3a34` (43150232030), the run that covers #3374, green.
+- `ec724137`: `from-zero` (43147689360) **red** on both runners, not the change: the second converge's one changed entry is `checkout: fast-forwarded to origin/main`, because `6057dd60` landed between the two converges; every other entry, `records-mirror` included, was `[ OK ]`. The run on `4b58ea1c` failed the same way at 02:57Z. Filed #3375 (bug, P3): the converge `checkout` step fast-forwards the tree under test, so the job measures `origin/main` at run time rather than `github.sha`; option A pins the ref, option B only makes the gate name the moved base. Same family as #3331.
+
+### The one next action (final)
+
+#3265, as above. #3375 and #3364 are the owner's A/B; #3293 waits for a WIP slot.
