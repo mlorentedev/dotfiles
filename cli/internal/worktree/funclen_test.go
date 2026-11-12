@@ -45,7 +45,7 @@ func TestParkPathFunctionsStayUnderTheLimit(t *testing.T) {
 	const limit = 40
 	for file, names := range map[string][]string{
 		"done.go":  {"Park"},
-		"sweep.go": {"parkSingleNamedLane", "SweepWithRunner", "sweepOne"},
+		"sweep.go": {"parkSingleNamedLane", "SweepWithRunner", "sweepOne", "sweepLane"},
 	} {
 		lines := funcLines(t, packageFile(t, file))
 		for _, name := range names {
