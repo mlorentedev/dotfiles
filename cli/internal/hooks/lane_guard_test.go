@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -205,6 +206,12 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	}
 	if strings.Contains(out, "main checkout") {
 		t.Fatalf("a linked worktree is not the main checkout; the message must not say so:\n%s", out)
+	}
+	// The parenthesised repository is the main root, not the scratch path and
+	// not empty: git answers with the physical path, so compare base names.
+	root := regexp.MustCompile(`repository \((.*)\)\.`).FindStringSubmatch(out)
+	if root == nil || root[1] == "" || filepath.Base(root[1]) != "lane-repo" || strings.Contains(root[1], "scratch-wt") {
+		t.Fatalf("expected the message to name the main repository root in parentheses, got:\n%s", out)
 	}
 	// 6c. The main checkout on a detached HEAD keeps its own wording.
 	detachedMain := filepath.Join(t.TempDir(), "detached-main")
