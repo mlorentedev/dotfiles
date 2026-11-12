@@ -1,21 +1,22 @@
 #!/usr/bin/env bats
-# test-windows restores the pinned npm CLIs on a pull request instead of
-# reinstalling them from npm, and only main writes that cache.
+# test-windows restores the pinned pi CLI on a pull request instead of
+# reinstalling it from npm, and only main writes that cache.
 #
 # CI-010 (#2047) cached the pi CLI: ~130 s of every PR's test-windows (p50
 # 508 s, 2026-10-07). #2059 added the three npm CLIs `dotf tools install`
-# pins in packages.json (bw, opencode, copilot): ~90 s of a 228-309 s setup
-# step on a PR, measured 2026-10-31. One cache holds all four, so the job pays
-# one restore, not four.
+# pinned in packages.json (bw, opencode, copilot); #2438 moved them to mise's
+# npm backend, which installs under mise's data directory, so the cache holds
+# pi only and its key no longer names packages.json or the installer.
 #
 # What these tests hold:
 # - the key names every input, so a PR that changes any of them misses and
-#   runs the fresh install itself: the runner image, PI_VERSION, packages.json,
-#   the Go installer with the packages it imports, and setup-windows.ps1;
+#   runs the fresh install itself: the runner image, PI_VERSION and
+#   setup-windows.ps1;
 # - the match is exact (no restore-keys), so a stale install never stands in;
 # - only a push to main saves, as the job's last step, so the cache is always a
 #   fresh install from a fully green run, never one restored and re-saved;
-# - every npm tool packages.json pins is cached or named as left out.
+# - a npm tool that packages.json pins again must join the cache or be named as
+#   left out.
 #
 # Asserted on the workflow text, because nothing here can run GitHub's runner.
 
@@ -48,9 +49,9 @@ setup() {
     [ "$after" -eq 0 ] || { echo "$after step(s) after the save: a later failure would not stop a cache write" >&2; return 1; }
 }
 
-@test "ci: the npm CLI cache key names the runner image, PI_VERSION, packages.json, the installer and setup-windows.ps1" {
+@test "ci: the npm CLI cache key names the runner image, PI_VERSION and setup-windows.ps1" {
     printf '%s\n' "$STEPS" | grep -q "PI_VERSION="
-    for part in "runner.os" "steps.picli.outputs.image" "steps.picli.outputs.version" "hashFiles('packages.json')" "hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go')" "hashFiles('setup-windows.ps1')"; do
+    for part in "runner.os" "steps.picli.outputs.image" "steps.picli.outputs.version" "hashFiles('setup-windows.ps1')"; do
         printf '%s\n' "$RESTORE" | grep -E 'key: npm-clis-' | grep -qF "$part" || { echo "restore key lacks $part" >&2; return 1; }
         printf '%s\n' "$SAVE" | grep -E 'key: npm-clis-' | grep -qF "$part" || { echo "save key lacks $part" >&2; return 1; }
     done
@@ -81,30 +82,29 @@ setup() {
     fi
 }
 
-@test "ci: the npm CLI cache holds each package and its shims, not the whole npm prefix" {
+@test "ci: the npm CLI cache holds pi and its shims, not the whole npm prefix" {
     paths=$(printf '%s\n' "$RESTORE" | awk '/path: \|/{f=1;next} /key:/{f=0} f' | sed 's/^[[:space:]]*//')
-    [ "$(printf '%s\n' "$paths" | wc -l | tr -d ' ')" -eq 16 ] || { printf 'paths:\n%s\n' "$paths" >&2; return 1; }
-    for pkg in '@earendil-works\pi-coding-agent' '@bitwarden\cli' 'opencode-ai' '@github\copilot'; do
-        printf '%s\n' "$paths" | grep -qxF "\${{ steps.picli.outputs.prefix }}\\node_modules\\$pkg" || { echo "missing package $pkg" >&2; return 1; }
-    done
-    for bin in pi bw opencode copilot; do
-        for shim in "$bin" "$bin.cmd" "$bin.ps1"; do
-            printf '%s\n' "$paths" | grep -qxF "\${{ steps.picli.outputs.prefix }}\\$shim" || { echo "missing shim $shim" >&2; return 1; }
-        done
+    [ "$(printf '%s\n' "$paths" | wc -l | tr -d ' ')" -eq 4 ] || { printf 'paths:\n%s\n' "$paths" >&2; return 1; }
+    printf '%s\n' "$paths" | grep -qxF "\${{ steps.picli.outputs.prefix }}\\node_modules\\@earendil-works\\pi-coding-agent" || { echo "missing package pi" >&2; return 1; }
+    for shim in pi pi.cmd pi.ps1; do
+        printf '%s\n' "$paths" | grep -qxF "\${{ steps.picli.outputs.prefix }}\\$shim" || { echo "missing shim $shim" >&2; return 1; }
     done
     saved=$(printf '%s\n' "$SAVE" | awk '/path: \|/{f=1;next} /key:/{f=0} f' | sed 's/^[[:space:]]*//')
     [ "$saved" = "$paths" ] || { printf 'save paths differ from restore paths:\n%s\n' "$saved" >&2; return 1; }
 }
 
-@test "ci: every npm tool packages.json pins is cached, or named as left out" {
-    # A new npm entry in the catalog must join the cache or be named here with
+@test "ci: a npm tool packages.json pins is cached, or named as left out" {
+    # The catalog holds no npm tool since #2438 moved bw, copilot, opencode and
+    # yarn to mise; one that returns must join the cache or be named here with
     # its reason, so the cache cannot fall behind the pins unnoticed.
-    # yarn: the runner image ships it, so the installer already skips it.
-    left_out='yarn'
+    left_out=''
+    # The query is checked against the catalog, so a wrong path cannot read as
+    # "no npm tool".
+    [ "$(jq -r '.tools | length' "$REPO/packages.json")" -gt 0 ] || { echo "packages.json lists no tool: the jq query is wrong" >&2; return 1; }
     pkgs=$(jq -r '.tools[] | select(.source.type == "npm") | .name + " " + .source.package' "$REPO/packages.json")
-    [ -n "$pkgs" ] || { echo "packages.json lists no npm tool: the jq query is wrong" >&2; return 1; }
+    [ -z "$pkgs" ] && return 0
     while read -r name pkg; do
-        [ "$name" = "$left_out" ] && continue
+        [ -n "$left_out" ] && [ "$name" = "$left_out" ] && continue
         win=$(printf '%s' "$pkg" | tr '/' '\\')
         printf '%s\n' "$RESTORE" | grep -qF "node_modules\\$win" || { echo "packages.json pins $pkg but the cache does not hold it" >&2; return 1; }
     done <<EOF

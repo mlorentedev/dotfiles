@@ -162,3 +162,18 @@ Left out on purpose:
 - Browser and application caches, which belong to their apps.
 
 The quiet day of `dotf update`, which the 2026-11-10 amendment gave to `system-upgrade`, now runs `system-upgrade` and `cache-gc`. A stamp under the state dir keeps the weekly cadence, so the step needs no trigger of its own. A home volume under 20 GiB free makes the step due inside the week, and `dotf doctor` warns at the same threshold, naming the step as the remedy.
+
+## Amendment 2026-11-12 (#2438, PLAT-001c AC4)
+
+`bw`, `copilot`, `opencode` and `yarn` leave the `npm` source type and install through mise's npm backend. The 2026-10-06 amendment left the npm row unchanged; this one changes it for the CLIs that are npm packages and have no self-installer. Each pin lives in `versions.conf` under `# mise: cli` and nowhere else, so decision 2 holds with that file as the single place for them, and their `packages.json` entries are deleted. `npmBackend` (`cli/internal/tools/mise.go`) aliases each short name to its `npm:` package (`bw` to `npm:@bitwarden/cli`, and so on), so `mise which`, `mise ls` and `dotf doctor` keep the short name.
+
+**Why.** With Node installed by mise, `npm install -g` writes its launchers into the Node install directory, a path nothing puts on PATH on Windows. mise's shims do not depend on where npm writes. One owner per tool on every OS is the point of PLAT-001c, and these four were the last ones the catalog installed through a different channel there.
+
+**Rules the move carries.**
+
+1. **Node is pinned in the same file.** The sync refuses an npm CLI marked without a `node` pin, since the package runs on it.
+2. **Install scripts are off.** mise installs npm packages with `--ignore-scripts=true`. A package whose binary depends on its `postinstall` is named in `npmBuildScripts` with the package allowed to run it (`allow_builds`), not by lifting the flag for the whole tree: `opencode-ai` ships a 479-byte placeholder for `bin/opencode.exe` that its `postinstall` replaces (lesson 586, #3329). Before moving another npm package, read `npm view <package> scripts bin`.
+3. **Windows installs through npm, scoped to the call.** The aube installer creates no `.cmd` launcher, so on Windows the sync installs each npm CLI with `MISE_NPM_PACKAGE_MANAGER=npm` set for that one child process, after Node, as it already did for bats. Nothing is written to the user's mise settings.
+4. **Released first.** A `DOTF_VERSION` that predates `npmBackend` aliases none of them, and every from-zero install would look up an aqua recipe that does not exist (lesson 373). `tests/versions-conf.bats` refuses to mark them until the pinned release carries the table; 0.80.0 is the first that does.
+
+**What stays.** The `npm` source type and `pi` are unchanged: `pi` keeps its block until `packages.json` can express its install flags (2026-10-03 amendment). The npm installer in `installNpm` is deleted in its own change once no catalog entry uses it and the pinned release is past this one. `dotf doctor` reads a tool's pin from `packages.json` and falls back to `versions.conf`, and says which file the row came from. The Windows CI cache for the pinned npm CLIs holds `pi` only, since the others no longer install under the npm prefix it caches.

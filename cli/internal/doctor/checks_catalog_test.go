@@ -44,6 +44,12 @@ func TestCatalogPin_FallsBackToTheVersionsConfPinOfAMiseTool(t *testing.T) {
 	if got := catalogPin(sys, cfg, "nope"); got != "" {
 		t.Errorf("no pin anywhere, got %q", got)
 	}
+	if got := pinSource(sys, cfg, "copilot"); got != "versions.conf" {
+		t.Errorf("a row names versions.conf for a tool the catalog lacks, got %q", got)
+	}
+	if got := pinSource(sys, cfg, "opencode"); got != "packages.json" {
+		t.Errorf("a row names packages.json for a tool the catalog holds, got %q", got)
+	}
 }
 
 // Two opencode copies on PATH — the Windows work box's npm-global + winget

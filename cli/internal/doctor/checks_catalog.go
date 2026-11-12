@@ -53,6 +53,18 @@ func catalogPin(sys *System, cfg *Config, name string) string {
 	return cfg.Versions[strings.ToUpper(strings.ReplaceAll(name, "-", "_"))+"_VERSION"]
 }
 
+// pinSource names the file catalogPin read a tool's pin from, so a row says
+// where the number lives: a tool mise installs is pinned in versions.conf, not
+// in the catalog (#2438).
+func pinSource(sys *System, cfg *Config, name string) string {
+	for _, t := range loadCatalog(sys, cfg).Tools {
+		if t.Name == name {
+			return "packages.json"
+		}
+	}
+	return "versions.conf"
+}
+
 // checkShadowedCatalogTools reports an npm-distributed catalog tool that
 // resolves from more than one PATH directory (AI-034/#1294). The copy that
 // wins is not necessarily the one `dotf tools install` converges: the Windows

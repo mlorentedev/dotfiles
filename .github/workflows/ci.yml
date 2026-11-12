@@ -727,18 +727,14 @@ jobs:
       # inside it) and its three shims. Not the prefix, which also holds the
       # image's own globals.
       #
-      # #2059: the same cache holds the three npm CLIs `dotf tools install`
-      # pins in packages.json (bw, opencode, copilot). They were the largest
-      # uncached part of setup on a PR, ~90 s of a 228-309 s step (bw alone
-      # ~60 s), measured 2026-10-31 on three PR runs. packages.json and the
-      # installer's code join the key (cli/internal/tools, the platform and env
-      # packages it and `dotf tools` import, cli/internal/cmd/tools.go), so
-      # a pin bump or a PR that changes how they install misses and installs
-      # fresh: the install path stays covered on exactly the PRs that can break
-      # it, which is why #2050 had left these out. On a hit the installer's
-      # version probe skips them; a restored package that does not answer the
-      # probe is reinstalled, so a bad hit costs today's time, not a red job.
-      # yarn is not here: the runner image already ships it.
+      # #2059 added the three npm CLIs `dotf tools install` then pinned in
+      # packages.json (bw, opencode, copilot) to this cache: ~90 s of a 228-309 s
+      # setup step on a PR, measured 2026-10-31. #2438 moved them to mise's npm
+      # backend, which installs under mise's data directory and not under the npm
+      # prefix cached here, so the cache holds pi only again and its key drops
+      # packages.json and the installer's code. Their install is no longer
+      # cached on a PR; the cost is read from test-windows' setup step on the run
+      # that moved them. yarn is not here: the runner image ships it.
       - name: Resolve the npm CLI cache key
         id: picli
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -765,19 +761,7 @@ jobs:
             ${{ steps.picli.outputs.prefix }}\pi
             ${{ steps.picli.outputs.prefix }}\pi.cmd
             ${{ steps.picli.outputs.prefix }}\pi.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@bitwarden\cli
-            ${{ steps.picli.outputs.prefix }}\bw
-            ${{ steps.picli.outputs.prefix }}\bw.cmd
-            ${{ steps.picli.outputs.prefix }}\bw.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\opencode-ai
-            ${{ steps.picli.outputs.prefix }}\opencode
-            ${{ steps.picli.outputs.prefix }}\opencode.cmd
-            ${{ steps.picli.outputs.prefix }}\opencode.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@github\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot.cmd
-            ${{ steps.picli.outputs.prefix }}\copilot.ps1
-          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('packages.json') }}-${{ hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go') }}-${{ hashFiles('setup-windows.ps1') }}
+          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
 
       # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
       # the binary built above survives setup. No DOTFILES_DIR override: the
@@ -996,19 +980,7 @@ jobs:
             ${{ steps.picli.outputs.prefix }}\pi
             ${{ steps.picli.outputs.prefix }}\pi.cmd
             ${{ steps.picli.outputs.prefix }}\pi.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@bitwarden\cli
-            ${{ steps.picli.outputs.prefix }}\bw
-            ${{ steps.picli.outputs.prefix }}\bw.cmd
-            ${{ steps.picli.outputs.prefix }}\bw.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\opencode-ai
-            ${{ steps.picli.outputs.prefix }}\opencode
-            ${{ steps.picli.outputs.prefix }}\opencode.cmd
-            ${{ steps.picli.outputs.prefix }}\opencode.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@github\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot.cmd
-            ${{ steps.picli.outputs.prefix }}\copilot.ps1
-          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('packages.json') }}-${{ hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go') }}-${{ hashFiles('setup-windows.ps1') }}
+          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
 
   integration:
     runs-on: ubuntu-latest

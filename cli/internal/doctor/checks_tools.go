@@ -207,14 +207,15 @@ func checkVersionMatch(sys *System, cfg *Config, rep *Report) {
 		}
 	}
 
-	// yarn is npm-global (cross-platform) — always checked. Its pin lives in
-	// packages.json since OPS-042 (#1336), where `dotf tools install` reads it;
-	// versions.conf no longer carries YARN_VERSION.
+	// yarn is npm-global (cross-platform) — always checked. Its pin moved from
+	// versions.conf to packages.json with OPS-042 (#1336) and back to versions.conf
+	// when mise took it over through its npm backend (#2438); catalogPin reads
+	// whichever holds it.
 	if !sys.has("yarn") {
 		rep.Skip("yarn not installed (run `dotf tools install yarn`; needs Node.js on PATH)")
 	} else {
 		got, _ := sys.versionLine("yarn")
-		matchPinFloorFrom(rep, "yarn", got, catalogPin(sys, cfg, "yarn"), "packages.json")
+		matchPinFloorFrom(rep, "yarn", got, catalogPin(sys, cfg, "yarn"), pinSource(sys, cfg, "yarn"))
 	}
 
 	checkGitWindowsFloor(sys, cfg, rep)
