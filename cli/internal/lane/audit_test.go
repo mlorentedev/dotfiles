@@ -183,6 +183,21 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 		}
 		wantFindings(t, audit(t, repoDir, wtRoot), 0)
 	})
+	t.Run("an admin dir whose gitdir file is gone is reported, not folded into a missing record", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		gitDir, _, err := worktreeGitDirs(filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(filepath.Join(gitDir, "gitdir")); err != nil {
+			t.Fatal(err)
+		}
+		a := audit(t, repoDir, wtRoot)
+		wantFindings(t, a, 1, filepath.Base(gitDir), LaneFeatPrimary, "gitdir", "git worktree prune")
+		if strings.Contains(joined(a), "no identity record") {
+			t.Errorf("the record is intact; only the gitdir file is gone:\n%s", joined(a))
+		}
+	})
 	t.Run("an unreadable record is a finding, as the guard fails closed on it", func(t *testing.T) {
 		if runtime.GOOS == "windows" || os.Getuid() == 0 {
 			t.Skip("mode bits do not deny reads here")

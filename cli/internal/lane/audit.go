@@ -232,8 +232,18 @@ func laneRecords(commonDir string) (map[string][]laneRecord, []Finding, error) {
 			unreadable = append(unreadable, Finding{adminDir, "the identity record there is not readable, so the guard refuses commits in that worktree", "restore it with dotf lane init"})
 			continue
 		}
+		if !ok {
+			continue
+		}
+		// The record reads fine but git's own pointer to the worktree does
+		// not: without this the lane fell through to "no identity record",
+		// a diagnosis of the wrong file (#3337). The empty path marks the
+		// entry as reported so auditLane does not diagnose it again.
 		gitdir, gerr := os.ReadFile(filepath.Join(adminDir, "gitdir"))
-		if !ok || gerr != nil {
+		if gerr != nil {
+			unreadable = append(unreadable, Finding{adminDir, "the gitdir file there is missing or not readable, so git cannot locate the worktree of lane " + name,
+				"git worktree prune if the worktree is gone, or git worktree repair <path> if it was moved; then run dotf lane doctor again"})
+			out[name] = append(out[name], laneRecord{adminDir: adminDir})
 			continue
 		}
 		p := filepath.FromSlash(strings.TrimSpace(string(gitdir)))
@@ -250,6 +260,8 @@ func laneRecords(commonDir string) (map[string][]laneRecord, []Finding, error) {
 // carries its record and lease. One finding per lane, the first that applies.
 func auditLane(absRepo, commonDir, name, expected string, records []laneRecord) []Finding {
 	switch {
+	case len(records) == 1 && records[0].path == "":
+		return nil // already reported by laneRecords: the admin dir's gitdir is unreadable
 	case len(records) > 1:
 		paths := make([]string, 0, len(records))
 		for _, r := range records {
