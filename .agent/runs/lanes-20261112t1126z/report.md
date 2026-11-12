@@ -1,0 +1,35 @@
+# run lanes-20261112t1126z
+
+Armed 2026-11-12T11:26Z (the owner's go-ahead was 07:48Z; the arming turn waited 3h38m on the usage limit and the window kept the original expiry), expires 2026-11-12T19:48Z. Objective: work the lane/worktree follow-up queue in order (#3337, #3324, #3265+#3360, #3320), park the four that need a decision or a spec slot (#3114, #3307, #3327, #3318). Interim entries below; the disarm entry closes the file.
+
+## Pre-arming: #3380 and the release
+
+- #3380 (spec-gate warns instead of refusing a draft's unarchived spec) landed at `5dcfe6ff` after its triage; #3364 closed, worktree and branch removed, board Done. The owner cut v0.80.0; `dotf update` on this host reached 0.80.0 and its converge failed on Homebrew's `visual-studio-code` cask download, reported by dotf as `install dotf 0.80.0: install.sh: exit status 1`. Filed #3395 (the real failure is masked); no unattended retry of `system-upgrade`, which is outside the envelope.
+- Peer envelopes read before arming: the v0.80.0 acceptance and the npm pins runs write `cli/internal/doctor`, the review run owns #3243; none touch the lane or worktree paths. `cli/internal/doctor/**` frozen here for that reason. #3391 was warned that main already holds lesson 590 (from #3380).
+
+## Iteration 1: #3337 (lane doctor reports an unreadable gitdir)
+
+- Branch `fix/3337-audit-unreadable-gitdir`, worktree `fix-3337-audit-unreadable-gitdir`. Red test first (`audit_test.go`: an admin dir whose `gitdir` file is gone is reported, not folded into a missing record; a second registration whose gitdir is gone is not listed as a blank duplicate), then the fix: `laneRecords` emits a finding with the `prune`/`repair` FIX and keeps the admin dir in the per-lane list, `located` drops empty-path entries before `auditLane` decides. Four production lines plus the helper.
+- PR #3397: PR-Agent on `550967ed` found one REAL (the finding text named no remedy the runbook has) reproduced with `dotf pr reproduce` (exit 1 on `550967ed`, control did-not-reproduce on `c74072b4`); fixed, triaged, landed with `dotf pr land` at `c74072b4` under the standing grant. #3337 closed by the merge; board Done; worktree and branch removed.
+
+## Iteration 2: #3324 (rule 6b names the right checkout)
+
+- Branch `fix/3324-detached-no-lease-message`, worktree `fix-3324-detached-no-lease-message`. Option B (message only, owner's answer): rule 6b tells a detached main checkout from a detached leaseless worktree, naming the worktree's path in the second case. Tests 6b (scratch detached worktree; asserts the message, the base repository and not the scratch path) and 6c (detached main checkout keeps its wording). The first assertion tripped on this run's own wording, `(main checkout: …)`, which was dropped for `($main_root)`.
+- PR #3398: PR-Agent on `964f0839` left one THEORETICAL (an unasserted message segment) and a description-evidence row, both applied on `510656f5`; CodeRabbit posted a limit notice, not a review. Triage posted at 12:1xZ on `510656f5`; no reviewer ran on that head. Landing waits on `from-zero (macos-latest)`.
+
+## Iteration 3: #3265 and #3360 (Park under the 40-line limit)
+
+- Branch `refactor/3265-park-path-under-40`, worktree `refactor-3265-park-path-under-40`, commit `5893c19c`: `Park` split into `parkPreflight`, `parkable`, `parkedLease`, `detachAtBase`, `releaseParkedLane`, `parkOutcome`; `parkSingleNamedLane` and `switchLaneLocked` (now `switchTarget`, `switchable`) use the same helpers. Two go/ast guards (`TestParkPathFunctionsStayUnderTheLimit`, `TestSwitchLaneLockedStaysUnderTheLimit`, limit 40) proved red by restoring `named.go` from HEAD (60 lines) and green on the new file. 234 production lines, under the cap; `go test ./internal/worktree ./internal/lane` ok, pinned lint 0 issues.
+- Parked, branch local. The SDD gate counts the refactor over the 50-line threshold; the push under `SDD_LABELS=skip-sdd` was denied by the harness's own classifier (a gate bypass), and this run does not work around a denial. Two options on #3265 (the owner pushes under `skip-sdd`, there is no contract change; or a spec slot when one frees); board Blocked. #3360 builds on the same seam and waits on the answer.
+
+## Iteration 4: #3320 (the prompt directory's own name)
+
+- Branch `fix/3320-prompt-dir-name`, worktree `fix-3320-prompt-dir-name`. `PromptDirName = "dotf-lane-prompts"`, a one-time move of a legacy `dotf-lane` prompt directory (a regular file under the old name is left alone; both present, the new wins), `lane next` resolves through it; four tests. `git grep` outside the lane package finds no other reader of the old name (`.dotf-lane-prompt.md` is a different artifact).
+- PR #3400: PR-Agent on `3b7c91ed` found one REAL, a dry `lane next` moved the directory. Reproduced with `dotf pr reproduce` (exit 1 on `cd91fa52`, the red test `TestLaneNext_DryRunLeavesTheLegacyPromptDirectoryAlone`), fixed on `ce332d91`: `PromptDir(commonDir, migrate)` with `lane next` passing `!dryRun`. The THEORETICAL race (two movers, the loser's rename fails) applied in the same commit: a rename failing with ENOENT while the new directory exists resolves to it. Triage posted; landing waits on the checks and any reviewer output for `ce332d91`.
+
+## Parked without an attempt (one ERROR/WHY/FIX comment each, board Blocked)
+
+- #3114: 69 executable lines over the threshold, no spec slot (the free one is #3227's), `skip-sdd` is the owner's call.
+- #3307: the lease's home (next to the identity record, ADR-061 territory, or re-created on switch) is a design choice.
+- #3327: `dotf doctor` sweep entry; the two options measure different things and `cli/internal/doctor` is written by two peers tonight.
+- #3318: needs the ADR extending ADR-061 the issue itself asks for.
