@@ -56,7 +56,7 @@ Round 2 (`review.md`, verdict FAIL on `94cb2f6f`):
 
 | Finding | Disposition | Where |
 |---|---|---|
-| F1 Major REAL: the Windows proof claimed for round-1 F1 did not exist, the fixes were unpushed | applied | the push was held by the pre-push archive-on-merge gate (the PR closes #3263 while this spec is active). The PR body was switched to `Refs #3263` for the push, the gate's own non-closing path, and is restored to `Fixes #3263` with the archive. Proof: `test (windows-latest)` on the pushed head, in the table below. The circularity (a gate that holds review fixes whose evidence is CI) is ticketed |
+| F1 Major REAL: the Windows proof claimed for round-1 F1 did not exist, the fixes were unpushed | applied | the push was held by the pre-push archive-on-merge gate (the PR closes #3263 while this spec is active). The PR body was switched to `Refs #3263` for the push, the gate's own non-closing path, and is restored to `Fixes #3263` with the archive. Proof: `test (windows-latest)` on the pushed head, in the table below. The circularity (a gate that holds review fixes whose evidence is CI) is #3364 |
 | F2 Minor THEORETICAL: `laneLanded` parked on `isMerged` alone, the old code re-checked `branchLanding` when heads were named | applied | `2ad5fbdb`: the certified shape is restored; only the no-reader case is new, and it refuses to park |
 | F3 Minor THEORETICAL: an unreadable status was reported as a dirty tree | applied | `2ad5fbdb`: `its state could not be read: <err>`, tested with the mock runner's `DirtyErrors`; added to the proposal's reason list |
 | F4 Minor SPECULATIVE: `gitFailure` could read a stdout line before git's fatal line | declined | `git checkout --detach` prints nothing on stdout when it refuses; the one observed refusal (the index lock) starts with the `fatal:` line, and a reason that quoted stdout would still be git's own words |
@@ -65,7 +65,7 @@ Windows proof for F1:
 
 | Head | Run | `test (windows-latest)` |
 |---|---|---|
-| pending | pending | pending |
+| `564f4a2c` | 43143382318, job 130935507892 | pass (`cli-gate` pass; `hygiene` 43143382465 and `knowledge-gate` 43143382438 pass on the same head) |
 
 ## Promotion candidates
 
