@@ -39,10 +39,11 @@ func TestIdentity_ReadsTheRecordFromTheWorktreeGitDir(t *testing.T) {
 
 	bare := filepath.Join(wtRoot, "no-record")
 	runGitLaneTest(t, repo, "worktree", "add", "--detach", bare, "HEAD")
-	// A main checkout's git dir is the common dir, where `dotf lane next` keeps
-	// its prompt DIRECTORY under the same name (cli/internal/cmd/lane.go). The
-	// record is a worktree's, so the main checkout is never a lane, prompt dir
-	// or not.
+	// A main checkout's git dir is the common dir, where `dotf lane next` kept
+	// its prompt DIRECTORY under the same name until #3320 (now PromptDirName,
+	// and a one-time move). A directory at the record path stays "no record"
+	// as defence in depth: the record is a worktree's, so the main checkout is
+	// never a lane, prompt dir or not.
 	if err := os.MkdirAll(filepath.Join(repo, ".git", LaneIdentityFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
