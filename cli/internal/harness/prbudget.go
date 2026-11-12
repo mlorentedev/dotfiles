@@ -37,7 +37,14 @@ const (
 	envRetrySameModel = "CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT"
 	envMaxOutput      = "CONFIG__MAX_OUTPUT_TOKENS"
 	envMaxModelTokens = "CONFIG__MAX_MODEL_TOKENS"
-	envModelWindow    = "CONFIG__CUSTOM_MODEL_MAX_TOKENS"
+	// envModelWindow is the step's own model window. Lowering it on the step
+	// narrows the room its clip has, so a step that declares it is checked
+	// against its own window rather than the toml's.
+	envModelWindow = "CONFIG__CUSTOM_MODEL_MAX_TOKENS"
+	// envForceStreaming is the prefix of LiteLLM's forced-streaming settings.
+	// A streamed call's ai_timeout bounds the gap between chunks rather than
+	// the answer, which changes what the ceiling arithmetic proves.
+	envForceStreaming = "LITELLM__FORCE_STREAMING"
 )
 
 // reviewConfig is everything the invariants are computed from.
@@ -61,9 +68,19 @@ type reviewStep struct {
 	// .pr_agent.toml, so a step that declares it is checked against its own
 	// number rather than the file's.
 	maxTokens int
-	// window is the step's own custom_model_max_tokens, overriding the toml
-	// the same way; a step that lowers it shrinks the room the clip must leave.
+	// window is the step's own model window, 0 when the step inherits the
+	// toml's. A step that narrows it has less room for the answer than the
+	// file suggests, so the clip is checked against this one.
 	window int
+	// outputCapRaw is CONFIG__MAX_OUTPUT_TOKENS as written, empty when the step
+	// does not declare it. It is kept because a zero reserve is the pass
+	// direction of the clip invariant: an expression or a typo parses to 0, and
+	// the check would then report room for an answer nobody sized.
+	outputCapRaw string
+	// streams marks a step whose call is streamed, where ai_timeout bounds the
+	// gap between chunks rather than the answer. The ceiling arithmetic is
+	// still worth reporting, but as a lower bound rather than as coverage.
+	streams bool
 }
 
 // workflowStep is the part of a workflow step the budget reads.
@@ -195,14 +212,16 @@ func reviewStepsOf(steps []workflowStep, cfg *reviewConfig) []reviewStep {
 // fallback chain to the toml's pool and the attempts to the conservative bound.
 func newReviewStep(s workflowStep, cfg *reviewConfig) reviewStep {
 	st := reviewStep{
-		name:      orDefault(s.Name, "unnamed review step"),
-		minutes:   s.TimeoutMinutes,
-		attempts:  prAttemptsWithoutDeclaration,
-		chain:     cfg.tomlFallbacks + 1,
-		aiTimeout: envInt(s.Env[envAITimeout]),
-		outputCap: envInt(s.Env[envMaxOutput]),
-		maxTokens: envInt(s.Env[envMaxModelTokens]),
-		window:    envInt(s.Env[envModelWindow]),
+		name:         orDefault(s.Name, "unnamed review step"),
+		minutes:      s.TimeoutMinutes,
+		attempts:     prAttemptsWithoutDeclaration,
+		chain:        cfg.tomlFallbacks + 1,
+		aiTimeout:    envInt(s.Env[envAITimeout]),
+		outputCap:    envInt(s.Env[envMaxOutput]),
+		outputCapRaw: strings.TrimSpace(envText(s.Env[envMaxOutput])),
+		maxTokens:    envInt(s.Env[envMaxModelTokens]),
+		window:       envInt(s.Env[envModelWindow]),
+		streams:      declaresStreaming(s.Env),
 	}
 	if list, ok := literalList(s.Env[envFallbackModels]); ok {
 		st.chain = len(list) + 1
@@ -213,21 +232,43 @@ func newReviewStep(s workflowStep, cfg *reviewConfig) reviewStep {
 	return st
 }
 
+// declaresStreaming reports whether the step turns on LiteLLM's forced
+// streaming, which is what makes ai_timeout a chunk-gap bound rather than an
+// answer bound. Any of the FORCE_STREAMING_* settings counts: the provider one
+// is enough for PR-Agent to stream a matching request.
+func declaresStreaming(env map[string]any) bool {
+	for k := range env {
+		if strings.HasPrefix(k, envForceStreaming) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkTokenClip asserts that the prompt cap plus the largest declared answer
 // stays under the model window. Equal numbers are the failure this exists for:
-// the cap then has no reachable subject. A step that declares its own clip is
-// checked too, because the workflow's env overrides the toml and lowering only
-// the file would leave the run clipped by a number nobody changed. The same
-// goes for a step's own window: the env wins there as well, and a step that
-// lowers it is measured against its own, not the file's.
+// the cap then has no reachable subject. A step that declares its own clip or
+// its own window is checked too, because the workflow's env overrides the toml:
+// lowering only the file would leave the run clipped by a number nobody
+// changed, and raising only the step's clip would fill a window nobody sized.
+//
+// A reserve this check cannot read is a gap, not a pass. Zero is the pass
+// direction of `clip + reserve < window`, so an expression, a typo'd number or
+// no declaration at all would otherwise report room for an answer nobody sized.
 func checkTokenClip(cfg *reviewConfig) []CheckLine {
 	if cfg.maxModelTokens <= 0 {
 		return []CheckLine{prBudgetProblem(prAgentTomlFile,
 			errors.New("max_model_tokens is absent or not positive, so no prompt is ever clipped"))}
 	}
-	reserve := largestOutputCap(cfg.steps)
+	reserve, gaps := answerReserve(cfg)
+	if len(gaps) > 0 {
+		return gaps
+	}
 	out := clipLine(prAgentTomlFile, cfg.maxModelTokens, reserve, cfg.customModelMaxTokens)
 	for _, s := range cfg.steps {
+		// A step that exports neither number runs on the file's, already
+		// checked above; one that exports either is clipped and windowed by
+		// its own pair.
 		if s.maxTokens <= 0 && s.window <= 0 {
 			continue
 		}
@@ -236,10 +277,41 @@ func checkTokenClip(cfg *reviewConfig) []CheckLine {
 	return out
 }
 
-// orInt is a step's own number when it declares one, else the file's.
-func orInt(own, file int) int {
-	if own > 0 {
-		return own
+// answerReserve is the room the prompt must leave for the answer, and the gaps
+// that make it unverifiable: a step whose declared cap is not a number, or no
+// step declaring one at all. The largest declaration is the bound, because the
+// window has to cover the worst case rather than the smallest.
+func answerReserve(cfg *reviewConfig) (int, []CheckLine) {
+	reserve := 0
+	var gaps []CheckLine
+	declared := false
+	for _, s := range cfg.steps {
+		if s.outputCapRaw == "" {
+			continue
+		}
+		declared = true
+		if s.outputCap <= 0 {
+			gaps = append(gaps, prBudgetProblem(prAgentWorkflowFile,
+				fmt.Errorf("the answer cap in %s is %q, which this check cannot read as a number, so nothing says how much room the prompt must leave",
+					s.name, s.outputCapRaw)))
+			continue
+		}
+		if s.outputCap > reserve {
+			reserve = s.outputCap
+		}
+	}
+	if !declared {
+		gaps = append(gaps, prBudgetProblem(prAgentWorkflowFile,
+			fmt.Errorf("no review step declares %s, so the room the prompt must leave for the answer is unknown", envMaxOutput)))
+	}
+	return reserve, gaps
+}
+
+// orInt is the effective value of a per-step override: the step's own number
+// when it declares one, the file's otherwise.
+func orInt(step, file int) int {
+	if step > 0 {
+		return step
 	}
 	return file
 }
@@ -253,18 +325,6 @@ func clipLine(where string, clip, reserve, window int) []CheckLine {
 		Text: fmt.Sprintf("[GAP] the prompt clip in %s never fires: max_model_tokens %d + answer cap %d = %d, not under custom_model_max_tokens %d",
 			where, clip, reserve, clip+reserve, window),
 		Detail: []string{fmt.Sprintf("      -> set the clip below %d so the prompt leaves room for the answer", window-reserve)}}}
-}
-
-// largestOutputCap is the biggest answer any review step declares: the window
-// must be reserved for the worst case, not the smallest.
-func largestOutputCap(steps []reviewStep) int {
-	best := 0
-	for _, s := range steps {
-		if s.outputCap > best {
-			best = s.outputCap
-		}
-	}
-	return best
 }
 
 // checkStepCeilings asserts each step's own bound.
@@ -287,9 +347,18 @@ func stepCeiling(s reviewStep) []CheckLine {
 			Text:   fmt.Sprintf("[GAP] %s does not declare %s, so its attempt budget is the image's default", s.name, envAITimeout),
 			Detail: []string{"      -> declare it on the step; an inherited timeout is the setting that killed svqtriana run 42562380120"}}}
 	}
+	if s.minutes <= 0 {
+		return []CheckLine{{Problem: true,
+			Text:   fmt.Sprintf("[GAP] %s declares no timeout-minutes, so its ceiling is the job's and this check cannot see it", s.name),
+			Detail: []string{fmt.Sprintf("      -> declare it on the step; %d s of attempts need %d minutes", s.chain*s.attempts*s.aiTimeout, prCeilDiv(s.chain*s.attempts*s.aiTimeout, 60))}}}
+	}
 	need, have := s.chain*s.attempts*s.aiTimeout, s.minutes*60
-	if s.minutes > 0 && need <= have {
-		return []CheckLine{{Text: fmt.Sprintf("[check] OK -> %s: %d s of attempts in a %d s ceiling", s.name, need, have)}}
+	if need <= have {
+		line := fmt.Sprintf("[check] OK -> %s: %d s of attempts in a %d s ceiling", s.name, need, have)
+		if s.streams {
+			line += " (streamed: ai_timeout bounds the gap between chunks, not the answer, so this is a lower bound on the step's wall clock)"
+		}
+		return []CheckLine{{Text: line}}
 	}
 	return []CheckLine{{Problem: true,
 		Text: fmt.Sprintf("[GAP] %s cannot afford its own attempts: %d models x %d attempts x %d s = %d s in a %d s ceiling",

@@ -106,6 +106,7 @@ func TestCheckReviewBudget_TheCurrentConfigurationFails(t *testing.T) {
 	// Five: the file's clip, the NaN step's clip (it declares the window, so
 	// it is measured on its own), two step ceilings and the undeclared ai_timeout.
 	n, text := budgetProblemText(t, repo)
+
 	if n != 5 {
 		t.Fatalf("want 5 problems (two clips, two step ceilings, undeclared ai_timeout), got %d:\n%s", n, text)
 	}
@@ -180,6 +181,7 @@ func TestCheckReviewBudget_RetryFalseHalvesTheAttempts(t *testing.T) {
         env:
           CONFIG__FALLBACK_MODELS: ["a", "b", "c"]
           CONFIG__AI_TIMEOUT: "120"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
           CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
 `
 	undeclared := `      - name: PR-Agent
@@ -188,6 +190,7 @@ func TestCheckReviewBudget_RetryFalseHalvesTheAttempts(t *testing.T) {
         env:
           CONFIG__FALLBACK_MODELS: ["a", "b", "c"]
           CONFIG__AI_TIMEOUT: "120"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
 `
 	if n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, declared)); n != 0 {
 		t.Errorf("one attempt of 360 s fits 360 s; got %d:\n%s", n, text)
@@ -207,6 +210,7 @@ func TestCheckReviewBudget_AnExpressionChainUsesTheTomlPoolAsItsBound(t *testing
         env:
           CONFIG__FALLBACK_MODELS: ${{ steps.route.outputs.nan_fallbacks }}
           CONFIG__AI_TIMEOUT: "120"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
           CONFIG__RETRY_SAME_MODEL_ON_TIMEOUT: "false"
 `)
 	if n, text := budgetProblemText(t, repo); n == 0 || !strings.Contains(text, "3 models x 1 attempts") {
@@ -254,22 +258,95 @@ func TestCheckReviewBudget_AStepThatLowersItsOwnWindowIsMeasuredAgainstIt(t *tes
 	}
 }
 
-func TestCheckReviewBudget_TheReserveIsTheLargestCapNotTheFirst(t *testing.T) {
-	// 150000 + 40000 fits under 200000; 150000 + 60000 does not. A guard that
-	// stopped at the first declared cap would pass on the step order alone.
-	small := strings.Replace(budgetStepFirstFixed, `"40000"`, `"40000"`, 1)
-	large := strings.Replace(budgetStepSecondFixed, `"40000"`, `"60000"`, 1)
-	toml := "max_model_tokens = 150000\ncustom_model_max_tokens = 200000\n"
-	if n, text := budgetProblemText(t, budgetRepo(t, toml, small+large)); n == 0 || !strings.Contains(text, "answer cap 60000") {
-		t.Fatalf("want the 60000 cap to be the reserve, got %d:\n%s", n, text)
+func TestCheckReviewBudget_AStepWithoutItsOwnTimeoutSaysSo(t *testing.T) {
+	// The step inherits the job's ceiling, which this guard does not model. The
+	// line must say that rather than report the zero as a ceiling of its own.
+	step := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        env:
+          CONFIG__AI_TIMEOUT: "360"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+`
+	n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, step))
+	if n == 0 || !strings.Contains(text, "declares no timeout-minutes") {
+		t.Fatalf("want the missing step ceiling named, got %d:\n%s", n, text)
+	}
+	if strings.Contains(text, "in a 0 s ceiling") {
+		t.Errorf("the guard must not report a 0 s ceiling:\n%s", text)
 	}
 }
 
-func TestCheckReviewBudget_AFileWithoutAClipFailsClosed(t *testing.T) {
-	toml := "custom_model_max_tokens = 200000\n"
-	if n, text := budgetProblemText(t, budgetRepo(t, toml, budgetStepFirstFixed)); n == 0 || !strings.Contains(text, "max_model_tokens is absent") {
-		t.Fatalf("want a missing clip reported, got %d:\n%s", n, text)
+func TestCheckReviewBudget_AnAnswerCapItCannotReadIsAGapNotAPass(t *testing.T) {
+	// Zero is the pass direction of `clip + reserve < window`, so an expression
+	// or a typo'd number would report room for an answer nobody sized. Both
+	// forms are checked, because the expression is the one this workflow can
+	// actually acquire.
+	for _, raw := range []string{"${{ vars.MAX_OUTPUT }}", "40.000"} {
+		step := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 13
+        env:
+          CONFIG__AI_TIMEOUT: "360"
+          CONFIG__MAX_OUTPUT_TOKENS: "` + raw + `"
+`
+		repo := budgetRepo(t, budgetTomlFixed, step)
+		n, text := budgetProblemText(t, repo)
+		if n == 0 || !strings.Contains(text, "cannot read as a number") {
+			t.Errorf("an unreadable answer cap %q must be a gap, got %d:\n%s", raw, n, text)
+		}
+		// All the lines, not just the problems: the clip line this asserts the
+		// absence of is an OK line, and budgetProblemText drops exactly those,
+		// so the assertion could never fail (#3301 review).
+		if all := budgetAllText(t, repo); strings.Contains(all, "OK -> prompt clip") {
+			t.Errorf("no clip may be reported OK while the reserve is unreadable (%q):\n%s", raw, all)
+		}
 	}
+}
+
+func TestCheckReviewBudget_AWorkflowThatNeverDeclaresTheAnswerCapSaysSo(t *testing.T) {
+	// The image supplies its own default, which this guard cannot see. Saying
+	// nothing would claim the clip leaves room for an answer nobody declared.
+	step := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 13
+        env:
+          CONFIG__AI_TIMEOUT: "360"
+`
+	n, text := budgetProblemText(t, budgetRepo(t, budgetTomlFixed, step))
+	if n == 0 || !strings.Contains(text, "no review step declares CONFIG__MAX_OUTPUT_TOKENS") {
+		t.Fatalf("want the undeclared answer cap named, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_AStreamedStepIsReportedAsALowerBound(t *testing.T) {
+	// A streamed call is bounded in chunks, not in total, so the same numbers
+	// prove less. The line says so rather than reading as coverage.
+	streamed := `      - name: PR-Agent
+        uses: docker://pragent/pr-agent@sha256:0000
+        timeout-minutes: 12
+        env:
+          CONFIG__AI_TIMEOUT: "120"
+          CONFIG__MAX_OUTPUT_TOKENS: "40000"
+          LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '["api.nan.builders"]'
+`
+	plain := strings.Replace(streamed, "          LITELLM__FORCE_STREAMING_API_BASE_SUBSTRINGS: '[\"api.nan.builders\"]'\n", "", 1)
+
+	if text := budgetAllText(t, budgetRepo(t, budgetTomlFixed, streamed)); !strings.Contains(text, "lower bound on the step's wall clock") {
+		t.Errorf("a streamed step's ceiling is a lower bound and must say so:\n%s", text)
+	}
+	if text := budgetAllText(t, budgetRepo(t, budgetTomlFixed, plain)); strings.Contains(text, "lower bound") {
+		t.Errorf("an unstreamed step must not carry the caveat:\n%s", text)
+	}
+}
+
+// budgetAllText is every line the guard emits, OK ones included.
+func budgetAllText(t *testing.T, repoRoot string) string {
+	t.Helper()
+	var texts []string
+	for _, l := range checkReviewBudget(repoRoot) {
+		texts = append(texts, l.Text)
+	}
+	return strings.Join(texts, "\n")
 }
 
 func TestCheckReviewBudget_AWorkflowWithoutAReviewStepFailsClosed(t *testing.T) {
@@ -307,6 +384,26 @@ func TestCheckReviewBudget_TheRepositoryPassesItsOwnGuard(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
 	if n, text := budgetProblemText(t, root); n != 0 {
 		t.Fatalf("this repository's own reviewer budget does not hold, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_AFileWithoutAClipFailsClosed(t *testing.T) {
+	toml := "custom_model_max_tokens = 200000\n"
+	if n, text := budgetProblemText(t, budgetRepo(t, toml, budgetStepFirstFixed)); n == 0 || !strings.Contains(text, "max_model_tokens is absent") {
+		t.Fatalf("want a missing clip reported, got %d:\n%s", n, text)
+	}
+}
+
+func TestCheckReviewBudget_TheReserveIsTheLargestCapNotTheFirst(t *testing.T) {
+	// Two steps can declare different caps, and the window must be reserved
+	// for the roomiest answer, not the one that happens to be published first.
+	// 150000 + 40000 fits under 200000; 150000 + 60000 does not, so a reserve
+	// that stopped at the first cap would pass on step order alone.
+	small := budgetStepFirstFixed
+	large := strings.Replace(budgetStepSecondFixed, `"40000"`, `"60000"`, 1)
+	toml := "max_model_tokens = 150000\ncustom_model_max_tokens = 200000\n"
+	if n, text := budgetProblemText(t, budgetRepo(t, toml, small+large)); n == 0 || !strings.Contains(text, "answer cap 60000") {
+		t.Fatalf("want the 60000 cap to be the reserve, got %d:\n%s", n, text)
 	}
 }
 

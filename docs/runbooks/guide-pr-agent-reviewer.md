@@ -226,6 +226,17 @@ pins it and each of these settings:
 | step `timeout-minutes` | `13` | at most two attempts run at `ai_timeout = 360`, so the step needs 720 s and 13 minutes gives it 780. At 8 minutes it could not afford its own second attempt |
 | job `timeout-minutes` | `38` | the worst pair is one Anthropic step (13) plus the NaN step (12) = 25 minutes; the probes add 6 (90 s per NaN model in the preflight, 30 s per Anthropic model the route may probe: the drawn one and, on a risky PR, the risk one), setup 3 and the publication calls 3, for 37. The bound must exceed the sum, so 38. `tests/pr-agent-config.bats` computes this from the probe timeouts themselves and fails if a step ceiling grows past it — which is how the previous 34 was caught |
 
+`dotf harness check` reads these two numbers from the workflow rather than
+trusting them. It subtracts the largest declared answer cap from each step's
+window and fails when the pair leaves no room, and it now fails closed on the
+cap itself: a `CONFIG__MAX_OUTPUT_TOKENS` it cannot read as a number, or a
+workflow where no step declares one at all, is reported as a gap and no clip
+line prints — a reserve it could not read is indistinguishable from no reserve,
+and silence there would have passed every step. A step whose call streams gets
+`(streamed: …)` appended to its OK line, because `ai_timeout` bounds the gap
+between chunks and not the answer, so the arithmetic is a lower bound on that
+step's wall clock and not a ceiling (#3302).
+
 A worst-case review is about 260K input plus 32K output tokens: roughly $0.21 on
 Haiku at its higher prices, and $0.84 on Sonnet. A test holds a price row and a
 ceiling for every allowed model ($0.25 and $1.00), so allowlisting a model
