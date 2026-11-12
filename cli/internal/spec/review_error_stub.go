@@ -52,8 +52,9 @@ func WriteErrorStub(review, transcript, ended string) (bool, error) {
 		"Run `dotf spec review %s%s` again, or choose another member with `--reviewer`.\n\n",
 		slot.Review, specID, slot.Flag())
 	if reqErr != nil {
-		// Loud, as the request's own reader is: an empty reviewer with no
-		// reason looks like a launcher bug, not a damaged sidecar.
+		// Named in the record, where whoever opens it to see why the review
+		// failed looks: an empty reviewer with no reason reads as a launcher
+		// bug, not a damaged sidecar.
 		fmt.Fprintf(&b, "The launch request could not be read, so the reviewer and commit above are empty: %v\n\n", reqErr)
 	}
 	fmt.Fprintf(&b, "## How the run ended\n\n%s\n", ended)

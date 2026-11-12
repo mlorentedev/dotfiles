@@ -892,7 +892,7 @@ func confirmLaunched(slot spec.ReviewSlot, session, transcript, specID string, c
 			}
 		}
 		return fmt.Errorf("the review died on startup — tmux session %q is already gone.\n%s\n"+
-			"Nothing was reviewed: %s, if the run left one, records verdict ERROR; re-run with --foreground to watch it fail live.%s",
+			"Check %s: a verdict it holds is the reviewer's own; when the run left none, it records verdict ERROR. Re-run with --foreground to watch it fail live.%s",
 			session, reviewerLastWords(transcript), slot.Review, nextAdvice)
 	}
 	return nil
