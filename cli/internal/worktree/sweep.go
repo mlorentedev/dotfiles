@@ -427,8 +427,8 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 	if _, out, err := detachAtBase(repoRoot, info.Path, false, info.Metadata); err != nil {
 		return false, "git refused to detach it: " + gitFailure(out, err)
 	}
-	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
 	releaseParkedLane(repoRoot, info.Path, info.Branch, issueNum)
+	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
 	return true, ""
 }
 

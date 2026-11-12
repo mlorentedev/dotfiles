@@ -38,7 +38,7 @@ func packageFile(t *testing.T, name string) string {
 	return filepath.Join(filepath.Dir(self), name)
 }
 
-// The park path grew past the 40-line limit three times before a review
+// The park path grew past the under-40-line limit three times before a review
 // noticed (#3265); this pins the extraction so it does not grow back.
 func TestParkPathFunctionsStayUnderTheLimit(t *testing.T) {
 	const limit = 40
@@ -50,8 +50,8 @@ func TestParkPathFunctionsStayUnderTheLimit(t *testing.T) {
 		for _, name := range names {
 			if n, ok := lines[name]; !ok {
 				t.Errorf("%s: %s not found", file, name)
-			} else if n > limit {
-				t.Errorf("%s: %s is %d lines, over the %d-line limit", file, name, n, limit)
+			} else if n >= limit {
+				t.Errorf("%s: %s is %d lines, not under the %d-line limit", file, name, n, limit)
 			}
 		}
 	}

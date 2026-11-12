@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// The switch path grew past the 40-line limit before a review noticed
+// The switch path grew past the under-40-line limit before a review noticed
 // (#3265); this pins the extraction so it does not grow back.
 func TestSwitchLaneLockedStaysUnderTheLimit(t *testing.T) {
 	const limit = 40
@@ -27,8 +27,8 @@ func TestSwitchLaneLockedStaysUnderTheLimit(t *testing.T) {
 		if !ok || fn.Name.Name != "switchLaneLocked" {
 			continue
 		}
-		if n := fset.Position(fn.End()).Line - fset.Position(fn.Pos()).Line + 1; n > limit {
-			t.Errorf("switchLaneLocked is %d lines, over the %d-line limit", n, limit)
+		if n := fset.Position(fn.End()).Line - fset.Position(fn.Pos()).Line + 1; n >= limit {
+			t.Errorf("switchLaneLocked is %d lines, not under the %d-line limit", n, limit)
 		}
 		return
 	}
