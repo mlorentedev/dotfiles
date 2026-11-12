@@ -252,7 +252,7 @@ func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, erro
 		return lane.Outcome{}, fmt.Errorf("lane next: prompt template: %w", err)
 	}
 	parent := filepath.Dir(common)
-	promptDir, err := lane.PromptDir(common)
+	promptDir, err := lane.PromptDir(common, !dryRun)
 	if err != nil {
 		return lane.Outcome{}, fmt.Errorf("lane next: %w", err)
 	}

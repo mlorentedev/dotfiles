@@ -10,7 +10,7 @@ func TestPromptDir_IsNotNamedLikeTheIdentityRecord(t *testing.T) {
 	if PromptDirName == LaneIdentityFile {
 		t.Fatalf("the prompt directory and the identity record share the name %q (#3320)", PromptDirName)
 	}
-	dir, err := PromptDir(t.TempDir())
+	dir, err := PromptDir(t.TempDir(), true)
 	if err != nil || filepath.Base(dir) != PromptDirName {
 		t.Fatalf("PromptDir = %q, %v", dir, err)
 	}
@@ -26,7 +26,7 @@ func TestPromptDir_MovesTheOldDirectoryOnceAndKeepsItsPrompts(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		dir, err := PromptDir(common)
+		dir, err := PromptDir(common, true)
 		if err != nil {
 			t.Fatalf("call %d: %v", i, err)
 		}
@@ -45,7 +45,7 @@ func TestPromptDir_LeavesAFileUnderTheOldNameAlone(t *testing.T) {
 	if err := os.WriteFile(record, []byte("feat-lane-primary\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := PromptDir(common); err != nil {
+	if _, err := PromptDir(common, true); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := os.ReadFile(record); err != nil || string(got) != "feat-lane-primary\n" {
@@ -60,11 +60,34 @@ func TestPromptDir_PrefersTheNewDirectoryWhenBothExist(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	dir, err := PromptDir(common)
+	dir, err := PromptDir(common, true)
 	if err != nil || filepath.Base(dir) != PromptDirName {
 		t.Fatalf("PromptDir = %q, %v", dir, err)
 	}
 	if _, err := os.Stat(filepath.Join(common, "dotf-lane")); err != nil {
 		t.Fatalf("the old directory was removed although the new one existed: %v", err)
+	}
+}
+
+// Without migrate (a dry run) the legacy directory stays where it is and the
+// new path is still the answer, the one the real run will use.
+func TestPromptDir_WithoutMigrateResolvesWithoutMoving(t *testing.T) {
+	common := t.TempDir()
+	legacy := filepath.Join(common, legacyPromptDirName)
+	if err := os.MkdirAll(legacy, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := PromptDir(common, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(common, PromptDirName); dir != want {
+		t.Errorf("resolved %q, want %q", dir, want)
+	}
+	if _, err := os.Stat(legacy); err != nil {
+		t.Errorf("the legacy directory moved: %v", err)
+	}
+	if _, err := os.Stat(dir); err == nil {
+		t.Error("the new directory was created")
 	}
 }
