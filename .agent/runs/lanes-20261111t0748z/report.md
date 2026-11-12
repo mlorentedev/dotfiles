@@ -105,3 +105,11 @@ The owner chose A for #3263 (spec, never `skip-sdd`) and A for #3293 (a provenan
 - Review round 2 (`94cb2f6f`): FAIL on one REAL Major that was true: the Windows proof for round-1 F1 did not exist, because the pre-push archive-on-merge gate refused every push while the PR closed #3263 with the spec active. Three artifacts each correct and no path through: ticketed as #3364 (two options; A moves the hard refusal to CI's `spec-gate`, where the invariant belongs). The way through used here: the PR body switched to `Refs #3263` (the gate's own non-closing path) for the push of `564f4a2c`, to be restored to `Fixes #3263` with the archive. Round 2's three Minors applied (`laneLanded` keeps the re-check it had; an unreadable status says so instead of claiming a dirty tree) or declined with the reason in `verification.md`.
 - The rebase onto `main` was not done: the force-push it needs was denied in this session; the branch is 5 commits behind `main` with no conflicts, and `dotf pr land` decides whether that base moved too far.
 - Both pre-existing queue entries (#3354, #3353) belong to other threads on this host with their own worktrees; not touched here.
+- Review round 3 (`14541186`): PASS, two Minors (function length, ticketed; an unticked `tasks.md` box, declined so the digest stays). Spec archived in `c70410ec`; the PR body went back to `Fixes #3263`; `gh pr ready`.
+- PR review: PR-Agent (four inline, one REAL reproduced with a probe and pinned by a new test, one REAL refuted on the rule's own scope, one deferred to #3265/#3360) and CodeRabbit (three inline, all applied: a dirty named lane never reached the park path because `Classify` stops it at gate f, so the loop now records it with `Classify`'s reason; two lesson-585 corrections). Triage posted; `dotf pr triage-queue --pr 3355` exit 0.
+- **#3355 landed** with `dotf pr land` at `885839c9` -> main `ec724137`; #3263 closed, Done on the board; worktree and branch removed.
+- The repo-wide queue still lists #3354 and #3353, other threads' PRs on this host.
+
+### The one next action (updated)
+
+#3265: extract the park family under 40 lines from the `laneLanded` seam, with characterisation tests first; #3360 folds into it. #3293 waits for a WIP slot.
