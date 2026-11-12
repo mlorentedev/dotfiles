@@ -23,6 +23,9 @@
 # offline) additionally prints one line naming the failure (#2710). Once a PR exists for the
 # branch, local pre-push becomes as strict as CI: archive-on-merge and the
 # label-gated skips now apply locally too, not only after push.
+# One deliberate difference: a draft PR's archive-on-merge violation is a
+# warning here and a refusal in CI (#3364), since the invariant is about the
+# merge and a draft may need the push to prove a review fix.
 #
 # No token required: `gh` uses the developer's own local auth, unlike
 # spec-gate-pr.sh's CI run, which is the one that needs GH_TOKEN.
@@ -32,13 +35,22 @@
 
 set -euo pipefail
 
+# This adapter is the only writer of the draft waiver. SDD_PR_BODY and the
+# label variables inherited from the caller only ever make the gate stricter
+# (the documented `SDD_PR_BODY=... git push` escape), but an inherited
+# SDD_PR_DRAFT=true turns a refusal into a warning, so a stray value from a
+# profile would waive the archive-on-merge check on every push that resolves
+# no PR, and the warning would then describe a draft PR that does not exist.
+# Dropped here, before any fall-through path can hand it to the gate.
+unset SDD_PR_DRAFT
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 usage() {
     cat <<'EOF'
 Usage: spec-gate-prepush.sh [args forwarded to check-spec-gate.sh]
 
-Resolves the labels/body/author of the open PR for the branch being pushed
+Resolves the labels/body/author/draft state of the open PR for the branch being pushed
 live via `gh`, when one exists, then forwards every argument to check-spec-gate.sh. Falls through to
 running the gate with no PR context (today's local behaviour) when `gh`/`jq`
 are unavailable, the developer is unauthenticated, or no PR is open yet for
@@ -76,7 +88,7 @@ branch=${branch#refs/heads/}
 head_ref=$(jq -rn --arg b "$branch" '$b | @uri')
 errf=$(mktemp)
 if meta=$(gh api "repos/{owner}/{repo}/pulls?head={owner}:${head_ref}&state=open&per_page=1" \
-        --jq '.[0] // empty | {labels: [.labels[] | {name}], body, author: {login: .user.login}}' 2>"$errf"); then
+        --jq '.[0] // empty | {labels: [.labels[] | {name}], body, author: {login: .user.login}, draft}' 2>"$errf"); then
     rc=0
 else
     rc=$?
@@ -100,6 +112,10 @@ fi
 SDD_LABELS=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
 SDD_PR_BODY=$(printf '%s' "$meta" | jq -r '.body // ""')
 SDD_PR_AUTHOR=$(printf '%s' "$meta" | jq -r '.author.login // ""')
-export SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR
+# A draft is still under review: the gate warns about an unarchived spec
+# instead of refusing the push, and CI's spec-gate, which never reads this
+# flag, keeps the refusal at merge time (#3364). Anything but `true` is false.
+SDD_PR_DRAFT=$(printf '%s' "$meta" | jq -r 'if .draft == true then "true" else "false" end')
+export SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR SDD_PR_DRAFT
 
 _run_gate "$@"
