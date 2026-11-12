@@ -7,6 +7,7 @@
 load 'lib/both-shells'
 load 'lib/dotf-bin'
 load 'lib/spec-gate-parity'
+load 'lib/refute'
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
@@ -251,7 +252,7 @@ _write_849_feed() {
     [[ "$output" == *"#901"* ]] || false
     [[ "$output" != *$'\r'* ]] || false
     [[ "$output" != *$'\033'* ]] || false
-    ! grep -q $'[\r\033]' "$REPO_FIXTURE/summary.md" || false
+    refute_grep $'[\r\033]' "$REPO_FIXTURE/summary.md"
     grep -qF 'breaks ::error::injected [31m' "$REPO_FIXTURE/summary.md"
 }
 
@@ -264,7 +265,7 @@ _write_849_feed() {
         spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     grep -qF '&lt;img src=x onerror=alert(1)&gt; breaks' "$REPO_FIXTURE/summary.md"
-    ! grep -qF '<img' "$REPO_FIXTURE/summary.md" || false
+    refute_grep_fixed '<img' "$REPO_FIXTURE/summary.md"
 }
 
 @test "adjacency: --help documents the flag" {
