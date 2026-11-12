@@ -37,7 +37,15 @@ owner: manu
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-170-review-not-on-head/` -> `specs/archive/BUG-170-review-not-on-head/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-170-review-not-on-head/` -> `specs/archive/BUG-170-review-not-on-head/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
+
+## Review dispositions
+
+The review, by nan/glm5.3-flash at `5d6a957b`, gave PASS.
+
+1. Minor, SPECULATIVE: two review runs with an identical or missing `started_at`. Declined: GitHub sets `started_at` on every check run, and the review job runs one at a time per repository (`concurrency` with `queue: max` in `pr-agent.yml`), so two runs on one head cannot start in the same instant. A tie would at worst pick the earlier of two readings on the same head.
+2. Minor, SPECULATIVE: one unreproduced `internal/prtriage` FAIL in the reviewer's fresh worktree. Re-run here: `go test -count=10 ./internal/prtriage/` and `go test -count=3 -race ./internal/prtriage/` both ok. No case to file; if it recurs, the failing case name goes into a ticket.
+3. Question: the live smoke reading of #3410 is no longer observable, because the PR's state moved on. Accepted as data drift; the fixtures in `TestReviewOnHeadHoldsAQueueTheCommentsLeaveClear` hold the same reading.
