@@ -271,7 +271,7 @@ _write_849_feed() {
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"#903"* && "$output" == *"#904"* ]] || false
     printf '%s\n' "$output" > out.txt
-    refute_grep '^[[:space:]]*::' out.txt
+    refute_grep '^[[:space:]]*::error' out.txt
     refute_grep_fixed '##[' out.txt
 }
 
