@@ -158,8 +158,11 @@ func controlled(ctx context.Context, o Options, res Result) Result {
 		return res
 	}
 	res.State = CouldNotRun
-	res.Output = fmt.Sprintf("the check read %s on the clean head too (exit %d): the probe did not change its reading, so the exit is not evidence of the defect.\nWith the probe:\n%s\nOn the clean head:\n%s",
-		res.Control, res.ControlExit, res.Output, out)
+	why := fmt.Sprintf("the check read %s on the clean head too (exit %d): the probe did not change its reading, so the exit is not evidence of the defect.", res.Control, res.ControlExit)
+	if res.Control == CouldNotRun {
+		why = fmt.Sprintf("the check could not run on the clean head (exit %d): with no control reading, the exit with the probe is not evidence of the defect.", res.ControlExit)
+	}
+	res.Output = fmt.Sprintf("%s\nWith the probe:\n%s\nOn the clean head:\n%s", why, res.Output, out)
 	return res
 }
 

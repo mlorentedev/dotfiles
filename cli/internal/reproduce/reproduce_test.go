@@ -404,6 +404,29 @@ func TestRunWithAProbeNeedsTheCleanHeadAsItsControl(t *testing.T) {
 	}
 }
 
+// A control that cannot run is no control: the probe's reading stands
+// unconfirmed, and the message must not claim the two runs read the same.
+func TestRunWithAProbeSaysWhenTheControlCouldNotRun(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("needs sh")
+	}
+	dir := newRepo(t)
+	probe := probeFor(t, dir, "exit 3\n")
+	got, err := Run(context.Background(), Options{Dir: dir, Command: []string{"sh", "a.txt"}, Probe: probe})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got.State != CouldNotRun || got.Control != CouldNotRun || got.ControlExit != 127 {
+		t.Fatalf("State, Control, ControlExit = %q, %q, %d, want %q, %q, 127 (output %q)", got.State, got.Control, got.ControlExit, CouldNotRun, CouldNotRun, got.Output)
+	}
+	if !strings.Contains(got.Output, "the check could not run on the clean head (exit 127)") {
+		t.Errorf("the output does not say the control could not run:\n%s", got.Output)
+	}
+	if strings.Contains(got.Output, "on the clean head too") {
+		t.Errorf("the output claims the two runs read the same:\n%s", got.Output)
+	}
+}
+
 // A refutation needs no control: the check passed with the probe applied, and
 // a second run could only cost time.
 func TestRunWithAProbeRunsNoControlForARefutation(t *testing.T) {
