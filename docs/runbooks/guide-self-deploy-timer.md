@@ -105,18 +105,25 @@ dotf doctor                                       # [Self-deploy]: role, trigger
 dotf converge --plan --only self-deploy           # 0 changes when the trigger is current
 cat ~/.local/state/dotfiles/update/last.json      # the last run: at, status, message, error
 # macOS
-launchctl print gui/$(id -u)/com.github.mlorentedev.dotf.self-deploy
+launchctl print gui/$(id -u)/com.github.mlorentedev.dotf.self-deploy   # spawn type = background, low priority i/o
 tail ~/Library/Logs/dotf-self-deploy.log          # the last runs' output
 # Linux
 systemctl --user list-timers dotfiles-selfupdate.timer
 systemctl --user status dotfiles-selfupdate.service   # last run result
+systemctl --user show dotfiles-selfupdate.service -p Nice -p IOSchedulingClass -p CPUSchedulingPolicy
 ```
 
 ```powershell
 # Windows
 Get-ScheduledTask -TaskName DotfilesSelfUpdate
 Get-ScheduledTaskInfo -TaskName DotfilesSelfUpdate   # LastRunTime / LastTaskResult
+(Get-ScheduledTask -TaskName DotfilesSelfUpdate).Settings.Priority   # 7, below normal
 ```
+
+The run is unattended, so it runs at background priority and yields CPU and I/O to the user:
+launchd's `ProcessType=Background` with `LowPriorityIO`, and systemd's `Nice=19` with idle CPU and
+I/O scheduling. The Task Scheduler's default priority, 7, is already below normal, so the task XML
+sets nothing (#3367).
 
 Run it once by hand with `dotf update`. On a clean, current checkout whose installed `dotf` matches
 the `DOTF_VERSION` pin, it still runs the system-upgrade step (step 5 above), which upgrades any

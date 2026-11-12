@@ -57,6 +57,12 @@ type Job struct {
 	// Log is where launchd sends the job's stdout and stderr. launchd only:
 	// systemd writes the journal, and the Task Scheduler keeps the result.
 	Log string
+	// Background runs the job at low priority, so an unattended job yields
+	// the machine to the user: launchd's ProcessType=Background and
+	// LowPriorityIO, systemd's Nice=19 with idle CPU and I/O scheduling. The
+	// Task Scheduler needs nothing: a task without <Priority> gets the
+	// schema's default, 7, which is already below normal.
+	Background bool
 }
 
 // Clock is a local time of day.
