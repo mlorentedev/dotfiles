@@ -113,3 +113,12 @@ The owner chose A for #3263 (spec, never `skip-sdd`) and A for #3293 (a provenan
 ### The one next action (updated)
 
 #3265: extract the park family under 40 lines from the `laneLanded` seam, with characterisation tests first; #3360 folds into it. #3293 waits for a WIP slot.
+
+### Post-land: a defect the last push introduced (#3372, #3374)
+
+A second opinion on the landed change found that `885839c9`'s last commit, applied after the final review round, recorded every dirty named lane in `lane_skips`, including a lane whose lease was live or under fifteen minutes old. A sweep then printed `skipped: <lane>: has uncommitted changes or untracked files` for a lane someone was working in, which reads as a complaint about live work. Filed as #3372 (bug, P3).
+
+- Fix in #3374 from `fix/3372-dirty-live-lane` (`98a22323`): `laneHeldByDirt` records a dirty lane only when it is not parked, its lease has expired and it is older than fifteen minutes, the same three conditions `Classify` applies before deciding a lane is parkable. New test `TestSweepDoesNotReportADirtyLaneWithALiveLease`; the existing expired-lease test keeps the entry. Under 20 lines, obvious cause: no spec.
+- CI 27/27 green on `98a22323`. PR-Agent reviewed, no findings beyond the verification. CodeRabbit's only comment was a "Review limit reached" notice: no review ran, disclosed in the triage; merged with one reviewer.
+- **#3374 landed** with `dotf pr land` -> main `6057dd60`; #3372 closed, Done on the board; worktree and branch removed.
+- Main on `ec724137`: `cli`, `CI`, `cli-smoke`, `Repo hygiene`, `release-please` green; `from-zero` still running. Main on `6057dd60`: `cli-smoke`, `Repo hygiene`, `release-please` green, `cli` and `CI` running, `from-zero` cancelled by its concurrency group (the `ec724137` run holds it).
