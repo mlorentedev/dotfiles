@@ -357,3 +357,54 @@ func TestRunWithAnInvertedCheck(t *testing.T) {
 		})
 	}
 }
+
+// #3333: a check that fails before it reaches the code under test fails on
+// the clean head too. Only the pair (fails with the probe, passes without it)
+// says the probe found the defect, so a probe run also runs the check on the
+// clean head, and a check that reads the same both ways is could-not-run.
+func TestRunWithAProbeNeedsTheCleanHeadAsItsControl(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		check    []string
+		inverted bool
+		want     State
+		control  State
+	}{
+		{"fails with and without the probe", []string{"git", "grep", "-q", "three", "--", "a.txt"}, false, CouldNotRun, Reproduced},
+		{"passes with and without the probe, inverted", []string{"git", "status"}, true, CouldNotRun, Reproduced},
+		{"fails only with the probe", []string{"git", "grep", "-q", "one", "--", "a.txt"}, false, Reproduced, DidNotReproduce},
+		{"passes only with the probe, inverted", []string{"git", "grep", "-q", "two", "--", "a.txt"}, true, Reproduced, DidNotReproduce},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newRepo(t)
+			probe := probeFor(t, dir, "two\n")
+			got, err := Run(context.Background(), Options{Dir: dir, Command: tc.check, Probe: probe, DefectWhenPasses: tc.inverted})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got.State != tc.want || got.Control != tc.control {
+				t.Errorf("State, Control = %q, %q, want %q, %q (output %q)", got.State, got.Control, tc.want, tc.control, got.Output)
+			}
+			if tc.want == CouldNotRun && !strings.Contains(got.Output, "on the clean head") {
+				t.Errorf("the output does not say the control read the same:\n%s", got.Output)
+			}
+			if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
+				t.Errorf("the tree was not left clean:\n%s", st)
+			}
+		})
+	}
+}
+
+// A refutation needs no control: the check passed with the probe applied, and
+// a second run could only cost time.
+func TestRunWithAProbeRunsNoControlForARefutation(t *testing.T) {
+	dir := newRepo(t)
+	probe := probeFor(t, dir, "two\n")
+	got, err := Run(context.Background(), Options{Dir: dir, Command: []string{"git", "grep", "-q", "two", "--", "a.txt"}, Probe: probe})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got.State != DidNotReproduce || got.Control != "" {
+		t.Errorf("State, Control = %q, %q, want %q and no control", got.State, got.Control, DidNotReproduce)
+	}
+}
