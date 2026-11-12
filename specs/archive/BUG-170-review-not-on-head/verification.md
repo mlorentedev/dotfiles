@@ -49,3 +49,7 @@ The review, by nan/glm5.3-flash at `5d6a957b`, gave PASS.
 1. Minor, SPECULATIVE: two review runs with an identical or missing `started_at`. Declined: GitHub sets `started_at` on every check run, and the review job runs one at a time per repository (`concurrency` with `queue: max` in `pr-agent.yml`), so two runs on one head cannot start in the same instant. A tie would at worst pick the earlier of two readings on the same head.
 2. Minor, SPECULATIVE: one unreproduced `internal/prtriage` FAIL in the reviewer's fresh worktree. Re-run here: `go test -count=10 ./internal/prtriage/` and `go test -count=3 -race ./internal/prtriage/` both ok. No case to file; if it recurs, the failing case name goes into a ticket.
 3. Question: the live smoke reading of #3410 is no longer observable, because the PR's state moved on. Accepted as data drift; the fixtures in `TestReviewOnHeadHoldsAQueueTheCommentsLeaveClear` hold the same reading.
+
+## After the review
+
+- The lesson was renumbered from 592 to 593 after the review (4f3b1297), because an open PR (#3410) already took 592. The signed `review.md` names 592 and its pre-archive paths as they were at `5d6a957b`, and is left as signed.
