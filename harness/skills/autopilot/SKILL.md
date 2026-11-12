@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 25584991f3026ee6
+generated_sha: dfa92e8b08af7d40
 id: autopilot-skill
 type: skill
 status: active
@@ -94,9 +94,10 @@ When the operator says (any variant): *"Me voy a ausentar / a dormir / a trabaja
 
    **Host precondition — the failure everyone forgets.** The dominant real case for "I'm going to sleep" is a laptop whose lid closes. Arm with a wake-lock bounded by the envelope's `expires_at`, or state in the report that the window was not covered:
    ```bash
-   # macOS: start it with the harness's background-job mechanism, never a bare `&`
+   # macOS: run this line as a harness background job (it blocks until expiry).
+   # `exec` gives caffeinate the shell's PID, so the file names the lock itself.
    PIDFILE="${TMPDIR:-/tmp}/autopilot-${RUN_ID}.caffeinate.pid"
-   caffeinate -i -t "$SECONDS_UNTIL_EXPIRY" & echo $! > "$PIDFILE"; wait
+   sh -c 'echo $$ > "$1"; exec caffeinate -i -t "$2"' sh "$PIDFILE" "$SECONDS_UNTIL_EXPIRY"
    systemd-inhibit --what=idle:sleep -- <cmd> # Linux
    powercfg /change standby-timeout-ac 0      # Windows
    ```
