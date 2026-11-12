@@ -1,0 +1,31 @@
+version: 1
+run_id: "accept-20261112t0728z"
+armed_by: manu
+armed_at: 2026-11-12T07:28:00Z
+expires_at: 2026-11-12T19:28:00Z
+objective: "Prove dotf v0.80.0 on macOS, Linux and the Windows guest, and close #3363 and #3367 with the evidence."
+scope:
+  write_paths: ["docs/**", "cli/internal/converge/**", "cli/internal/tools/**", "cli/internal/doctor/**", "cli/internal/schedule/**", ".agent/runs/**"]
+  frozen_paths: [".github/**", "harness/**", "**/AGENTS.md", "ai/**", "setup-*.sh", "setup-*.ps1", ".agent/unattended.yml"]
+  max_files: 8
+  max_loc: 300
+allowed_commands: [dotf, gh, git, go, ssh, mise, launchctl, plutil, uv, lsof]
+queue:
+  source: bitacora
+  filter: "v0.80.0 acceptance: #3363, #3367, #3274 (#3343 stays open for the lab box)"
+  max_items: 4
+budget:
+  max_iterations: 8
+  max_minutes_per_iteration: 60
+  max_consecutive_failures: 2
+  github_core_floor: 500
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
+constraints:
+  - "VM guests only in a slot fix-issue-491-conflict-marker-gate-31 confirms; never in parallel."
+  - "REST gh api only; check rate_limit each iteration; park below the floor."
+  - "msi is read-only (ssh msi <query>)."
+  - "Close an issue only after grepping specs/*/proposal.md for its number."
