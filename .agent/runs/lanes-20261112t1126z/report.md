@@ -15,7 +15,7 @@ Armed 2026-11-12T11:26Z (the owner's go-ahead was 07:48Z; the arming turn waited
 ## Iteration 2: #3324 (rule 6b names the right checkout)
 
 - Branch `fix/3324-detached-no-lease-message`, worktree `fix-3324-detached-no-lease-message`. Option B (message only, owner's answer): rule 6b tells a detached main checkout from a detached leaseless worktree, naming the worktree's path in the second case. Tests 6b (scratch detached worktree; asserts the message, the base repository and not the scratch path) and 6c (detached main checkout keeps its wording). The first assertion tripped on this run's own wording, `(main checkout: …)`, which was dropped for `($main_root)`.
-- PR #3398: PR-Agent on `964f0839` left one THEORETICAL (an unasserted message segment) and a description-evidence row, both applied on `510656f5`; CodeRabbit posted a limit notice, not a review. Triage posted at 12:1xZ on `510656f5`; no reviewer ran on that head. Landing waits on `from-zero (macos-latest)`.
+- PR #3398: PR-Agent on `964f0839` left one THEORETICAL (an unasserted message segment) and a description-evidence row, both applied on `510656f5`; CodeRabbit posted a limit notice, not a review. Triage posted on `510656f5`; no reviewer ran on that head. Every check green there; scoped queue clear; landed with `dotf pr land` at `510656f5` under the standing grant. #3324 closed by the merge; board Done; worktree and branch removed.
 
 ## Iteration 3: #3265 and #3360 (Park under the 40-line limit)
 
