@@ -1059,3 +1059,22 @@ jobs:
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           docker run --rm dotfiles-integration-test
+
+  # The one check of this workflow that branch protection can require
+  # (ci-workflows ADR-001 decision 3, CI-017 #3306). It reports on every pull
+  # request and push, and fails when any job it needs failed or was cancelled; a
+  # job skipped by `changes` passes. `if: always()` is required: without it a
+  # failed need skips this job, and GitHub counts a skipped required check as
+  # passing. It needs every other job here, because it sees only its own needs
+  # (tests/lib/check-workflow-contexts.py, rule 3). Named `ci-gate`, not `gate`:
+  # spec-gate.yml's `gate` job already reports that name.
+  ci-gate:
+    needs: [changes, lint, lint-powershell, test, pi-nan-package, test-macos, test-windows, integration]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: mlorentedev/ci-workflows/.github/actions/gate@2355330358344bb08c0b7a305be4ed6488f23d0c # v0.6.0
+        with:
+          needs: ${{ toJSON(needs) }}
