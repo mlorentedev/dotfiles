@@ -1,5 +1,5 @@
 ---
-id: "lesson-590-git-archive-drops-what-export-ignore-names"
+id: "lesson-591-git-archive-drops-what-export-ignore-names"
 type: lesson
 status: active
 title: "git archive drops what export-ignore names, .github included"

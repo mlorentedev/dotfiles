@@ -24,7 +24,7 @@ owner: manu
 - PR 2b: `bats tests/check-spec-gate.bats tests/spec-gate-archive.bats` -> 1..65; mutations: a verdict message (24 red), the archived-at-head check removed (6 red)
 - PR 1 mutations: a changed problem message (3 cases red), `escaped` inverted (3 cases red)
 - Closing, 2026-11-12 at dd4009de (the reviewed commit; main was 5854b97c): `bats tests/check-knowledge-gate.bats` 1..45, `tests/check-spec-gate.bats` 1..30, `tests/spec-gate-archive.bats` 1..35, `tests/spec-gate-adjacency.bats` 1..15, no failures; `go test ./internal/fleetlint/` 18 tests ok; `go test ./internal/cmd/ -run LintFleet` 7 tests ok
-- Adoption, 2026-11-12: the eight rules run against each default-branch tip of the owner's 14 other repositories gave 4 to 57 findings each; one issue per repository, in that repository (ci-workflows#8 lists them)
+- Adoption, 2026-11-12: a second run, not the one `tasks.md` records. That one (2026-11-11, `--fleet` over the local working trees) found 221 findings in 13 checkouts. This one read each repository's default-branch tip instead, because several checkouts were behind or on another branch (#3384): 15 repositories had findings, dotfiles and 14 others, 4 to 57 each. One issue per repository, in that repository (ci-workflows#8 lists them); dotfiles is covered by #3335 and #3336
 - PR 5b: `go test ./...`, both vets and both lints clean; mutations, each red: the stale-exception check, the unknown-rule check, the `.git` test in `Repos`, the `[OK]` line on an incomplete run, the checkout prefix, a failed checkout counted, the empty-fleet error
 
 ## Decisions made during implementation
@@ -46,7 +46,7 @@ Independent review by nan/qwen3.8-flash (pool draw), verdict PASS WITH GAPS, sev
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-590-git-archive-drops-what-export-ignore-names.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-591-git-archive-drops-what-export-ignore-names.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: the decisions (logic in dotf, one lint per standard) are ci-workflows ADR-001's, which now links the runbook
 - [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the fleet standard's home is ci-workflows ADR-001, not a vault pattern
 
@@ -54,5 +54,5 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/CI-018-dotf-gate-and-fleet-lint/` -> `specs/archive/CI-018-dotf-gate-and-fleet-lint/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3147 closes with #3391, the PR that archives this spec
 - [x] Promotions above executed (if any)
