@@ -35,10 +35,11 @@ The body is stored in the thread's own file, threads/<thread>.md beside
 MEMORY.md, and the sub-block becomes an entry derived from it: the Updated date,
 the first line of the Next action, how many items await Manu, the Journal line and
 a "[full thread](threads/<thread>.md)" pointer. A block an older release wrote
-inline stays readable and is moved to this shape on its next write. A write that
-would take MEMORY.md past 25,000 bytes, which is what a session start reads,
-fails and names the oldest threads to archive. --dry-run prints MEMORY.md and
-names the thread file on stderr, writing neither.
+inline stays readable and is moved to this shape on its next write. A session
+start reads 25,000 bytes and 200 lines of MEMORY.md, so a write that would take
+the file past either fails and names the oldest threads to archive. A write that
+holds or shrinks a file already past one still passes. --dry-run prints
+MEMORY.md and names the thread file on stderr, writing neither.
 
 A thread is a LINE OF WORK, and git already names it: the branch. So the key
 defaults to the current branch (e.g. feat-x), which means work resumed tomorrow on
