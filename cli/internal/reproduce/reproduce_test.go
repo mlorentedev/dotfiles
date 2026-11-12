@@ -385,8 +385,17 @@ func TestRunWithAProbeNeedsTheCleanHeadAsItsControl(t *testing.T) {
 			if got.State != tc.want || got.Control != tc.control {
 				t.Errorf("State, Control = %q, %q, want %q, %q (output %q)", got.State, got.Control, tc.want, tc.control, got.Output)
 			}
-			if tc.want == CouldNotRun && !strings.Contains(got.Output, "on the clean head") {
-				t.Errorf("the output does not say the control read the same:\n%s", got.Output)
+			if tc.want == CouldNotRun {
+				for _, want := range []string{
+					"the check read " + string(tc.control) + " on the clean head too (exit ",
+					"the probe did not change its reading, so the exit is not evidence of the defect",
+					"\nWith the probe:\n",
+					"\nOn the clean head:\n",
+				} {
+					if !strings.Contains(got.Output, want) {
+						t.Errorf("the output lacks %q:\n%s", want, got.Output)
+					}
+				}
 			}
 			if st := run(t, dir, "status", "--porcelain", "--untracked-files=all"); st != "" {
 				t.Errorf("the tree was not left clean:\n%s", st)

@@ -149,7 +149,8 @@ func probed(ctx context.Context, o Options, top string, res Result) (Result, err
 // directory, a package that does not exist) fails the same way without the
 // probe, and its exit alone reads like the defect. Only a check that then
 // refutes leaves the reproduction standing; any other reading, could-not-run
-// included, makes it could-not-run, with the control's output.
+// included, makes it could-not-run. The record keeps both runs' output: the
+// probe run's says what the check did, the control's why it is no verdict.
 func controlled(ctx context.Context, o Options, res Result) Result {
 	var out string
 	res.ControlExit, res.Control, out = check(ctx, o)
@@ -157,7 +158,8 @@ func controlled(ctx context.Context, o Options, res Result) Result {
 		return res
 	}
 	res.State = CouldNotRun
-	res.Output = fmt.Sprintf("the check read %s on the clean head too (exit %d), so the probe is not what made it fail; its output there:\n%s", res.Control, res.ControlExit, out)
+	res.Output = fmt.Sprintf("the check read %s on the clean head too (exit %d): the probe did not change its reading, so the exit is not evidence of the defect.\nWith the probe:\n%s\nOn the clean head:\n%s",
+		res.Control, res.ControlExit, res.Output, out)
 	return res
 }
 
