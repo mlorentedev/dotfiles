@@ -1,0 +1,25 @@
+version: 1
+run_id: "pins20261112t0735z"
+armed_by: manu
+armed_at: 2026-11-12T07:35:00Z
+expires_at: 2026-11-12T19:35:00Z
+objective: "Measure the four npm CLI pins (bw, copilot, opencode, yarn) on a clean Windows 11 Arm64 guest with the released 0.80.0, and leave PR B of #2438 (the pins, the four packages.json deletions, their doctor read, the ADR-036 amendment, the three bats guards and the Windows npm cache step) open, green and triaged for the owner to land."
+scope:
+  write_paths: ["versions.conf", "packages.json", "cli/internal/tools/mise*.go", "cli/internal/doctor/checks*.go", "tests/versions-conf.bats", "tests/ci-npm-cli-cache.bats", "tests/copilot-config.bats", "docs/adr/ADR-036*", ".github/workflows/ci.yml", "specs/PLAT-001c-tools-via-mise/**", "docs/lessons/**"]
+  frozen_paths: [".github/merge-grant.yml", ".github/CODEOWNERS", ".github/actions/**", ".github/workflows/add-to-project.yml", ".github/workflows/bitacora-*.yml", ".github/workflows/cli*.yml", ".github/workflows/from-zero.yml", ".github/workflows/knowledge-gate.yml", ".github/workflows/model-canary.yml", ".github/workflows/pat-expiry.yml", ".github/workflows/pr-agent.yml", ".github/workflows/release-please.yml", ".github/workflows/repo-hygiene.yml", ".github/workflows/review-attestation.yml", ".github/workflows/spec-gate.yml", "harness/**", "**/AGENTS.md", ".agent/unattended.yml", "secrets/**", "scripts/install.ps1", "setup-windows.ps1", "setup-linux.sh", "cli/internal/tools/system*.go", "cli/internal/tools/catalog*.go", "cli/internal/tools/install*.go", "cli/internal/converge/**", "cli/internal/vm/**", "cli/internal/spec/**", "cli/internal/worktree/**", "cli/internal/autopilot/**", "docs/adr/ADR-0[0-35-9]*", "docs/runbooks/**"]
+  max_files: 16
+  max_loc: 300
+allowed_commands: [dotf, gh, git, make, go, golangci-lint, bats, shellcheck, jq, npm, qemu-system-aarch64, swtpm, caffeinate]
+queue:
+  source: bitacora
+  filter: 'the PLAT-001c Windows tools line only: #2438 (PR B: the four pins under # mise: cli, the four packages.json deletions, the doctor read of a versions.conf pin, the ADR-036 amendment, the three bats guards that name the npm entries, and the Windows npm cache step in ci.yml), and the acceptance evidence for #3328 and #3329, which stay open. Measure first, with no --dotf: the guest converges with the released 0.80.0 and --ref feat/mise-npm-pins. If that run fails only on Go that lives on the branch, that Go goes in its own PR and the pins wait for the next release (lesson 373). The guest is shared: check dotf vm windows status first, wait up to 60 minutes if it is busy, and park guest-busy afterwards without counting it as a failure; slots agreed with the peer sessions are 08:00Z-10:30Z for this run and not before 15:00Z after it. PR B is never merged by the run, whatever its checks: it changes what every machine installs and touches ci.yml. Refs #2438, never Closes: PLAT-001c is active and names it. Nothing in cli/internal/converge, catalog*.go, system*.go or install*.go (the TOOL-036 session owns the first three, and install.go loses its npm installer only after PR B lands); setup-windows.ps1 stays frozen (the AC4 follow-up is another night); never close an issue an active spec names; no harness/** change'
+  max_items: 3
+budget:
+  max_iterations: 6
+  max_minutes_per_iteration: 120
+  max_consecutive_failures: 2
+authority:
+  merge: standing-grant
+  push: true
+  open_pr: true
+  advisor_tier: top
