@@ -9,8 +9,8 @@ Armed 2026-11-12T11:26Z (the owner's go-ahead was 07:48Z; the arming turn waited
 
 ## Iteration 1: #3337 (lane doctor reports an unreadable gitdir)
 
-- Branch `fix/3337-audit-unreadable-gitdir`, worktree `fix-3337-audit-unreadable-gitdir`. Red test first (`audit_test.go`: an admin dir whose `gitdir` file is gone is reported, not folded into a missing record; a second registration whose gitdir is gone is not listed as a blank duplicate), then the fix: `laneRecords` emits a finding with the `prune`/`repair` FIX and keeps the admin dir in the per-lane list, `located` drops empty-path entries before `auditLane` decides. Four production lines plus the helper.
-- PR #3397: PR-Agent on `550967ed` found one REAL (the finding text named no remedy the runbook has) reproduced with `dotf pr reproduce` (exit 1 on `550967ed`, control did-not-reproduce on `c74072b4`); fixed, triaged, landed with `dotf pr land` at `c74072b4` under the standing grant. #3337 closed by the merge; board Done; worktree and branch removed.
+- Branch `fix/3337-audit-unreadable-gitdir`, worktree `fix-3337-audit-unreadable-gitdir`. Red test first (`audit_test.go`: an admin dir whose `gitdir` file is gone is reported, not folded into a missing record; a second registration whose gitdir is gone is not listed as a blank duplicate), then the fix: `laneRecords` emits a finding with the `prune`/`repair` FIX and keeps the admin dir in the per-lane list, `located` drops empty-path entries before `auditLane` decides. 63 added lines over two files, under the threshold.
+- PR #3397: PR-Agent on `550967ed` left one THEORETICAL (the empty-path placeholder padded the duplicate list; fixed by `located` with a test) and one REAL on the PR description (the body did not carry the red runs; reproduced with `dotf pr reproduce`, exit 1 on `550967ed`, control did-not-reproduce on `c74072b4`, body rewritten); triaged, landed with `dotf pr land` at `c74072b4` under the standing grant. #3337 closed by the merge; board Done; worktree and branch removed.
 
 ## Iteration 2: #3324 (rule 6b names the right checkout)
 
