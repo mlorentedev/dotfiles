@@ -93,7 +93,7 @@ func printSyncPlan(w io.Writer, s tools.MiseSync, pins []tools.MiseTool) error {
 		_, _ = fmt.Fprintf(w, "  %s %s\n", t.Name, t.Version)
 	}
 	for _, pkg := range s.PythonPackages {
-		_, _ = fmt.Fprintf(w, "  python package %s %s (%s)\n", pkg.Name, pkg.Version, s.PythonPackagesPath())
+		_, _ = fmt.Fprintf(w, "  python package %s %s (python's postinstall in %s)\n", pkg.Name, pkg.Version, s.ConfigPath())
 	}
 	if p.UnparsableConfig != "" {
 		// mise answers no command over that file, so what to install is

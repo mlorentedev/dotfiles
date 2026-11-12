@@ -106,6 +106,7 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - AC4 Windows activates mise's shims in setup's own session (`mise activate pwsh --shims`) rather than putting the shims directory on the user PATH. The later blocks of this run need uvx and node now; every later shell already gets them from the profile's `mise activate pwsh`. Persisting the directory for shell-less processes is W2b PR 2, not this change: converge's `env-persist` step on Windows (#3222) puts the shims and `~/.local/bin` on the user Path. The two hold together: the activation serves this run's later blocks, the user Path serves every process started after it
 - AC4 Windows keeps eza on winget: it is a catalog `system` entry with an apt row on Linux, not a `# mise: cli` pin, so the winget row is its only Windows owner
 - P5b leaves the kubectl and helm pins out. `ProbeVersion` runs `<tool> --version`, which both reject, so `dotf tools sync` would install them and then report them not running at their pin. Found by the toolset worker before this PR pushed
+- AC9 moves the python packages from `python.default_packages_file` to the `python` tool's `postinstall` hook (#3363), not to the `pypi:` backend that mise's deprecation notice also offers: `pypi:` installs CLIs into isolated venvs, and PyYAML is a library imported from mise's own Python. Measured with mise 2026.11.6 in an isolated data dir: `mise install python` runs the hook, `import yaml` answers 6.0.3, and no deprecation warning is printed
 
 ## Promotion candidates
 
