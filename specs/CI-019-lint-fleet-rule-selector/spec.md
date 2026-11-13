@@ -41,8 +41,33 @@ Out of scope:
 
 - `go test ./...` passes; `go vet` and `golangci-lint run` report nothing on darwin and with `GOOS=windows`.
 - New tests: `TestActionManifestsArePinChecked`, `TestActionManifestFindingMayBeExcepted`, `TestUnreadableActionManifestIsAnError`, `TestRulesListsEveryFindingRule`, `TestLintFleetRuleSelector`, `TestLintFleetRuleSelectorOverCheckouts`, `TestLintFleetUnknownRule`.
-- Ten mutations on a copy, each caught: no action directories read; `.gitea/actions` dropped; `action.yaml` dropped; a manifest parse error ignored; the manifest pin check off; no `--rule` filter; the filter inverted; no `--rule` validation; the selection not passed to the lint; `fleet/exception` missing from `Rules()`.
-- Real checkouts, finding counts before (main) and after: dotfiles 26/26, ci-workflows 0/0, pollex 20/20, kubelab 57/57, hive 22/22. With `--rule fleet/sha-pin` each exits 0, pollex included, where the full run exits 1.
+- Mutations on a copy, each caught (output below), and finding counts on real checkouts, main against this branch:
+
+```
+$ mutations on a copy (pattern -> replacement), tests: Action|Rules|RuleSelector|UnknownRule|RuleFixtures|Exception
+no action dirs: caught
+gitea actions dropped: caught
+action.yaml dropped: caught
+action parse error ignored: caught
+action pin check off: caught
+symlinked action skipped: caught
+stat error swallowed: caught
+no rule filter: caught
+inverted filter: caught
+no rule validation: caught
+selection not passed: caught
+exception missing from Rules: caught
+```
+
+```
+$ for r in dotfiles ci-workflows pollex kubelab hive; do  # findings on main, on this branch, and --rule fleet/sha-pin
+dotfiles: main 26 findings (exit 1); branch 26 findings (exit 1); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
+ci-workflows: main 0 findings (exit 0); branch 0 findings (exit 0); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
+pollex: main 20 findings (exit 1); branch 20 findings (exit 1); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
+kubelab: main 57 findings (exit 1); branch 57 findings (exit 1); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
+hive: main 22 findings (exit 1); branch 22 findings (exit 1); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
+```
+
 - A copy of ci-workflows with `actions/setup-node` in `.github/actions/setup-node/action.yml` moved to `@v9`: `--rule fleet/sha-pin` exits 1 with `.github/actions/setup-node/action.yml:58: fleet/sha-pin: actions/setup-node@v9 is not pinned by a full commit SHA`.
 
 ## Next

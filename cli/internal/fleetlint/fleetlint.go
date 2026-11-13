@@ -96,7 +96,9 @@ func lintFile(dir, f string, lint func(rel string, data []byte) ([]Finding, erro
 }
 
 // actionFiles are the manifests of the actions directly under dir: each
-// subdirectory's action.yml or action.yaml.
+// subdirectory's action.yml or action.yaml, a symlinked one included. Only a
+// manifest that does not exist is skipped: any other failure to stat one is
+// an error, since skipping it would read as a clean check.
 func actionFiles(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -107,13 +109,22 @@ func actionFiles(dir string) ([]string, error) {
 	}
 	var out []string
 	for _, e := range entries {
-		if !e.IsDir() {
+		// Stat follows a symlink, as Repos does: e.IsDir() would not.
+		fi, err := os.Stat(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		if !fi.IsDir() {
 			continue
 		}
 		for _, name := range []string{"action.yml", "action.yaml"} {
 			f := filepath.Join(dir, e.Name(), name)
-			if _, err := os.Stat(f); err == nil {
+			_, err := os.Stat(f)
+			switch {
+			case err == nil:
 				out = append(out, f)
+			case !errors.Is(err, os.ErrNotExist):
+				return nil, err
 			}
 		}
 	}

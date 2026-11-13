@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -449,3 +450,36 @@ func TestRulesListsEveryFindingRule(t *testing.T) {
 }
 
 const strings40 = "0123456789abcdef0123456789abcdef01234567"
+
+// A symlinked action directory is read like any other, and a manifest that
+// cannot be stat'ed for a reason other than its absence is an error: either
+// way, skipping it would read as a clean pin check.
+func TestActionManifestsFailClosed(t *testing.T) {
+	shared := repo(t, map[string]string{"setup/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: owner/setup@v4\n"})
+	dir := repo(t, map[string]string{".github/workflows/ci.yml": "on: push\njobs: {}\n"})
+	if err := os.MkdirAll(filepath.Join(dir, ".github", "actions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(shared, "setup"), filepath.Join(dir, ".github", "actions", "setup")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	got, err := Lint(dir, "main")
+	if err != nil || len(got) != 1 || got[0].Path != ".github/actions/setup/action.yml" {
+		t.Errorf("symlinked action: got %v, %v; want one finding on its manifest", got, err)
+	}
+
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("permission bits do not deny access here")
+	}
+	locked := filepath.Join(dir, ".github", "actions", "locked")
+	if err := os.Mkdir(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	if _, err := Lint(dir, "main"); err == nil {
+		t.Error("an action directory that cannot be searched read as clean")
+	}
+}
