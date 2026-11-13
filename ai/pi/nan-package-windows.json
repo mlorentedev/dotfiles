@@ -1,12 +1,16 @@
 {
-  "source": "npm:@gtrabanco/pi-nan-provider@0.7.0",
+  "source": "npm:@gtrabanco/pi-nan-provider@1.5.3",
   "contextWindow": {
-    "deepseek-v4-flash": 1000000,
+    "deepseek-v4-flash": 1048576,
+    "deepseek-v4-pro": 1048576,
     "gemma4": 262144,
-    "glm5.3-flash": 1000000,
-    "mimo-v2.5": 1048576,
+    "glm5.3": 1048576,
+    "glm5.3-flash": 1048576,
+    "hy4": 1048576,
+    "kimi-k3.1-pro": 1048576,
     "mimo-v2.6-flash": 1048576,
     "qwen3.6": 262144,
-    "qwen3.8-flash": 262144
+    "qwen3.8-flash": 1048576,
+    "qwen3.8-max": 1000000
   }
 }
