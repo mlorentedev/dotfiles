@@ -32,6 +32,9 @@ func (f Finding) String() string {
 // workflowDirs are read on every forge the fleet runs on.
 var workflowDirs = []string{".github/workflows", ".gitea/workflows"}
 
+// actionDirs hold local composite actions, one directory each, on every forge.
+var actionDirs = []string{".github/actions", ".gitea/actions"}
+
 // Lint returns the findings in dir's workflows that no exception covers, and
 // the exceptions file's own, sorted by file, line and rule. An unreadable file
 // is an error, never an empty result.
@@ -43,14 +46,24 @@ func Lint(dir, defaultBranch string) ([]Finding, error) {
 			return nil, err
 		}
 		for _, f := range files {
-			data, err := os.ReadFile(f)
+			found, err := lintFile(dir, f, func(rel string, data []byte) ([]Finding, error) {
+				return lintWorkflow(rel, data, defaultBranch)
+			})
 			if err != nil {
 				return nil, err
 			}
-			rel, _ := filepath.Rel(dir, f)
-			found, err := lintWorkflow(filepath.ToSlash(rel), data, defaultBranch)
+			all = append(all, found...)
+		}
+	}
+	for _, ad := range actionDirs {
+		files, err := actionFiles(filepath.Join(dir, ad))
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			found, err := lintFile(dir, f, func(rel string, data []byte) ([]Finding, error) { return lintAction(rel, data) })
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", filepath.ToSlash(rel), err)
+				return nil, err
 			}
 			all = append(all, found...)
 		}
@@ -63,6 +76,47 @@ func Lint(dir, defaultBranch string) ([]Finding, error) {
 	slices.SortStableFunc(out, func(a, b Finding) int {
 		return cmp.Or(strings.Compare(a.Path, b.Path), cmp.Compare(a.Line, b.Line), strings.Compare(a.Rule, b.Rule))
 	})
+	return out, nil
+}
+
+// lintFile reads f and lints it under its path relative to dir, with forward
+// slashes; an error names the file.
+func lintFile(dir, f string, lint func(rel string, data []byte) ([]Finding, error)) ([]Finding, error) {
+	data, err := os.ReadFile(f)
+	if err != nil {
+		return nil, err
+	}
+	rel, _ := filepath.Rel(dir, f)
+	rel = filepath.ToSlash(rel)
+	found, err := lint(rel, data)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", rel, err)
+	}
+	return found, nil
+}
+
+// actionFiles are the manifests of the actions directly under dir: each
+// subdirectory's action.yml or action.yaml.
+func actionFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		for _, name := range []string{"action.yml", "action.yaml"} {
+			f := filepath.Join(dir, e.Name(), name)
+			if _, err := os.Stat(f); err == nil {
+				out = append(out, f)
+			}
+		}
+	}
 	return out, nil
 }
 

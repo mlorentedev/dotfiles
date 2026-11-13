@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/fleetlint"
@@ -13,6 +14,7 @@ import (
 
 func newLintFleetCmd() *cobra.Command {
 	var dir, fleet, summary, defaultBranch string
+	var only []string
 	cmd := &cobra.Command{
 		Use:   "fleet",
 		Short: "Check a repository's CI workflows against the fleet's CI standard",
@@ -46,8 +48,15 @@ the branch its own origin/HEAD names, and prefixes each finding with the
 checkout's name. A checkout that cannot be read is reported and the others
 are still checked.
 
+--rule <id>, repeatable, reports only the named rules: findings of the
+others neither print nor count toward the exit code. Exceptions are
+applied first, so a stale one shows only under --rule fleet/exception.
+
+fleet/sha-pin also reads the steps of each local composite action,
+.github/actions/<name>/action.yml (or .gitea/actions, or action.yaml).
+
 Exit 0 is clean, 1 is findings, 2 is a workflow or exceptions file that
-cannot be read.`,
+cannot be read, or an unknown --rule.`,
 		Args: func(c *cobra.Command, args []string) error {
 			switch {
 			case len(args) > 0:
@@ -55,12 +64,17 @@ cannot be read.`,
 			case fleet != "" && (c.Flags().Changed("dir") || defaultBranch != ""):
 				return guardUsage(c, "--fleet reads each checkout's own default branch; it takes neither --dir nor --default-branch")
 			}
+			for _, r := range only {
+				if !slices.Contains(fleetlint.Rules(), r) {
+					return guardUsage(c, fmt.Sprintf("--rule %s names no rule; the rules are %s", r, strings.Join(fleetlint.Rules(), ", ")))
+				}
+			}
 			return nil
 		},
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			deps := lintFleetDeps{branchOf: fleetlint.DefaultBranch}
+			deps := lintFleetDeps{branchOf: fleetlint.DefaultBranch, only: only}
 			if fleet != "" {
 				return runLintFleetAll(c.OutOrStdout(), c.ErrOrStderr(), deps, fleet, summary)
 			}
@@ -70,23 +84,30 @@ cannot be read.`,
 	cmd.Flags().StringVar(&dir, "dir", ".", "repository root to check")
 	cmd.Flags().StringVar(&fleet, "fleet", "", "directory whose git checkouts are each checked")
 	cmd.Flags().StringVar(&defaultBranch, "default-branch", "", "the branch every branch filter must include (default: what origin/HEAD names)")
+	cmd.Flags().StringSliceVar(&only, "rule", nil, "report only this rule's findings; repeat for more (default: every rule)")
 	cmd.Flags().StringVar(&summary, "summary", "", "Markdown file to append the findings table to, e.g. $GITHUB_STEP_SUMMARY")
 	return cmd
 }
 
 // lintFleetDeps is the command's one external surface: what a checkout's
-// origin/HEAD names, which reads git.
+// origin/HEAD names, which reads git. only is the --rule selection, empty for
+// every rule.
 type lintFleetDeps struct {
 	branchOf func(dir string) string
+	only     []string
 }
 
 // lintRepo lints one checkout against defaultBranch, else the one its
-// origin/HEAD names.
+// origin/HEAD names, and keeps the selected rules' findings.
 func lintRepo(deps lintFleetDeps, dir, defaultBranch string) ([]fleetlint.Finding, error) {
 	if defaultBranch == "" {
 		defaultBranch = deps.branchOf(dir)
 	}
-	return fleetlint.Lint(dir, defaultBranch)
+	findings, err := fleetlint.Lint(dir, defaultBranch)
+	if err != nil || len(deps.only) == 0 {
+		return findings, err
+	}
+	return slices.DeleteFunc(findings, func(f fleetlint.Finding) bool { return !slices.Contains(deps.only, f.Rule) }), nil
 }
 
 func runLintFleet(stdout, stderr io.Writer, deps lintFleetDeps, dir, defaultBranch, summary string) error {

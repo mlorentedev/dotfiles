@@ -55,6 +55,28 @@ func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, er
 	return out, nil
 }
 
+// lintAction applies the pin rule to a local composite action's steps: they
+// run third-party actions as a workflow's do. The other step rules stay with
+// workflows.
+func lintAction(path string, data []byte) ([]Finding, error) {
+	docs, err := decodeDocs(data)
+	if err != nil {
+		return nil, err
+	}
+	var out []Finding
+	for _, d := range docs {
+		if len(d.Content) == 0 {
+			continue
+		}
+		for _, st := range seq(mapValue(mapValue(d.Content[0], "runs"), "steps")) {
+			if su := mapValue(st, "uses"); su != nil && !pinned(su.Value) {
+				out = append(out, Finding{Rule: RuleSHAPin, Path: path, Line: su.Line, Message: su.Value + " is not pinned by a full commit SHA"})
+			}
+		}
+	}
+	return out, nil
+}
+
 func lintJob(path string, key, job *yaml.Node) []Finding {
 	var out []Finding
 	add := func(rule string, line int, msg string) {
