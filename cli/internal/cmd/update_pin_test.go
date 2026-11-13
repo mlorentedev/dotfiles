@@ -39,7 +39,11 @@ func pinnedCheckout(t *testing.T) (checkout, recorded string) {
 	if err := os.WriteFile(filepath.Join(writer, env.CheckoutMarker), []byte("# pins\nDOTF_VERSION=0.70.0\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	script := "#!/bin/sh\n{ printf 'DOTF_VERSION=%s\\n' \"$DOTF_VERSION\"; printf 'arg=%s\\n' \"$@\"; } > \"$FAKE_INSTALL_OUT\"\nexit \"${FAKE_INSTALL_RC:-0}\"\n"
+	// FAKE_INSTALL_REPORT, when set, is a converge report the installer writes
+	// as its own converge would, stamped with the time it runs (#3395).
+	script := "#!/bin/sh\n{ printf 'DOTF_VERSION=%s\\n' \"$DOTF_VERSION\"; printf 'arg=%s\\n' \"$@\"; } > \"$FAKE_INSTALL_OUT\"\n" +
+		"if [ -n \"$FAKE_INSTALL_REPORT\" ]; then mkdir -p \"$XDG_STATE_HOME/dotfiles/converge\" && sed \"s/@NOW@/$(date -u +%Y-%m-%dT%H:%M:%SZ)/\" \"$FAKE_INSTALL_REPORT\" > \"$XDG_STATE_HOME/dotfiles/converge/last.json\"; fi\n" +
+		"exit \"${FAKE_INSTALL_RC:-0}\"\n"
 	if err := os.WriteFile(filepath.Join(writer, "install.sh"), []byte(script), 0o755); err != nil { //nolint:gosec // the fixture installer must be executable
 		t.Fatal(err)
 	}
@@ -118,6 +122,32 @@ func TestUpdate_FailsWhenThePinCannotBeInstalled(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "0.70.0") || !strings.Contains(err.Error(), "0.69.0") {
 		t.Errorf("error = %q, want both versions named", err)
+	}
+}
+
+// #3395: the installer installed the pin, then its converge failed a step, so
+// it exits non-zero. dotf update reads that converge's report and says the pin
+// is installed and which step failed. This drives the command's own wiring of
+// the reader, which the unit tests of the reader and of update.Run cannot see.
+func TestUpdate_NamesTheStepWhenTheInstallersConvergeFails(t *testing.T) {
+	_, _ = pinnedCheckout(t)
+	tmpl := filepath.Join(t.TempDir(), "report.json")
+	body := `{"finished_at":"@NOW@","goos":"` + runtime.GOOS + `","result":"failed","error":"1 step failed","changed":0,"entries":[{"name":"system-upgrade","status":"failed"}]}`
+	if err := os.WriteFile(tmpl, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_INSTALL_REPORT", tmpl)
+	t.Setenv("FAKE_INSTALL_RC", "1")
+
+	stdout, err := runUpdateAs(t, "0.69.0")
+	if err == nil {
+		t.Fatalf("a failed installer run must fail update:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "installed; its converge failed at system-upgrade") {
+		t.Errorf("output = %q, want the pin reported installed and the failed step named", stdout)
+	}
+	if !strings.Contains(err.Error(), "system-upgrade") {
+		t.Errorf("error = %q, want the failed step named", err)
 	}
 }
 
