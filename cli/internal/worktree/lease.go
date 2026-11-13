@@ -69,9 +69,10 @@ func LoadMetadata(worktreePath string) (*Metadata, error) {
 // not redeployed and the pinned binary the hooks call read the tree file. A
 // path that is not a linked worktree is refused, never written in the tree.
 // The mirror is written first and the admin dir last, and a mirror whose
-// admin-dir write then fails is put back as it was, so an error always
-// means both copies, the one a new reader prefers and the one an old guard
-// reads, are as they were.
+// admin-dir write then fails is put back as it was, so an error means both
+// copies, the one a new reader prefers and the one an old guard reads, are
+// as they were; when even that restore fails, the error says the mirror is
+// ahead.
 func SaveMetadata(worktreePath string, meta Metadata) error {
 	admin, err := AdminDir(worktreePath)
 	if err != nil {
