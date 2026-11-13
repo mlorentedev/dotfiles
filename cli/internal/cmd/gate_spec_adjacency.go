@@ -54,8 +54,10 @@ func (g *specGate) reportAdjacency() {
 	g.summarizeAdjacency(rows)
 }
 
-// titleEscaper backslash-escapes markdown's inline link and image syntax.
-var titleEscaper = strings.NewReplacer("[", `\[`, "]", `\]`, "!", `\!`)
+// titleEscaper backslash-escapes markdown's inline link and image syntax, and
+// doubles a backslash already there, or `\[x\](u)` would become a live link
+// again. One pass, so the backslashes it adds are not themselves doubled.
+var titleEscaper = strings.NewReplacer(`\`, `\\`, "[", `\[`, "]", `\]`, "!", `\!`)
 
 func (g *specGate) summarizeAdjacency(rows []gate.Adjacent) {
 	if g.o.summary == "" {
@@ -67,7 +69,7 @@ func (g *specGate) summarizeAdjacency(rows []gate.Adjacent) {
 	esc := strings.NewReplacer("|", `\|`, "<", "&lt;", ">", "&gt;").Replace
 	// The title cell is markdown text, so link and image syntax would render
 	// (#3414); the path cell is a code span and takes no backslashes.
-	title := func(t string) string { return titleEscaper.Replace(esc(t)) }
+	title := func(t string) string { return esc(titleEscaper.Replace(t)) }
 	var b strings.Builder
 	b.WriteString("\n### Adjacent open issues (advisory)\n\n| Issue | Names | Title |\n|---|---|---|\n")
 	for _, r := range rows {

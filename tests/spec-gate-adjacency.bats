@@ -315,6 +315,19 @@ _write_849_feed() {
     refute_grep_fixed ' [x]' "$REPO_FIXTURE/summary.md"
 }
 
+# A backslash already in the title must not cancel the escape: `\[x\](u)`
+# escaped naively becomes `\\[x\\](u)`, which renders a live link (#3424 review).
+@test "adjacency: a backslash in an issue title cannot cancel the link escape" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 904 'BUG-8: scripts/tool.sh \[x\](https://example.invalid) a|b' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF 'tool.sh \\\[x\\\](https://example.invalid) a\|b |' "$REPO_FIXTURE/summary.md"
+}
+
 @test "adjacency: --help documents the flag" {
     spec_gate_both --help
     [ "$status" -eq 0 ]
