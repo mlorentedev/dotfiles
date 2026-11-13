@@ -1,7 +1,7 @@
 ---
 id: "CLI-133-update-self-install"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-12"
 issue: "mlorentedev/dotfiles#3433"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
