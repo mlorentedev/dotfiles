@@ -1,7 +1,7 @@
 ---
 id: "CI-018-dotf-gate-and-fleet-lint"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-11"
 issue: "mlorentedev/dotfiles#3147"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -81,12 +81,12 @@ Deleting the shell scripts and switching dotfiles' workflows is CI-008's adoptio
 
 ## Acceptance criteria
 
-- [ ] AC1: `dotf gate knowledge` passes every case of `tests/check-knowledge-gate.bats` through the event shim.
-- [ ] AC2: `dotf gate spec` passes every case of the spec-gate suites through the event shim.
-- [ ] AC3: The gates make no network call: they run with no `gh` and no token in the environment.
-- [ ] AC4: Each fleet rule has a stable id, a good and a bad fixture, and a declared exception silences only
+- [x] AC1: `dotf gate knowledge` passes every case of `tests/check-knowledge-gate.bats` through the event shim.
+- [x] AC2: `dotf gate spec` passes every case of the spec-gate suites through the event shim.
+- [x] AC3: The gates make no network call: they run with no `gh` and no token in the environment.
+- [x] AC4: Each fleet rule has a stable id, a good and a bad fixture, and a declared exception silences only
   its rule and path; an exception without reason or issue is a finding.
-- [ ] AC5: `dotf lint fleet --fleet` lists findings per repository; the rules are documented in one runbook
+- [x] AC5: `dotf lint fleet --fleet` lists findings per repository; the rules are documented in one runbook
   section linked from ci-workflows ADR-001.
 
 ## References

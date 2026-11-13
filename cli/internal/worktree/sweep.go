@@ -355,59 +355,84 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	absCwd, _ := filepath.Abs(cwd)
 
 	for _, info := range infos {
-		if info.State == StateParkable {
-			if reason := sessionSkipReason(opts.Sessions, info.Path, now); reason != "" {
-				report.SkippedCount++
-				report.SessionSkips = append(report.SessionSkips, SessionSkip{Path: info.Path, Reason: reason})
-				continue
-			}
-			if opts.DryRun {
-				report.Reaped = append(report.Reaped, info)
-				continue
-			}
-			if parked, why := parkSingleNamedLane(opts.RepoRoot, info, runner, opts.LandedHeads); parked {
-				report.Reaped = append(report.Reaped, info)
-			} else {
-				report.SkippedCount++
-				report.LaneSkips = append(report.LaneSkips, SessionSkip{Path: info.Path, Reason: why})
-			}
-			continue
-		}
-		reading, candidate := gateF(info, absCwd)
-		if reading.Uninspectable > report.UninspectableProcesses {
-			report.UninspectableProcesses = reading.Uninspectable
-		}
-		if !candidate {
-			report.SkippedCount++
-			if laneHeldByDirt(info, now) {
-				report.LaneSkips = append(report.LaneSkips, SessionSkip{Path: info.Path, Reason: info.StateReason})
-			}
-			if info.PRMergedUnknown != "" && (info.State == StateUnmerged || info.State == StateOrphan) {
-				report.MergeUnknownSkips = append(report.MergeUnknownSkips, SessionSkip{Path: info.Path, Reason: info.StateReason})
-			}
-			continue
-		}
-		// After gate f, so only a worktree sweep would otherwise reap is
-		// reported: the main checkout's key prefixes every legacy sibling's.
-		if reason := sessionSkipReason(opts.Sessions, info.Path, now); reason != "" {
-			report.SkippedCount++
-			report.SessionSkips = append(report.SessionSkips, SessionSkip{Path: info.Path, Reason: reason})
-			continue
-		}
-
-		if opts.DryRun {
-			report.Reaped = append(report.Reaped, info)
-			continue
-		}
-
-		if reapSingleWorktree(opts.RepoRoot, info, runner, now, absCwd) {
-			report.Reaped = append(report.Reaped, info)
-		} else {
-			report.SkippedCount++
-		}
+		report.record(info, sweepOne(opts, info, runner, now, absCwd))
 	}
 
 	return report, nil
+}
+
+// sweepOutcome is what one worktree contributes to the report: reaped (or
+// listed as such under --dry-run), or skipped with the list that names why.
+// A skip with no list is counted and not named, as before.
+type sweepOutcome struct {
+	reaped        bool
+	session       string // a session holds it
+	lane          string // a named lane sweep did not park, or held by dirt
+	mergeUnknown  string // the forge could not say whether its branch landed
+	uninspectable int
+}
+
+// record folds one worktree's outcome into the report.
+func (r *SweepReport) record(info Info, out sweepOutcome) {
+	if out.uninspectable > r.UninspectableProcesses {
+		r.UninspectableProcesses = out.uninspectable
+	}
+	if out.reaped {
+		r.Reaped = append(r.Reaped, info)
+		return
+	}
+	r.SkippedCount++
+	if out.session != "" {
+		r.SessionSkips = append(r.SessionSkips, SessionSkip{Path: info.Path, Reason: out.session})
+	}
+	if out.lane != "" {
+		r.LaneSkips = append(r.LaneSkips, SessionSkip{Path: info.Path, Reason: out.lane})
+	}
+	if out.mergeUnknown != "" {
+		r.MergeUnknownSkips = append(r.MergeUnknownSkips, SessionSkip{Path: info.Path, Reason: out.mergeUnknown})
+	}
+}
+
+// sweepOne decides one worktree: a parkable named lane is parked, anything
+// else passes gate f and the session check before it is reaped.
+func sweepOne(opts SweepOptions, info Info, runner SweepRunner, now time.Time, absCwd string) sweepOutcome {
+	if info.State == StateParkable {
+		return sweepLane(opts, info, runner, now)
+	}
+	reading, candidate := gateF(info, absCwd)
+	out := sweepOutcome{uninspectable: reading.Uninspectable}
+	if !candidate {
+		if laneHeldByDirt(info, now) {
+			out.lane = info.StateReason
+		}
+		if info.PRMergedUnknown != "" && (info.State == StateUnmerged || info.State == StateOrphan) {
+			out.mergeUnknown = info.StateReason
+		}
+		return out
+	}
+	// After gate f, so only a worktree sweep would otherwise reap is
+	// reported: the main checkout's key prefixes every legacy sibling's.
+	if out.session = sessionSkipReason(opts.Sessions, info.Path, now); out.session != "" {
+		return out
+	}
+	out.reaped = opts.DryRun || reapSingleWorktree(opts.RepoRoot, info, runner, now, absCwd)
+	return out
+}
+
+// sweepLane decides a parkable named lane: held by a session, listed under
+// --dry-run, or parked, with the reason when the park did not happen.
+func sweepLane(opts SweepOptions, info Info, runner SweepRunner, now time.Time) sweepOutcome {
+	var out sweepOutcome
+	if out.session = sessionSkipReason(opts.Sessions, info.Path, now); out.session != "" {
+		return out
+	}
+	if opts.DryRun {
+		out.reaped = true
+		return out
+	}
+	parked, why := parkSingleNamedLane(opts.RepoRoot, info, runner, opts.LandedHeads)
+	out.reaped, out.lane = parked, why
+	return out
 }
 
 func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (parked bool, why string) {
@@ -419,41 +444,16 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 	if landed, why := laneLanded(repoRoot, info, runner, landedHeads); !landed {
 		return false, why
 	}
-	laneName := filepath.Base(info.Path)
-	createdAt := time.Now()
-	issueNum := 0
-	if info.Metadata != nil {
-		if info.Metadata.Lane != "" {
-			laneName = info.Metadata.Lane
-		}
-		if !info.Metadata.CreatedAt.IsZero() {
-			createdAt = info.Metadata.CreatedAt
-		}
-		issueNum = info.Metadata.Issue
-	}
 	// Write State="PARKED" before checkout --detach / branch delete (M-CODE-2).
-	if err := SaveMetadata(info.Path, Metadata{
-		Lane:      laneName,
-		State:     string(StateParked),
-		CreatedAt: createdAt,
-		ReapOK:    false,
-	}); err != nil {
+	parkedMeta, issueNum := parkedLease(info.Path, info.Metadata)
+	if err := SaveMetadata(info.Path, parkedMeta); err != nil {
 		return false, "its lease could not be written: " + err.Error()
 	}
-	baseRef := resolveBaseRef(repoRoot)
-	if baseRef == "" {
-		baseRef = "HEAD"
-	}
-	if out, err := gitIn(info.Path, "checkout", "--detach", baseRef).CombinedOutput(); err != nil {
-		if info.Metadata != nil {
-			_ = SaveMetadata(info.Path, *info.Metadata)
-		}
+	if _, out, err := detachAtBase(repoRoot, info.Path, false, info.Metadata); err != nil {
 		return false, "git refused to detach it: " + gitFailure(out, err)
 	}
-	_ = os.Remove(filepath.Join(info.Path, ".dotf-lane-prompt.md"))
+	releaseParkedLane(repoRoot, info.Path, info.Branch, issueNum)
 	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
-	releaseIssueClaimRefs(repoRoot, issueNum)
-	archiveBranchMemoryThread(repoRoot, info.Branch)
 	return true, ""
 }
 

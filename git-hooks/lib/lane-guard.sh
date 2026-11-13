@@ -129,7 +129,14 @@ if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
   exit 1
 fi
 if [ -z "$branch" ] && [ ! -f "$top/.dotf-worktree.json" ]; then
-  echo "ERROR: detached HEAD commits at the main checkout are blocked in lane-managed repository ($top)." >&2
+  # Same verdict at the main checkout and in a leaseless linked worktree; the
+  # message names which one was detected, since the old one sent a user in a
+  # scratch worktree to "the main checkout" (#3324).
+  if [ "$git_dir" = "$common_dir" ]; then
+    echo "ERROR: detached HEAD commits at the main checkout are blocked in lane-managed repository ($top)." >&2
+  else
+    echo "ERROR: detached HEAD without a lease at $top is blocked in lane-managed repository ($main_root)." >&2
+  fi
   echo "FIX: use a persistent named lane instead: dotf lane switch <type>/<issue>-<slug>" >&2
   exit 1
 fi

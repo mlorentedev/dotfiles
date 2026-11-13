@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 )
 
 // Facts is what Decide needs, read from GitHub for one head commit.
@@ -109,6 +111,7 @@ func Decide(f Facts) []string {
 			r = append(r, c.Name+": "+c.Bucket)
 		}
 	}
+	r = append(r, reviewReasons(f)...)
 	switch {
 	case f.MergeState == "UNKNOWN" && f.UnknownFor > 0:
 		r = append(r, fmt.Sprintf("merge state is UNKNOWN after waiting %s for GitHub to compute it; a new head (a re-created merge of the base) makes it compute again", f.UnknownFor))
@@ -122,6 +125,30 @@ func Decide(f Facts) []string {
 		r = append(r, "the repository has not opted in to the standing merge grant ("+GrantFile+" on "+f.BaseRef+"): the owner merges this PR")
 	}
 	return r
+}
+
+// reviewReasons refuses a head no review ran on (#3243). A failed review is
+// already refused as a red check and a pending one is waited for, so what is
+// left is the reading the generic rule lets through: a review check that was
+// skipped, or none at all. With no checks reported, Decide already says so.
+func reviewReasons(f Facts) []string {
+	if len(f.Checks) == 0 {
+		return nil
+	}
+	found := false
+	for _, c := range f.Checks {
+		if !prtriage.IsReviewCheck(c.Name) {
+			continue
+		}
+		found = true
+		if c.Bucket == "skipping" {
+			return []string{fmt.Sprintf("review did not run on %s: the %s check was skipped", short(f.HeadSHA), c.Name)}
+		}
+	}
+	if !found {
+		return []string{fmt.Sprintf("review did not run on %s: no review check reported", short(f.HeadSHA))}
+	}
+	return nil
 }
 
 // excludedReasons applies the grant's exclusions to the head branch. An
@@ -253,7 +280,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 // repository without the grant, reviewer output still awaiting triage.
 func manualMerge(o Options, number int, f Facts) string {
 	ciRed := slices.ContainsFunc(f.Checks, func(c Check) bool {
-		return c.Bucket != "pass" && c.Bucket != "skipping" && c.Name != "review" && c.Name != "review-attestation"
+		return c.Bucket != "pass" && c.Bucket != "skipping" && !prtriage.IsReviewCheck(c.Name) && c.Name != attestationCheck
 	})
 	if f.State != "OPEN" || f.IsDraft || f.HeadSHA == "" || ownerOnly(f) || ciRed || len(f.Checks) == 0 {
 		return ""

@@ -15,6 +15,9 @@
 #   SDD_LABELS     Comma-separated PR labels
 #   SDD_PR_BODY    PR body text
 #   SDD_PR_AUTHOR  PR author login (gates the "dependencies" bot skip)
+#   SDD_PR_DRAFT   "true" when the PR is a draft: an archive-on-merge violation
+#                  is then a warning, not a refusal (the pre-push adapter sets
+#                  it; CI never does, so the merge stays refused, #3364)
 #
 # Exit:
 #   0  OK (under threshold OR spec folder present OR valid skip)
@@ -70,6 +73,8 @@ Env:
   SDD_LABELS     Comma-separated PR labels (CI sets this; locally optional)
   SDD_PR_BODY    PR body text (CI sets this; locally optional)
   SDD_PR_AUTHOR  PR author login; gates the "dependencies" skip to bot authors
+  SDD_PR_DRAFT   "true" on a draft PR: archive-on-merge warns instead of failing
+                 (set by the pre-push adapter only; CI keeps the refusal)
 
 Exit codes:
   0  OK
@@ -104,6 +109,7 @@ fi
 SDD_LABELS="${SDD_LABELS:-}"
 SDD_PR_BODY="${SDD_PR_BODY:-}"
 SDD_PR_AUTHOR="${SDD_PR_AUTHOR:-}"
+SDD_PR_DRAFT="${SDD_PR_DRAFT:-}"
 
 _has_label() {
     case ",${SDD_LABELS}," in
@@ -413,6 +419,20 @@ EOF
         exit 1
     fi
 
+    # A draft is still under review, and the push may carry the fix a review
+    # round needs CI to prove (#3364). The invariant is about the merge, so
+    # here it is a warning; CI's spec-gate never sets SDD_PR_DRAFT and refuses.
+    if [[ "$SDD_PR_DRAFT" == "true" ]]; then
+        {
+            printf '[WARN] SDD archive-on-merge: this draft PR closes an issue whose spec is still active:\n'
+            while IFS= read -r v; do [[ -n "$v" ]] && printf '         %s\n' "$v"; done <<< "$violations"
+            printf '       The push goes through; spec-gate in CI refuses the merge until the spec is\n'
+            printf '       archived in this PR. Before marking it ready, run:\n'
+            while IFS= read -r v; do [[ -n "$v" ]] && printf '         dotf spec archive %s\n' "${v%% *}"; done <<< "$violations"
+        } >&2
+        return 0
+    fi
+
     {
         printf '[FAIL] SDD archive-on-merge violation:\n'
         printf '       This PR closes an issue whose spec is still active:\n'
@@ -494,6 +514,10 @@ _adjacent_open_issues() {
     while IFS=$'\t' read -r num haystack; do
         if [[ -z "$num" || -z "${haystack:-}" ]]; then continue; fi
         if printf '%s\n' "$closed" | grep -qxF "$num"; then continue; fi
+        # Titles are written by anyone who can open an issue: a carriage return
+        # would end a workflow command and start another (#3389). Every ASCII
+        # control character, tab included, becomes a space before any output.
+        haystack=$(printf '%s' "$haystack" | tr '\001-\037\177' ' ')
         while IFS= read -r file_path; do
             if [[ -z "$file_path" ]]; then continue; fi
             if [[ "$haystack" == *"$file_path"* ]]; then
@@ -509,6 +533,18 @@ _adjacent_open_issues() {
         done <<< "$files"
     done < "$feed"
     return 0
+}
+
+# A step-summary table cell: a pipe would split the cell, and the summary renders
+# inline HTML, so angle brackets in an issue title would reach it as tags (#3389).
+_summary_cell() {
+    printf '%s' "$1" | sed -e 's/|/\\|/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+# A title printed on its own stdout line: the runner trims leading whitespace and
+# reads "::cmd::" (or the legacy "##[cmd]") as a workflow command (#3389).
+_break_commands() {
+    printf '%s' "$1" | sed -e 's/::/: :/g' -e 's/##\[/## [/g'
 }
 
 # The CI-only half of the report: a workflow annotation and a step-summary table.
@@ -528,7 +564,9 @@ _emit_adjacency_ci_artifacts() {
                 if [[ -z "$num" ]]; then continue; fi
                 # shellcheck disable=SC2016  # backticks are markdown code spans
                 # for the step-summary table, not command substitution.
-                printf '| #%s | `%s` | %.88s |\n' "$num" "${file_path//|/\\|}" "${haystack//|/\\|}"
+                # Clip before escaping: an entity cut in half would show on the page.
+                printf '| #%s | `%s` | %s |\n' "$num" "$(_summary_cell "$file_path")" \
+                    "$(_summary_cell "$(printf '%.88s' "$haystack")")"
             done <<< "$rows"
         } >> "$GITHUB_STEP_SUMMARY"
     fi
@@ -555,7 +593,7 @@ _report_adjacent_issues() {
     while IFS=$'\t' read -r num file_path haystack; do
         if [[ -z "$num" ]]; then continue; fi
         printf '         #%-6s names %s\n' "$num" "$file_path"
-        printf '                 %.88s\n' "$haystack"
+        printf '                 %.88s\n' "$(_break_commands "$haystack")"
     done <<< "$rows"
     printf '       One of these may describe the same defect on an input shape this\n'
     printf '       change does not cover. Fold it in, or record why it is separate,\n'

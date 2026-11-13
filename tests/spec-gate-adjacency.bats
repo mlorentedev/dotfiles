@@ -7,6 +7,7 @@
 load 'lib/both-shells'
 load 'lib/dotf-bin'
 load 'lib/spec-gate-parity'
+load 'lib/refute'
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
@@ -235,6 +236,68 @@ _write_849_feed() {
         spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     grep -qF '| #999 | `scripts/a\|b.sh` |' "$REPO_FIXTURE/summary.md"
+}
+
+# Issue titles are writable by anyone who can open an issue (#3389). The feed is
+# line-based, so a newline cannot pass, but a carriage return can: it would end
+# a workflow command early and start another on the runner's side.
+@test "adjacency: control characters in an issue title reach no output" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 901 $'BUG-5: scripts/tool.sh breaks\r::error::injected\033[31m' > feed.tsv
+    GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"#901"* ]] || false
+    [[ "$output" != *$'\r'* ]] || false
+    [[ "$output" != *$'\033'* ]] || false
+    refute_grep $'[\r\033]' "$REPO_FIXTURE/summary.md"
+    grep -qF 'breaks ::error::injected [31m' "$REPO_FIXTURE/summary.md"
+}
+
+# The runner trims leading whitespace before it reads a workflow command, so the
+# report's indentation does not protect a title that starts with one (#3389).
+@test "adjacency: workflow-command syntax in an issue title is broken on stdout" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    {
+        printf '%s\t%s\n' 903 '::error::scripts/tool.sh broke'
+        printf '%s\t%s\n' 904 'BUG-7: scripts/tool.sh ##[error]legacy'
+    } > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"#903"* && "$output" == *"#904"* ]] || false
+    printf '%s\n' "$output" > out.txt
+    refute_grep '^[[:space:]]*::error' out.txt
+    refute_grep_fixed '##[' out.txt
+}
+
+# Escaping lengthens the cell, so clipping after it could cut an entity in half
+# and the page would show "&l". Clip the title first, then escape it.
+@test "adjacency: a summary cell is clipped before it is escaped" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 905 "scripts/tool.sh $(printf 'x%.0s' {1..70})<b>tail" > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qE 'x&lt;b \|$' "$REPO_FIXTURE/summary.md"
+}
+
+@test "adjacency: angle brackets in an issue title are escaped in the step summary" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 902 'BUG-6: scripts/tool.sh <img src=x onerror=alert(1)> breaks' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF '&lt;img src=x onerror=alert(1)&gt; breaks' "$REPO_FIXTURE/summary.md"
+    refute_grep_fixed '<img' "$REPO_FIXTURE/summary.md"
 }
 
 @test "adjacency: --help documents the flag" {

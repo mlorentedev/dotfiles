@@ -100,42 +100,75 @@ func Done(opts DoneOptions) (DoneResult, error) {
 // merged local branch while recording its 40-char SHA, removes any residual
 // .dotf-lane-prompt.md (M4), and updates .dotf-worktree.json to State="PARKED".
 func Park(opts DoneOptions) (DoneResult, error) {
-	absRepo, absWT, err := validateDoneOptions(opts)
+	absRepo, absWT, unlock, err := parkPreflight(opts)
 	if err != nil {
 		return DoneResult{}, err
-	}
-	lockPath := opts.LockPath
-	if lockPath == "" {
-		lockPath = DefaultLockPath()
-	}
-	unlock, err := filelock.Lock(lockPath, time.Minute)
-	if err != nil {
-		return DoneResult{}, fmt.Errorf("acquiring worktree lock: %w", err)
 	}
 	defer unlock()
-
-	// Best-effort fetch so origin/main reflects any remote PR merge before tip check (m-CODE-3).
-	_ = gitIn(absRepo, "fetch", "--quiet", "origin").Run()
-
-	if err := checkUncommittedChanges(absWT, opts.Force); err != nil {
-		return DoneResult{}, err
-	}
-	if err := checkUnpushedCommits(absRepo, absWT, opts.Force, opts.landedHeads()); err != nil {
-		return DoneResult{}, err
-	}
-	if !opts.IgnoreRecentSession {
-		if err := checkNoRecentSession(opts.Sessions, absWT, time.Now()); err != nil {
-			return DoneResult{}, err
-		}
-	}
 
 	branch, tip, landed, why := branchLanding(absRepo, absWT, opts.landedHeads())
 	if branch != "" && !landed && !opts.Force {
 		return DoneResult{}, fmt.Errorf("worktree %s branch %s is not landed (%s); push or merge before parking, or pass --force", absWT, branch, why)
 	}
 
+	// Write State="PARKED" before detaching/deleting branch so an interrupted park
+	// never leaves State="ACTIVE" on a detached HEAD (M-CODE-2).
 	meta, _ := LoadMetadata(absWT)
-	laneName := filepath.Base(absWT)
+	parkedMeta, issueNum := parkedLease(absWT, meta)
+	if err := SaveMetadata(absWT, parkedMeta); err != nil {
+		return DoneResult{}, fmt.Errorf("saving parked metadata: %w", err)
+	}
+	if baseRef, out, err := detachAtBase(absRepo, absWT, opts.Force, meta); err != nil {
+		return DoneResult{}, fmt.Errorf("git checkout --detach %s failed (%w): %s", baseRef, err, strings.TrimSpace(string(out)))
+	}
+	releaseParkedLane(absRepo, absWT, branch, issueNum)
+	return parkOutcome(absRepo, branch, tip, landed, why), nil
+}
+
+// parkPreflight validates the options, takes the worktree lock, refreshes
+// origin and refuses a lane that is dirty, unpushed or held by a recent
+// session. The caller releases the lock it returns.
+func parkPreflight(opts DoneOptions) (absRepo, absWT string, unlock func(), err error) {
+	absRepo, absWT, err = validateDoneOptions(opts)
+	if err != nil {
+		return "", "", nil, err
+	}
+	lockPath := opts.LockPath
+	if lockPath == "" {
+		lockPath = DefaultLockPath()
+	}
+	unlock, err = filelock.Lock(lockPath, time.Minute)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("acquiring worktree lock: %w", err)
+	}
+	// Best-effort fetch so origin/main reflects any remote PR merge before tip check (m-CODE-3).
+	_ = gitIn(absRepo, "fetch", "--quiet", "origin").Run()
+	if err := parkable(absRepo, absWT, opts); err != nil {
+		unlock()
+		return "", "", nil, err
+	}
+	return absRepo, absWT, unlock, nil
+}
+
+// parkable is the three refusals a park makes before it changes anything.
+func parkable(absRepo, absWT string, opts DoneOptions) error {
+	if err := checkUncommittedChanges(absWT, opts.Force); err != nil {
+		return err
+	}
+	if err := checkUnpushedCommits(absRepo, absWT, opts.Force, opts.landedHeads()); err != nil {
+		return err
+	}
+	if opts.IgnoreRecentSession {
+		return nil
+	}
+	return checkNoRecentSession(opts.Sessions, absWT, time.Now())
+}
+
+// parkedLease is the lease a park writes: the lane's name and creation time
+// carry over from the previous lease when there is one, and the issue it
+// named is returned so its claim refs can be released.
+func parkedLease(path string, meta *Metadata) (Metadata, int) {
+	laneName := filepath.Base(path)
 	createdAt := time.Now()
 	issueNum := 0
 	if meta != nil {
@@ -147,49 +180,55 @@ func Park(opts DoneOptions) (DoneResult, error) {
 		}
 		issueNum = meta.Issue
 	}
-
-	// Write State="PARKED" before detaching/deleting branch so an interrupted park
-	// never leaves State="ACTIVE" on a detached HEAD (M-CODE-2).
-	parkedMeta := Metadata{
+	return Metadata{
 		Lane:      laneName,
 		State:     string(StateParked),
 		CreatedAt: createdAt,
 		ReapOK:    false,
-	}
-	if err := SaveMetadata(absWT, parkedMeta); err != nil {
-		return DoneResult{}, fmt.Errorf("saving parked metadata: %w", err)
-	}
+	}, issueNum
+}
 
-	baseRef := resolveBaseRef(absRepo)
+// detachAtBase detaches the lane at the remote default branch (HEAD when none
+// resolves) and restores the previous lease if git refuses. It returns the ref
+// and git's output so each caller words the refusal as it did before.
+func detachAtBase(absRepo, absWT string, force bool, prev *Metadata) (baseRef string, out []byte, err error) {
+	baseRef = resolveBaseRef(absRepo)
 	if baseRef == "" {
 		baseRef = "HEAD"
 	}
 	detachArgs := []string{"checkout", "--detach", baseRef}
-	if opts.Force {
+	if force {
 		detachArgs = []string{"checkout", "--force", "--detach", baseRef}
 	}
-	if out, err := gitIn(absWT, detachArgs...).CombinedOutput(); err != nil {
-		if meta != nil {
-			_ = SaveMetadata(absWT, *meta)
-		}
-		return DoneResult{}, fmt.Errorf("git checkout --detach %s failed (%w): %s", baseRef, err, strings.TrimSpace(string(out)))
+	out, err = gitIn(absWT, detachArgs...).CombinedOutput()
+	if err != nil && prev != nil {
+		_ = SaveMetadata(absWT, *prev)
 	}
+	return baseRef, out, err
+}
 
+// releaseParkedLane drops what the active lane left behind: the handoff
+// prompt (M4), the issue's claim refs (M-CODE-1) and the branch's memory thread.
+func releaseParkedLane(absRepo, absWT, branch string, issueNum int) {
 	_ = os.Remove(filepath.Join(absWT, ".dotf-lane-prompt.md"))
 	releaseIssueClaimRefs(absRepo, issueNum)
 	archiveBranchMemoryThread(absRepo, branch)
+}
 
+// parkOutcome deletes a landed branch, recording its 40-char SHA, and reports
+// what the park kept.
+func parkOutcome(absRepo, branch, tip string, landed bool, why string) DoneResult {
 	switch {
 	case branch == "":
-		return DoneResult{}, nil
+		return DoneResult{}
 	case !landed:
-		return DoneResult{KeptBranch: branch, KeptReason: why}, nil
+		return DoneResult{KeptBranch: branch, KeptReason: why}
 	}
 	_, _ = fmt.Fprintf(os.Stderr, "Deleting branch %s (was %s)\n", branch, tip)
 	if out, err := gitIn(absRepo, "branch", "-D", branch).CombinedOutput(); err != nil {
-		return DoneResult{KeptBranch: branch, KeptReason: "git branch -D failed: " + strings.TrimSpace(string(out))}, nil
+		return DoneResult{KeptBranch: branch, KeptReason: "git branch -D failed: " + strings.TrimSpace(string(out))}
 	}
-	return DoneResult{DeletedBranch: branch, DeletedSHA: tip}, nil
+	return DoneResult{DeletedBranch: branch, DeletedSHA: tip}
 }
 
 // releaseIssueClaimRefs cleans up local and remote claim refs for issueNum (M-CODE-1).

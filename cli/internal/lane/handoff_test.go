@@ -278,7 +278,7 @@ func TestNext_APathWithASpaceReachesNoPane(t *testing.T) {
 	o := opts(t)
 	o.Parent = filepath.Join(spaced, "my repo")
 	o.GitDir = filepath.Join(spaced, "my repo", ".git")
-	o.PromptDir = filepath.Join(o.GitDir, "dotf-lane")
+	o.PromptDir = filepath.Join(o.GitDir, PromptDirName)
 	out, err := Handoff(o, b, queue)
 	if err != nil || !out.Started {
 		t.Fatalf("Handoff = %+v, %v", out, err)
@@ -308,7 +308,7 @@ func TestNext_NoBackendQuotesAPathWithASpace(t *testing.T) {
 	o.Agent, o.DryRun = "claude", true // nothing is written: the paths are not real
 	o.Parent = "/repos/my repo"
 	o.WorktreeRoot = "/srv/my wt"
-	o.PromptDir = "/repos/my repo/.git/dotf-lane"
+	o.PromptDir = "/repos/my repo/.git/" + PromptDirName
 	out, err := Handoff(o, nil, queue)
 	if err != nil {
 		t.Fatal(err)

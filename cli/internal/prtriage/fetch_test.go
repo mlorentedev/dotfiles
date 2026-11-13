@@ -82,6 +82,11 @@ func (f *fakeGH) run(ctx context.Context, args ...string) ([]byte, error) {
 	if isReviews {
 		return []byte(`[]`), nil
 	}
+	// A head whose check runs no fixture names was reviewed: every fixture
+	// written before #3243 describes a PR whose review ran.
+	if strings.Contains(joined, "/check-runs") {
+		return []byte(reviewRan), nil
+	}
 	return nil, fmt.Errorf("fakeGH: no canned response for %q", joined)
 }
 
@@ -112,8 +117,8 @@ func testRegistry() Registry {
 // written at all.
 func TestFetchWithRunnerDrivesTheWholePath(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls": `[{"number":10,"title":"a reviewed PR","html_url":"https://github.com/o/r/pull/10"},
-		            {"number":11,"title":"a quiet PR","html_url":"https://github.com/o/r/pull/11"}]`,
+		"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":10,"title":"a reviewed PR","html_url":"https://github.com/o/r/pull/10"},
+		            {"head":{"sha":"0123456789abcdef"},"number":11,"title":"a quiet PR","html_url":"https://github.com/o/r/pull/11"}]`,
 		"/issues/10/comments": `[{"user":{"login":"github-actions[bot]"},
 		                          "body":"## PR Reviewer Guide\nfindings here",
 		                          "created_at":"2026-09-02T10:00:00Z"}]`,
@@ -167,7 +172,7 @@ func TestFetchWithRunnerDrivesTheWholePath(t *testing.T) {
 // behind and a queue reading it reports clear over unread findings.
 func TestFetchCarriesUpdatedAtFromTheWire(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls": `[{"number":12,"title":"a re-reviewed PR","html_url":"https://github.com/o/r/pull/12"}]`,
+		"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":12,"title":"a re-reviewed PR","html_url":"https://github.com/o/r/pull/12"}]`,
 		"/issues/12/comments": `[{"user":{"login":"github-actions[bot]"},
 		                          "body":"## PR Reviewer Guide\nfirst, then more",
 		                          "created_at":"2026-09-02T10:00:00Z",
@@ -198,7 +203,7 @@ func TestFetchCarriesUpdatedAtFromTheWire(t *testing.T) {
 // in this file, since the queue it produces is identical.
 func TestFetchUsesRESTOnly(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls":             `[{"number":7,"title":"t","html_url":"u"}]`,
+		"/pulls":             `[{"head":{"sha":"0123456789abcdef"},"number":7,"title":"t","html_url":"u"}]`,
 		"/issues/7/comments": `[]`,
 	}}
 
@@ -234,7 +239,7 @@ func TestFetchFoldsTheBotLoginSuffix(t *testing.T) {
 				marker = "## PR Reviewer Guide"
 			}
 			fake := &fakeGH{responses: map[string]string{
-				"/pulls": `[{"number":3,"title":"t","html_url":"u"}]`,
+				"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":3,"title":"t","html_url":"u"}]`,
 				"/issues/3/comments": fmt.Sprintf(
 					`[{"user":{"login":%q},"body":%q,"created_at":"2026-09-02T10:00:00Z"}]`,
 					login, marker+"\nbody"),
@@ -264,7 +269,7 @@ func TestFetchRefusesTruncationOnBothAxes(t *testing.T) {
 			if i > 0 {
 				sb.WriteString(",")
 			}
-			fmt.Fprintf(&sb, `{"number":%d,"title":"t","html_url":"u"}`, i+1)
+			fmt.Fprintf(&sb, `{"head":{"sha":"0123456789abcdef"},"number":%d,"title":"t","html_url":"u"}`, i+1)
 		}
 		sb.WriteString("]")
 
@@ -293,7 +298,7 @@ func TestFetchRefusesTruncationOnBothAxes(t *testing.T) {
 		sb.WriteString("]")
 
 		fake := &fakeGH{responses: map[string]string{
-			"/pulls":             `[{"number":5,"title":"t","html_url":"u"}]`,
+			"/pulls":             `[{"head":{"sha":"0123456789abcdef"},"number":5,"title":"t","html_url":"u"}]`,
 			"/issues/5/comments": sb.String(),
 		}}
 		_, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
@@ -319,7 +324,7 @@ func TestFetchFansOutConcurrently(t *testing.T) {
 		if i > 0 {
 			sb.WriteString(",")
 		}
-		fmt.Fprintf(&sb, `{"number":%d,"title":"t","html_url":"u"}`, i+1)
+		fmt.Fprintf(&sb, `{"head":{"sha":"0123456789abcdef"},"number":%d,"title":"t","html_url":"u"}`, i+1)
 	}
 	sb.WriteString("]")
 
@@ -367,7 +372,7 @@ func TestFetchReportsFailureRatherThanAnEmptyQueue(t *testing.T) {
 
 	t.Run("one PR's comments fail", func(t *testing.T) {
 		fake := &fakeGH{
-			responses: map[string]string{"/pulls": `[{"number":9,"title":"t","html_url":"u"}]`},
+			responses: map[string]string{"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":9,"title":"t","html_url":"u"}]`},
 			errs:      map[string]error{"/issues/9/comments": fmt.Errorf("gh: exit status 1")},
 		}
 		got, err := fetchWith(context.Background(), fake.run, "o/r", testRegistry())
@@ -403,7 +408,7 @@ func TestFetchDropsAPendingPRWhoseDiffIsAnExemptSignature(t *testing.T) {
 	r.Exempt.Signatures = []Signature{{Name: "release-please", Files: []string{"CHANGELOG.md", "versions.conf"}}}
 	review := `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-09T05:00:00Z"}]`
 	fake := &fakeGH{responses: map[string]string{
-		"pulls?state":         `[{"number":20,"title":"release"},{"number":21,"title":"feature"},{"number":22,"title":"quiet"}]`,
+		"pulls?state":         `[{"head":{"sha":"0123456789abcdef"},"number":20,"title":"release"},{"head":{"sha":"0123456789abcdef"},"number":21,"title":"feature"},{"head":{"sha":"0123456789abcdef"},"number":22,"title":"quiet"}]`,
 		"/issues/20/comments": review,
 		"/issues/21/comments": review,
 		"/issues/22/comments": `[]`,
@@ -434,7 +439,7 @@ func TestFetchKeepsAPRWhoseFileListFillsAPage(t *testing.T) {
 		files[i] = `{"filename":"CHANGELOG.md"}`
 	}
 	fake := &fakeGH{responses: map[string]string{
-		"pulls?state":         `[{"number":20,"title":"release"}]`,
+		"pulls?state":         `[{"head":{"sha":"0123456789abcdef"},"number":20,"title":"release"}]`,
 		"/issues/20/comments": `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-09T05:00:00Z"}]`,
 		"pulls/20/files":      "[" + strings.Join(files, ",") + "]",
 	}}
@@ -452,7 +457,7 @@ func TestFetchKeepsAPRWhoseFilesCannotBeRead(t *testing.T) {
 	review := `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-09T05:00:00Z"}]`
 	fake := &fakeGH{
 		responses: map[string]string{
-			"pulls?state":         `[{"number":20,"title":"release"},{"number":21,"title":"feature"}]`,
+			"pulls?state":         `[{"head":{"sha":"0123456789abcdef"},"number":20,"title":"release"},{"head":{"sha":"0123456789abcdef"},"number":21,"title":"feature"}]`,
 			"/issues/20/comments": review,
 			"/issues/21/comments": review,
 			"pulls/21/files":      `[{"filename":"cli/main.go"}]`,
@@ -476,7 +481,7 @@ func TestFetchKeepsAPRWhoseFilesCannotBeRead(t *testing.T) {
 // seconds later.
 func TestFetchCountsAFormalReviewFiledAfterTheTriage(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls": `[{"number":2581,"title":"t","html_url":"u"}]`,
+		"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":2581,"title":"t","html_url":"u"}]`,
 		"/issues/2581/comments": `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nf",
 		                            "created_at":"2026-10-16T02:55:00Z"},
 		                           {"user":{"login":"mlorentedev"},"author_association":"OWNER","body":"## Review triage\nall declined",
@@ -508,7 +513,7 @@ func TestFetchCountsAFormalReviewFiledAfterTheTriage(t *testing.T) {
 // and a pending one was never submitted; neither is output owed a disposition.
 func TestFetchIgnoresDismissedAndPendingReviews(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls":             `[{"number":5,"title":"t","html_url":"u"}]`,
+		"/pulls":             `[{"head":{"sha":"0123456789abcdef"},"number":5,"title":"t","html_url":"u"}]`,
 		"/issues/5/comments": `[]`,
 		"/pulls/5/reviews": `[{"user":{"login":"coderabbitai[bot]"},"state":"DISMISSED","body":"x","submitted_at":"2026-10-16T03:00:00Z"},
 		                      {"user":{"login":"coderabbitai[bot]"},"state":"PENDING","body":"y"}]`,
@@ -527,7 +532,7 @@ func TestFetchIgnoresDismissedAndPendingReviews(t *testing.T) {
 // triage written after the review read it, so the queue is clear.
 func TestFetchReviewTriagedAfterwardsIsClear(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls": `[{"number":8,"title":"t","html_url":"u"}]`,
+		"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":8,"title":"t","html_url":"u"}]`,
 		"/issues/8/comments": `[{"user":{"login":"mlorentedev"},"author_association":"OWNER","body":"## Review triage\napplied",
 		                         "created_at":"2026-10-16T03:30:00Z"}]`,
 		"/pulls/8/reviews": `[{"user":{"login":"coderabbitai[bot]"},"state":"COMMENTED","body":"3 findings",
@@ -551,7 +556,7 @@ func TestFetchRefusesAFullPageOfReviews(t *testing.T) {
 		items[i] = `{"user":{"login":"someone"},"state":"COMMENTED","body":"b","submitted_at":"2026-10-16T03:00:00Z"}`
 	}
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls":             `[{"number":9,"title":"t","html_url":"u"}]`,
+		"/pulls":             `[{"head":{"sha":"0123456789abcdef"},"number":9,"title":"t","html_url":"u"}]`,
 		"/issues/9/comments": `[]`,
 		"/pulls/9/reviews":   "[" + strings.Join(items, ",") + "]",
 	}}
@@ -567,7 +572,7 @@ func TestFetchRefusesAFullPageOfReviews(t *testing.T) {
 // marker, and it is an issue comment, so reading reviews must not change that.
 func TestFetchDoesNotCountANoticeAsReview(t *testing.T) {
 	fake := &fakeGH{responses: map[string]string{
-		"/pulls": `[{"number":6,"title":"t","html_url":"u"}]`,
+		"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":6,"title":"t","html_url":"u"}]`,
 		"/issues/6/comments": `[{"user":{"login":"coderabbitai[bot]"},
 		                         "body":"<!-- rate limited by coderabbit.ai -->\n## Review limit reached",
 		                         "created_at":"2026-10-16T03:25:58Z"}]`,
@@ -588,7 +593,7 @@ func TestFetchDoesNotCountANoticeAsReview(t *testing.T) {
 func TestFetchFailsWhenReviewsCannotBeRead(t *testing.T) {
 	fake := &fakeGH{
 		responses: map[string]string{
-			"/pulls":             `[{"number":4,"title":"t","html_url":"u"}]`,
+			"/pulls":             `[{"head":{"sha":"0123456789abcdef"},"number":4,"title":"t","html_url":"u"}]`,
 			"/issues/4/comments": `[]`,
 		},
 		errs: map[string]error{"/pulls/4/reviews": fmt.Errorf("HTTP 502")},
@@ -609,7 +614,7 @@ func classifyingRegistry() Registry {
 }
 
 var reviewedPR10 = map[string]string{
-	"/pulls": `[{"number":10,"title":"a reviewed PR","html_url":"https://github.com/o/r/pull/10"}]`,
+	"/pulls": `[{"head":{"sha":"0123456789abcdef"},"number":10,"title":"a reviewed PR","html_url":"https://github.com/o/r/pull/10"}]`,
 	"/issues/10/comments": `[{"user":{"login":"github-actions[bot]"},
 	                          "body":"## PR Reviewer Guide\nfindings here",
 	                          "created_at":"2026-09-02T10:00:00Z"}]`,

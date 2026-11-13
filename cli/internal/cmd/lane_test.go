@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 )
 
 func runLane(t *testing.T, args ...string) error {
@@ -197,5 +199,23 @@ func TestReadPrompt_FallsBackToTheWorktreeRoot(t *testing.T) {
 	}
 	if got, err := readPrompt("p.md"); err != nil || string(got) != "from the cwd" {
 		t.Errorf("a file in the cwd wins: %q, %v", got, err)
+	}
+}
+
+// A dry run changes nothing, the prompt directory's one-time move included
+// (#3400 review): with a legacy dotf-lane/ prompt directory in place,
+// `lane next --dry-run` must leave it where it is.
+func TestLaneNext_DryRunLeavesTheLegacyPromptDirectoryAlone(t *testing.T) {
+	top := t.TempDir()
+	legacy := filepath.Join(top, ".git", "dotf-lane")
+	if err := os.MkdirAll(legacy, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	laneNextDryRun(t, top)
+	if _, err := os.Stat(legacy); err != nil {
+		t.Errorf("a dry run moved the legacy prompt directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(top, ".git", lane.PromptDirName)); err == nil {
+		t.Error("a dry run created the new prompt directory")
 	}
 }

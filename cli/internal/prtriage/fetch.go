@@ -34,6 +34,9 @@ const (
 	prLimit      = 100
 	commentLimit = 100
 	filesLimit   = 100
+	// checkRunLimit is the page of check runs read for one head. A full page
+	// is refused: the review run could be on the next one.
+	checkRunLimit = 100
 
 	// commentFanout bounds the per-pull-request calls. The session-start probe
 	// runs on every session start under a five-second budget (see the caller in
@@ -53,6 +56,10 @@ type restPR struct {
 	Title   string `json:"title"`
 	HTMLURL string `json:"html_url"`
 	State   string `json:"state"` // read by fetchPRWith; the list asks for open ones only
+	Draft   bool   `json:"draft"`
+	Head    struct {
+		SHA string `json:"sha"`
+	} `json:"head"`
 }
 
 // restComment is one item of `GET /repos/{owner}/{repo}/issues/{n}/comments`.
@@ -216,6 +223,7 @@ func pendingOf(ctx context.Context, run ghRunner, base string, wire []restPR, re
 		if !st.Pending {
 			st = withReproductions(st, findings, reg)
 		}
+		st = withHeadReview(st)
 		if st.Pending {
 			pending = append(pending, st)
 		}
@@ -313,9 +321,7 @@ func withoutExempt(ctx context.Context, run ghRunner, base string, pending []Sta
 			kept = append(kept, st)
 			continue
 		}
-		pr := st.PR
-		pr.Files = files
-		if ev := Evaluate(pr, reg); ev.Pending {
+		if _, exempt := exemptAs(files, reg); !exempt {
 			kept = append(kept, st)
 		}
 	}
@@ -380,7 +386,14 @@ func withComments(ctx context.Context, run ghRunner, base string, wire []restPR)
 				errs[i] = err
 				return
 			}
-			prs[i] = PR{Number: w.Number, Title: w.Title, URL: w.HTMLURL, Comments: comments, Reviews: reviews}
+			pr := PR{Number: w.Number, Title: w.Title, URL: w.HTMLURL, Comments: comments, Reviews: reviews, Draft: w.Draft, HeadSHA: w.Head.SHA}
+			if !pr.Draft {
+				if pr.HeadReview, err = fetchHeadReview(ctx, run, base, pr.HeadSHA); err != nil {
+					errs[i] = fmt.Errorf("#%d: %w", w.Number, err)
+					return
+				}
+			}
+			prs[i] = pr
 		}()
 	}
 	wg.Wait()

@@ -68,9 +68,15 @@ type Result struct {
 	Head    string // the commit the check ran on
 	Command []string
 	Output  string // the tail of the command's combined output
+	// Control is how the same check read on the clean head, run after a probe
+	// reproduced; empty when no control ran. ControlExit is that run's exit.
+	Control     State
+	ControlExit int
 }
 
-// Run runs the check once against the committed tree and classifies it.
+// Run runs the check against the committed tree and classifies it: once, or
+// with a probe, under the probe and, when that reproduces, again on the clean
+// head as its control.
 // An error means no reproduction was attempted; every outcome of the check
 // itself, a failure to start included, is a Result.
 func Run(ctx context.Context, o Options) (Result, error) {
@@ -132,7 +138,32 @@ func probed(ctx context.Context, o Options, top string, res Result) (Result, err
 	if revertErr != nil || !maps.Equal(before, fingerprint(context.WithoutCancel(ctx), top, targets)) {
 		return res, fmt.Errorf("%w: %s no longer match the commit %s (%v)", ErrNotReverted, strings.Join(targets, ", "), res.Head, revertErr)
 	}
+	if res.State == Reproduced {
+		res = controlled(ctx, o, res)
+	}
 	return res, nil
+}
+
+// controlled runs the check again on the clean head, the probe's control
+// (#3333). A check that fails before reaching the code under test (a wrong
+// directory, a package that does not exist) fails the same way without the
+// probe, and its exit alone reads like the defect. Only a check that then
+// refutes leaves the reproduction standing; any other reading, could-not-run
+// included, makes it could-not-run. The record keeps both runs' output: the
+// probe run's says what the check did, the control's why it is no verdict.
+func controlled(ctx context.Context, o Options, res Result) Result {
+	var out string
+	res.ControlExit, res.Control, out = check(ctx, o)
+	if res.Control == DidNotReproduce {
+		return res
+	}
+	res.State = CouldNotRun
+	why := fmt.Sprintf("the check read %s on the clean head too (exit %d): the probe did not change its reading, so the exit is not evidence of the defect.", res.Control, res.ControlExit)
+	if res.Control == CouldNotRun {
+		why = fmt.Sprintf("the check could not run on the clean head (exit %d): with no control reading, the exit with the probe is not evidence of the defect.", res.ControlExit)
+	}
+	res.Output = fmt.Sprintf("%s\nWith the probe:\n%s\nOn the clean head:\n%s", why, res.Output, out)
+	return res
 }
 
 // restore puts the targets back as HEAD has them, which is how they were

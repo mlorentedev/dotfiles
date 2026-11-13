@@ -45,6 +45,17 @@ probe lands only if a file it names changed bytes; one that did not is never
 read as a clean result. A probe that cannot be reverted is an error. Keep the
 patch outside the tree: an untracked file is a dirty tree.
 
+When the check reproduces under --probe, it runs once more on the clean head
+as the control. Only a check that then refutes leaves the reproduction
+standing: a reproduction the clean head reads the same way failed before
+reaching the code under test, and is could-not-run. A refutation runs no
+control, so with --defect-when-passes a check that cannot run still reads
+did-not-reproduce: confirm such a refutation by hand. Narrow the check
+to the test that names the defect: a coarser one that fails on the clean head
+too is could-not-run. The row names the control's reading. The
+check runs in the current directory: "go run -C cli" moves it into cli/, where
+a check written for the root does not start.
+
 --defect-when-passes reads a check the other way round, for a claim that a
 guard misses something: with the probe applied, the defect exists exactly
 when the guard's own test passes. Use it instead of sh -c '! <check>', which
@@ -99,7 +110,11 @@ func reproductionRow(r reproduce.Result, probe string, inverted bool) string {
 	if inverted {
 		read = ", defect when the check passes"
 	}
-	return fmt.Sprintf("Reproduction: %s (exit %d%s) on %s%s: `%s`", r.State, r.Exit, read, head, with, commandLine(r.Command))
+	control := ""
+	if r.Control != "" {
+		control = fmt.Sprintf(", control %s (exit %d) on the clean head", r.Control, r.ControlExit)
+	}
+	return fmt.Sprintf("Reproduction: %s (exit %d%s%s) on %s%s: `%s`", r.State, r.Exit, read, control, head, with, commandLine(r.Command))
 }
 
 // commandLine renders argv so the row, once rendered, can be run again: an

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "CI-017-gate-required-check-f1",
+    "behavior": "ci.yml has a ci-gate job under always() that needs every other job and runs the pinned gate composite",
+    "verification": "bats tests/workflow-job-names.bats && python3 tests/lib/check-workflow-contexts.py .",
+    "state": "passing",
+    "evidence": "2026-11-12: 1..7, no failures; checker exit 0"
+  },
+  {
+    "id": "CI-017-gate-required-check-f2",
+    "behavior": "On a pull request ci-gate reports and fails when a need failed or was cancelled",
+    "verification": "gh api repos/mlorentedev/dotfiles/commits/$(git rev-parse HEAD)/check-runs --jq '.check_runs[]|select(.name==\"ci-gate\")|.conclusion' | grep -qx success",
+    "state": "passing",
+    "evidence": "2026-11-12: ci-gate success on 6929dd90 (#3387)"
+  },
+  {
+    "id": "CI-017-gate-required-check-f3",
+    "behavior": "Branch protection requires ci-gate in place of the five ci.yml checks",
+    "verification": "dotf forge protection check",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CI-017-gate-required-check-f4",
+    "behavior": "test-windows skips at job level on a documentation-only pull request; CI-004 checker passes",
+    "verification": "python3 tests/lib/check-workflow-contexts.py . && bats tests/workflow-job-names.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]
