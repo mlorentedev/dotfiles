@@ -33,7 +33,7 @@ The lease of a linked worktree lives in the worktree's git admin dir, `<repo>/.g
 
 ## Out of scope
 
-- Removing the in-tree mirror, the legacy read path and the `info/exclude` line for `.dotf-worktree.json` (`excludeFile` calls in `lane/lease.go` and `lane/named.go`, `worktree/add.go`): its own ticket, filed from this spec, with two preconditions rather than a date alone: one release has shipped with the mirror, and `dotf worktree list` reports no legacy-only lease on the owner's seats.
+- Removing the in-tree mirror, the legacy read path and the `info/exclude` line for `.dotf-worktree.json` (`excludeFile` calls in `lane/lease.go` and `lane/named.go`, `worktree/add.go`): #3443 (HARNESS-194), filed from this spec, with two preconditions rather than a date alone: one release has shipped with the mirror, and `dotf worktree list` reports no legacy-only lease on the owner's seats.
 - Re-creating a missing lease on `lane switch` (direction 2 of #3307): the class is removed, not reported.
 - A `doctor` entry listing leases left at the legacy location: #3327 (seat-wide sweep entry) is where that belongs.
 - Reading the lease from a subdirectory of a worktree in `forge write` and `harness gate` (`LoadMetadata(cwd)` takes the worktree root today and keeps doing so).

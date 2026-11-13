@@ -24,32 +24,32 @@ owner: manu
 
 ## Implementation
 
-- [ ] [AC2] Failing test: `worktree.AdminDir(path)` resolves `<repo>/.git/worktrees/<id>` from a linked worktree's `.git` pointer (absolute and relative forms), and answers not-a-worktree for a main checkout, a plain directory and a `.git` pointing into `modules/`.
-- [ ] [AC2] Implement `AdminDir` in `cli/internal/worktree` by reading the pointer file, no subprocess.
-- [ ] [AC2] Failing test: `LoadMetadata` prefers the admin dir, falls back to the in-tree file (on a non-worktree path too), and returns `nil` with neither; `SaveMetadata` writes the admin dir and the same bytes to the in-tree mirror, and refuses a non-worktree path naming it.
-- [ ] [AC2] Implement the new `LoadMetadata`/`SaveMetadata`: new constant `LeaseFileName = "dotf-worktree.json"` for the admin dir; `MetadataFileName` (`.dotf-worktree.json`) keeps naming the in-tree file for `excludeFile`/`ensureExclude`, `clean.go` and `audit.go`.
-- [ ] [AC6] Rewrite the fixtures that call `SaveMetadata` or write the in-tree file inside a real linked worktree (29 lines in 16 files: `worktree/{add,adopt,detached,sweep,sweep_park,park,clean}_test`, `lane/{lease,handoff,lanes,audit,plan_mutation}_test`, `cmd/{worktree_sweep_lane_skip,lane_wiring,harness_gate_sticky}_test`, `hooks/lane_guard_test`) to the admin-dir lease; keep one fake-directory fixture per package on the legacy path as the fallback's coverage. `go test ./internal/worktree ./internal/lane ./internal/cmd` green.
-- [ ] [AC6] Failing test: `dotf worktree list` reason text names a legacy-only lease (admin dir empty, in-tree present) and not one the admin dir holds; implement in `Classify`/`list`.
-- [ ] [AC3] Failing test: `dotf lane init` on lanes with legacy-only leases reports `changed=<n>` and copies them into the admin dir; a second run reports `changed=0` with the in-tree files still present.
-- [ ] [AC3] Implement the migration in `provisionLane`'s adopt and healthy-return paths (one `LoadMetadata` + `SaveMetadata` when the lease is legacy-only).
-- [ ] [AC1] Failing test in the lane package: ACTIVE lane, `git clean -fdx`, then `lane status` says ACTIVE, `worktree list` says ACTIVE, and `git commit` with the guard installed as the pre-commit hook succeeds.
-- [ ] [AC4] Failing guard cases in `cli/internal/hooks/lane_guard_test.go`: PARKED lease in the admin dir blocks; ACTIVE lease in the admin dir with no in-tree file passes rules 5 and 6; in-tree-only PARKED lease still blocks (fallback).
-- [ ] [AC4] Implement rule 5 and rule 6's detached-HEAD test in `git-hooks/lib/lane-guard.sh` through one resolved `lease` path (`$git_dir/dotf-worktree.json`, fallback `$top/.dotf-worktree.json`); `sh -n` and `shellcheck -s sh` clean.
-- [ ] [AC1] Make the AC1 test pass (it depends on the guard and the Go seam together).
-- [ ] [AC5] Failing test: `isWorktreeParked` recognises an admin-dir PARKED lease from the lane root and a subdirectory, and a legacy in-tree one.
-- [ ] [AC5] Implement in `cli/internal/mem/session_end.go` through `readGitdirPointer`.
-- [ ] Docs: runbook `guide-persistent-named-lanes.md` (lease location, re-init migrates it, mixed-version note), `docs/lessons/lesson-594-<slug>.md` for the "excluded is not ignored by clean" class and the migration shape.
-- [ ] File the follow-up ticket: remove the mirror, the legacy in-tree read and the `.dotf-worktree.json` exclude lines once a release has shipped with the mirror and `worktree list` reports no legacy-only lease; link it from `proposal.md` Out of scope.
+- [x] [AC2] Failing test: `worktree.AdminDir(path)` resolves `<repo>/.git/worktrees/<id>` from a linked worktree's `.git` pointer (absolute and relative forms), and answers not-a-worktree for a main checkout, a plain directory and a `.git` pointing into `modules/`.
+- [x] [AC2] Implement `AdminDir` in `cli/internal/worktree` by reading the pointer file, no subprocess.
+- [x] [AC2] Failing test: `LoadMetadata` prefers the admin dir, falls back to the in-tree file (on a non-worktree path too), and returns `nil` with neither; `SaveMetadata` writes the admin dir and the same bytes to the in-tree mirror, and refuses a non-worktree path naming it.
+- [x] [AC2] Implement the new `LoadMetadata`/`SaveMetadata`: new constant `LeaseFileName = "dotf-worktree.json"` for the admin dir; `MetadataFileName` (`.dotf-worktree.json`) keeps naming the in-tree file for `excludeFile`/`ensureExclude`, `clean.go` and `audit.go`.
+- [x] [AC6] Rewrite the fixtures that call `SaveMetadata` or write the in-tree file inside a real linked worktree (the real-linked-worktree ones moved to `SaveMetadata` or `gittest.LinkWorktree`; two failure fixtures now break the admin-dir copy; the in-tree writes left are the fallback's coverage in `lease_location_test.go`, the guard test and `session_end_lease_test.go`; originally 29 lines in 16 files: `worktree/{add,adopt,detached,sweep,sweep_park,park,clean}_test`, `lane/{lease,handoff,lanes,audit,plan_mutation}_test`, `cmd/{worktree_sweep_lane_skip,lane_wiring,harness_gate_sticky}_test`, `hooks/lane_guard_test`) to the admin-dir lease; keep one fake-directory fixture per package on the legacy path as the fallback's coverage. `go test ./internal/worktree ./internal/lane ./internal/cmd` green.
+- [x] [AC6] Failing test: `dotf worktree list` reason text names a legacy-only lease (admin dir empty, in-tree present) and not one the admin dir holds; implement in `Classify`/`list`.
+- [x] [AC3] Failing test: `dotf lane init` on lanes with legacy-only leases reports `changed=<n>` and copies them into the admin dir; a second run reports `changed=0` with the in-tree files still present.
+- [x] [AC3] Implement the migration in `provisionLane`'s adopt and healthy-return paths (one `LoadMetadata` + `SaveMetadata` when the lease is legacy-only).
+- [x] [AC1] Failing test in the lane package: ACTIVE lane, `git clean -fdx`, then `lane status` says ACTIVE, `worktree list` says ACTIVE, and `git commit` with the guard installed as the pre-commit hook succeeds.
+- [x] [AC4] Failing guard cases in `cli/internal/hooks/lane_guard_test.go`: PARKED lease in the admin dir blocks; ACTIVE lease in the admin dir with no in-tree file passes rules 5 and 6; in-tree-only PARKED lease still blocks (fallback).
+- [x] [AC4] Implement rule 5 and rule 6's detached-HEAD test in `git-hooks/lib/lane-guard.sh` through one resolved `lease` path (`$git_dir/dotf-worktree.json`, fallback `$top/.dotf-worktree.json`); `sh -n` and `shellcheck -s sh` clean.
+- [x] [AC1] Make the AC1 test pass (it depends on the guard and the Go seam together).
+- [x] [AC5] Failing test: `isWorktreeParked` recognises an admin-dir PARKED lease from the lane root and a subdirectory, and a legacy in-tree one.
+- [x] [AC5] Implement in `cli/internal/mem/session_end.go` through `readGitdirPointer`.
+- [x] Docs: runbook `guide-persistent-named-lanes.md` (lease location, re-init migrates it, mixed-version note), `docs/lessons/lesson-594-<slug>.md` for the "excluded is not ignored by clean" class and the migration shape.
+- [x] File the follow-up ticket (#3443, HARNESS-194): remove the mirror, the legacy in-tree read and the `.dotf-worktree.json` exclude lines once a release has shipped with the mirror and `worktree list` reports no legacy-only lease; link it from `proposal.md` Out of scope.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass (`go build ./... && go vet ./...`, `GOOS=windows go vet ./...`)
-- [ ] Lint passes (pinned `golangci-lint run`, `GOOS=windows golangci-lint run ./...`, `shellcheck -s sh git-hooks/lib/lane-guard.sh`)
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass (`go build ./... && go vet ./...`, `GOOS=windows go vet ./...`)
+- [x] Lint passes (pinned `golangci-lint run`, `GOOS=windows golangci-lint run ./...`, `shellcheck -s sh git-hooks/lib/lane-guard.sh`)
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 
