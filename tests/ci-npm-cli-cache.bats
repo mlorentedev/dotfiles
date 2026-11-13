@@ -93,21 +93,24 @@ setup() {
     [ "$saved" = "$paths" ] || { printf 'save paths differ from restore paths:\n%s\n' "$saved" >&2; return 1; }
 }
 
-@test "ci: a npm tool packages.json pins is cached, or named as left out" {
+@test "ci: a npm tool packages.json pins is cached" {
     # The catalog holds no npm tool since #2438 moved bw, copilot, opencode and
-    # yarn to mise; one that returns must join the cache or be named here with
-    # its reason, so the cache cannot fall behind the pins unnoticed.
-    left_out=''
-    # The query is checked against the catalog, so a wrong path cannot read as
-    # "no npm tool".
-    [ "$(jq -r '.tools | length' "$REPO/packages.json")" -gt 0 ] || { echo "packages.json lists no tool: the jq query is wrong" >&2; return 1; }
+    # yarn to mise; one that returns must join the cache, so the cache cannot
+    # fall behind the pins unnoticed.
+    #
+    # With no npm tool the query has nothing to match, so a typo in it, or a
+    # renamed `source.type`, would read as "none" too. Hold it to the catalog's
+    # shape first: every tool carries a string type, and every type is one the
+    # loader knows, so the select below is a query against a field that exists.
+    [ "$(jq -r '.tools | length' "$REPO/packages.json")" -gt 0 ] || { echo "packages.json lists no tool: the jq path is wrong" >&2; return 1; }
+    jq -e 'all(.tools[]; (.source.type | type == "string") and (.source.type | IN("system", "npm", "github-release", "github-archive", "uv-tool")))' "$REPO/packages.json" >/dev/null ||
+        { echo "a catalog tool has no known source.type: update this test with the loader" >&2; return 1; }
     pkgs=$(jq -r '.tools[] | select(.source.type == "npm") | .name + " " + .source.package' "$REPO/packages.json")
     [ -z "$pkgs" ] && return 0
     while read -r name pkg; do
-        [ -n "$left_out" ] && [ "$name" = "$left_out" ] && continue
         win=$(printf '%s' "$pkg" | tr '/' '\\')
-        printf '%s\n' "$RESTORE" | grep -qF "node_modules\\$win" || { echo "packages.json pins $pkg but the cache does not hold it" >&2; return 1; }
-    done <<EOF
+        printf '%s\n' "$RESTORE" | grep -qF "node_modules\\$win" || { echo "packages.json pins $pkg ($name) but the cache does not hold it" >&2; return 1; }
+    done <<EOF2
 $pkgs
-EOF
+EOF2
 }
