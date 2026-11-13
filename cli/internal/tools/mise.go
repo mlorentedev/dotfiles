@@ -655,10 +655,10 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 		return p, nil
 	}
 	if p.ConfigChanged || len(p.Missing) > 0 {
-		if runtime.GOOS == "windows" {
-			if err := s.installNpmFirst(p.Missing); err != nil {
-				return p, err
-			}
+		// The npm CLIs go through npm on every OS: mise's default installer
+		// (aube) could not resolve bw's dependencies on Linux and macOS (#3403).
+		if err := s.installNpmFirst(p.Missing); err != nil {
+			return p, err
 		}
 		if out, err := s.Run("mise", "install"); err != nil {
 			return p, fmt.Errorf("mise install: %w\n%s", err, strings.TrimSpace(string(out)))
@@ -994,15 +994,16 @@ func npmTools(tools []MiseTool) []string {
 	return out
 }
 
-// installNpmFirst installs, one by one, the missing tools that need npm to
-// create a Windows launcher, after Node is in place: bats, which the config
-// keys as npm:bats, and the npmBackend CLIs, keyed by their short name. A bare
+// installNpmFirst installs, one by one, the missing tools that need npm, after
+// Node is in place: the npmBackend CLIs, keyed by their short name, on every OS,
+// and on Windows bats too, which the config keys as npm:bats. On Windows a bare
 // `mise install` reports such a tool installed and creates no launcher (the
-// aube installer), so each goes through the npm installer the runner scopes to
-// exactly these calls (miseInstallEnv).
+// aube installer); on Linux and macOS aube could not resolve bw's dependencies
+// (#3403). Each goes through the npm installer the runner scopes to exactly
+// these calls (miseInstallEnv).
 func (s MiseSync) installNpmFirst(missing []string) error {
 	var targets [][]string
-	if contains(missing, "bats") {
+	if runtime.GOOS == "windows" && contains(missing, "bats") {
 		targets = append(targets, batsInstallArgs)
 	}
 	for _, name := range missing {
@@ -1060,7 +1061,10 @@ func isBatsInstall(name string, args ...string) bool {
 }
 
 func miseInstallEnv(name string, args ...string) string {
-	if runtime.GOOS == "windows" && npmInstallTarget(name, args...) != "" {
+	target := npmInstallTarget(name, args...)
+	// bats takes npm only on Windows, where it needs npm's .cmd launcher; the
+	// npmBackend CLIs take it everywhere.
+	if target != "" && (target != "bats" || runtime.GOOS == "windows") {
 		return "MISE_NPM_PACKAGE_MANAGER=npm"
 	}
 	return ""

@@ -613,6 +613,70 @@ func TestSync_WindowsRefusesBatsWithoutPinnedNode(t *testing.T) {
 	}
 }
 
+// bw failed to resolve under mise's default npm installer (aube) on Linux and
+// macOS in CI (#2438, #3403), so the npm CLIs install one by one through npm on
+// every OS, after Node, as they already did on Windows.
+func TestSync_InstallsNpmCLIsThroughNpmWithNodeFirstOnEveryOS(t *testing.T) {
+	pins := []MiseTool{{"bw", "2026.5.0"}, {"copilot", "1.0.81"}, {"jq", "1.8.2"}, {"node", "24.11.1"}, {"yarn", "1.22.22"}}
+	installed := map[string]bool{}
+	var calls []string
+	run := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" {
+			switch {
+			case len(args) == 2 && args[0] == "which":
+				if installed[args[1]] {
+					return []byte(args[1]), nil
+				}
+				return nil, errors.New("not installed")
+			case len(args) >= 1 && args[0] == "install":
+				calls = append(calls, strings.Join(args, " "))
+				switch {
+				case len(args) == 2 && args[1] == "node":
+					installed["node"] = true
+				case len(args) == 3 && args[1] == "--force" && (args[2] == "bw" || args[2] == "copilot" || args[2] == "yarn"):
+					if !installed["node"] {
+						return nil, errors.New(args[2] + " installed before node")
+					}
+					installed[args[2]] = true
+				case len(args) == 1:
+					installed["jq"] = true
+				default:
+					return nil, errors.New("unexpected install")
+				}
+				return nil, nil
+			}
+		}
+		if installed[name] && len(args) == 1 && args[0] == "--version" {
+			for _, pin := range pins {
+				if pin.Name == name {
+					return []byte(pin.Version), nil
+				}
+			}
+		}
+		return nil, errors.New("unexpected command")
+	}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: run}
+	if _, err := s.Apply(pins); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(calls, ", "); got != "install node, install --force bw, install --force copilot, install --force yarn, install" {
+		t.Errorf("install sequence = %q", got)
+	}
+}
+
+func TestMiseInstallEnv_ScopesNpmToTheNpmCLIsOnEveryOS(t *testing.T) {
+	for _, tool := range []string{"bw", "copilot", "opencode", "yarn"} {
+		if got := miseInstallEnv("mise", "install", "--force", tool); got != "MISE_NPM_PACKAGE_MANAGER=npm" {
+			t.Errorf("%s install env = %q", tool, got)
+		}
+	}
+	for _, args := range [][]string{{"mise", "install"}, {"mise", "install", "node"}, {"mise", "install", "npm:prettier"}} {
+		if got := miseInstallEnv(args[0], args[1:]...); got != "" {
+			t.Errorf("%v unexpectedly changes the npm installer: %q", args, got)
+		}
+	}
+}
+
 func TestHomeRunners_WindowsScopesNpmToBatsInstall(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows bats needs npm, other mise npm tools keep their installer")
