@@ -769,6 +769,25 @@ func TestFetchKeepsTheOriginalLineOfAFindingThatLeftTheDiff(t *testing.T) {
 	}
 }
 
+// Lines added above the finding shift its current line while the reviewer's
+// comment still prints the original. A row may name either and match.
+func TestFetchMatchesARowOnEitherAnchorOfAShiftedFinding(t *testing.T) {
+	for name, row := range map[string]string{
+		"the reviewer's line": "| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |",
+		"the current line":    "| `cli/a.go:9` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |",
+	} {
+		responses := triagedPR10(row)
+		responses["/pulls/10/comments"] = `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":9,"original_line":4,"created_at":"2026-09-02T10:00:01Z"}]`
+		got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+		if err != nil {
+			t.Fatalf("%s: fetchWith: %v", name, err)
+		}
+		if len(got) != 0 {
+			t.Fatalf("%s: got %+v, want an empty queue", name, got)
+		}
+	}
+}
+
 // A gate that cannot read what it gates on fails closed: the PR stays listed.
 func TestFetchHoldsATriagedPRWhoseFindingsCannotBeRead(t *testing.T) {
 	fake := &fakeGH{responses: triagedPR10("| `cli/a.go:4` | apply | fixed |"), errs: map[string]error{"/pulls/10/comments": errors.New("boom")}}

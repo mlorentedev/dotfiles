@@ -27,11 +27,13 @@ right, and the failure reads like an author who never triaged.
 
 ## Solution
 
-Key the finding by the line the reviewer saw: the current one while it is in the diff, the
-`original_line` once it has left it. `restInline.anchor()` does that, and
-`TestFetchKeepsTheOriginalLineOfAFindingThatLeftTheDiff` holds a null-line finding against a row
-written under the original line and asserts the queue is clear. The row the author wrote at review
-time now matches for the life of the PR.
+Carry both anchors and let a row name either. `Comment.Anchors()` lists the current line and the
+reviewer's `original_line`, `rowFor` tries each, and the queue prints the reviewer's line once the
+current one is gone. Two tests hold the two shapes: a null-line finding against a row written
+under the original line, and a shifted finding (`line` 9, `original_line` 4) against a row keyed
+by either. The same PR showed both: four `lease.go` anchors had shifted by six to nine lines while
+PR-Agent still printed the originals. A file-level comment has neither line and no row keyed by a
+line can name it; that case stays open on #3455.
 
 ## Related
 
