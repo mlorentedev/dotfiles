@@ -178,6 +178,12 @@ means the pin is in place and a converge step failed: look at that step in the c
 CLI-133). On Windows a `dotf.exe.old` beside `dotf.exe` is the previous binary, still held by a process that was
 running it; the next update removes it.
 
+**The first update after CLI-133 needs the installer once.** Only a `dotf` that carries CLI-133 (newer than 0.80.0)
+installs itself from a dirty, ahead or diverged checkout. A machine still running 0.80.0 or older keeps answering
+`diverged ... skipping` from such a checkout, because the binary doing the update is the old one. Run the installer once
+(`./install.sh`, or `pwsh -File install.ps1` on Windows) or reconcile the checkout so it can fast-forward; from then on
+`dotf update` replaces itself.
+
 ## Diagnose
 
 Every `dotf update`, a skip included, writes `<state dir>/update/last.json` (`$XDG_STATE_HOME/dotfiles`,
@@ -192,7 +198,7 @@ reason that recurs every night (`dirty`, `diverged`, `no-upstream`, `not-a-repo`
 | doctor: `has not run since` (older than three days) | the machine was off, or the scheduler lost the trigger | `dotf converge --only self-deploy`, then the per-OS commands above |
 | `[skip] Dirty worktree` in the journal | uncommitted changes in the repo | commit or stash; the timer resumes next slot |
 | `ahead of origin/main ... nothing to deploy` | local commits not pushed yet; `origin/main` has nothing new | none: push when ready; the timer deploys what the upstream holds |
-| `[skip] ... diverged ... (non fast-forward)` | local and `origin/main` both have commits the other lacks | reconcile your branch (rebase or merge); non-ff is never auto-resolved. `dotf` itself is still updated to the pin; only the converge waits |
+| `[skip] ... diverged ... (non fast-forward)` | local and `origin/main` both have commits the other lacks | reconcile your branch (rebase or merge); non-ff is never auto-resolved. `dotf` itself is still updated to the pin (from a release newer than 0.80.0; an older one needs the installer once, above); only the converge waits |
 | `[skip] git fetch failed (network?)` | offline / remote unreachable | transient; next slot retries |
 | `[skip] No upstream configured` | current branch has no `@{u}` | `git branch --set-upstream-to=origin/main` |
 | service shows **failed** | a converge step errored, the setup script included (not a skip) | read `journalctl --user -u dotfiles-selfupdate.service` (macOS: `~/Library/Logs/dotf-self-deploy.log`); the report names the failing step, `~/.local/state/dotfiles/converge/last.json` keeps it, and `converge/runs/<UTC>.log` holds the run's full transcript, subprocess output included |
