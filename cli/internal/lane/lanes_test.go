@@ -469,3 +469,48 @@ func TestLaneInitAdoptsASymlinkToThisRepositorysWorktree(t *testing.T) {
 		t.Errorf("second init: changed=%d err=%v; want 0, nil", changed, err)
 	}
 }
+
+// A lane whose lease a binary before ADR-062 wrote in the tree gets it copied
+// into the worktree's git dir by the next init, counted as a change; the
+// mirror's presence or absence, once the admin dir holds the lease, is not.
+func TestLaneInitMigratesInTreeLeases(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes failed: %v", err)
+	}
+	lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatSecondary)
+	admin, err := worktree.AdminDir(lanePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminLease := filepath.Join(admin, worktree.LeaseFileName)
+	before, err := os.ReadFile(adminLease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(adminLease); err != nil {
+		t.Fatal(err)
+	}
+
+	changed, err := InitLanes(repoDir, wtRoot)
+	if err != nil {
+		t.Fatalf("InitLanes over a legacy-only lease failed: %v", err)
+	}
+	if changed != 1 {
+		t.Errorf("InitLanes changed = %d, want 1 (the migrated lease)", changed)
+	}
+	after, err := os.ReadFile(adminLease)
+	if err != nil {
+		t.Fatalf("the lease was not copied into the admin dir: %v", err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Errorf("the migrated lease differs from the in-tree one:\nbefore: %s\nafter:  %s", before, after)
+	}
+
+	if err := os.Remove(filepath.Join(lanePath, worktree.MetadataFileName)); err != nil {
+		t.Fatal(err)
+	}
+	if changed, err := InitLanes(repoDir, wtRoot); err != nil || changed != 0 {
+		t.Errorf("InitLanes with the admin-dir lease and no mirror = %d, %v; want 0, nil", changed, err)
+	}
+}

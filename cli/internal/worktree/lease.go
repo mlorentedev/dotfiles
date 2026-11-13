@@ -86,6 +86,22 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 	return nil
 }
 
+// LeaseLegacyOnly reports whether worktreePath's lease exists only at the
+// legacy in-tree location: the admin dir resolves and holds none, and the
+// in-tree file is there. A path that is not a linked worktree answers false,
+// as does one whose admin dir holds the lease whatever the mirror's state.
+func LeaseLegacyOnly(worktreePath string) bool {
+	admin, err := AdminDir(worktreePath)
+	if err != nil {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(admin, LeaseFileName)); err == nil {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(worktreePath, MetadataFileName))
+	return err == nil
+}
+
 func readLease(path string) (*Metadata, error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- a lease path this package composed
 	if err != nil {

@@ -84,8 +84,11 @@ type Info struct {
 	PRMerged       bool     `json:"pr_merged"`
 	// PRMergedUnknown is why the forge could not say whether the branch
 	// landed. PRMerged is then false: the safe verdict, never "merged".
-	PRMergedUnknown string         `json:"pr_merged_unknown,omitempty"`
-	Metadata        *Metadata      `json:"metadata,omitempty"`
+	PRMergedUnknown string    `json:"pr_merged_unknown,omitempty"`
+	Metadata        *Metadata `json:"metadata,omitempty"`
+	// LeaseLegacyOnly says the lease was read from the in-tree file because the
+	// worktree's git admin dir holds none (ADR-062): written before the move.
+	LeaseLegacyOnly bool           `json:"lease_legacy_only,omitempty"`
 	State           LifecycleState `json:"state"`
 	StateReason     string         `json:"state_reason,omitempty"`
 }

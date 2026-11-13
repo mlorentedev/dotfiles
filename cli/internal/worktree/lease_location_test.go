@@ -159,3 +159,36 @@ func mustJSON(t *testing.T, meta Metadata) []byte {
 	}
 	return b
 }
+
+// A lease that lives only at the legacy in-tree location is named by list, so
+// the report says which worktrees the move has not reached; once the admin
+// dir holds one, the mirror's presence is not reported (ADR-062).
+func TestListNamesALegacyLocationLease(t *testing.T) {
+	repoDir, wtDir, _ := setupTestGitRepoAndWorktree(t)
+	now := time.Now()
+	meta := Metadata{ReapOK: true, CreatedAt: now.Add(-time.Hour), LeaseExpiresAt: now.Add(time.Hour)}
+	if err := os.WriteFile(filepath.Join(wtDir, MetadataFileName), mustJSON(t, meta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	list := func() Info {
+		t.Helper()
+		infos, err := List(repoDir, func(string, string) ([]string, error) { return nil, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		return featInfo(t, infos)
+	}
+
+	legacy := list()
+	if !legacy.LeaseLegacyOnly || !strings.Contains(legacy.StateReason, "legacy") {
+		t.Errorf("legacy-only lease: LeaseLegacyOnly=%v reason=%q; want true and a reason naming the legacy location", legacy.LeaseLegacyOnly, legacy.StateReason)
+	}
+
+	if err := SaveMetadata(wtDir, meta); err != nil {
+		t.Fatal(err)
+	}
+	moved := list()
+	if moved.LeaseLegacyOnly || strings.Contains(moved.StateReason, "legacy") {
+		t.Errorf("admin-dir lease with the mirror present: LeaseLegacyOnly=%v reason=%q; want false and no legacy note", moved.LeaseLegacyOnly, moved.StateReason)
+	}
+}
