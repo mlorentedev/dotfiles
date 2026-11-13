@@ -1580,3 +1580,30 @@ func TestSync_RemovesThePackagesFileAnOlderSyncWrote(t *testing.T) {
 		t.Fatalf("a second sync must have nothing to do, got %+v, %v", again, err)
 	}
 }
+
+// mise's Windows build imports vcruntime140.dll, which a clean Windows lacks, so
+// the tools step walks the catalog in file order and must place the runtime
+// before it downloads mise: with the entry after mise, or absent, mise "does not
+// run" and every tool it owns waits on a 45-minute failure (#3396, lesson 561).
+func TestShippedCatalog_PlacesTheVCRuntimeAheadOfMise(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vc, mise := -1, -1
+	for i, tool := range c.Tools {
+		switch tool.Name {
+		case "vcredist":
+			vc = i
+		case "mise":
+			mise = i
+		}
+	}
+	if vc < 0 || mise < 0 || vc > mise {
+		t.Fatalf("vcredist must precede mise in packages.json, got vcredist=%d mise=%d", vc, mise)
+	}
+	got := c.Tools[vc].Source
+	if got.Type != "system" || len(got.Platforms) != 1 || got.Platforms[0] != "windows" {
+		t.Errorf("vcredist is a Windows-only system entry, got %+v", got)
+	}
+}
