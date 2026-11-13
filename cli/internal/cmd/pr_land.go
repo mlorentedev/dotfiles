@@ -16,7 +16,6 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/execerr"
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
-	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 )
 
@@ -37,12 +36,18 @@ var prLandOptions = func(repo string, registry registryLoader) prland.Options {
 			if err != nil {
 				return nil, err
 			}
-			pending, err := prtriage.FetchWithRegistry(ctx, repo, reg)
+			pending, err := triageFetch(ctx, repo, reg)
 			if err != nil {
 				return nil, err
 			}
 			numbers := make([]int, 0, len(pending))
 			for _, st := range pending {
+				// A head no review ran on is refused by Decide in its own
+				// words; listing it here would add "awaits triage" for output
+				// that does not exist.
+				if st.HeadUnreviewed {
+					continue
+				}
 				numbers = append(numbers, st.PR.Number)
 			}
 			return numbers, nil
@@ -68,7 +73,8 @@ func newPrLandCmd() *cobra.Command {
     it, and no entry of its excluded: list matches: release-please,
     branch:<prefix> (the head branch) or path:<file or dir/> (a changed path);
     an entry of any other kind refuses;
-  - every check passed or was skipped;
+  - every check passed or was skipped, and a review ran on the head: a
+    review check that was skipped, or none at all, refuses;
   - its merge state is CLEAN: up to date with its base, with no conflicts;
   - the triage queue does not list it: reviewer output has been dispositioned;
   - no lesson it adds under docs/lessons/ takes a number another lesson

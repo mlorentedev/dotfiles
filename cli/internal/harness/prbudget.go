@@ -350,10 +350,12 @@ func stepCeiling(s reviewStep) []CheckLine {
 	if s.minutes <= 0 {
 		return []CheckLine{{Problem: true,
 			Text:   fmt.Sprintf("[GAP] %s declares no timeout-minutes, so its ceiling is the job's and this check cannot see it", s.name),
-			Detail: []string{fmt.Sprintf("      -> declare it on the step; %d s of attempts need %d minutes", s.chain*s.attempts*s.aiTimeout, prCeilDiv(s.chain*s.attempts*s.aiTimeout, 60))}}}
+			Detail: []string{fmt.Sprintf("      -> declare it on the step; %d s of attempts need %d minutes", s.chain*s.attempts*s.aiTimeout, minutesAbove(s.chain*s.attempts*s.aiTimeout))}}}
 	}
+	// Strictly less: the docker pull, the start-up and the publication run on
+	// the same clock, so attempts that exactly fill the ceiling die at it (#3352).
 	need, have := s.chain*s.attempts*s.aiTimeout, s.minutes*60
-	if need <= have {
+	if need < have {
 		line := fmt.Sprintf("[check] OK -> %s: %d s of attempts in a %d s ceiling", s.name, need, have)
 		if s.streams {
 			line += " (streamed: ai_timeout bounds the gap between chunks, not the answer, so this is a lower bound on the step's wall clock)"
@@ -364,10 +366,11 @@ func stepCeiling(s reviewStep) []CheckLine {
 		Text: fmt.Sprintf("[GAP] %s cannot afford its own attempts: %d models x %d attempts x %d s = %d s in a %d s ceiling",
 			s.name, s.chain, s.attempts, s.aiTimeout, need, have),
 		Detail: []string{fmt.Sprintf("      -> raise timeout-minutes to at least %d, or declare the settings the attempt count rests on",
-			prCeilDiv(need, 60))}}}
+			minutesAbove(need))}}}
 }
 
-func prCeilDiv(a, b int) int { return (a + b - 1) / b }
+// minutesAbove is the smallest whole-minute ceiling strictly above seconds.
+func minutesAbove(seconds int) int { return seconds/60 + 1 }
 
 func prBudgetProblem(file string, err error) CheckLine {
 	return CheckLine{Problem: true, Text: fmt.Sprintf("[ERROR] %s: %v", file, err)}

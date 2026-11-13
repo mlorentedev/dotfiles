@@ -13,7 +13,7 @@ import (
 func readyFacts() Facts {
 	return Facts{
 		State: "OPEN", HeadSHA: "abc123", HeadRef: "feat/x", BaseRef: "main", MergeState: "CLEAN",
-		Checks:        []Check{{Name: "test", Bucket: "pass"}, {Name: "goreleaser", Bucket: "skipping"}},
+		Checks:        []Check{{Name: "test", Bucket: "pass"}, {Name: "goreleaser", Bucket: "skipping"}, {Name: "review", Bucket: "pass"}},
 		GrantDeclared: true,
 		Excluded:      []string{"release-please"},
 		Files:         []string{"cli/x.go"},
@@ -24,6 +24,41 @@ func readyFacts() Facts {
 func TestDecide_AReadyPRHasNoReasons(t *testing.T) {
 	if r := Decide(readyFacts()); len(r) != 0 {
 		t.Fatalf("want no reasons, got %v", r)
+	}
+}
+
+// #3243 AC3: a review that did not run on the head refuses the merge, under
+// either name the reviewer's job reports. A failed one is refused by the
+// generic check rule and a pending one is waited for, so only skipped and
+// absent need this reason.
+func TestDecide_ReviewDidNotRunOnTheHead(t *testing.T) {
+	withReview := func(cs ...Check) func(*Facts) {
+		return func(f *Facts) { f.Checks = append([]Check{{Name: "test", Bucket: "pass"}}, cs...) }
+	}
+	for name, tc := range map[string]struct {
+		mutate func(*Facts)
+		want   string // "" means it lands
+	}{
+		"skipped":                      {withReview(Check{"review", "skipping"}), "review did not run on abc123: the review check was skipped"},
+		"skipped, the reusable's name": {withReview(Check{"review / review", "skipping"}), "review did not run on abc123: the review / review check was skipped"},
+		"absent":                       {withReview(), "review did not run on abc123: no review check reported"},
+		"only a look-alike":            {withReview(Check{"preview", "pass"}), "no review check reported"},
+		"the reusable's name, passed":  {withReview(Check{"review / review", "pass"}), ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := readyFacts()
+			tc.mutate(&f)
+			r := Decide(f)
+			if tc.want == "" {
+				if len(r) != 0 {
+					t.Fatalf("want no reasons, got %v", r)
+				}
+				return
+			}
+			if !strings.Contains(strings.Join(r, "\n"), tc.want) {
+				t.Errorf("reasons %v lack %q", r, tc.want)
+			}
+		})
 	}
 }
 
@@ -309,7 +344,7 @@ func TestLand_AnUnreadableGrantIsAnError(t *testing.T) {
 }
 
 const readyView = `{"state":"OPEN","isDraft":false,"headRefOid":"abc123","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"CLEAN"}`
-const greenChecks = `[{"name":"test","bucket":"pass"},{"name":"goreleaser","bucket":"skipping"}]`
+const greenChecks = `[{"name":"test","bucket":"pass"},{"name":"goreleaser","bucket":"skipping"},{"name":"review","bucket":"pass"}]`
 
 func noneUntriaged(context.Context) ([]int, error) { return nil, nil }
 

@@ -183,6 +183,41 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 		}
 		wantFindings(t, audit(t, repoDir, wtRoot), 0)
 	})
+	t.Run("an admin dir whose gitdir file is gone is reported, not folded into a missing record", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		gitDir, _, err := worktreeGitDirs(filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(filepath.Join(gitDir, "gitdir")); err != nil {
+			t.Fatal(err)
+		}
+		a := audit(t, repoDir, wtRoot)
+		wantFindings(t, a, 1, filepath.Base(gitDir), LaneFeatPrimary, "gitdir", "git worktree prune")
+		if strings.Contains(joined(a), "no identity record") {
+			t.Errorf("the record is intact; only the gitdir file is gone:\n%s", joined(a))
+		}
+	})
+	t.Run("a second registration whose gitdir is gone is not listed as a blank duplicate path", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		twin := filepath.Join(wtRoot, "dotfiles", "twin")
+		runGitLaneTest(t, repoDir, "worktree", "add", "--detach", twin, "HEAD")
+		twinGitDir, _, err := worktreeGitDirs(twin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(twinGitDir, LaneIdentityFile), []byte(LaneFeatPrimary+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(filepath.Join(twinGitDir, "gitdir")); err != nil {
+			t.Fatal(err)
+		}
+		a := audit(t, repoDir, wtRoot)
+		wantFindings(t, a, 1, filepath.Base(twinGitDir), "gitdir")
+		if strings.Contains(joined(a), "more than one worktree") {
+			t.Errorf("the broken registration is reported on its own; it must not pad the duplicate list:\n%s", joined(a))
+		}
+	})
 	t.Run("an unreadable record is a finding, as the guard fails closed on it", func(t *testing.T) {
 		if runtime.GOOS == "windows" || os.Getuid() == 0 {
 			t.Skip("mode bits do not deny reads here")

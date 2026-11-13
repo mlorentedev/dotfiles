@@ -98,3 +98,22 @@ YML
     run python3 "$BATS_TEST_DIRNAME/lib/check-workflow-contexts.py" "$BATS_TEST_TMPDIR"
     [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
 }
+
+# ADR-001 decision 3 (CI-017, #3306): ci.yml ends in one aggregate, `ci-gate`,
+# that branch protection can require in place of its separate jobs. It must run
+# under always() (a skipped required check passes), need every other job in the
+# workflow, and judge them with the pinned ci-workflows gate composite.
+@test "ci.yml: ci-gate runs under always(), needs every other job, and uses the pinned gate composite" {
+    run python3 - "$REPO/.github/workflows/ci.yml" <<'PY'
+import re, sys, yaml
+jobs = yaml.safe_load(open(sys.argv[1]))["jobs"]
+gate = jobs.get("ci-gate")
+assert gate, "ci.yml has no ci-gate job"
+assert str(gate.get("if", "")).strip() in ("always()", "${{ always() }}"), gate.get("if")
+assert set(gate["needs"]) == set(jobs) - {"ci-gate"}, sorted(set(jobs) - {"ci-gate"} - set(gate["needs"]))
+uses = [s.get("uses", "") for s in gate["steps"]]
+assert any(re.fullmatch(r"mlorentedev/ci-workflows/\.github/actions/gate@[0-9a-f]{40}", u) for u in uses), uses
+assert any("toJSON(needs)" in str(s.get("with", {}).get("needs", "")) for s in gate["steps"])
+PY
+    [ "$status" -eq 0 ] || { printf '%s\n' "$output" >&2; false; }
+}

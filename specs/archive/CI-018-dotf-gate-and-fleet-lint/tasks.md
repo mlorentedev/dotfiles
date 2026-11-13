@@ -106,13 +106,13 @@ The script does not fit one PR under the 300-line cap, so PR 2 splits along the 
 - [x] Stale exceptions (matching nothing) and unknown rule ids as findings; the fixture test walks the list of
   rules an exception may name, and a test ties that list to the fixture directories
 - [x] [AC5] The runbook: `docs/runbooks/guide-fleet-lint.md`
-- [ ] [AC5] The link from ci-workflows ADR-001, a pull request in that repository once the runbook is on main
+- [x] [AC5] The link from ci-workflows ADR-001, a pull request in that repository once the runbook is on main: ci-workflows#99
 - [x] Run over the owner's local checkouts: 221 findings in 13 repositories, no unreadable one
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Lint passes
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in

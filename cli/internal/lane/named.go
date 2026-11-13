@@ -417,56 +417,21 @@ func SwitchLane(repoRoot, worktreeRoot, branch, explicitLane string) (string, st
 }
 
 func switchLaneLocked(absRepo, absWTRoot, branch, explicitLane string) (string, string, error) {
-	var laneName, lanePath string
-	if explicitLane != "" {
-		repoName := filepath.Base(filepath.Clean(absRepo))
-		laneName = explicitLane
-		lanePath = filepath.Join(absWTRoot, repoName, explicitLane)
-		meta, err := worktree.LoadMetadata(lanePath)
-		if err != nil || meta == nil {
-			return "", "", fmt.Errorf("lane switch: lane %q is not initialized at %s; run `dotf lane init` first", explicitLane, lanePath)
-		}
-		if !strings.EqualFold(meta.State, string(worktree.StateParked)) {
-			curBranchOut, _ := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
-			if strings.TrimSpace(string(curBranchOut)) != branch {
-				return "", "", fmt.Errorf("lane switch: lane %q is already ACTIVE on %q; park it first", explicitLane, strings.TrimSpace(string(curBranchOut)))
-			}
-		}
-	} else {
-		var err error
-		laneName, lanePath, err = RouteBranchToLane(absRepo, absWTRoot, branch)
-		if err != nil {
-			return "", "", err
-		}
-	}
-
-	// The lane path is a convention; the lane must be this repository's.
-	repoCommonDir, err := resolveGitCommonDir(absRepo)
+	laneName, lanePath, err := switchTarget(absRepo, absWTRoot, branch, explicitLane)
 	if err != nil {
 		return "", "", err
 	}
-	if err := assertWorktreeOf(absRepo, repoCommonDir, lanePath); err != nil {
-		return "", "", fmt.Errorf("lane switch: %w", err)
+	if err := switchable(absRepo, laneName, lanePath); err != nil {
+		return "", "", err
 	}
-
-	dirt, err := (&worktree.RealGitRunner{}).Dirt(lanePath)
-	if err != nil {
-		return "", "", fmt.Errorf("lane switch: checking %s status: %w", laneName, err)
-	}
-	if dirt.Any() {
-		return "", "", fmt.Errorf("lane switch: lane %s has uncommitted or non-disposable ignored files", laneName)
-	}
-
 	if err := checkoutBranchInLane(absRepo, lanePath, branch); err != nil {
 		return "", "", err
 	}
-
-	issueNum := parseIssueFromBranch(branch)
 	now := time.Now()
 	meta := worktree.Metadata{
 		Lane:           laneName,
 		State:          string(worktree.StateActive),
-		Issue:          issueNum,
+		Issue:          parseIssueFromBranch(branch),
 		CreatedAt:      now,
 		LeaseExpiresAt: now.Add(leaseTTL),
 		ReapOK:         false,
@@ -475,6 +440,51 @@ func switchLaneLocked(absRepo, absWTRoot, branch, explicitLane string) (string, 
 		return "", "", fmt.Errorf("lane switch: saving metadata: %w", err)
 	}
 	return laneName, lanePath, nil
+}
+
+// switchTarget resolves the lane a branch goes to: the one named explicitly,
+// which must be initialised and parked (or already on this branch), or the
+// one the routing picks.
+func switchTarget(absRepo, absWTRoot, branch, explicitLane string) (string, string, error) {
+	if explicitLane == "" {
+		laneName, lanePath, err := RouteBranchToLane(absRepo, absWTRoot, branch)
+		if err != nil {
+			return "", "", err
+		}
+		return laneName, lanePath, nil
+	}
+	lanePath := filepath.Join(absWTRoot, filepath.Base(filepath.Clean(absRepo)), explicitLane)
+	meta, err := worktree.LoadMetadata(lanePath)
+	if err != nil || meta == nil {
+		return "", "", fmt.Errorf("lane switch: lane %q is not initialized at %s; run `dotf lane init` first", explicitLane, lanePath)
+	}
+	if !strings.EqualFold(meta.State, string(worktree.StateParked)) {
+		curBranchOut, _ := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+		if strings.TrimSpace(string(curBranchOut)) != branch {
+			return "", "", fmt.Errorf("lane switch: lane %q is already ACTIVE on %q; park it first", explicitLane, strings.TrimSpace(string(curBranchOut)))
+		}
+	}
+	return explicitLane, lanePath, nil
+}
+
+// switchable refuses a lane path that is not this repository's worktree (the
+// path is a convention) or that carries uncommitted or non-disposable files.
+func switchable(absRepo, laneName, lanePath string) error {
+	repoCommonDir, err := resolveGitCommonDir(absRepo)
+	if err != nil {
+		return err
+	}
+	if err := assertWorktreeOf(absRepo, repoCommonDir, lanePath); err != nil {
+		return fmt.Errorf("lane switch: %w", err)
+	}
+	dirt, err := (&worktree.RealGitRunner{}).Dirt(lanePath)
+	if err != nil {
+		return fmt.Errorf("lane switch: checking %s status: %w", laneName, err)
+	}
+	if dirt.Any() {
+		return fmt.Errorf("lane switch: lane %s has uncommitted or non-disposable ignored files", laneName)
+	}
+	return nil
 }
 
 func checkoutBranchInLane(absRepo, lanePath, branch string) error {

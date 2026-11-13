@@ -53,6 +53,8 @@ jobs:
       install: ${{ github.event_name != 'pull_request' || steps.filter.outputs.install == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
         if: github.event_name == 'pull_request'
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         if: github.event_name == 'pull_request'
@@ -106,6 +108,7 @@ jobs:
       # at, so nothing changes there.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           ref: ${{ github.sha }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7

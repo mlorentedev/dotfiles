@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
+	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 )
 
 // grantContents is the contents API's answer for a grant that opts in.
@@ -38,7 +39,7 @@ func TestPrLand_ARefusalListsTheReasonsAndExitsNonZero(t *testing.T) {
 				if args[1] == "view" {
 					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"BEHIND"}`), nil
 				}
-				return []byte(`[{"name":"test","bucket":"pass"}]`), nil
+				return []byte(`[{"name":"test","bucket":"pass"},{"name":"review","bucket":"pass"}]`), nil
 			},
 			Untriaged: func(context.Context) ([]int, error) { return nil, nil },
 		}
@@ -101,7 +102,7 @@ func (q *queueFake) options(repo string, _ registryLoader) prland.Options {
 				}
 				return fmt.Appendf(nil, `{"state":"OPEN","isDraft":false,"headRefOid":"sha%s0000","headRefName":"feat/%s","baseRefName":"main","mergeStateStatus":%q}`, f[2], f[2], state), nil
 			case strings.HasPrefix(line, "pr checks"):
-				return []byte(`[{"name":"test","bucket":"pass"}]`), nil
+				return []byte(`[{"name":"test","bucket":"pass"},{"name":"review","bucket":"pass"}]`), nil
 			case strings.HasPrefix(line, "pr list"):
 				return []byte(`[]`), nil
 			case strings.HasPrefix(line, "pr merge"):
@@ -288,7 +289,7 @@ func TestPrLand_UnknownWaitBoundsTheWaitOnAnUncomputedMergeState(t *testing.T) {
 				if args[1] == "view" {
 					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"UNKNOWN"}`), nil
 				}
-				return []byte(`[{"name":"test","bucket":"pass"}]`), nil
+				return []byte(`[{"name":"test","bucket":"pass"},{"name":"review","bucket":"pass"}]`), nil
 			},
 			Untriaged: func(context.Context) ([]int, error) { return nil, nil },
 			Sleep:     func(d time.Duration) { slept += d },
@@ -380,5 +381,26 @@ func TestPrLand_ARefusalPrintsTheManualMergeCommand(t *testing.T) {
 	}
 	if strings.Contains(queued, "gh pr merge 31 ") {
 		t.Errorf("a merged PR was offered a manual command:\n%s", queued)
+	}
+}
+
+// A PR held only because no review covers its head is not untriaged output:
+// Decide refuses it for the review in its own words (#3243).
+func TestPrLandOptions_UntriagedSkipsAHeadNoReviewRanOn(t *testing.T) {
+	prev := triageFetch
+	t.Cleanup(func() { triageFetch = prev })
+	triageFetch = func(context.Context, string, prtriage.Registry) ([]prtriage.Status, error) {
+		return []prtriage.Status{
+			{PR: prtriage.PR{Number: 7}, Pending: true, Reason: "github-actions reviewed, never triaged"},
+			{PR: prtriage.PR{Number: 8}, Pending: true, HeadUnreviewed: true, Reason: "no review covers the head"},
+		}, nil
+	}
+	o := prLandOptions("o/r", func(context.Context) (prtriage.Registry, error) { return prtriage.Registry{}, nil })
+	got, err := o.Untriaged(context.Background())
+	if err != nil {
+		t.Fatalf("Untriaged: %v", err)
+	}
+	if len(got) != 1 || got[0] != 7 {
+		t.Errorf("Untriaged = %v, want [7]", got)
 	}
 }
