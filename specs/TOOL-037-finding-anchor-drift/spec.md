@@ -36,7 +36,8 @@ golangci-lint run ./internal/prtriage/... ./internal/cmd/...                -> 0
 probe: original_line fallback removed -> TestFetchKeepsTheOriginalLineOfAFindingThatLeftTheDiff fails
        ("the triage record has no row for it")
 go run ./cmd/dotf pr triage-queue --pr 3421 from this branch                -> [OK] no reviewer output is awaiting a disposition, exit 0
-the pinned release on the same PR                                           -> exit 1, "REAL ...verification.md:0: the triage record has no row for it"
+the same command built from main on the same PR                             -> exit 1, "REAL ...verification.md:0: the triage record has no row for it"
+(the pinned release, 0.80.0, predates the stricter row match and does not hold it)
 ```
 
 ## Next
