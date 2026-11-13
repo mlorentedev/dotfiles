@@ -13,7 +13,7 @@ host, an operating system, an agent or a machine path.
 flowchart TB
   subgraph Data["Data (the marker is committed; the lease and the record are local to the machine)"]
     M[".dotf/lanes.json<br/>canonical_lanes[]<br/>third_party_roots[]<br/>committed, travels with every clone"]
-    W["&lt;WORKTREE_ROOT&gt;/&lt;repo&gt;/&lt;lane&gt;/.dotf-worktree.json<br/>lane, state, issue, lease<br/>local, excluded from git"]
+    W["&lt;repo&gt;/.git/worktrees/&lt;id&gt;/dotf-worktree.json<br/>lane, state, issue, lease<br/>local, git-owned, out of git clean's reach"]
     I["&lt;repo&gt;/.git/worktrees/&lt;id&gt;/dotf-lane<br/>the lane's identity, git-owned<br/>local, never committed"]
   end
   subgraph Code["Code (Go CLI, one definition)"]
@@ -44,8 +44,13 @@ Three properties follow from that split:
   with whatever the file already declares, so adding a session host is a data
   change that survives re-initialization.
 - **The guard parses, it does not decide.** It reads the marker's roots, the
-  lease file and the identity record. A repository that declares nothing gets no
+  lease and the identity record. A repository that declares nothing gets no
   rules.
+- **The lease lives next to the identity record.** `dotf` writes it to
+  `dotf-worktree.json` inside the worktree's git admin dir (ADR-062), the
+  directory `git clean -fdx` never reaches; a `.dotf-worktree.json` at the
+  worktree root is the legacy location, still read when the admin dir holds
+  none and still written as a mirror for one release (section 6).
 - **A lane's identity is a record, not a name.** `dotf lane init` writes the lane
   name to `dotf-lane` inside the worktree's git admin dir (ADR-061). Git moves
   that directory with `git worktree move`, keeps it through `git gc` and `git
@@ -100,7 +105,7 @@ flowchart TD
   D -->|no| OK
   D -->|yes| E{worktree path matches a<br/>declared third_party_root?}
   E -->|yes| B1([exit 1: claim a lane])
-  E -->|no| F{'.dotf-worktree.json'<br/>present?}
+  E -->|no| F{lease present?<br/>'$git_dir/dotf-worktree.json',<br/>else '$top/.dotf-worktree.json'}
   F -->|yes, state PARKED| B2([exit 1: lane is parked])
   F -->|yes, other state| H
   F -->|no, '$git_dir/dotf-lane'<br/>present| B3([exit 1: missing lease])
@@ -118,10 +123,14 @@ Rule summary:
 | 2 | `.obsidian/` in worktree or main root (vault) | allowed |
 | 3 | No `.dotf/lanes.json` | allowed — the guard is not armed |
 | 4 | Worktree sits under a declared `third_party_root` | **blocked** |
-| 5a | `.dotf-worktree.json` present and `state == "PARKED"` | **blocked** |
-| 5b | Identity record `$git_dir/dotf-lane` readable with a non-empty first line, or present but unreadable; no lease file | **blocked** |
+| 5a | Lease present and `state == "PARKED"` | **blocked** |
+| 5b | Identity record `$git_dir/dotf-lane` readable with a non-empty first line, or present but unreadable; no lease | **blocked** |
 | 6a | Branch is `main` or `master` | **blocked** |
-| 6b | Detached HEAD at the main checkout, no lease file | **blocked** |
+| 6b | Detached HEAD at the main checkout or in a linked worktree, no lease | **blocked** |
+
+The lease is one resolved path for both rules: `$git_dir/dotf-worktree.json`
+first, the legacy `$top/.dotf-worktree.json` second, the order `dotf` reads
+them in. The admin-dir copy outranks a stale in-tree one.
 
 ## 4. Lane lifecycle
 
@@ -133,7 +142,7 @@ stateDiagram-v2
   ACTIVE --> PARKED: dotf lane park
   PARKED --> PARKED: dotf lane init (idempotent)
   note right of PARKED
-    state=PARKED in .dotf-worktree.json
+    state=PARKED in the lease
     guard blocks commits here
   end note
   note right of ACTIVE
@@ -182,6 +191,20 @@ same merge would block every existing session container on every seat at once.
 5. Announce the change: from that merge onward, commits in third-party session
    roots and on `main` in this repository are refused.
 
+Lanes leased by a `dotf` older than ADR-062 carry the lease at the worktree
+root only. Re-run `dotf lane init` once after updating: it copies each such
+lease into the lane's git admin dir as it is and reports one change per copied
+lease, then `changed=0`. `dotf worktree list` names every worktree whose lease
+is still only at the legacy location (`lease at the legacy in-tree location
+only` in its reason, `lease_legacy_only` in `--json`); a non-lane worktree
+migrates on its next lease write. While seats run mixed versions, the new
+binary also writes the in-tree copy, so a guard not yet redeployed by
+`converge` keeps reading; a `git clean -fdx` under that old guard reproduces
+the old block and nothing worse, and `dotf hooks install` clears it. The
+mirror, the legacy read and the `info/exclude` line go away together under
+their follow-up ticket once a release has shipped with the mirror and the list
+reports no legacy-only lease.
+
 Lanes provisioned by a `dotf` older than the identity record (ADR-061) carry no
 `dotf-lane` file. Re-run `dotf lane init` once after updating: it is idempotent
 and reports `changed=3` for the three restored records, then `changed=0`. Until
@@ -220,8 +243,13 @@ third-party root (blocked), PARKED lane (blocked), ACTIVE lane (allowed),
 declared custom root (blocked), undeclared root with no fallback (allowed),
 identity: an unleased worktree merely named after a lane (allowed), the same
 worktree once `dotf-lane` is recorded, refused by the guard running as a real
-pre-commit hook (blocked), and still blocked after `git worktree move` to a name
-the marker never declared.
+pre-commit hook (blocked), still blocked after `git worktree move` to a name
+the marker never declared, and the lease location: a PARKED lease only in the
+admin dir (blocked), an ACTIVE one there with no in-tree copy on a detached
+HEAD (allowed), and that copy outranking a stale PARKED in-tree file (allowed).
+`TestActiveLaneSurvivesGitClean` in `internal/lane` runs the defect itself:
+init, switch, `git clean -fdx`, then status, list and a commit through the
+installed guard.
 
 ### 7.3 Marker contract and idempotency
 
