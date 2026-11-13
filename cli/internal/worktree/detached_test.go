@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/gittest"
 )
 
 func detachedOpts(t *testing.T) DetachedOptions {
@@ -124,9 +126,13 @@ func TestAddDetachedRemovesTheWorktreeWhenItsLeaseCannotBeSaved(t *testing.T) {
 	opts := detachedOpts(t)
 	var removed string
 	runner := &MockAddRunner{
-		OnWorktreeAddDetached: func(_, target, _ string) error {
-			// A directory where the lease file goes makes SaveMetadata fail.
-			return os.MkdirAll(filepath.Join(target, MetadataFileName), 0o755)
+		OnWorktreeAddDetached: func(repo, target, _ string) error {
+			// A directory where the lease goes in the admin dir makes SaveMetadata fail.
+			admin, err := gittest.LinkWorktree(repo, target)
+			if err != nil {
+				return err
+			}
+			return os.MkdirAll(filepath.Join(admin, LeaseFileName), 0o755)
 		},
 		OnWorktreeRemoveForce: func(_, target string) error {
 			removed = target

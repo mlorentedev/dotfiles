@@ -412,7 +412,7 @@ func RouteBranchToLane(repoRoot, worktreeRoot, branch string) (string, string, e
 }
 
 // SwitchLane claims a PARKED persistent lane (or explicitLane), checks out branch
-// inside it, and transitions its .dotf-worktree.json to State="ACTIVE".
+// inside it, and transitions its lease to State="ACTIVE".
 func SwitchLane(repoRoot, worktreeRoot, branch, explicitLane string) (string, string, error) {
 	if strings.TrimSpace(branch) == "" {
 		return "", "", fmt.Errorf("lane switch: branch cannot be empty")

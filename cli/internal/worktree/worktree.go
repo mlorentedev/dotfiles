@@ -26,7 +26,9 @@ const (
 
 const MetadataFileName = ".dotf-worktree.json"
 
-// Metadata is stored in <worktree-root>/.dotf-worktree.json.
+// Metadata is the lease, stored in the worktree's git admin dir as
+// LeaseFileName, with an in-tree mirror under MetadataFileName for one
+// release (ADR-062).
 type Metadata struct {
 	Creator        string    `json:"creator,omitempty"`
 	Issue          int       `json:"issue,omitempty"`
@@ -193,7 +195,7 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 		return StateDirty, "uncommitted changes"
 	}
 
-	// Gate (a): explicit metadata exists in .dotf-worktree.json with reap_ok: true
+	// Gate (a): an explicit lease exists with reap_ok: true
 	if info.Metadata == nil {
 		return StateUnadopted, "no dotf lease; sweep will not reap it until `dotf worktree adopt <path>`"
 	}

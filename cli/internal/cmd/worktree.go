@@ -51,7 +51,7 @@ func newWorktreeAdoptCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "adopt [path|slug]",
 		Short: "Give a worktree created without dotf (by herdr or git) a lease, so sweep may reap it",
-		Long: `adopt writes the .dotf-worktree.json lease add would have written, for a
+		Long: `adopt writes the lease add would have written, for a
 linked worktree that has none: list shows such a worktree as UNADOPTED, and
 sweep never reaps it. With a lease it is reaped like any other once merged,
 clean and past the lease. A worktree that already has a lease keeps it.
@@ -293,7 +293,8 @@ starts from origin's default branch unless --base names another. A branch that
 already exists, locally or on origin, is checked out under its own name (one only
 on origin tracks it), whatever its shape: a release or dependabot branch. Only its
 directory is slugified, and --base is refused for it.
-It writes .dotf-worktree.json to register lease time and creator metadata, and automatically
+It writes a lease into the worktree's git admin dir (dotf-worktree.json under
+.git/worktrees/<id>/) to register lease time and creator metadata, and automatically
 adds it to .git/info/exclude. With --issue, add refuses while another worktree of
 the repository holds a live lease on that issue, and names it; --share-issue adds a
 second worktree on it anyway.

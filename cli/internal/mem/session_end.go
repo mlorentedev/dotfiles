@@ -271,7 +271,7 @@ func buildRecord(date, project, agent, sid, block string) string {
 }
 
 // isWorktreeParked returns true when cwd (or an ancestor worktree root) holds a
-// .dotf-worktree.json with state == "PARKED" (HARNESS-186, B3), so SessionEnd
+// lease with state == "PARKED" (HARNESS-186, B3), so SessionEnd
 // never writes a detached <lane>@<host> fallback journal for a parked lane.
 func isWorktreeParked(cwd string) bool {
 	for dir := filepath.Clean(cwd); ; {

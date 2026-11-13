@@ -68,6 +68,8 @@ func LoadMetadata(worktreePath string) (*Metadata, error) {
 // release, the same bytes to the in-tree file (ADR-062): the guard a seat has
 // not redeployed and the pinned binary the hooks call read the tree file. A
 // path that is not a linked worktree is refused, never written in the tree.
+// The mirror is written first and the admin dir last, so an error always
+// means the copy every reader prefers is as it was.
 func SaveMetadata(worktreePath string, meta Metadata) error {
 	admin, err := AdminDir(worktreePath)
 	if err != nil {
@@ -77,11 +79,11 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(admin, LeaseFileName), data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
-		return fmt.Errorf("writing worktree metadata: %w", err)
-	}
 	if err := os.WriteFile(filepath.Join(worktreePath, MetadataFileName), data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
 		return fmt.Errorf("writing the worktree metadata mirror: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(admin, LeaseFileName), data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
+		return fmt.Errorf("writing worktree metadata: %w", err)
 	}
 	return nil
 }
