@@ -43,3 +43,26 @@ setup() {
     grep -q 'dotf lane switch "\$BRANCH"' "$SKILL" || false
     grep -q 'dotf lane claim "\$ISSUE_NUM"' "$SKILL" || false
 }
+
+@test "a failed lane switch parks as wip-cap and ends the run, never falling through to worktree add" {
+    # The lane branch is the text between the marker test and its `else`.
+    branch="$(awk '/^[[:space:]]*if \[ -f \.dotf\/lanes\.json \]/{f=1; next} f && /^[[:space:]]*else[[:space:]]*$/{exit} f' "$SKILL")"
+    [ -n "$branch" ] || false
+    # The switch's exit status is tested, and the failure arm names the park and exits.
+    printf '%s\n' "$branch" | grep -qE '^[[:space:]]*if ! .*dotf lane switch "\$BRANCH"' || false
+    printf '%s\n' "$branch" | grep -q 'parked(wip-cap)' || false
+    printf '%s\n' "$branch" | grep -qE '^[[:space:]]*exit [0-9]+' || false
+    # No worktree creation inside the lane branch.
+    if printf '%s\n' "$branch" | grep -v '^[[:space:]]*#' | grep -q 'dotf worktree add'; then false; fi
+}
+
+@test "wip-cap is a declared run-level stop" {
+    grep -q '`wip-cap`' "$SKILL" || false
+}
+
+@test "the wip-cap exit comes before the lease-lost path" {
+    cap="$(grep -n 'parked(wip-cap)' "$SKILL" | grep -v ':[[:space:]]*#' | head -1 | cut -d: -f1)"
+    lost="$(grep -n 'worktree resolution failed -> park(lease-lost)' "$SKILL" | head -1 | cut -d: -f1)"
+    [ -n "$cap" ] && [ -n "$lost" ] || false
+    [ "$cap" -lt "$lost" ] || false
+}
