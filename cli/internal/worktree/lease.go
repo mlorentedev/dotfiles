@@ -82,7 +82,7 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 		return err
 	}
 	mirror := filepath.Join(worktreePath, MetadataFileName)
-	previous, readErr := os.ReadFile(mirror) // #nosec G304 -- the mirror path this package composed
+	previous, readErr := os.ReadFile(mirror)                  // #nosec G304 -- the mirror path this package composed
 	if err := os.WriteFile(mirror, data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
 		return fmt.Errorf("writing the worktree metadata mirror: %w", err)
 	}
