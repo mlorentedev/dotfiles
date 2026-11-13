@@ -16,6 +16,8 @@ created: "2026-11-07"
 
 Accepted 2026-11-07.
 
+**Amended 2026-11-12:** what each lane is for, how many there are, and how a session reaches one are now decided. See *Amendment 2026-11-12 (lanes as the default, #3432)*.
+
 ## Context
 
 Operating across Herdr, Orca ADE, GitHub Copilot CLI, `tmux`, and bare terminals (`claude`, `agy`, `pi`, `opencode`) across Windows (`EGW-LEN029`), macOS (`macmini`), and Linux (`ace2`) exposed four structural failure modes:
@@ -43,6 +45,33 @@ Operating across Herdr, Orca ADE, GitHub Copilot CLI, `tmux`, and bare terminals
 
 - Worktree count per repository is bounded to at most 4 directories (`main` + 3 named lanes), eliminating `MAX_PATH` overflow and Windows directory-deletion locks.
 - Any session on any OS can immediately identify which machine, OS, and lane produced a PR and resume full thread state via `dotf mem resume`.
+
+## Amendment 2026-11-12 (lanes as the default, #3432)
+
+Five days after acceptance, no repository carried `.dotf/lanes.json` and no machine had a lane directory. Every session still worked in a branch-per-directory worktree, about 40 of them for dotfiles alone. The CLI shipped, but nothing ever routed a session into a lane. This amendment settles the three questions that left the decision unexecuted.
+
+1. **Three typed working lanes, and three is the cap on purpose.**
+
+   | Directory | Holds |
+   |---|---|
+   | `main` | The read-only coordinator: triage, review, launching sessions |
+   | `feat-lane-primary` | One large change (a spec) |
+   | `feat-lane-secondary` | A second large change in parallel |
+   | `fast-track-lane` | Quick fixes, hotfixes, and answering other sessions |
+
+   `RouteBranchToLane` already routes by the branch's type: `feat`, `refactor`, `perf` and `build` go to the two feature lanes, and any other type goes to `fast-track-lane`, falling back to `feat-lane-secondary`. When every lane a branch may take is ACTIVE, it answers "WIP cap reached". That answer is the policy, not a defect to route around: it is ADR-043's finish-before-starting rule enforced at the directory level. The count stays the code's `CanonicalLanes`. A marker-driven count was considered and rejected: it buys per-repository flexibility nobody asked for, and it turns the cap into a setting each repository can raise.
+
+2. **`dotf worktree add` coexists with lanes.** In a repository carrying `.dotf/lanes.json` it still creates the worktree and prints which lane to use instead. Refusing would break the detached worktrees `dotf spec review` creates, and the worktrees that exist until the sweep. Detached and review worktrees stay outside the lanes.
+
+3. **A session reaches a lane through `dotf`, never by where it was opened.** A session's working directory is fixed when it starts, so no hook, skill or rule can move it afterwards. The two entrances are `dotf lane next` (queue-driven) and `dotf lane switch <branch>` (branch-driven), and both must be agent-, OS- and machine-agnostic:
+   - Every harness in the agnostic set gets a launcher once a real launch is observed (the CLI-119 rule).
+   - `lane next` gets a backend that needs no herdr.
+   - Every harness's session start reports the lane it is in, or that the repository runs lanes. It informs and never relocates.
+   - An autopilot run takes a free lane. When none is free, the run ends rather than opening a directory.
+
+4. **Activation is committed, then converged.** A repository opts in with a PR that adds `.dotf/lanes.json`. Each machine then creates its lanes and arms the guard in a converge step that reads the committed marker and reaches `changed=0` on re-run. A run or a person running `dotf lane init` by hand is not the activation path, because it arms the guard for every worktree of the repository on that machine without a reviewed change.
+
+The word "lane" belongs to this ADR. AGENTS.md also uses it for implementation tiers (Answer, Inline, Fast-Track, Full SDD), and that use is renamed. The implementation is tracked in #3432.
 
 ## References
 
