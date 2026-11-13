@@ -35,6 +35,8 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - `SaveMetadata` writes the mirror first and the admin dir last, and puts the mirror back when the admin-dir write fails (review finding on #3421, `TestSaveMetadataPutsTheMirrorBackWhenTheAdminDirRefuses`), so an error always leaves both copies unchanged; the two "lease cannot be written" fixtures break the admin-dir copy so they survive the mirror's removal (#3443).
 - The guard's missing-lease message keeps the phrase "lease metadata" (an existing hook test asserts it) and adds where the lease lives.
 - `worktree list` appends the legacy note after `Classify` rather than inside it: `Classify` stays a pure function of `Info`, and the note is a location fact, not a lifecycle state.
+- Independent review (PASS, `review.md`): the session-end reader prefers the admin-dir copy, so a lane parked by a binary older than this change (in-tree PARKED, admin-dir still ACTIVE) gets a detached journal once. That is the same mixed-version window the runbook names, it costs one stray journal and no data, and it ends when the old binary is gone; accepted as noise, no code change. The review's other findings were applied: Save refusals for the main checkout and a submodule, a source pin for the two spellings outside the worktree package (`TestLeaseFileNameSpellingsAgree`), and the duplicate test label.
+- `features.json` entries stay `pending` with the exit-0 evidence line: no harness runs those commands, and the archived specs that carry `features.json` (SEC-002 among them) close the same way; the independent review, not a runner, is the archive gate.
 
 ## Promotion candidates
 

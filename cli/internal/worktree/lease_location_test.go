@@ -80,7 +80,7 @@ func TestAdminDir(t *testing.T) {
 // The lease lives in the admin dir; the in-tree file is a mirror for one
 // release and the fallback for a lease written before this change.
 func TestLeaseLivesInTheWorktreeGitDir(t *testing.T) {
-	_, wt := linkedWorktree(t, "feat/y")
+	repo, wt := linkedWorktree(t, "feat/y")
 	admin, err := AdminDir(wt)
 	if err != nil {
 		t.Fatal(err)
@@ -142,14 +142,48 @@ func TestLeaseLivesInTheWorktreeGitDir(t *testing.T) {
 		t.Fatalf("Load on a plain directory: got %+v, %v; want the in-tree lease", got, err)
 	}
 
-	// Save refuses a non-worktree path, naming it, and writes nothing there.
-	other := t.TempDir()
-	err = SaveMetadata(other, meta)
-	if !errors.Is(err, ErrNotLinkedWorktree) || !strings.Contains(err.Error(), other) {
-		t.Fatalf("Save on a plain directory: %v; want ErrNotLinkedWorktree naming %s", err, other)
+	// Save refuses every path that is not a linked worktree, naming it, and
+	// writes nothing there: a plain directory, the main checkout (its .git is
+	// a directory, not a pointer) and a submodule (its pointer names
+	// .git/modules, which has no worktrees/<id> admin dir).
+	sub := filepath.Join(t.TempDir(), "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if _, statErr := os.Stat(filepath.Join(other, MetadataFileName)); !os.IsNotExist(statErr) {
-		t.Fatal("Save wrote an in-tree lease on a path it refused")
+	if err := os.WriteFile(filepath.Join(sub, ".git"), []byte("gitdir: ../.git/modules/sub\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for name, other := range map[string]string{"plain directory": t.TempDir(), "main checkout": repo, "submodule": sub} {
+		err = SaveMetadata(other, meta)
+		if !errors.Is(err, ErrNotLinkedWorktree) || !strings.Contains(err.Error(), other) {
+			t.Fatalf("Save on a %s: %v; want ErrNotLinkedWorktree naming %s", name, err, other)
+		}
+		if _, statErr := os.Stat(filepath.Join(other, MetadataFileName)); !os.IsNotExist(statErr) {
+			t.Fatalf("Save wrote an in-tree lease on a %s it refused", name)
+		}
+	}
+}
+
+// The lease filename is spelled in two places Go constants cannot reach: the
+// shell guard, and the session-end reader, which keeps its own copy so the
+// mem package does not import worktree. This pins both spellings to the
+// constants, so renaming one without the others fails here instead of in a
+// hook that quietly stops finding the lease.
+func TestLeaseFileNameSpellingsAgree(t *testing.T) {
+	root := filepath.Join("..", "..", "..")
+	for _, tc := range []struct{ path, name string }{
+		{filepath.Join(root, "cli", "internal", "mem", "session_end.go"), LeaseFileName},
+		{filepath.Join(root, "cli", "internal", "mem", "session_end.go"), MetadataFileName},
+		{filepath.Join(root, "git-hooks", "lib", "lane-guard.sh"), "$git_dir/" + LeaseFileName},
+		{filepath.Join(root, "git-hooks", "lib", "lane-guard.sh"), "$top/" + MetadataFileName},
+	} {
+		src, err := os.ReadFile(tc.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(src, []byte(`"`+tc.name+`"`)) {
+			t.Errorf("%s does not spell %q; it reads the lease by that name and must agree with the worktree package", tc.path, tc.name)
+		}
 	}
 }
 

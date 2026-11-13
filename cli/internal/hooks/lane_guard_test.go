@@ -247,7 +247,7 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	if out, err := runLaneGuardInDir(t, script, adminWT); err != nil {
 		t.Fatalf("expected the ACTIVE admin-dir lease to outrank a stale PARKED in-tree copy, got err=%v out=%s", err, out)
 	}
-	// 6c. The main checkout on a detached HEAD keeps its own wording.
+	// 6d. The main checkout on a detached HEAD keeps its own wording.
 	detachedMain := filepath.Join(t.TempDir(), "detached-main")
 	initGitRepoForLaneGuard(t, detachedMain, "main")
 	writeLanesMarkerFixture(t, detachedMain)
