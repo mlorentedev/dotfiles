@@ -1,7 +1,7 @@
 ---
 id: "BUG-171-lessons-stray-names"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-12"
 issue: "mlorentedev/dotfiles#3415"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]

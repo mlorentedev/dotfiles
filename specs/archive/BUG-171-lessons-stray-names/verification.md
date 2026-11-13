@@ -35,10 +35,10 @@ owner: manu
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-171-lessons-stray-names/` -> `specs/archive/BUG-171-lessons-stray-names/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-171-lessons-stray-names/` -> `specs/archive/BUG-171-lessons-stray-names/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 ## Review dispositions
 
