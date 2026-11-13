@@ -563,3 +563,29 @@ make_conflict() {
     [ "$status" -eq 0 ]
     grep -q -- '--hook-type post-checkout' "$ARGS_LOG"
 }
+
+# #3405: pre-commit stashes every unstaged change while it runs, even for a
+# stage the config declares nothing for. A file checkout (`git checkout --
+# <path>`, flag 0) is a restore inside scripts and tests, so handing it over hid
+# every uncommitted edit from anything reading the tree at the same time.
+@test "#3405: a file checkout (flag 0) is not handed to pre-commit" {
+    stub_precommit 0
+    add_precommit_config
+    cd "$FIXTURE"
+
+    run "$CHAIN" post-checkout aaa aaa 0 < /dev/null
+    [ "$status" -eq 0 ]
+    [ ! -e "$ARGS_LOG" ]
+}
+
+@test "#3405: a file checkout still runs an executable repo-local post-checkout hook" {
+    stub_precommit 0
+    add_precommit_config
+    printf '#!/bin/sh\necho "local $3" > "%s/local-ran"\n' "$WORK" > "$FIXTURE/.git/hooks/post-checkout"
+    chmod +x "$FIXTURE/.git/hooks/post-checkout"
+    cd "$FIXTURE"
+
+    run "$CHAIN" post-checkout aaa aaa 0 < /dev/null
+    [ "$status" -eq 0 ]
+    [ "$(cat "$WORK/local-ran")" = "local 0" ]
+}

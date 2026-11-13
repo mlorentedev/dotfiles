@@ -133,6 +133,15 @@ case "$hook_type" in
         ;;
 esac
 
+# #3405: pre-commit stashes every unstaged change for the length of its run,
+# even for a stage the config declares nothing for. A file checkout
+# (`git checkout -- <path>`, git's third argument 0) is a restore that scripts
+# and tests run in a loop, so handing it over hid the whole uncommitted tree from
+# anything reading it concurrently. Only a branch checkout (1) is handed over.
+if [ "$hook_type" = post-checkout ] && [ "${3:-}" = 0 ]; then
+    exit 0
+fi
+
 # uv's documented order for its tool executables: UV_TOOL_BIN_DIR, then
 # XDG_BIN_HOME, then ~/.local/bin.
 pre_commit="$(command -v pre-commit 2>/dev/null)"
