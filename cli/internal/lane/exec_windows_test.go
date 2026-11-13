@@ -44,10 +44,40 @@ func TestExec_RefusesABatchShimAndNeverStartsIt(t *testing.T) {
 	}
 }
 
-// The refusal is for batch files only: a native executable still starts, with
-// a prompt full of the same characters. The test binary is the native program.
-func TestExec_StillStartsANativeExecutable(t *testing.T) {
-	if err := Exec([]string{os.Args[0], "-test.run=^$", "a & b %PATH% ^ | < > \""}); err != nil {
+// The refusal is for batch files only: a native executable still starts and
+// receives the prompt byte for byte, with the same characters in it. The test
+// binary is the native program, and TestExecHelperProcess its entry point.
+func TestExec_StillStartsANativeExecutableWithThePromptIntact(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "args")
+	t.Setenv("LANE_EXEC_HELPER_OUT", out)
+	prompt := "a & b %PATH% ^ | < > \"q\"\nsecond line"
+	if err := Exec([]string{os.Args[0], "-test.run=^TestExecHelperProcess$", "--", prompt}); err != nil {
 		t.Fatalf("Exec of a native executable: %v", err)
+	}
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("the native child did not run: %v", err)
+	}
+	if string(got) != prompt {
+		t.Errorf("the child received %q, want %q", got, prompt)
+	}
+}
+
+// TestExecHelperProcess is the child of the test above, not a test of its own:
+// it does nothing unless the parent set LANE_EXEC_HELPER_OUT.
+func TestExecHelperProcess(t *testing.T) {
+	out := os.Getenv("LANE_EXEC_HELPER_OUT")
+	if out == "" {
+		return
+	}
+	args := os.Args
+	for i, a := range args {
+		if a == "--" {
+			args = args[i+1:]
+			break
+		}
+	}
+	if err := os.WriteFile(out, []byte(strings.Join(args, " ")), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
