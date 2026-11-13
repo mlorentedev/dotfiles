@@ -440,3 +440,41 @@ func TestRunWithAProbeRunsNoControlForARefutation(t *testing.T) {
 		t.Errorf("State, Control = %q, %q, want %q and no control", got.State, got.Control, DidNotReproduce)
 	}
 }
+
+// #3401: an inverted check reads a failure as a refutation, and a check that
+// cannot reach the code under test fails too. So an inverted refutation gets
+// the same control as a reproduction: it stands only when the clean head reads
+// the opposite, and a check that fails both ways is could-not-run.
+func TestRunWithAProbeControlsAnInvertedRefutation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		check   []string
+		want    State
+		control State
+	}{
+		{"fails with and without the probe", []string{"git", "grep", "-q", "three", "--", "a.txt"}, CouldNotRun, DidNotReproduce},
+		{"fails only with the probe", []string{"git", "grep", "-q", "one", "--", "a.txt"}, DidNotReproduce, Reproduced},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newRepo(t)
+			probe := probeFor(t, dir, "two\n")
+			got, err := Run(context.Background(), Options{Dir: dir, Command: tc.check, Probe: probe, DefectWhenPasses: true})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got.State != tc.want || got.Control != tc.control {
+				t.Errorf("State, Control = %q, %q, want %q, %q (output %q)", got.State, got.Control, tc.want, tc.control, got.Output)
+			}
+			if tc.want == CouldNotRun {
+				for _, want := range []string{
+					"the check read did-not-reproduce on the clean head too (exit ",
+					"the probe did not change its reading, so the exit is not evidence against the defect",
+				} {
+					if !strings.Contains(got.Output, want) {
+						t.Errorf("the output lacks %q:\n%s", want, got.Output)
+					}
+				}
+			}
+		})
+	}
+}

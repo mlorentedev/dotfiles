@@ -48,9 +48,10 @@ patch outside the tree: an untracked file is a dirty tree.
 When the check reproduces under --probe, it runs once more on the clean head
 as the control. Only a check that then refutes leaves the reproduction
 standing: a reproduction the clean head reads the same way failed before
-reaching the code under test, and is could-not-run. A refutation runs no
-control, so with --defect-when-passes a check that cannot run still reads
-did-not-reproduce: confirm such a refutation by hand. Narrow the check
+reaching the code under test, and is could-not-run. With --defect-when-passes
+a refutation is a failing check, so it gets the same control and stands only
+when the clean head reproduces. A plain refutation passed and runs no
+control. Narrow the check
 to the test that names the defect: a coarser one that fails on the clean head
 too is could-not-run. The row names the control's reading. The
 check runs in the current directory: "go run -C cli" moves it into cli/, where
