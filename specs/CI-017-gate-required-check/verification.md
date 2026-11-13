@@ -13,7 +13,7 @@ owner: manu
 
 - [x] AC1 -> PR 1, test `ci.yml: ci-gate runs under always(), needs every other job, and uses the pinned gate composite` in `tests/workflow-job-names.bats`, and `tests/lib/check-workflow-contexts.py` (rule 3)
 - [x] AC2 -> PR 1's own CI run on 6929dd90: `ci-gate` reported success with its eight needs green (#3387). The failure path is the composite's, covered by ci-workflows `tests/gate.bats`
-- [ ] AC3 -> PR 2 declares it (`forge/branch-protection.json`); `dotf forge protection check --unmerged` shows only the expected dotfiles drift. Closes when the owner applies it after merge
+- [x] AC3 -> PR 2 (#3419) declares it (`forge/branch-protection.json`); the owner applied it after merge on 2026-11-13: `dotf forge protection apply` -> `[APPLIED] mlorentedev/dotfiles` (`changes`, `lint`, `lint-powershell`, `test`, `test-windows` -> `ci-gate`), then `dotf forge protection check` -> `[OK] mlorentedev/dotfiles`, 10 ok, 0 drift. The first apply attempt was refused fail-closed by a preflight timeout (#3434); the retry applied
 - [x] AC4 -> PR 2: job-level `if:` on `test-windows`, held by `tests/ci-os-matrix.bats` (CI-013, which exempts only required checks) and `tests/ci-path-filtering.bats` (HARNESS-041, which now accepts a job-level guard on the right output)
 
 ## Test status
@@ -36,9 +36,9 @@ owner: manu
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [ ] Lesson for the repo's `docs/lessons/`? <yes: path / no: reason>
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] Lesson for the repo's `docs/lessons/`? no: nothing surprising; the one defect met, the preflight timeout, is ticketed as #3434 with its root cause
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: one aggregate required check per workflow is the fleet's existing gate pattern (CI-004); this spec applies it to `ci.yml`
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the gate composite in ci-workflows already carries the pattern
 
 ## Archive checklist
 
