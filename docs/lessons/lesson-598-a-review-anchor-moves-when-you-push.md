@@ -27,13 +27,16 @@ right, and the failure reads like an author who never triaged.
 
 ## Solution
 
-Carry both anchors and let a row name either. `Comment.Anchors()` lists the current line and the
-reviewer's `original_line`, `rowFor` tries each, and the queue prints the reviewer's line once the
-current one is gone. Two tests hold the two shapes: a null-line finding against a row written
-under the original line, and a shifted finding (`line` 9, `original_line` 4) against a row keyed
-by either. The same PR showed both: four `lease.go` anchors had shifted by six to nine lines while
-PR-Agent still printed the originals. A file-level comment has neither line and no row keyed by a
-line can name it; that case stays open on #3455.
+Key the finding by the line the reviewer anchored, `original_line`, which never moves: a row written
+when the reviewer spoke matches for the life of the PR, and the queue prints that line once the
+current one is gone. The current line is not a second key. The first cut accepted either, and the
+review of the fix showed why that fails open: a push that removes lines above finding A moves it
+onto the line finding B was anchored to, and B's row then clears A. `Comment.Anchors()` answers the
+reviewer's line, with the current line only for a comment GitHub reports no original for, and
+three tests hold the shapes: a null-line finding against a row under the original, a shifted
+finding whose row matches on the original and not on the current line, and two findings sharing a
+current line where one row clears one finding. A file-level comment has neither line and no row
+keyed by a line can name it; that case stays open on #3455.
 
 ## Related
 

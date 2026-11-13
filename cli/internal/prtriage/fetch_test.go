@@ -770,20 +770,25 @@ func TestFetchKeepsTheOriginalLineOfAFindingThatLeftTheDiff(t *testing.T) {
 }
 
 // Lines added above the finding shift its current line while the reviewer's
-// comment still prints the original. A row may name either and match.
-func TestFetchMatchesARowOnEitherAnchorOfAShiftedFinding(t *testing.T) {
-	for name, row := range map[string]string{
-		"the reviewer's line": "| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |",
-		"the current line":    "| `cli/a.go:9` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |",
+// comment still prints the original. The row names the reviewer's line; one
+// keyed by the shifted current line does not match, since that line is the
+// diff's, not the reviewer's, and another finding may move onto it.
+func TestFetchMatchesARowOnTheReviewersLineOfAShiftedFinding(t *testing.T) {
+	for name, tc := range map[string]struct {
+		row  string
+		held int
+	}{
+		"the reviewer's line": {"| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |", 0},
+		"the current line":    {"| `cli/a.go:9` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |", 1},
 	} {
-		responses := triagedPR10(row)
+		responses := triagedPR10(tc.row)
 		responses["/pulls/10/comments"] = `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":9,"original_line":4,"created_at":"2026-09-02T10:00:01Z"}]`
 		got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
 		if err != nil {
 			t.Fatalf("%s: fetchWith: %v", name, err)
 		}
-		if len(got) != 0 {
-			t.Fatalf("%s: got %+v, want an empty queue", name, got)
+		if len(got) != tc.held {
+			t.Fatalf("%s: got %+v, want %d PR(s) held", name, got, tc.held)
 		}
 	}
 }

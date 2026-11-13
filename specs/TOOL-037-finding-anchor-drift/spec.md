@@ -15,7 +15,7 @@ issue: "mlorentedev/dotfiles#3455"
 ## Scope
 
 - `Comment` carries both anchors: `Line` (current, zero once outdated) and `OriginalLine` (the reviewer's, never moves). `fetchInline` reads `original_line` alongside `line`.
-- `rowFor` accepts a row naming either anchor, through `Comment.Anchors()`; the path rules (bounded name, directory tail, shared base names) are unchanged.
+- `rowFor` matches a row on the reviewer's anchor, `Comment.Anchors()`: `original_line`, or `line` only when GitHub reports no original. The current line is not a key, because a push can move one finding onto the line another was anchored to and one row would clear both (REAL finding on #3457, reproduced before the fix). The path rules (bounded name, directory tail, shared base names) are unchanged.
 - `triage-queue` prints a finding as the reviewer did, `Comment.Where()`: the reviewer's line once the current one is gone, the path alone for a file-level comment.
 - Out of scope: a file-level comment (`line` and `original_line` both null) parsed as a REAL finding still has no anchor a row can name. No configured reviewer posts REAL findings that way today; noted on #3455 for a path-only match if one starts to.
 
@@ -24,7 +24,8 @@ issue: "mlorentedev/dotfiles#3455"
 - [x] `Comment.Anchors()` and `rowFor` trying each anchor (`rowForLine` keeps the matching rule)
 - [x] `Comment.Where()` used by the two places `dotf pr` prints a finding's location
 - [x] `TestFetchKeepsTheOriginalLineOfAFindingThatLeftTheDiff` (null `line`, row under the original)
-- [x] `TestFetchMatchesARowOnEitherAnchorOfAShiftedFinding` (`line` 9 / `original_line` 4, a row keyed by each)
+- [x] `TestFetchMatchesARowOnTheReviewersLineOfAShiftedFinding` (`line` 9 / `original_line` 4: a row keyed by 4 clears, one keyed by 9 holds)
+- [x] `TestFetchDoesNotClearAFindingOnAnotherFindingsRow` (A 4/9 and B null/4 with one row `:4`: A stays held)
 - [x] Lesson 598
 
 ## Evidence

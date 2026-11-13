@@ -124,7 +124,7 @@ func tableRows(body string) [][]string {
 // does. A name is bounded on both sides, so a.go:4 is not ba.go:4 or a.go:40.
 // It is f's path or a tail of it at a directory, so a/util.go:4 is neither
 // b/util.go:4 nor x/a/util.go:4, and the bare base name counts only when
-// baseShared is false. The line is any of f's anchors: the row was written
+// baseShared is false. The line is the reviewer's anchor: the row was written
 // when the reviewer spoke, and the diff may have moved since (#3455).
 func rowFor(f Comment, rows [][]string, baseShared bool) ([]string, int) {
 	if f.Path == "" {
