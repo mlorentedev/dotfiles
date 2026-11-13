@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HARNESS-193-lease-in-git-dir-f1",
+    "behavior": "git clean -fdx inside an ACTIVE lane leaves it ACTIVE for lane status, worktree list and a commit through the installed guard",
+    "verification": "cd cli && go test ./internal/lane -run 'TestLane.*SurvivesGitClean' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-193-lease-in-git-dir-f2",
+    "behavior": "LoadMetadata prefers the admin dir and falls back to the in-tree lease; SaveMetadata writes the admin dir, removes the in-tree copy and refuses a non-worktree path",
+    "verification": "cd cli && go test ./internal/worktree -run 'TestAdminDir|TestLoadMetadata|TestSaveMetadata' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-193-lease-in-git-dir-f3",
+    "behavior": "dotf lane init migrates in-tree leases into the admin dir (changed=n) and is idempotent (changed=0)",
+    "verification": "cd cli && go test ./internal/lane -run 'TestLaneInit.*Lease' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-193-lease-in-git-dir-f4",
+    "behavior": "The guard reads the admin-dir lease first and the in-tree lease as a fallback in rules 5 and 6; every other guard case passes unchanged",
+    "verification": "cd cli && go test ./internal/hooks -run 'TestPreCommitLaneGuard' -count=1 && sh -n ../git-hooks/lib/lane-guard.sh",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-193-lease-in-git-dir-f5",
+    "behavior": "mem session-end treats an admin-dir PARKED lease as parked from the root and a subdirectory, and still a legacy in-tree one",
+    "verification": "cd cli && go test ./internal/mem -run 'TestIsWorktreeParked' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-193-lease-in-git-dir-f6",
+    "behavior": "worktree list names a lease still at the legacy location; every existing test in worktree, lane, cmd and mem passes",
+    "verification": "cd cli && go test ./internal/worktree ./internal/lane ./internal/cmd ./internal/mem -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]
