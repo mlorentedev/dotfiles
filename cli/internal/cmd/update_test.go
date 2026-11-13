@@ -189,6 +189,9 @@ func TestUpdate_AFailedUpgradeOnAQuietDayIsRecorded(t *testing.T) {
 	if r.Status != "upgrade-failed" || !r.Failed() {
 		t.Errorf("update record = %+v, want status upgrade-failed with its error", r)
 	}
+	if !strings.Contains(stdout+err.Error(), "packages.json") {
+		t.Errorf("the failure is not the catalog's: err=%v\n%s", err, stdout)
+	}
 }
 
 // AC7: every run leaves its outcome where doctor reads it.
