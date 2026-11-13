@@ -655,6 +655,9 @@ jobs:
     # only with a run that crossed it and a ticket that names the cause.
     timeout-minutes: 20
     needs: [changes]
+    # Not a required check since CI-017: ci-gate aggregates it, so it may skip
+    # at job level and a documentation-only pull request starts no Windows runner.
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     # issues: read is for the spec issue-state audit, the one step handed
     # GH_TOKEN below. The workflow default grants contents only.
     permissions:
@@ -666,7 +669,6 @@ jobs:
           persist-credentials: false
 
       - name: Install age (deterministic release + registry PATH — BUG-025)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $ver = ((Get-Content versions.conf | Select-String '^AGE_VERSION=').Line -split '=', 2)[1]
@@ -692,13 +694,11 @@ jobs:
       # tree; the integration container builds from source for the same
       # reason) and make it reachable by effect before setup runs.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         with:
           go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
 
       - name: Build dotf from this PR and put ~/.local/bin on PATH (TEST-003)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $bin = "$env:USERPROFILE\.local\bin"
@@ -716,7 +716,6 @@ jobs:
           & "$bin\dotf.exe" version
 
       - name: Verify harness regions and records, offline (dotf harness check)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           dotf harness check --repo-root $env:GITHUB_WORKSPACE
@@ -755,7 +754,6 @@ jobs:
       # yarn is not here: the runner image already ships it.
       - name: Resolve the npm CLI cache key
         id: picli
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $v = ((Get-Content versions.conf | Select-String '^PI_VERSION=').Line -split '=', 2)[1]
@@ -770,7 +768,6 @@ jobs:
 
       - name: Restore the pinned npm CLIs (pull requests; a lookup on main)
         id: picli-cache
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           lookup-only: ${{ github.event_name == 'push' }}
@@ -847,7 +844,6 @@ jobs:
       # a red main being noticed. Stated out loud because an unread signal is how
       # CI-001 stayed invisible for as long as it did.
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: powershell
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
@@ -872,7 +868,6 @@ jobs:
       # obsidian stub. That scope also skips doctor's gh checks, so the spec
       # issue-state audit they carried is the next step, on its own.
       - name: Post-setup doctor gate (TEST-003)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
@@ -892,7 +887,6 @@ jobs:
       # audit cannot block that PR: its merge ref no longer holds the active
       # spec, and a specs-only diff skips this step.
       - name: Spec issue-state audit (CI-004 AC8)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -906,7 +900,7 @@ jobs:
       # Scheduled Task's last result and the daemon's own output. Print both on a
       # red run, so it explains itself without a Windows box.
       - name: Hive daemon diagnostics (on failure)
-        if: failure() && (github.event_name == 'push' || needs.changes.outputs.code == 'true')
+        if: failure()
         shell: pwsh
         run: |
           schtasks /Query /TN HiveVaultDaemon /V /FO LIST 2>&1 | Select-String -Pattern 'Status|Last Run Time|Last Result|Run As User|Logon Mode|Task To Run'
@@ -927,7 +921,6 @@ jobs:
       # Read in pwsh, as AGE_VERSION is: a CRLF checkout would hand bash a `\r`.
       - name: Resolve the Pester pin
         id: pester
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $v = ((Get-Content versions.conf | Select-String '^PESTER_VERSION=').Line -split '=', 2)[1]
@@ -935,14 +928,12 @@ jobs:
           "version=$($v.Trim())" >> $env:GITHUB_OUTPUT
 
       - name: Restore the pinned Pester
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/Documents/PowerShell/Modules/Pester/${{ steps.pester.outputs.version }}
           key: pester-${{ runner.os }}-${{ steps.pester.outputs.version }}
 
       - name: Run Pester suites
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           PESTER_VERSION: ${{ steps.pester.outputs.version }}
@@ -975,7 +966,6 @@ jobs:
           Invoke-Pester -Path tests -CI
 
       - name: Run PowerShell bats subset (Git Bash, pinned bats)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: bash
         env:
           DOTFILES_CI_EXPECT_PWSH: '1' # pwsh is this job's shell; see tests/lib/pwsh.bash
@@ -1002,7 +992,7 @@ jobs:
       # every step passed writes the cache. The first clause is every step's
       # guard (HARNESS-041); the rest narrows it to a miss on main.
       - name: Save the npm CLIs that main installed
-        if: (github.event_name == 'push' || needs.changes.outputs.code == 'true') && github.event_name == 'push' && steps.picli-cache.outputs.cache-hit != 'true'
+        if: github.event_name == 'push' && steps.picli-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |

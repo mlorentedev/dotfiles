@@ -17,7 +17,7 @@
           "strict": false,
           "checks": [
             {
-              "context": "changes",
+              "context": "ci-gate",
               "app_id": 15368
             },
             {
@@ -33,27 +33,11 @@
               "app_id": 15368
             },
             {
-              "context": "lint",
-              "app_id": 15368
-            },
-            {
-              "context": "lint-powershell",
-              "app_id": 15368
-            },
-            {
               "context": "review-attestation",
               "app_id": 15368
             },
             {
               "context": "spec-gate",
-              "app_id": 15368
-            },
-            {
-              "context": "test",
-              "app_id": 15368
-            },
-            {
-              "context": "test-windows",
               "app_id": 15368
             }
           ]

@@ -25,8 +25,9 @@ owner: manu
 
 ## PR 2: protection and the Windows skip (owner, after `ci-gate` reports on main)
 
-- [ ] [AC3] `forge/branch-protection.json`: `ci-gate` replaces `changes`, `lint`, `lint-powershell`, `test`, `test-windows`; `dotf forge protection check` clean
-- [ ] [AC4] `test-windows` takes `if: github.event_name == 'push' || needs.changes.outputs.code == 'true'`; the CI-004 checker passes
+- [x] [AC3] `forge/branch-protection.json`: `ci-gate` replaces `changes`, `lint`, `lint-powershell`, `test`, `test-windows`
+- [ ] [AC3] Owner, after merge: `dotf forge protection apply`, then `dotf forge protection check` clean
+- [x] [AC4] `test-windows` takes `if: github.event_name == 'push' || needs.changes.outputs.code == 'true'`; the CI-004 checker passes
 
 ## Closing
 

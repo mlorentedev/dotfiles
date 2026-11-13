@@ -68,10 +68,11 @@ setup() {
 @test "ci: only a push to main saves the npm CLI cache, and only on a miss" {
     printf '%s\n' "$SAVE" | grep -qE 'uses: actions/cache/save@[0-9a-f]{40}'
     cond=$(printf '%s\n' "$SAVE" | grep -E '^[[:space:]]*if:')
-    # Every step's HARNESS-041 guard already names `push` inside an OR, which
-    # admits a PR. Drop it, then require `push` as a conjunct of its own.
+    # A step-level HARNESS-041 guard names `push` inside an OR, which admits a
+    # PR. Drop it, then require `push` as a conjunct of its own (the first one,
+    # since CI-017 moved test-windows' guard to the job).
     narrowed=${cond/"(github.event_name == 'push' || needs.changes.outputs.code == 'true')"/}
-    printf '%s\n' "$narrowed" | grep -qF "&& github.event_name == 'push' &&" || { echo "the save can run outside a push to main: $cond" >&2; return 1; }
+    printf '%s\n' "$narrowed" | grep -qE "(if: |&& )github\.event_name == 'push' &&" || { echo "the save can run outside a push to main: $cond" >&2; return 1; }
     printf '%s\n' "$narrowed" | grep -qF "steps.picli-cache.outputs.cache-hit != 'true'"
     # A status function replaces the implicit success(): with one, a red or
     # cancelled main run would write the cache every PR then restores.

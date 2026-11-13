@@ -18,13 +18,13 @@
     "behavior": "Branch protection requires ci-gate in place of the five ci.yml checks",
     "verification": "dotf forge protection check",
     "state": "pending",
-    "evidence": ""
+    "evidence": "2026-11-12, PR 2 before apply: `dotf forge protection check --unmerged` shows the one expected drift on mlorentedev/dotfiles (declared ci-gate in place of changes, lint, lint-powershell, test, test-windows); passing once the owner runs `dotf forge protection apply` after merge"
   },
   {
     "id": "CI-017-gate-required-check-f4",
     "behavior": "test-windows skips at job level on a documentation-only pull request; CI-004 checker passes",
-    "verification": "python3 tests/lib/check-workflow-contexts.py . && bats tests/workflow-job-names.bats",
-    "state": "pending",
-    "evidence": ""
+    "verification": "python3 tests/lib/check-workflow-contexts.py . && bats tests/ci-os-matrix.bats tests/ci-path-filtering.bats",
+    "state": "passing",
+    "evidence": "2026-11-12: checker exit 0; CI-013 and HARNESS-041 green, and both red with test-windows' job-level if removed"
   }
 ]
