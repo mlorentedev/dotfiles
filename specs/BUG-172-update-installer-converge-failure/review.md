@@ -1,119 +1,130 @@
 ---
 spec: "BUG-172-update-installer-converge-failure"
-verdict: "FAIL"
-reviewed_sha: "b911c61a66ba2c99789c53e0e8a5f3ea6940f1b9"
-reviewer: "nan/qwen3.8-flash"
+verdict: "PASS-WITH-GAPS"
+reviewed_sha: "2c82e9188b56b7e84fc101366c14ba90fa881d64"
+reviewer: "nan/mimo-v2.6-flash"
 date: "2026-11-12"
 ---
 
 ## Adversarial review
 
-**Scope**: `BUG-172-update-installer-converge-failure` (issue mlorentedev/dotfiles#3395)
-**Sources**: `specs/BUG-172-update-installer-converge-failure/{proposal,tasks,verification,features}.md/json`;
-diff `git diff 437e4556474e4c539c1a2191a8fdf0ed6b72c37f...HEAD` (= one commit, `b911c61a`, confirmed with
-`git log --first-parent --no-merges <base>..HEAD`: no other work merged into the range); `install.sh`,
-`install.ps1`, `cli/internal/converge/{report,converge}.go`, `cli/internal/cmd/{update,converge}.go`,
-`cli/internal/update/{update,record,pin_test,update_test}.go`, `docs/runbooks/guide-self-deploy-timer.md`.
+**Scope**: `BUG-172-update-installer-converge-failure` (issue mlorentedev/dotfiles#3395, state OPEN, verified this session)
+**Sources**: `specs/BUG-172-update-installer-converge-failure/{proposal,tasks,verification,features}.json/md`,
+round-1 review (`review-round1.md`, FAIL by nan/qwen3.8-flash at `b911c61a`); diff
+`git diff 437e4556474e4c539c1a2191a8fdf0ed6b72c37f...HEAD` (whole change, both commits — round 2 judges the late fix
+against the early one it builds on). `git log --first-parent --no-merges <base>..HEAD` lists exactly the spec's two
+commits (`b911c61a`, `2c82e918`) — no other work merged into the range. Files: `cli/internal/cmd/update.go`,
+`cli/internal/cmd/update_installer_test.go` (new), `cli/internal/update/update.go`,
+`cli/internal/update/pin_test.go`, `docs/runbooks/guide-self-deploy-timer.md`, spec folder.
 Contract digests in `review-request.json` match `dotf spec digest BUG-172-update-installer-converge-failure`
-(features `b59496a2…`, proposal `86976baf…`, tasks `4e033e63…`) — this review is about the current contract.
+exactly (features `b59496a2…`, proposal `86976baf…`, tasks `4e033e63…`) — this review is about the current contract.
 
 ### Spec and task alignment
 
-- **Premise verified at the installer, not just asserted.** `install.sh` ends with
-  `install_dotf || exit 1` then `exec "$_dotf_bin" converge "$@"` (install.sh:292-293); a failed
-  download/verify exits before any converge. `install.ps1` mirrors it: `throw 'install.ps1: dotf could not be
-  installed, so nothing was converged'` before `& $script:DotfBin converge @args` (install.ps1:256-258).
-  So "a failed report newer than the installer's start is the installer's own converge" holds on both
-  platforms the pin path runs on. This is the load-bearing assumption of the whole spec and it is true.
-- **Report provenance verified.** `last.json` is written only by `saveConvergeReport(..., full)` with
-  `full = len(only) == 0` (converge.go:189-212), so `--only` runs (the quiet-day `system-upgrade,cache-gc`
-  path) and `--plan` runs cannot leave a fresh report. `WriteReport` stamps
-  `time.Now().UTC().Format(time.RFC3339)` and sets `result:"failed"` exactly when the run errored, with
-  `error` non-empty — so the AC3 `"the run ()"` degenerate case needs a hand-written report. The installer's
-  converge inherits `os.Environ()` from `runInstaller` (`cmd.Env = append(os.Environ(), …)`), including the
-  `XDG_STATE_HOME` that `--state-home`/`updateHomes.apply()` set, so reader and writer resolve the same path
-  through `env.StateDir()`.
-- **Status vocabulary is not new.** `converge-failed` already flows into the update record
-  (`recordUpdate` → `update.NewRecord`, `Record.Failed()` keys on `Error != ""`), and
-  `doctor/checks_self_deploy_test.go:61` already asserts a `converge-failed` record FAILs with its error.
-  No status whitelist anywhere enumerates update statuses (`grep -rn "install-failed\|converge-failed"` over
-  the repo hits only Go tests + `update.go`), so the re-tag cannot strand a consumer.
-- **Every `[x]` in `tasks.md` maps to diff evidence.** The two named tests exist
-  (`pin_test.go:TestRunPin_ConvergeFailsInsideInstaller`, `update_installer_test.go:TestFailedConvergeSince`),
-  the seam and the reader exist, and the tooling box is true — re-run below. The one unticked box is the
-  closing one (verification/review/archive), correct for this window.
-- No `[AGENT-DRAFT]` / `[AGENT-SUGGESTION]` tags remain in the spec folder.
-- Nit (finding F6): the proposal's own AC boxes are still `[ ]` while `tasks.md` ticks everything; the
-  template's two check-boxes disagree about the same three criteria.
+- **Load-bearing premise holds at HEAD.** `install.sh:292-293`: `install_dotf || exit 1` then
+  `exec "$_dotf_bin" converge "$@"` — the installer converges only after the binary is placed, and a failed
+  download/verify exits before any converge. So a fresh failed report really does prove the pin installed, and its
+  absence really does mean the install itself failed (AC1/AC2's split). `install.ps1` mirrors it (round 1 checked
+  both; neither file changed in this range).
+- **Report provenance holds.** The writer resolves `<state>/converge/last.json` through the same `env.StateDir()`
+  as the reader (`cmd/converge.go:205` vs `cmd/update.go:213`), and only a full run updates it — `cmd/converge.go:75`
+  ("a plan or an `--only` run leaves [last.json] alone"). The installer inherits `os.Environ()` including
+  `XDG_STATE_HOME` (`runInstaller`), so writer and reader meet on one path.
+- **Round-1 F1 (REAL Major → FAIL) is fully addressed, and I re-derived it rather than reading the disposition.**
+  The start instant is now taken inside `update.Run` just before `Install` (`update/update.go:109`, call at `:111`);
+  `failedConvergeSince` returns nil for a zero instant (`cmd/update.go:206-208`) with table row "no installer start
+  recorded proves nothing"; `TestRunPin_ConvergeFailsInsideInstaller` asserts the instant is non-zero and no later
+  than the install (`pin_test.go:202-204`). Mutants (in an rsync copy under `mktemp -d`, removed at run end):
+  zero-guard removed → named row fails; `var start time.Time` → 3 subtests fail; start moved after `Install`
+  → 2 subtests fail; `.Truncate(time.Second)` removed → same-second row fails; `len(failed)==0` fallback removed
+  → AC3 row fails. Every mutant round 1 and `verification.md` claim is killed — reproduced this session.
+- **Round-1 F2 applied** (`converge.StatusFailed.String()` at `cmd/update.go:227`); `rep.Result != "failed"` at
+  `:218` is a report-result literal, matching `converge/report.go`'s own vocabulary (no typed constant exists for
+  `RunReport.Result`, and `ParseRunReport` validates it) — consistent, not a leftover.
+- **F3 declined with the trade-off in the proposal's Risks** (accepted window); **F5 applied** (runbook now tells
+  the two installer outcomes apart); **F6 answered** in `verification.md` dispositions; **F4 declined** with the
+  claim that `state`/`evidence` are harness-owned — the code agrees (`contract_digest.go:50-53`: "the fields the
+  harness writes after a review… progress, not contract, blanked before digesting"), see the Question row.
+- Every `[x]` in `tasks.md` maps to diff evidence; the closing box stays unticked correctly for this window.
+  Out of scope honoured: no `install.sh`/`install.ps1` change, no new status tag (`converge-failed` is pre-existing
+  and `doctor/checks_self_deploy_test.go:61` already FAILs it), no console parsing. Status is recorded through
+  `recordUpdate(c.ErrOrStderr(), out, err)` (`cmd/update.go:87`), so doctor reads the new error text too.
+- No `[AGENT-DRAFT]`/`[AGENT-SUGGESTION]` markers in any scanned spec file (the archive's tag scan skips
+  `review.md`/`review-round*.md` by `IsReviewState`, so round 1's prose mention is not a hit).
+- The one accepted residual: a *foreign* full converge (e.g. a human running `dotf converge`) finishing inside the
+  installer window would be attributed to it. The proposal declares and resolves this ("the only other converge on
+  the machine is this same scheduled update"); noted, not re-opened.
 
 ### Commands run in this review (fresh)
 
 | Claim under review | Command | Result |
 |---|---|---|
-| tests pass | `go test ./internal/update/ ./internal/cmd/ -timeout 8m` | `ok update 0.131s`, `ok cmd 44.060s`, exit 0 |
-| vet clean | `go vet ./...`; `GOOS=windows go vet ./...` | exit 0, exit 0 |
-| lint clean | `golangci-lint run ./internal/cmd/... ./internal/update/...` (+ `GOOS=windows`, after `cache clean`) | `0 issues.` both |
+| tests pass (whole change) | `go test ./internal/update/ ./internal/cmd/ -timeout 8m` | `ok update 0.155s`, `ok cmd 60.739s`, exit 0 |
+| features.json f1–f3 verifications | `go test ./internal/update/ -run 'TestRunPin_ConvergeFailsInsideInstaller' && go test ./internal/cmd/ -run 'TestFailedConvergeSince'` | both `ok`, exit 0 |
+| vet clean | `go vet ./...` ; `GOOS=windows go vet ./...` | exit 0, exit 0 |
+| lint clean | `golangci-lint run ./internal/cmd/... ./internal/update/...` (native, then `GOOS=windows`) | `0 issues.` both |
 | formatting | `gofmt -l` on the four touched Go files | no output |
-| AC1/AC2/AC3 mutation claims in `verification.md` | `.Truncate(time.Second)` removed → `--- FAIL: TestFailedConvergeSince/finished_in_the_installer's_start_second`; `len(failed)==0` fallback removed → `--- FAIL: …/a_failed_run_with_no_failed_step_names_the_run`; `installerConvergeFailed(d)` stubbed to nil → `--- FAIL: TestRunPin_ConvergeFailsInsideInstaller/{installer's converge failed a step,two steps failed}` | every claim reproduced; the suite is not vacuous on the units |
-| report-input robustness | probe in a `/tmp` copy of the module: naive timestamp (no offset), non-UTC offset landing before the start, missing `finished_at`, `status:"opaque"` entry | `[]`, `[]`, `[]`, `["the run (x)"]` — fails closed, and the offset case is compared as an instant, not a wall clock |
-| complexity ceiling | `min-complexity: 15` → `9` in the copy, `golangci-lint run ./internal/cmd/...` | neither new function is reported (only the pre-existing `TestUpdate_ConvergesAfterAFastForward` at 15), so `failedConvergeSince` and the `Run` branch are ≤ 9, inside the repo's stated < 10 |
+| contract fresh | `dotf spec digest BUG-172-…` vs `review-request.json` | identical |
+| mutation: zero guard removed | `TestFailedConvergeSince` | `--- FAIL …/no_installer_start_recorded_proves_nothing` |
+| mutation: `var start time.Time` | `TestRunPin_ConvergeFailsInsideInstaller` | `--- FAIL` 3 subtests (since = year 1) |
+| mutation: start after `Install` returns | same test | `--- FAIL` 2 subtests (since after installedAt) |
+| mutation: `.Truncate(time.Second)` removed | `TestFailedConvergeSince` | `--- FAIL …/finished_in_the_installer's_start_second` |
+| mutation: `len(failed)==0` fallback removed | `TestFailedConvergeSince` | `--- FAIL …/a_failed_run_with_no_failed_step_names_the_run` |
+| **mutation: binding line deleted** (`InstallerConverge: failedConvergeSince,` removed from `cmd/update.go:81`) | `go test ./internal/cmd/ ./internal/update/ -timeout 8m` | **exit 0 — suite stays green** (the survivor behind F1 below) |
+| complexity at round 1's threshold | copy with `min-complexity: 15 → 9`, `golangci-lint run ./internal/cmd/... ./internal/update/...` | neither new function reported (`failedConvergeSince`, `installerConvergeFailed`, `Run` all ≤ 9); 50 hits are pre-existing |
+| writer/reader path agreement | `grep last.json` over `cli/internal` | `cmd/converge.go:205` vs `cmd/update.go:213`, same `env.StateDir()` join |
 
-All mutation work ran in a `rsync` copy under `/tmp/rev172` (removed afterwards); the reviewed worktree holds
-only `specs/BUG-172-…/review.md` (`git status --porcelain` at the end of the run).
+All mutation work ran in an rsync copy under `mktemp -d` (removed at the end); the reviewed worktree holds only
+`specs/BUG-172-…/review.md` (and the launcher's own `review-request.json` update) per `git status`.
 
 ### Findings
 
 | Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
 |---|---|---|---|---|---|---|
-| **Major** | **REAL** | wiring / tests | The safety of the whole fix rests on one unguarded line in a package no test exercises: `installStart = time.Now()` inside the `Install` closure (`cmd/update.go:79-82`). `failedConvergeSince` has **no guard for the zero time** — `since.Truncate(time.Second)` is year 1, so *any* failed `last.json` ever written is accepted as "the installer's own converge". Mutation proof: deleting the assignment leaves `installStart` read-but-never-written (legal Go) and **the full `internal/update` + `internal/cmd` suites stay green** (`ok update (cached)`, `ok cmd 43.754s`). Probe proof: with `since = time.Time{}` a report stamped `2020-01-01T00:00:00Z` returned `["system-upgrade"]`; with a 2026 start the same report returned `[]`. The resulting user-visible lie is the *inverse* of #3395: a download that never landed is reported as `converge-failed` / "dotf X -> Y (the DOTF_VERSION pin) **installed**; its converge failed at …" — sending the operator to the wrong step again, now with a false positive about the binary. Same class: moving the assignment after `runInstaller` also survives (silently restoring the original bug). The premise is only enforced by call order in a *different package* from the reader. | surviving mutant (M1) + reproduced zero-time misread, this session | **UNTESTED** — no test drives `newUpdateCmd` through the pin path: `grep -rn "newUpdateCmd\|runInstaller" --include=*_test.go` hits only `installerInvocation` (`update_pin_test.go:153`) and the direct `failedConvergeSince(start)` call (`update_installer_test.go:46`); `TestUpdate_ConvergesAfterAFastForward` pins `DOTF_VERSION=1` but the running version is a source build, so `pinToInstall` returns `""` and the branch is never entered | code (`if since.IsZero() { return nil }` in `failedConvergeSince`) + tests (one table row: `{name: "no installer start recorded", start: time.Time{}, want: nil}` in `TestFailedConvergeSince`; and/or a command-level test of the pin path with a fake installer seam) |
-| Minor | THEORETICAL | quality | `failedConvergeSince` matches the entry status against the literal `"failed"` while ~60 lines above the same file compares the typed constant (`e.Status == converge.StatusSkipped` in `systemUpgradeSkip`). `RunEntry.Status` is the persisted string of `converge.Status`, whose vocabulary is defined by a positional array literal (`[...]string{"ok","change","skipped","failed","opaque"}`), so a rename/drop shifts the wording of every report to `the run (…)`, or to nil, without failing anything. `converge.StatusFailed.String()` is exported and free. | `converge.go:77-79`, `cmd/update.go:224-228` vs `cmd/update.go:120-126` | UNTESTED — `TestFailedConvergeSince` hardcodes its own JSON strings, so a vocabulary change cannot turn it red | code |
-| Minor | SPECULATIVE | perf/behaviour (accepted) | The same-second truncation accepts a failed report that finished in the installer's *start* second, which a foreign converge could also have produced. The direction is the right one (a converge can legitimately fail in <1s and must not be discarded), and the proposal's Risks section names this window and resolves it, so this is a recorded trade-off, not an oversight — the residual case it does not cover is a *human* running `dotf converge` while the timer's installer runs, which the risk note calls the only other converge on the machine. | proposal.md "Risks / open questions"; `update_installer_test.go` same-second case | `TestFailedConvergeSince/finished_in_the_installer's_start_second` | spec (already covered; no action needed beyond acknowledging the manual-converge variant) |
-| Minor | REAL | handoff | All three `features.json` entries still carry `state: "pending"` and `evidence: ""` although `verification.md` records the named tests for each. These fields are normalised out of the staleness digest (so they do not invalidate a verdict), but a reader of the feature list sees three unverified behaviours. | `features.json` vs `verification.md` "Evidence" | n/a | tests/spec-adjacent file (`features.json` state/evidence — outside the contract set for staleness purposes, but it *is* listed as a contract file in the review request, so update it after the re-review, not alongside a passing verdict) |
-| Minor | REAL | docs | `docs/runbooks/guide-self-deploy-timer.md` describes the installer branch ("When the installed `dotf` is not the pin, it runs the installer instead, which installs the pin and converges", :162-163) and lists the record statuses an operator can meet, but no doc anywhere distinguishes the two installer outcomes this change produces. The operator-facing consequence of the fix (which line to believe in `<state>/update/last.json`) is undocumented outside the spec folder. | runbook :25-45, :157-163; `grep -rn "install-failed"` repo-wide hits only Go | n/a | code-adjacent docs (`docs/runbooks/`, and/or `docs/troubleshooting/` per the repo's knowledge-placement rule) |
-| Question | — | spec artifacts | `proposal.md` AC1-AC3 boxes are unticked while `tasks.md` ticks every implementation task including AC1-AC3. Which is the intended record of acceptance? Tick-at-archive, or a missed edit? (Contract set — do not edit under a passing verdict; say so here.) | proposal.md vs tasks.md | n/a | spec (answer in `verification.md` "Review dispositions") |
+| **Major** | **THEORETICAL** | tests / traceability | Nothing covers the **effect** of the command-layer binding `InstallerConverge: failedConvergeSince` (`cmd/update.go:81`). Deleting that one line leaves the **entire** `internal/cmd` + `internal/update` suite green (50.4s run, exit 0, this session): the reader is tested directly, the outcome is tested against a fake seam, and the one command-level test that executes the line (`TestUpdate_FailsWhenThePinCannotBeInstalled`) writes no converge report, so it cannot tell wired from unwired. A future regression that loses the binding silently restores #3395's misattribution while every test stays green. THEORETICAL because the shipped wiring is correct and the failure direction is conservative (`install-failed`, never a false "installed" claim) — the wrong behavior needs an edit nobody has made; the *coverage gap* itself is demonstrated by the surviving mutant above. Round 1 offered this same test as an optional strengthening ("if time allows"); the test-traceability gate makes it the one open Major: an UNTESTED Major needs a named regression test. | mutation M-A (this session, full suite green after deleting `cmd/update.go:81`) | **UNTESTED** — no test distinguishes wired from unwired at the command level (that absence *is* the finding) | tests: extend `TestUpdate_FailsWhenThePinCannotBeInstalled` (or a sibling in `update_pin_test.go`) with `FAKE_INSTALL_RC=7` + a fresh failed `<XDG_STATE_HOME>/dotfiles/converge/last.json` → assert `converge-failed` in the command output; one test kills the mutant and exercises binding + start-order + reader together |
+| Minor | REAL | quality | `update.Run` is 49 lines against the repo's <40-line rule. Pre-existing debt — it was 43 at base — but this diff grows it by 6 while extracting `installerConvergeFailed` (the right instinct). gocyclo at threshold 9 does not report it (measured), so only the length rule is breached. | `update/update.go:84-132`; base `437e455` = 43 lines | n/a (static; measured line count + gocyclo ≤ 9) | code — optional follow-up: fold the pin branch into a helper alongside `installerConvergeFailed` |
+| Minor | REAL | evidence accuracy | `verification.md` claims the two start mutants fail "4 subtest failures each". Measured: `var start time.Time` → 3 subtest failures (+ parent = 4 FAIL lines); start-after-`Install` → **2** subtest failures. Both mutants do fail the suite, so the substance of the claim ("the test catches it") holds; the count does not reproduce. | this session's mutation runs vs `verification.md` "Test status" | `TestRunPin_ConvergeFailsInsideInstaller` (the counting site) | verification.md — outside the contract set; correct the count or drop it |
+| Question | — | spec artifacts | `proposal.md` AC1–AC3 boxes remain `[ ]` while `tasks.md` ticks the same criteria. Answered in `verification.md` → "Review dispositions" (tasks + verification are the record of acceptance; contract files are not edited after review). Recorded, not re-opened — and this verdict assumes that answer. | proposal.md vs tasks.md | n/a | spec (answer already recorded; no edit under this verdict) |
+| Question | — | features.json | `state`/`evidence` still `pending`/empty. `contract_digest.go:50-53` says these are harness-owned and blanked from the digest, and no writer for them exists anywhere in `cli/` (grep, this session) — **who sets `passing`, and when, is UNVERIFIED**. Implementer's decline of round-1 F4 is consistent with the code comment; the risk is that nothing ever sets them and the features stay visually unverified forever. | `features.json` vs `contract_digest.go:52` | n/a | spec-adjacent (harness; do not edit under this verdict — it is a contract file) |
 
 ### Evaluator rubric
 
 | Dimension | Grade (A-D) | Rationale (one line) |
 |---|---|---|
-| Correctness | B | All three ACs hold in the shipped code and I could not produce a wrong report through any reachable path; the gap is the unguarded precondition, not a present defect. |
-| Verification | B | Every evidence line in `verification.md` reproduced, including its mutation claim (M2/M3 killed) — but no evidence touches the command-level wiring (F1). |
-| Scope | A | Diff is 2 code files, 2 test files, the spec folder: 303 insertions, no creep, and both stated out-of-scope items honoured (no installer change, no new tag). |
-| Reliability | B | Fails closed on missing, unreadable, malformed, passing, stale, unparseable-timestamp and foreign-offset reports (probed); the zero time is the one input that fails open. |
-| Maintainability | B | `gofmt` clean, `golangci-lint` 0 issues natively and `GOOS=windows`, both new functions ≤ 9 by measured gocyclo, comments say WHY; loses A on the string-literal status comparison (F2) inconsistent with its own file. |
-| Handoff-readiness | B | Spec triad filled with named tests and decisions, promotion candidates explicitly answered; loses A on `features.json` still pending (F4) and the runbook split (F5). |
+| Correctness | B | AC1–AC3 hold in the shipped code (both halves unit-tested, every behavior mutant I could build killed); the gap is the untested conjunction, not a present defect. |
+| Verification | B | Every `verification.md` claim re-run and reproduced (tests, vet, lint ×2 GOOS, 5 of 5 killable mutants, digests) — but no evidence covers the command binding (F1) and one failure count doesn't reproduce (F3). |
+| Scope | A | 11 files, all named by the spec: 2 code, 2 tests, 1 runbook, spec folder; both out-of-scope items honoured; no foreign commits in the range. |
+| Reliability | B | Fails closed on missing, unreadable, stale, passing, zero-start and malformed reports (8 named rows + zero guard); loses A only on the accepted cross-process attribution window and the untested binding. |
+| Maintainability | B | gofmt clean, lint 0 issues native and `GOOS=windows`, new functions ≤ 9 gocyclo at a 9 threshold; loses A on `Run` at 49 lines (>40). |
+| Handoff-readiness | B | Triad + runbook + all six round-1 dispositions recorded; loses A on `features.json` still pending with an UNVERIFIED writer. |
 
-Aggregation: no D, no C → the rubric alone would read PASS. The severity path escalates independently
-(F1 is a REAL, UNTESTED Major), and the more severe of the two wins.
+Aggregation: no D, no C → the rubric path reads PASS. The severity path is taken instead: the one open Major is
+THEORETICAL (its failure needs a future edit; the shipped diff has no wrong behavior I could produce), so the
+verdict is **PASS WITH GAPS**, each gap tracked above.
 
 ### Verdict
 
-**FAIL** — one REAL Major (F1): the one line that makes the "the pin is installed" claim true is
-neither guarded against the zero time nor covered by a named test, and a mutation that deletes it leaves the
-whole suite green while the tool tells the operator the pin installed when nothing landed. Per the
-test-traceability gate, an UNTESTED Major is not resolved by the implementer's claim.
+**PASS WITH GAPS** — no Blocker, no REAL Major, rubric all B or above. Round 1's REAL Major (F1) is fixed in a
+stronger form than it asked for, and I reproduced every mutant kill it claimed. The one open Major is a test
+traceability gap (command-level binding UNTESTED, surviving mutant demonstrated) tagged THEORETICAL because the
+shipped code is correct and its failure direction is the conservative one.
 
-`dotf spec archive` is **not advisable** in this state.
+`dotf spec archive` is **advisable** once the implementer records F1's disposition (applied / ticketed / declined
+with a reason) in `verification.md` — the file is outside the contract set, so that edit does not stale this
+verdict, and the contract set (`proposal.md`, `tasks.md`, `features.json`) needs no change.
 
 ### Recommended next steps
 
-Minimum set to flip this to PASS (all of it outside the contract set — `proposal.md`, `tasks.md` and
-`features.json` need no edit, so the digests hold and the re-review is one round of tests):
+For `verification.md` dispositions or a follow-up ticket — **not** contract edits; the contract set stays closed
+under this verdict:
 
-1. **F1, code**: `failedConvergeSince` — return nil when `since.IsZero()`, with a one-line comment naming the
-   invariant it defends (a start that was never recorded proves nothing about the installer).
-2. **F1, tests**: table row in `TestFailedConvergeSince` — zero start + a failed report → `nil`. That row
-   kills the M1 mutant; a command-level test of the pin path (a `runInstaller` seam) would kill the
-   "assignment moved after the call" variant too, and is the stronger of the two if time allows.
-3. Re-run `dotf spec review BUG-172-update-installer-converge-failure`; the reviewer should need only
-   `go test ./internal/update/ ./internal/cmd/` plus the two mutants.
-4. **F2** (code, cheap, no re-review dependency): use `converge.StatusFailed.String()`.
-5. **F4/F5**: set `features.json` state/evidence for f1-f3 to the named tests, and add the
-   `install-failed` vs `converge-failed` distinction to `docs/runbooks/guide-self-deploy-timer.md`
-   (or a `docs/troubleshooting/` entry) — #3395's whole cost was an operator sent to the wrong step, and the
-   runbook is where the next one looks.
-6. Answer the Question row (proposal AC boxes) in `verification.md` → "Review dispositions".
-
-Strengths worth keeping, because they are what the gap is bounded by: the premise was checked at the
-installer rather than assumed, the chosen tag required no consumer change, and every fallback in the reader
-is the conservative one (`install-failed`), which is why F1 is the only path that can produce a false claim.
+1. **F1 (tests, apply now — does not stale the review):** the one command-level test above. It kills the binding
+   mutant and closes the last UNTESTED link between the spec's AC1 and `dotf update` as an operator runs it.
+2. **F2 (code, optional follow-up):** split `Run`'s pin branch into a helper to get back under the 40-line rule.
+3. **F3 (verification.md, cosmetic):** correct the "4 subtest failures each" count (3 and 2 measured).
+4. **F4/F5 (Questions, no action under this verdict):** proposal AC boxes — recorded answer stands;
+   `features.json` — harness's move after archive; confirm something actually sets `passing`, since no writer was
+   found in `cli/`.
+5. Second opinion: the harness offered no stronger-model review mechanism inside this run — cross-vendor
+   independence here comes from the pool draw (round 1 was nan/qwen3.8-flash, this one nan/mimo-v2.6-flash); no
+   differing second opinion exists to report.

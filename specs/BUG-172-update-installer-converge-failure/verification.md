@@ -19,7 +19,8 @@ owner: manu
 
 - `go test ./internal/update/ ./internal/cmd/` ok. `go vet ./...` and `GOOS=windows go vet` clean. `golangci-lint run` 0 issues natively and with `GOOS=windows`.
 - Mutation: comparing against the installer's start without truncating it to the second fails the same-second case.
-- Mutation, after the review: in `update.Run`, an unset start (`var start time.Time`) or one taken after `Install` returns fails `TestRunPin_ConvergeFailsInsideInstaller` (4 subtest failures each); removing the zero-time guard in `failedConvergeSince` fails "no installer start recorded proves nothing".
+- Command level: `TestUpdate_NamesTheStepWhenTheInstallersConvergeFails` runs `dotf update` against a fake installer that writes a failed converge report while it runs and exits 1; the output names the pin as installed and `system-upgrade`. Removing the `InstallerConverge: failedConvergeSince` binding fails it.
+- Mutation, after the review: in `update.Run`, an unset start (`var start time.Time`) or one taken after `Install` returns fails `TestRunPin_ConvergeFailsInsideInstaller` (3 and 2 subtest failures, as the second review measured); removing the zero-time guard in `failedConvergeSince` fails "no installer start recorded proves nothing".
 
 ## Decisions made during implementation
 
@@ -49,3 +50,10 @@ The first review, by nan/qwen3.8-flash at `b911c61a`, gave FAIL.
 4. Minor, REAL (F4): `features.json` state and evidence. Left `pending` on purpose: only the harness may set `passing`, after running each `verification` command.
 5. Minor, REAL (F5): no operator doc told the two installer outcomes apart. Applied in `docs/runbooks/guide-self-deploy-timer.md`, next to the installer branch.
 6. Question (F6): the proposal's AC boxes stay unticked; `tasks.md` and this file are the record of acceptance, and the contract files are not edited after review.
+
+The second review, by nan/mimo-v2.6-flash at `2c82e918`, gave PASS-WITH-GAPS.
+
+1. Major, THEORETICAL: the command's binding of `failedConvergeSince` was untested, and deleting it left the suite green. Applied: `TestUpdate_NamesTheStepWhenTheInstallersConvergeFails`, with the fake installer writing its converge report as it runs. The unbound mutant now fails.
+2. Minor, REAL: `update.Run` is 49 lines against the 40-line rule (43 before this change). Ticketed as #3427 rather than folded in here, so this fix stays the size the review read.
+3. Minor, REAL: the mutant failure counts were wrong. Corrected above.
+4. Questions (AC boxes, `features.json` state): answered in the first round's dispositions; nothing new.
