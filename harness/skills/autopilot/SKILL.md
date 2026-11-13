@@ -173,9 +173,13 @@ resolve_wt() {
 }
 WT_DIR="$(resolve_wt)"
 if [ -z "$WT_DIR" ]; then
-  if [ -f .dotf/lane.json ]; then
+  # `.dotf/lanes.json` is the committed ADR-060 marker (`LanesMarkerFile`); `.dotf/lane.json` is the
+  # CLI-129 queue contract and says nothing about lanes. A run never calls `dotf lane init`: that
+  # writes the marker into the main checkout and arms the lane guard for every worktree on the
+  # machine, which is the owner's or converge's step (#3426).
+  if [ -f .dotf/lanes.json ]; then
     # `lane switch` takes the branch as an argument; `lane claim` takes the lease `worktree add --issue` would
-    dotf lane init && dotf lane switch "$BRANCH" &&
+    dotf lane switch "$BRANCH" &&
       lane_dir="$(resolve_wt)" && [ -n "$lane_dir" ] &&
       ( cd "$lane_dir" && dotf lane claim "$ISSUE_NUM" )
   else
