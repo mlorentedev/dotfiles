@@ -773,20 +773,28 @@ func placeBinary(src, dst string) error {
 	return os.Chmod(dst, 0o755)
 }
 
-// renameFile is os.Rename; a test replaces it to fail the final rename.
-var renameFile = os.Rename
+// renameFile and removeFile are os.Rename and os.Remove; tests replace them to
+// fail the final rename, or to hold <dst>.old the way a running process holds
+// it on Windows.
+var (
+	renameFile = os.Rename
+	removeFile = os.Remove
+)
 
 // replaceFile moves staged onto dst so that dst can be a running executable.
 // Windows refuses to rename over, or delete, a running .exe but lets it be
-// renamed aside, so dst goes to <dst>.old first and staged takes its name; the
-// same sequence runs on every OS (CLI-133). A failed second rename puts the old
-// file back, so a failed update never leaves the path empty. Removing <dst>.old
-// is best-effort: on Windows it fails while the old process runs, and the next
-// replacement removes it first.
+// renamed aside, so dst is set aside first and staged takes its name; the same
+// sequence runs on every OS (CLI-133). A failed second rename puts the old file
+// back, so a failed update never leaves the path empty.
+//
+// The aside name is <dst>.old, or a unique <dst>.old.<n> while an earlier
+// <dst>.old is still running: on Windows a long-lived process (a `dotf secrets
+// run` wrapper) keeps it undeletable for days, and that must not fail the next
+// update. Every copy set aside is removed best-effort once the new file is in.
 func replaceFile(staged, dst string) error {
 	aside := dst + ".old"
-	if err := os.Remove(aside); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove the previous %s: %w", filepath.Base(aside), err)
+	if err := removeFile(aside); err != nil && !errors.Is(err, os.ErrNotExist) {
+		aside = fmt.Sprintf("%s.old.%d", dst, time.Now().UnixNano())
 	}
 	if err := renameFile(dst, aside); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -800,8 +808,23 @@ func replaceFile(staged, dst string) error {
 		}
 		return err
 	}
-	_ = os.Remove(aside)
+	removeAside(dst)
 	return nil
+}
+
+// removeAside removes, best-effort, every copy replaceFile set aside for dst.
+// One still running stays, and a later replacement removes it.
+func removeAside(dst string) {
+	entries, err := os.ReadDir(filepath.Dir(dst))
+	if err != nil {
+		return
+	}
+	prefix := filepath.Base(dst) + ".old"
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), prefix) {
+			_ = os.Remove(filepath.Join(filepath.Dir(dst), e.Name()))
+		}
+	}
 }
 
 // verifyChecksum confirms assetPath's sha256 matches the entry for assetName in

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -77,15 +78,37 @@ func TestPlaceBinaryReplacesARunningExecutable(t *testing.T) {
 	if got, _ := os.ReadFile(dst); !bytes.Equal(got, []byte("new release")) { //nolint:gosec // test path
 		t.Fatalf("dst holds %q, want the new release", got)
 	}
+	// The old process still runs from <dst>.old, which Windows will not
+	// delete: a long-lived `dotf secrets run` wrapper holds it for days. The
+	// next update must still succeed.
+	if err := placeBinary(src, dst); err != nil {
+		t.Fatalf("replacing again while the set-aside binary still runs: %v", err)
+	}
 
-	// Once the old process is gone, the next placement leaves nothing aside.
+	// Once the old process is gone, the next placement sweeps every copy aside.
 	stop()
 	if err := placeBinary(src, dst); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(dst + ".old"); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("%s.old left behind after a placement with nothing running: %v", dst, err)
+	if left := asideCopies(t, dst); len(left) != 0 {
+		t.Errorf("copies set aside survived a placement with nothing running: %v", left)
 	}
+}
+
+// asideCopies lists the files placeBinary set aside for dst.
+func asideCopies(t *testing.T, dst string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Dir(dst))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), filepath.Base(dst)+".old") {
+			left = append(left, e.Name())
+		}
+	}
+	return left
 }
 
 // When the new file cannot be renamed in, the old one goes back: a failed
@@ -103,7 +126,7 @@ func TestPlaceBinaryRestoresTheOldFileWhenTheFinalRenameFails(t *testing.T) {
 	real := renameFile
 	t.Cleanup(func() { renameFile = real })
 	renameFile = func(from, to string) error {
-		if to == dst && filepath.Dir(from) == dir && from != dst+".old" {
+		if to == dst && !strings.HasPrefix(filepath.Base(from), "dotf.old") {
 			return errors.New("injected: final rename refused")
 		}
 		return real(from, to)
@@ -115,7 +138,39 @@ func TestPlaceBinaryRestoresTheOldFileWhenTheFinalRenameFails(t *testing.T) {
 	if got, _ := os.ReadFile(dst); !bytes.Equal(got, []byte("old release")) { //nolint:gosec // test path
 		t.Fatalf("dst holds %q, want the old release restored", got)
 	}
-	if _, err := os.Stat(dst + ".old"); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("%s.old left behind after the restore: %v", dst, err)
+	if left := asideCopies(t, dst); len(left) != 0 {
+		t.Errorf("copies set aside survived the restore: %v", left)
+	}
+}
+
+// The Windows case on every OS: <dst>.old cannot be removed because a process
+// still runs from it. The update sets the current binary aside under another
+// name instead of failing.
+func TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld(t *testing.T) {
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "dotf")
+	for name, body := range map[string]string{"dotf": "current", "dotf.old": "still running"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := filepath.Join(t.TempDir(), "new")
+	if err := os.WriteFile(src, []byte("new release"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	real := removeFile
+	t.Cleanup(func() { removeFile = real })
+	removeFile = func(name string) error {
+		if name == dst+".old" {
+			return errors.New("injected: Access is denied")
+		}
+		return real(name)
+	}
+
+	if err := placeBinary(src, dst); err != nil {
+		t.Fatalf("a held %s.old failed the update: %v", dst, err)
+	}
+	if got, _ := os.ReadFile(dst); !bytes.Equal(got, []byte("new release")) { //nolint:gosec // test path
+		t.Errorf("dst holds %q, want the new release", got)
 	}
 }
