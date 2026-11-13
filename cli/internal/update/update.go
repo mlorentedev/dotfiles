@@ -39,13 +39,18 @@ import (
 // when unpinned. Install runs the checkout's installer for that version, which
 // replaces the dotf binary and converges with the new one. Upgrade runs only
 // the system-upgrade converge step and returns the step's skip reason, "" when
-// it ran; nil runs nothing.
+// it ran; nil runs nothing. InstallerConverge is asked only after Install
+// fails: the names of the steps a converge run by the installer failed, nil
+// when the installer converged nothing (#3395). The installer converges only
+// once the new binary is in place, so a failed converge from it means the pin
+// was installed; nil InstallerConverge is the same as nil steps.
 type Deps struct {
-	Git      func(args ...string) (string, error)
-	Converge func() error
-	Pin      func() (string, error)
-	Install  func(pin string) error
-	Upgrade  func() (skipped string, err error)
+	Git               func(args ...string) (string, error)
+	Converge          func() error
+	Pin               func() (string, error)
+	Install           func(pin string) error
+	Upgrade           func() (skipped string, err error)
+	InstallerConverge func() []string
 }
 
 // Config is the resolved run configuration. The converge run is captured by the
@@ -99,6 +104,11 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 	pin, note := pinToInstall(cfg.Version, d.Pin)
 	if pin != "" {
 		if err := d.Install(pin); err != nil {
+			if failed := installerConvergeFailed(d); len(failed) > 0 {
+				steps := strings.Join(failed, ", ")
+				return Outcome{Status: "converge-failed", Message: fmt.Sprintf("dotf %s -> %s (the DOTF_VERSION pin) installed; its converge failed at %s — see the report above", cfg.Version, pin, steps)},
+					fmt.Errorf("converge by the installed dotf %s (running %s) failed at %s: %w", pin, cfg.Version, steps, err)
+			}
 			return Outcome{Status: "install-failed", Message: fmt.Sprintf("dotf %s is not the pinned %s and installing it failed — see the report above", cfg.Version, pin)},
 				fmt.Errorf("install dotf %s (running %s): %w", pin, cfg.Version, err)
 		}
@@ -115,6 +125,15 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 			fmt.Errorf("converge: %w", err)
 	}
 	return Outcome{Status: "updated", Message: "self-update complete (fast-forwarded to " + out.Upstream + ")" + note}, nil
+}
+
+// installerConvergeFailed is the steps the installer's own converge failed,
+// nil when it converged nothing or the seam is not wired.
+func installerConvergeFailed(d Deps) []string {
+	if d.InstallerConverge == nil {
+		return nil
+	}
+	return d.InstallerConverge()
 }
 
 // upgradeQuietDay runs the system-upgrade step on a day the checkout did not

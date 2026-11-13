@@ -152,3 +152,48 @@ func TestRunPinSkippedBranchesNeverInstall(t *testing.T) {
 		})
 	}
 }
+
+// #3395: install.sh installs the pin and then converges with it, so a failed
+// converge step inside the installer exits it non-zero too. That is a converge
+// failure with the pin installed, not an install failure: the status says so
+// and names the failed step. With no converge report from the installer, the
+// binary itself did not land and the status stays install-failed.
+func TestRunPin_ConvergeFailsInsideInstaller(t *testing.T) {
+	const pin = "0.70.0"
+	tests := []struct {
+		name       string
+		failed     []string // InstallerConverge's answer; nil: the installer converged nothing
+		wantStatus string
+		wantMsg    []string
+	}{
+		{name: "installer's converge failed a step", failed: []string{"system-upgrade"}, wantStatus: "converge-failed", wantMsg: []string{"0.69.0", pin, "installed", "system-upgrade"}},
+		{name: "two steps failed", failed: []string{"system-upgrade", "cache-gc"}, wantStatus: "converge-failed", wantMsg: []string{"system-upgrade, cache-gc"}},
+		{name: "no converge from the installer", failed: nil, wantStatus: "install-failed", wantMsg: []string{"installing it failed"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := Deps{
+				Git:               healthyGit().run,
+				Pin:               func() (string, error) { return pin, nil },
+				Converge:          func() error { t.Fatal("update must not converge again with the old binary"); return nil },
+				Install:           func(string) error { return errors.New("install.sh: exit status 1") },
+				InstallerConverge: func() []string { return tt.failed },
+			}
+			out, err := Run(Config{Repo: "/repo", Version: "0.69.0"}, d)
+			if err == nil {
+				t.Fatal("a failed installer run must still fail the update")
+			}
+			if out.Status != tt.wantStatus {
+				t.Errorf("status = %q, want %q (msg: %s)", out.Status, tt.wantStatus, out.Message)
+			}
+			for _, s := range tt.wantMsg {
+				if !strings.Contains(out.Message, s) {
+					t.Errorf("message = %q, want it to contain %q", out.Message, s)
+				}
+			}
+			if tt.failed != nil && !strings.Contains(err.Error(), tt.failed[0]) {
+				t.Errorf("error = %q, want it to name the failed step %q", err, tt.failed[0])
+			}
+		})
+	}
+}

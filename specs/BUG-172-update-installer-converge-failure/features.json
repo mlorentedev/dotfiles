@@ -1,0 +1,23 @@
+[
+  {
+    "id": "BUG-172-update-installer-converge-failure-f1",
+    "behavior": "an installer that fails after its converge failed a step gives converge-failed, naming the pin as installed and the step",
+    "verification": "cd cli && go test ./internal/update/ -run 'TestRunPin_ConvergeFailsInsideInstaller' && go test ./internal/cmd/ -run 'TestFailedConvergeSince'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-172-update-installer-converge-failure-f2",
+    "behavior": "an installer that fails with no fresh failed converge report still gives install-failed",
+    "verification": "cd cli && go test ./internal/update/ -run 'TestRunPin' && go test ./internal/cmd/ -run 'TestFailedConvergeSince'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-172-update-installer-converge-failure-f3",
+    "behavior": "a failed report with no failed step counts as a converge failure named as the run",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestFailedConvergeSince'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -72,12 +72,17 @@ Env:
 				return err
 			}
 			repo := repoForUpdate()
+			var installStart time.Time
 			out, err := update.Run(update.Config{Repo: repo, Version: dotfVersion}, update.Deps{
 				Git:      gitRunner(repo),
 				Converge: func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
 				Pin:      func() (string, error) { return pinnedDotfVersion(repo) },
-				Install:  func(pin string) error { return runInstaller(c, repo, pin) },
-				Upgrade:  func() (string, error) { return runSystemUpgrade(c.OutOrStdout(), repo) },
+				Install: func(pin string) error {
+					installStart = time.Now()
+					return runInstaller(c, repo, pin)
+				},
+				Upgrade:           func() (string, error) { return runSystemUpgrade(c.OutOrStdout(), repo) },
+				InstallerConverge: func() []string { return failedConvergeSince(installStart) },
 			})
 			c.Println(out.Message)
 			if err != nil {
@@ -192,6 +197,41 @@ func runInstaller(c *cobra.Command, repo, pin string) error {
 		return fmt.Errorf("%s: %w", filepath.Base(name), err)
 	}
 	return nil
+}
+
+// failedConvergeSince returns the steps the latest full converge report
+// failed, when that report finished no earlier than since (to the second, the
+// report's resolution). install.sh converges with the binary it just placed,
+// so such a report is the installer's own converge (#3395). nil when there is
+// none, it passed, or it cannot be read: the caller then reports the install
+// itself as failed, the conservative reading.
+func failedConvergeSince(since time.Time) []string {
+	state, err := env.StateDir()
+	if err != nil {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(state, "converge", "last.json"))
+	if err != nil {
+		return nil
+	}
+	rep, err := converge.ParseRunReport(data)
+	if err != nil || rep.Result != "failed" {
+		return nil
+	}
+	finished, err := time.Parse(time.RFC3339, rep.FinishedAt)
+	if err != nil || finished.Before(since.Truncate(time.Second)) {
+		return nil
+	}
+	var failed []string
+	for _, e := range rep.Entries {
+		if e.Status == "failed" {
+			failed = append(failed, e.Name)
+		}
+	}
+	if len(failed) == 0 {
+		failed = []string{"the run (" + rep.Error + ")"}
+	}
+	return failed
 }
 
 // repoForUpdate resolves the dotfiles checkout to fast-forward. The cascade
