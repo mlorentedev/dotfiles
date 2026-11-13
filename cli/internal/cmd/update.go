@@ -212,7 +212,7 @@ func installDotf(w io.Writer, pin string) (string, error) {
 func convergeWith(c *cobra.Command, repo, exe string) error {
 	cmd := exec.Command(exe, "converge") //nolint:gosec // the dotf release update just verified and installed
 	cmd.Env = append(os.Environ(), "DOTFILES_REPO_DIR="+repo)
-	cmd.Stdout, cmd.Stderr = c.OutOrStdout(), c.ErrOrStderr()
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
 	return cmd.Run()
 }
 

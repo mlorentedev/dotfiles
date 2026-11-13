@@ -37,11 +37,17 @@ owner: manu
 - **A held `.old` is not an error** (advisor, before review). On Windows the previous copy is often still running (a `dotf secrets run` wrapper), so `<dst>.old` cannot be removed on the next update. The first draft returned an error there, which would have failed every second update on Windows while Unix, where unlinking a running binary is allowed, stayed green. Now the current binary goes aside under a unique `<dst>.old.<n>` and every `<dst>.old*` is swept best-effort. Mutation: restoring the error return fails `TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld` on macOS. Lesson 594.
 - **`update.Run` is 23 lines** after the rework, closing #3427.
 
+## Review findings (review.md, PASS at d738f8bb)
+
+- **Minor, POSIX window between the two renames** — declined. One replacement path on every OS is the point (AC4, agnostic CLI): a Unix-only `os.Rename(staged, dst)` branch would leave the Windows path exercised by one CI leg only. The window is two consecutive renames in one directory; a concurrent `dotf` started inside it fails to start and is rerun, it never runs a partial binary.
+- **Minor, a held `<dst>.old` aborts the next update on Windows** — applied in `86802fc6`, after the reviewed commit: unique aside name plus a best-effort sweep, `TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld` (decision above, lesson 594).
+- **Minor, `convergeWith` does not pass stdin** — applied: the child converge now inherits `c.InOrStdin()`, so an interactive `dotf update` behaves like an interactive `dotf converge`.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-594-a-binary-that-replaces-itself-must-survive-its-own-previous-copy.md
-- [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? <yes: path / no: reason>
-- [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. <yes: path / no: reason>
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: ADR-019 (fast-forward only) still governs the checkout; installing the pinned release is the existing DOTF_VERSION contract executed in Go, recorded in the spec and the runbook
+- [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: self-replacement of a running binary occurs only in dotf
 
 ## Archive checklist
 
