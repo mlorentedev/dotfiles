@@ -72,17 +72,13 @@ Env:
 				return err
 			}
 			repo := repoForUpdate()
-			var installStart time.Time
 			out, err := update.Run(update.Config{Repo: repo, Version: dotfVersion}, update.Deps{
-				Git:      gitRunner(repo),
-				Converge: func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
-				Pin:      func() (string, error) { return pinnedDotfVersion(repo) },
-				Install: func(pin string) error {
-					installStart = time.Now()
-					return runInstaller(c, repo, pin)
-				},
+				Git:               gitRunner(repo),
+				Converge:          func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
+				Pin:               func() (string, error) { return pinnedDotfVersion(repo) },
+				Install:           func(pin string) error { return runInstaller(c, repo, pin) },
 				Upgrade:           func() (string, error) { return runSystemUpgrade(c.OutOrStdout(), repo) },
-				InstallerConverge: func() []string { return failedConvergeSince(installStart) },
+				InstallerConverge: failedConvergeSince,
 			})
 			c.Println(out.Message)
 			if err != nil {
@@ -204,8 +200,12 @@ func runInstaller(c *cobra.Command, repo, pin string) error {
 // report's resolution). install.sh converges with the binary it just placed,
 // so such a report is the installer's own converge (#3395). nil when there is
 // none, it passed, or it cannot be read: the caller then reports the install
-// itself as failed, the conservative reading.
+// itself as failed, the conservative reading. A zero since proves nothing about
+// the installer and would accept any report ever written, so it is nil too.
 func failedConvergeSince(since time.Time) []string {
+	if since.IsZero() {
+		return nil
+	}
 	state, err := env.StateDir()
 	if err != nil {
 		return nil
@@ -224,7 +224,7 @@ func failedConvergeSince(since time.Time) []string {
 	}
 	var failed []string
 	for _, e := range rep.Entries {
-		if e.Status == "failed" {
+		if e.Status == converge.StatusFailed.String() {
 			failed = append(failed, e.Name)
 		}
 	}

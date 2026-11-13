@@ -18,10 +18,12 @@ func TestFailedConvergeSince(t *testing.T) {
 	}
 	const failedUpgrade = `{"name":"system-upgrade","status":"failed"},{"name":"cache-gc","status":"ok"}`
 	tests := []struct {
-		name string
-		body string // "" writes no report
-		want []string
+		name      string
+		body      string // "" writes no report
+		zeroStart bool   // the installer's start was never recorded
+		want      []string
 	}{
+		{name: "no installer start recorded proves nothing", body: report("2020-01-01T00:00:00Z", "failed", failedUpgrade), zeroStart: true, want: nil},
 		{name: "fresh failed report names its failed steps", body: report("2026-11-12T07:40:00Z", "failed", failedUpgrade), want: []string{"system-upgrade"}},
 		{name: "finished in the installer's start second", body: report("2026-11-12T07:32:42Z", "failed", failedUpgrade), want: []string{"system-upgrade"}},
 		{name: "a report older than the installer is not its converge", body: report("2026-11-12T07:00:00Z", "failed", failedUpgrade), want: nil},
@@ -43,7 +45,11 @@ func TestFailedConvergeSince(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if got := failedConvergeSince(start); !reflect.DeepEqual(got, tt.want) {
+			since := start
+			if tt.zeroStart {
+				since = time.Time{}
+			}
+			if got := failedConvergeSince(since); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("failedConvergeSince = %q, want %q", got, tt.want)
 			}
 		})

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestRunPin covers BUG-144 (#2506): the running dotf must match the
@@ -172,12 +173,16 @@ func TestRunPin_ConvergeFailsInsideInstaller(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var installedAt, since time.Time
 			d := Deps{
-				Git:               healthyGit().run,
-				Pin:               func() (string, error) { return pin, nil },
-				Converge:          func() error { t.Fatal("update must not converge again with the old binary"); return nil },
-				Install:           func(string) error { return errors.New("install.sh: exit status 1") },
-				InstallerConverge: func() []string { return tt.failed },
+				Git:      healthyGit().run,
+				Pin:      func() (string, error) { return pin, nil },
+				Converge: func() error { t.Fatal("update must not converge again with the old binary"); return nil },
+				Install: func(string) error {
+					installedAt = time.Now()
+					return errors.New("install.sh: exit status 1")
+				},
+				InstallerConverge: func(s time.Time) []string { since = s; return tt.failed },
 			}
 			out, err := Run(Config{Repo: "/repo", Version: "0.69.0"}, d)
 			if err == nil {
@@ -190,6 +195,12 @@ func TestRunPin_ConvergeFailsInsideInstaller(t *testing.T) {
 				if !strings.Contains(out.Message, s) {
 					t.Errorf("message = %q, want it to contain %q", out.Message, s)
 				}
+			}
+			// The report must be judged against an instant taken before the
+			// installer ran: a later one would discard its converge, a zero one
+			// would accept any report ever written (BUG-172 review).
+			if since.IsZero() || since.After(installedAt) {
+				t.Errorf("InstallerConverge got since = %v, want a non-zero instant no later than the install (%v)", since, installedAt)
 			}
 			if tt.failed != nil && !strings.Contains(err.Error(), tt.failed[0]) {
 				t.Errorf("error = %q, want it to name the failed step %q", err, tt.failed[0])
