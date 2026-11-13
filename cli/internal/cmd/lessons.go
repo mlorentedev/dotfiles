@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -89,7 +90,9 @@ func newLessonsFmtCmd() *cobra.Command {
 			"writes an _index.md: the index is rendered on read by `dotf lessons index`.\n\n" +
 			"--check writes nothing and exits 1 when any file would change, naming it, or\n" +
 			"when an _index.md is still committed under the lessons directory (a table\n" +
-			"nothing regenerates goes stale in silence). fmt leaves such a file alone.\n" +
+			"nothing regenerates goes stale in silence), or when a markdown file there is\n" +
+			"not named lesson-NNN-<slug>.md (_format.md and README.md excepted): nothing\n" +
+			"formats or indexes it. fmt leaves both kinds alone and names them.\n" +
 			"A second fmt on a formatted tree changes nothing.",
 		Example:       "  dotf lessons fmt\n  dotf lessons fmt --check",
 		Args:          cobra.NoArgs,
@@ -105,33 +108,19 @@ func newLessonsFmtCmd() *cobra.Command {
 				c.PrintErrln("lessons fmt:", err)
 				return err
 			}
-			stray, err := lessons.StrayIndexes(d)
+			left, err := lessonsLeftAlone(d)
 			if err != nil {
 				c.PrintErrln("lessons fmt:", err)
 				return err
 			}
 			w := c.OutOrStdout()
 			if check {
-				for _, ch := range changes {
-					_, _ = fmt.Fprintf(w, "not formatted: %s\n", ch.Path)
-				}
-				for _, p := range stray {
-					_, _ = fmt.Fprintf(w, "committed index: %s\n", p)
-				}
-				if len(changes) > 0 {
-					_, _ = fmt.Fprintln(w, "run: dotf lessons fmt")
-				}
-				if len(stray) > 0 {
-					_, _ = fmt.Fprintln(w, "run: git rm the index; render it with `dotf lessons index`")
-				}
-				if len(changes) > 0 || len(stray) > 0 {
-					return errLessonsDrift
-				}
-				_, _ = fmt.Fprintln(w, "[OK] lessons are in their canonical form")
-				return nil
+				return reportLessonsCheck(w, changes, left)
 			}
-			for _, p := range stray {
-				_, _ = fmt.Fprintf(w, "left alone: %s (a committed index goes stale; git rm it and use `dotf lessons index`)\n", p)
+			for _, f := range left {
+				for _, p := range f.paths {
+					_, _ = fmt.Fprintf(w, "left alone: %s (%s)\n", p, f.why)
+				}
 			}
 			if err := lessons.Apply(changes); err != nil {
 				return err
@@ -143,6 +132,60 @@ func newLessonsFmtCmd() *cobra.Command {
 	c.Flags().BoolVar(&check, "check", false, "write nothing; exit 1 when any file is not in its canonical form")
 	c.Flags().StringVar(&dir, "dir", "", "lessons directory (default: <repo>/docs/lessons)")
 	return c
+}
+
+// lessonsFinding is a kind of file fmt never rewrites but --check fails on:
+// the paths, the label --check names each with, the fix it prints once, and
+// why fmt leaves them alone.
+type lessonsFinding struct {
+	paths           []string
+	label, fix, why string
+}
+
+// lessonsLeftAlone reads the files under d that fmt reports and never touches:
+// a committed index (#2700) and a markdown file in no lesson-NNN-<slug>.md
+// form (#3415).
+func lessonsLeftAlone(d string) ([]lessonsFinding, error) {
+	stray, err := lessons.StrayIndexes(d)
+	if err != nil {
+		return nil, err
+	}
+	unnamed, err := lessons.StrayNames(d)
+	if err != nil {
+		return nil, err
+	}
+	return []lessonsFinding{
+		{stray, "committed index", "git rm the index; render it with `dotf lessons index`",
+			"a committed index goes stale; git rm it and use `dotf lessons index`"},
+		{unnamed, "unrecognised name", "git mv each to lesson-NNN-<slug>.md on the next free number, then `dotf lessons fmt`",
+			"not a lesson-NNN-<slug>.md name, so nothing formats or indexes it"},
+	}, nil
+}
+
+// reportLessonsCheck prints what --check found and fails on any of it.
+func reportLessonsCheck(w io.Writer, changes []lessons.Change, left []lessonsFinding) error {
+	paths := make([]string, 0, len(changes))
+	for _, ch := range changes {
+		paths = append(paths, ch.Path)
+	}
+	all := append([]lessonsFinding{{paths: paths, label: "not formatted", fix: "dotf lessons fmt"}}, left...)
+	drift := false
+	for _, f := range all {
+		for _, p := range f.paths {
+			_, _ = fmt.Fprintf(w, "%s: %s\n", f.label, p)
+		}
+	}
+	for _, f := range all {
+		if len(f.paths) > 0 {
+			_, _ = fmt.Fprintf(w, "run: %s\n", f.fix)
+			drift = true
+		}
+	}
+	if drift {
+		return errLessonsDrift
+	}
+	_, _ = fmt.Fprintln(w, "[OK] lessons are in their canonical form")
+	return nil
 }
 
 func newLessonsRenumberCmd() *cobra.Command {
