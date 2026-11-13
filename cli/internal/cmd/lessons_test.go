@@ -73,6 +73,7 @@ func TestLessonsFmt_CheckNamesAFileInAnotherNamingScheme(t *testing.T) {
 		"notes.txt":              "not markdown\n",
 		"2026-12-01-stray.md":    "# Stray\n",
 		"ops/2026-12-02-also.md": "# Also\n",
+		"ops/_index.md":          "# Index\n",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -92,7 +93,12 @@ func TestLessonsFmt_CheckNamesAFileInAnotherNamingScheme(t *testing.T) {
 			t.Errorf("check output lacks %q:\n%s", want, stdout)
 		}
 	}
-	for _, accepted := range []string{"_format.md", "README.md", "notes.txt"} {
+	// A committed index is reported once, as an index: naming it a stray
+	// lesson too would print a second, wrong fix for the same file.
+	if !strings.Contains(stdout, "committed index: "+filepath.Join(dir, "ops", "_index.md")) {
+		t.Errorf("check did not name the committed index:\n%s", stdout)
+	}
+	for _, accepted := range []string{"_format.md", "README.md", "notes.txt", filepath.Join("ops", "_index.md")} {
 		if strings.Contains(stdout, "unrecognised name: "+filepath.Join(dir, accepted)) {
 			t.Errorf("check named an accepted file %s:\n%s", accepted, stdout)
 		}

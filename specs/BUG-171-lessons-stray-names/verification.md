@@ -39,3 +39,12 @@ owner: manu
 - [ ] Folder moved: `specs/BUG-171-lessons-stray-names/` -> `specs/archive/BUG-171-lessons-stray-names/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+## Review dispositions
+
+The review, by nan/qwen3.8-flash at `7f8ed464`, gave PASS.
+
+1. Minor, REAL: nothing tested the `_index.md` exclusion in `lessonsDirDocs`, and deleting it left the suite green. Applied after the review: `TestLessonsFmt_CheckNamesAFileInAnotherNamingScheme` now holds `ops/_index.md` and asserts that it is named once, as `committed index`, never as `unrecognised name`. With the exclusion removed, the test fails (mutation-checked).
+2. Minor, SPECULATIVE: an uppercase `NOTE.MD` passes in silence. Declined. The whole package reads only lowercase `.md` as markdown (`fileRE`, `readDir`), and no measured repository has such a name. A fleet case would come back here as an issue.
+3. Question: the blast-radius measurement was outside the reviewer's worktree. Accepted as author evidence. The command used is in the PR body.
+4. Minor, SPECULATIVE: no command prints the next free number. Declined: the proposal leaves the number as a human choice, and `dotf lessons index` lists every number in use.
