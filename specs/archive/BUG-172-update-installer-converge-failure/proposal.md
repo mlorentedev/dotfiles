@@ -1,7 +1,7 @@
 ---
 id: "BUG-172-update-installer-converge-failure"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-12"
 issue: "mlorentedev/dotfiles#3395"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
