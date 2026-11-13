@@ -114,7 +114,7 @@ dir is reachable wherever git works, which every dotf command already requires.
   one release and `Load` prefers the admin dir, so an old guard keeps working
   and `git clean` can at worst reproduce today's block on an old guard; or
   **(B)** `Save` removes the in-tree copy and a seat whose converge failed is
-  blocked until `dotf hooks deploy` runs, with `dotf doctor`'s guard check as
+  blocked until `dotf hooks install` runs, with `dotf doctor`'s guard check as
   the signal. Recommendation: A. An old binary run after a new one (a dev build
   on a seat with a newer release, or the reverse) finds the mirror under A; under
   B it writes a fresh in-tree lease with `reap_ok: true` and no lane name, which
