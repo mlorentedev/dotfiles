@@ -122,6 +122,7 @@ Rule summary:
 | 5b | Identity record `$git_dir/dotf-lane` readable with a non-empty first line, or present but unreadable; no lease file | **blocked** |
 | 6a | Branch is `main` or `master` | **blocked** |
 | 6b | Detached HEAD at the main checkout, no lease file | **blocked** |
+| 6c | Detached HEAD in a linked worktree, no lease file | **blocked**; recover with `dotf worktree adopt` (keeps the worktree) or `git switch -c <type>/<issue>-<slug>` |
 
 ## 4. Lane lifecycle
 
