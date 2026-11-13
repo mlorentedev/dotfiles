@@ -890,21 +890,38 @@ func GitBash(execPath string) (string, bool) {
 // stdout alone (`mise which`, whose output is a path a stderr warning must not
 // corrupt, and a tool's `--version`, read stdout first).
 func HomeRunners(home string) (run, stdout Runner) {
-	bashBin := ""
-	if runtime.GOOS == "windows" {
-		if bash, reason := findGitBash(gitExecPath); reason == "" {
-			bashBin = filepath.Dir(bash)
-		}
-	}
-	command := func(name string, args ...string) *exec.Cmd {
+	return homeRunners(home, runtime.GOOS, func() (string, string) { return findGitBash(gitExecPath) })
+}
+
+// homeRunners builds the two runners. locateBash is asked at each command that
+// needs Git Bash, never once at construction: a converge that installs git and
+// then syncs tools in the same process builds its runners before git exists, so
+// an answer cached then is "not found" for the whole tools step and bats.cmd
+// falls through to WSL's bash.exe (#3328, #2346).
+func homeRunners(home, goos string, locateBash func() (bash, reason string)) (run, stdout Runner) {
+	command := homeCommand(home, goos, locateBash)
+	run = func(name string, args ...string) ([]byte, error) { return command(name, args...).CombinedOutput() }
+	stdout = func(name string, args ...string) ([]byte, error) { return command(name, args...).Output() }
+	return run, stdout
+}
+
+// homeCommand returns the builder both runners share: the command's directory
+// and environment, and nothing run.
+func homeCommand(home, goos string, locateBash func() (bash, reason string)) func(name string, args ...string) *exec.Cmd {
+	return func(name string, args ...string) *exec.Cmd {
 		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
 		c.Dir = home
 		installerEnv := miseInstallEnv(name, args...)
-		withBash := bashBin != "" && gitBashScope(name, args...)
-		if withBash || installerEnv != "" {
+		bashBin := ""
+		if goos == "windows" && gitBashScope(name, args...) {
+			if bash, reason := locateBash(); reason == "" {
+				bashBin = filepath.Dir(bash)
+			}
+		}
+		if bashBin != "" || installerEnv != "" {
 			c.Env = os.Environ()
 		}
-		if withBash {
+		if bashBin != "" {
 			c.Env = append(c.Env, "PATH="+bashBin+string(os.PathListSeparator)+os.Getenv("PATH"))
 		}
 		if installerEnv != "" {
@@ -912,9 +929,6 @@ func HomeRunners(home string) (run, stdout Runner) {
 		}
 		return c
 	}
-	run = func(name string, args ...string) ([]byte, error) { return command(name, args...).CombinedOutput() }
-	stdout = func(name string, args ...string) ([]byte, error) { return command(name, args...).Output() }
-	return run, stdout
 }
 
 // gitExecPath asks git where its helpers live; Git Bash is found from it.
