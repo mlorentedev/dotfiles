@@ -3,6 +3,7 @@ package tools
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -766,10 +767,41 @@ func placeBinary(src, dst string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(staged, dst); err != nil {
+	if err := replaceFile(staged, dst); err != nil {
 		return err
 	}
 	return os.Chmod(dst, 0o755)
+}
+
+// renameFile is os.Rename; a test replaces it to fail the final rename.
+var renameFile = os.Rename
+
+// replaceFile moves staged onto dst so that dst can be a running executable.
+// Windows refuses to rename over, or delete, a running .exe but lets it be
+// renamed aside, so dst goes to <dst>.old first and staged takes its name; the
+// same sequence runs on every OS (CLI-133). A failed second rename puts the old
+// file back, so a failed update never leaves the path empty. Removing <dst>.old
+// is best-effort: on Windows it fails while the old process runs, and the next
+// replacement removes it first.
+func replaceFile(staged, dst string) error {
+	aside := dst + ".old"
+	if err := os.Remove(aside); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove the previous %s: %w", filepath.Base(aside), err)
+	}
+	if err := renameFile(dst, aside); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return renameFile(staged, dst) // nothing to set aside
+	}
+	if err := renameFile(staged, dst); err != nil {
+		if rerr := renameFile(aside, dst); rerr != nil {
+			return fmt.Errorf("%w; restoring the previous %s also failed: %v", err, filepath.Base(dst), rerr)
+		}
+		return err
+	}
+	_ = os.Remove(aside)
+	return nil
 }
 
 // verifyChecksum confirms assetPath's sha256 matches the entry for assetName in

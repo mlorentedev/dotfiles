@@ -12,12 +12,12 @@ created: "2026-11-12"
 
 ## Setup
 
-- [ ] Branch `feat/3433-update-self-install` from `origin/main` (worktree)
-- [ ] Baseline: `go test ./internal/tools/ ./internal/update/ ./internal/cmd/ -count=1` passes
+- [x] Branch `feat/3433-update-self-install` from `origin/main` (worktree)
+- [x] Baseline: `go test ./internal/tools/ ./internal/update/ ./internal/cmd/ -count=1` passes
 
 ## Implementation — PR 1: the primitive
 
-- [ ] [P] [AC4] In `internal/tools/place_test.go`, add
+- [x] [P] [AC4] In `internal/tools/place_test.go`, add
   `TestPlaceBinaryReplacesARunningExecutable`: copy the test binary to a temp
   `dotf` (`dotf.exe`), start it as a helper child that blocks on stdin, call
   `placeBinary(new, thatPath)` while it runs, then assert the path holds the new
@@ -26,11 +26,11 @@ created: "2026-11-12"
   `rename` seam. Run `go test ./internal/tools/ -run TestPlaceBinary -count=1`.
   Expected: FAIL on Windows for the first (access denied on rename-over), and
   everywhere for the second (`undefined: renameFile`).
-- [ ] [AC4] In `internal/tools/install.go`, make `placeBinary` replace through
+- [x] [AC4] In `internal/tools/install.go`, make `placeBinary` replace through
   rename-aside: remove a stale `<dst>.old`, rename `dst` to `<dst>.old`, rename
   the staged file in, undo the first rename when the second fails, and remove
   `<dst>.old` best-effort. No `GOOS` branch. Rerun. Expected: PASS.
-- [ ] [P] [AC3] In `internal/tools/self_test.go`, add `TestDotfRelease` (asset,
+- [x] [P] [AC3] In `internal/tools/self_test.go`, add `TestDotfRelease` (asset,
   member and checksums names per OS and arch, matching `install.sh` and
   `install.ps1`) and `TestInstallSelf` against an `httptest` release server:
   installs into the given path and returns it; a checksum mismatch, an asset
@@ -39,7 +39,7 @@ created: "2026-11-12"
   is not `dotf` (`dotf.exe`) is refused. Run
   `go test ./internal/tools/ -run 'TestDotfRelease|TestInstallSelf' -count=1`.
   Expected: FAIL, `undefined: DotfRelease`.
-- [ ] [AC3] Add `internal/tools/self.go` with `DotfRelease(version) Tool` and
+- [x] [AC3] Add `internal/tools/self.go` with `DotfRelease(version) Tool` and
   `(*Installer).InstallSelf(t Tool, target string) error`, which sets `Dest` to
   the target's directory and runs `fetchVerifyPlace` unconditionally (a pin below
   the running version installs: the pin is the contract). Rerun. Expected: PASS.
