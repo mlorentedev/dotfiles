@@ -54,6 +54,9 @@ func (g *specGate) reportAdjacency() {
 	g.summarizeAdjacency(rows)
 }
 
+// titleEscaper backslash-escapes markdown's inline link and image syntax.
+var titleEscaper = strings.NewReplacer("[", `\[`, "]", `\]`, "!", `\!`)
+
 func (g *specGate) summarizeAdjacency(rows []gate.Adjacent) {
 	if g.o.summary == "" {
 		return
@@ -62,10 +65,13 @@ func (g *specGate) summarizeAdjacency(rows []gate.Adjacent) {
 	// brackets would reach the page as tags (#3389). Clip before escaping: an
 	// entity cut in half would show on the page.
 	esc := strings.NewReplacer("|", `\|`, "<", "&lt;", ">", "&gt;").Replace
+	// The title cell is markdown text, so link and image syntax would render
+	// (#3414); the path cell is a code span and takes no backslashes.
+	title := func(t string) string { return titleEscaper.Replace(esc(t)) }
 	var b strings.Builder
 	b.WriteString("\n### Adjacent open issues (advisory)\n\n| Issue | Names | Title |\n|---|---|---|\n")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "| #%s | `%s` | %s |\n", r.Issue, esc(r.Match), esc(gate.Clip(r.Text, 88)))
+		fmt.Fprintf(&b, "| #%s | `%s` | %s |\n", r.Issue, esc(r.Match), title(gate.Clip(r.Text, 88)))
 	}
 	_ = appendText(g.o.summary, b.String()) // advisory: a summary it cannot write is silence
 }
