@@ -31,7 +31,7 @@ Out of scope:
 ## Checklist
 
 - [x] Failing tests first: a `--rule` selection, an unknown id, `--rule` with `--fleet`, and an action manifest pinned by tag (bad and good fixtures).
-- [x] `fleetlint`: read action manifests, apply the pin check to their steps; export the known rule ids.
+- [x] `fleetlint`: read action manifests (a symlinked action directory included; a stat failure other than absence is an error), apply the pin check to their steps; export the known rule ids.
 - [x] `lint fleet`: the `--rule` flag, its validation and the filter; help text.
 - [x] Runbook `docs/runbooks/guide-fleet-lint.md`: the flag and the manifests.
 - [x] `go test ./...`, `go vet`, `golangci-lint` (also `GOOS=windows`); mutation checks on a copy.
