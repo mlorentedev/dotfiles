@@ -31,7 +31,7 @@ owner: manu
 
 - [x] Lesson for the repo's `docs/lessons/`? no: a misattributed error, recorded on #3395 and in this spec
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: no new contract
-- [x] New pattern candidate for `00_meta/patterns/`? no
+- [x] New pattern candidate for `00_meta/patterns/`? no: "judge a report by when it finished relative to the run that should have written it" is specific to this seam
 
 ## Archive checklist
 
