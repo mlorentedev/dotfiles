@@ -108,9 +108,11 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent@<PI_VERSION>
 
 ## Model environment
 
-NaN only — the free tier, with no paid fallback in the picker.
+NaN only, billed from NaN's credit pool, with no paid OpenRouter fallback in the picker.
 
-- **NaN** (free, primary): `glm5.3-flash`, `deepseek-v4-flash`, `qwen3.8-flash`, `qwen3.6`, `mimo-v2.6-flash`, `gemma4`
+- **NaN** (primary): `glm5.3-flash`, `deepseek-v4-flash`, `qwen3.8-flash`, `qwen3.6`, `mimo-v2.6-flash`, `gemma4`, `kimi-k3.1-pro`, `qwen3.8-max`, `deepseek-v4-pro`, `hy4`
+
+The last four are NaN's larger models (#3417). They spend credits 5 to 20 times faster than the flash models, so they are in the picker for a deliberate choice, not in any default or route; routing them is #3273. `glm5.3` stays out: its own 400M-tokens-per-4h window answers `429`, and nothing can watch it (`ai/nan/README.md`).
 
 `qwen3.8-flash` and `glm5.3-flash` (added 2026-08-26) are catalog additions only — picker
 availability, not a default or routing change. Both are live, reasoning-class, and
