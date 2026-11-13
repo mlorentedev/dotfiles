@@ -1,9 +1,11 @@
 package worktree
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -190,5 +192,53 @@ func TestListNamesALegacyLocationLease(t *testing.T) {
 	moved := list()
 	if moved.LeaseLegacyOnly || strings.Contains(moved.StateReason, "legacy") {
 		t.Errorf("admin-dir lease with the mirror present: LeaseLegacyOnly=%v reason=%q; want false and no legacy note", moved.LeaseLegacyOnly, moved.StateReason)
+	}
+}
+
+// A Save whose admin-dir write fails leaves both copies as they were: the
+// mirror an old guard reads must not run ahead of the lease a new reader
+// prefers (review finding on #3421).
+func TestSaveMetadataPutsTheMirrorBackWhenTheAdminDirRefuses(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only file does not refuse a write here")
+	}
+	_, wt := linkedWorktree(t, "feat/mirror")
+	old := Metadata{Lane: "feat-lane-primary", State: string(StateActive), ReapOK: false}
+	if err := SaveMetadata(wt, old); err != nil {
+		t.Fatal(err)
+	}
+	admin, err := AdminDir(wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminLease := filepath.Join(admin, LeaseFileName)
+	if err := os.Chmod(adminLease, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(adminLease, 0o644) })
+
+	if err := SaveMetadata(wt, Metadata{Lane: "feat-lane-primary", State: string(StateParked)}); err == nil {
+		t.Fatal("Save with an unwritable admin-dir lease returned nil")
+	}
+	mirror, err := os.ReadFile(filepath.Join(wt, MetadataFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(mirror, mustJSON(t, old)) {
+		t.Errorf("the mirror ran ahead of the admin-dir lease after a failed Save:\n%s", mirror)
+	}
+	if meta, err := LoadMetadata(wt); err != nil || meta == nil || meta.State != string(StateActive) {
+		t.Errorf("LoadMetadata after the failed Save = %+v, %v; want the previous ACTIVE lease", meta, err)
+	}
+
+	// With no mirror before the failed Save, none is left behind.
+	if err := os.Remove(filepath.Join(wt, MetadataFileName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveMetadata(wt, Metadata{Lane: "feat-lane-primary", State: string(StateParked)}); err == nil {
+		t.Fatal("Save with an unwritable admin-dir lease returned nil")
+	}
+	if _, err := os.Stat(filepath.Join(wt, MetadataFileName)); !os.IsNotExist(err) {
+		t.Errorf("a failed Save left a mirror behind (err=%v)", err)
 	}
 }

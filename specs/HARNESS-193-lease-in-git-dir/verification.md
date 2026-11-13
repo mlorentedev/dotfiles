@@ -32,7 +32,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 Brief log of non-obvious trade-offs or course corrections taken during the work. Routine choices belong in commit messages, not here.
 
 - Overlap policy A (mirror for one release) taken on the owner's delegation; the owner can overrule before the release ships.
-- `SaveMetadata` writes the mirror first and the admin dir last, so an error always leaves the copy readers prefer unchanged; the two "lease cannot be written" fixtures break the admin-dir copy so they survive the mirror's removal (#3443).
+- `SaveMetadata` writes the mirror first and the admin dir last, and puts the mirror back when the admin-dir write fails (review finding on #3421, `TestSaveMetadataPutsTheMirrorBackWhenTheAdminDirRefuses`), so an error always leaves both copies unchanged; the two "lease cannot be written" fixtures break the admin-dir copy so they survive the mirror's removal (#3443).
 - The guard's missing-lease message keeps the phrase "lease metadata" (an existing hook test asserts it) and adds where the lease lives.
 - `worktree list` appends the legacy note after `Classify` rather than inside it: `Classify` stays a pure function of `Info`, and the note is a location fact, not a lifecycle state.
 

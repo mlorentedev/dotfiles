@@ -68,8 +68,10 @@ func LoadMetadata(worktreePath string) (*Metadata, error) {
 // release, the same bytes to the in-tree file (ADR-062): the guard a seat has
 // not redeployed and the pinned binary the hooks call read the tree file. A
 // path that is not a linked worktree is refused, never written in the tree.
-// The mirror is written first and the admin dir last, so an error always
-// means the copy every reader prefers is as it was.
+// The mirror is written first and the admin dir last, and a mirror whose
+// admin-dir write then fails is put back as it was, so an error always
+// means both copies, the one a new reader prefers and the one an old guard
+// reads, are as they were.
 func SaveMetadata(worktreePath string, meta Metadata) error {
 	admin, err := AdminDir(worktreePath)
 	if err != nil {
@@ -79,13 +81,27 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(worktreePath, MetadataFileName), data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
+	mirror := filepath.Join(worktreePath, MetadataFileName)
+	previous, readErr := os.ReadFile(mirror) // #nosec G304 -- the mirror path this package composed
+	if err := os.WriteFile(mirror, data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
 		return fmt.Errorf("writing the worktree metadata mirror: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(admin, LeaseFileName), data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
+		restoreMirror(mirror, previous, readErr)
 		return fmt.Errorf("writing worktree metadata: %w", err)
 	}
 	return nil
+}
+
+// restoreMirror puts the in-tree mirror back to what it held before a Save
+// whose admin-dir write failed: the previous bytes, or no file. Best effort,
+// since the error that matters is the one already being returned.
+func restoreMirror(mirror string, previous []byte, readErr error) {
+	if readErr != nil {
+		_ = os.Remove(mirror)
+		return
+	}
+	_ = os.WriteFile(mirror, previous, 0o644) // #nosec G306 -- the lease is not a secret
 }
 
 // LeaseLegacyOnly reports whether worktreePath's lease exists only at the
