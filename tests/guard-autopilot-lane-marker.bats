@@ -20,6 +20,7 @@ setup() {
 }
 
 @test "autopilot decides on a lane by testing exactly LanesMarkerFile" {
+    [ -n "$MARKER" ] || { printf 'LanesMarkerFile not read from named.go\n' >&2; false; }
     cond="$(grep -E '^[[:space:]]*if \[ -[a-z] [^]]*\.dotf/lanes?\.json' "$SKILL")" || false
     [ -n "$cond" ] || false
     n="$(printf '%s\n' "$cond" | wc -l | tr -d ' ')"
@@ -28,6 +29,7 @@ setup() {
 }
 
 @test "autopilot names no .dotf lane marker other than LanesMarkerFile in executable lines" {
+    [ -n "$MARKER" ] || { printf 'LanesMarkerFile not read from named.go\n' >&2; false; }
     # Comment lines may explain the difference; a command must not name the other file.
     bad="$(grep -nE '\.dotf/lanes?\.json' "$SKILL" | grep -v ':[[:space:]]*#' | grep -vF "$MARKER" || true)"
     [ -z "$bad" ] || { printf '%s\n' "$bad" >&2; false; }
