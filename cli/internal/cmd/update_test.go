@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,24 +83,7 @@ func TestUpdate_ConvergesAfterAFastForward(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not on PATH")
 	}
-	files, home := convergeFixture(t)
-	root := t.TempDir()
-	upstream, writer, checkout := filepath.Join(root, "up.git"), filepath.Join(root, "w"), filepath.Join(root, "dotfiles")
-	gitIn(t, root, "init", "-q", "--bare", upstream)
-	gitIn(t, root, "clone", "-q", upstream, writer)
-	if err := os.CopyFS(writer, os.DirFS(files)); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(writer, env.CheckoutMarker), []byte("DOTF_VERSION=1\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	gitIn(t, writer, "add", "-A")
-	gitIn(t, writer, "commit", "-q", "-m", "one")
-	gitIn(t, writer, "push", "-q", "origin", "HEAD")
-	gitIn(t, root, "clone", "-q", upstream, checkout)
-	t.Setenv("DOTFILES_REPO_DIR", checkout)
-	state := filepath.Join(home, ".local", "state")
-	t.Setenv("XDG_STATE_HOME", state)
+	writer, state := currentCheckout(t, nil)
 
 	setups := 0
 	fixture := convergeOptions
@@ -137,6 +121,73 @@ func TestUpdate_ConvergesAfterAFastForward(t *testing.T) {
 	}
 	if setups != wantSetups {
 		t.Errorf("setup ran %d time(s), want %d", setups, wantSetups)
+	}
+}
+
+// currentCheckout builds a converge fixture as an upstream and a clone of it
+// that is current with it, plus extra files committed beside the fixture's, and
+// points `dotf update` at the clone. It returns the upstream's working clone,
+// for a test that pushes more, and the XDG state home the run records under.
+func currentCheckout(t *testing.T, extra map[string]string) (writer, state string) {
+	t.Helper()
+	files, home := convergeFixture(t)
+	root := t.TempDir()
+	upstream, checkout := filepath.Join(root, "up.git"), filepath.Join(root, "dotfiles")
+	writer = filepath.Join(root, "w")
+	gitIn(t, root, "init", "-q", "--bare", upstream)
+	gitIn(t, root, "clone", "-q", upstream, writer)
+	if err := os.CopyFS(writer, os.DirFS(files)); err != nil {
+		t.Fatal(err)
+	}
+	extra = maps.Clone(extra)
+	if extra == nil {
+		extra = map[string]string{}
+	}
+	extra[env.CheckoutMarker] = "DOTF_VERSION=1\n"
+	for rel, body := range extra {
+		if err := os.WriteFile(filepath.Join(writer, rel), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gitIn(t, writer, "add", "-A")
+	gitIn(t, writer, "commit", "-q", "-m", "one")
+	gitIn(t, writer, "push", "-q", "origin", "HEAD")
+	gitIn(t, root, "clone", "-q", upstream, checkout)
+	t.Setenv("DOTFILES_REPO_DIR", checkout)
+	state = filepath.Join(home, ".local", "state")
+	t.Setenv("XDG_STATE_HOME", state)
+	return writer, state
+}
+
+// #3344, TOOL-036 AC8 at the command: a quiet day whose system-upgrade step
+// fails exits non-zero and records upgrade-failed. The step fails through the
+// real converge on every OS: a package-manager runner is wired, so the step
+// reads the catalog, and the checkout's packages.json does not parse.
+func TestUpdate_AFailedUpgradeOnAQuietDayIsRecorded(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not on PATH")
+	}
+	_, state := currentCheckout(t, map[string]string{"packages.json": "{ not json"})
+	fixture := convergeOptions
+	convergeOptions = func() converge.Options {
+		o := fixture()
+		o.SystemRun = func(name string, args ...string) ([]byte, error) {
+			t.Errorf("the manager ran (%s %v) although the catalog did not load", name, args)
+			return nil, nil
+		}
+		return o
+	}
+
+	stdout, _, err := execute(t, "update")
+	if err == nil {
+		t.Fatalf("a failed system-upgrade step exited 0:\n%s", stdout)
+	}
+	r, rerr := update.ReadRecord(filepath.Join(state, "dotfiles"))
+	if rerr != nil {
+		t.Fatalf("no update record after the run: %v", rerr)
+	}
+	if r.Status != "upgrade-failed" || !r.Failed() {
+		t.Errorf("update record = %+v, want status upgrade-failed with its error", r)
 	}
 }
 
