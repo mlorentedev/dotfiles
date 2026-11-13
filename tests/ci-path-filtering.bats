@@ -55,6 +55,10 @@ output = {"lint-powershell": "powershell"}
 bad = []
 for name in sys.argv[2:]:
     want = f"needs.changes.outputs.{output.get(name, 'code')} =="
+    # A job that is not a required check may skip whole (CI-017): its job-level
+    # guard covers every step, on the same output.
+    if want in str(jobs[name].get("if", "")):
+        continue
     for i, step in enumerate(jobs[name]["steps"]):
         if step.get("uses", "").startswith("actions/checkout@"):
             continue

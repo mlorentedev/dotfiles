@@ -31,8 +31,9 @@ EOF
 # The structural rule, so a Windows or macOS job added later is held to it too:
 # on a pull request it is gated at job level, or its OS list is a `changes`
 # output whose expression keeps Linux alone on a pull request. A required check is exempt: a job-level `if` would let it
-# pass without running (CI-004, tests/lib/check-workflow-contexts.py), so
-# test-windows starts its runner and skips its steps instead (HARNESS-041).
+# pass without running (CI-004, tests/lib/check-workflow-contexts.py). Since
+# CI-017 no Windows or macOS job is required: ci-gate aggregates them, so
+# test-windows is gated like the rest (HARNESS-041 took the step-level route).
 @test "CI-013: every Windows or macOS job on a pull request is gated before a runner starts" {
     run _py '
 bad = []
