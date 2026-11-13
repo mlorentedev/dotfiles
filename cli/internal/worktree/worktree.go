@@ -2,9 +2,7 @@ package worktree
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -156,24 +154,6 @@ func parsePorcelainLine(line string, current *RawWorktree) {
 		current.GitDir = strings.TrimPrefix(line, "gitdir ")
 		current.IsSubmodule = IsSubmoduleGitDir(current.GitDir)
 	}
-}
-
-// LoadMetadata reads .dotf-worktree.json from the worktree root if present.
-func LoadMetadata(worktreePath string) (*Metadata, error) {
-	metaPath := filepath.Join(worktreePath, MetadataFileName)
-	data, err := os.ReadFile(metaPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("reading worktree metadata: %w", err)
-	}
-
-	var meta Metadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return nil, fmt.Errorf("parsing worktree metadata: %w", err)
-	}
-	return &meta, nil
 }
 
 // Classify evaluates all fail-closed criteria to decide the lifecycle state.

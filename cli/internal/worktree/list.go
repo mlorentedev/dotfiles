@@ -1,7 +1,6 @@
 package worktree
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -286,16 +285,6 @@ func (m *MockGitRunner) IsPRMerged(repoRoot, branch string) (bool, error) {
 
 func (m *MockGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
 	return m.OrphanBranches[branch], nil
-}
-
-// SaveMetadata writes metadata to .dotf-worktree.json in target directory.
-func SaveMetadata(worktreePath string, meta Metadata) error {
-	metaPath := filepath.Join(worktreePath, MetadataFileName)
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshaling metadata: %w", err)
-	}
-	return os.WriteFile(metaPath, data, 0o644)
 }
 
 func isMainWorktree(path string, index int) bool {

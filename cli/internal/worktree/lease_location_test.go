@@ -1,0 +1,161 @@
+package worktree
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+// linkedWorktree makes a repository with one commit and one linked worktree
+// on branch, and returns both paths with symlinks resolved, as git answers.
+func linkedWorktree(t *testing.T, branch string) (repo, wt string) {
+	t.Helper()
+	tmp := t.TempDir()
+	repo = filepath.Join(tmp, "repo")
+	gitT(t, tmp, "init", "-q", "-b", "main", repo)
+	gitT(t, repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init")
+	wt = filepath.Join(tmp, "wt")
+	gitT(t, repo, "worktree", "add", "-q", "-b", branch, wt)
+	var err error
+	if repo, err = filepath.EvalSymlinks(repo); err != nil {
+		t.Fatal(err)
+	}
+	if wt, err = filepath.EvalSymlinks(wt); err != nil {
+		t.Fatal(err)
+	}
+	return repo, wt
+}
+
+// AdminDir answers the worktree's own git admin dir from its .git pointer,
+// absolute or relative, and refuses everything that is not a linked worktree.
+func TestAdminDir(t *testing.T) {
+	repo, wt := linkedWorktree(t, "feat/x")
+	want := gitT(t, wt, "rev-parse", "--path-format=absolute", "--git-dir")
+	if want, _ = filepath.EvalSymlinks(want); want == "" {
+		t.Fatal("git answered no git dir")
+	}
+
+	got, err := AdminDir(wt)
+	if err != nil || got != want {
+		t.Fatalf("absolute pointer: got %q, %v; want %q", got, err, want)
+	}
+
+	gitT(t, repo, "worktree", "repair")
+	rel, err := filepath.Rel(wt, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+rel+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err = AdminDir(wt)
+	if err != nil || got != want {
+		t.Fatalf("relative pointer: got %q, %v; want %q", got, err, want)
+	}
+
+	plain := t.TempDir()
+	sub := filepath.Join(t.TempDir(), "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, ".git"), []byte("gitdir: ../.git/modules/sub\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for name, path := range map[string]string{"main checkout": repo, "plain directory": plain, "submodule": sub} {
+		got, err := AdminDir(path)
+		if !errors.Is(err, ErrNotLinkedWorktree) || got != "" {
+			t.Errorf("%s: got %q, %v; want ErrNotLinkedWorktree", name, got, err)
+		}
+		if err != nil && !strings.Contains(err.Error(), path) {
+			t.Errorf("%s: error %q does not name the path", name, err)
+		}
+	}
+}
+
+// The lease lives in the admin dir; the in-tree file is a mirror for one
+// release and the fallback for a lease written before this change.
+func TestLeaseLivesInTheWorktreeGitDir(t *testing.T) {
+	_, wt := linkedWorktree(t, "feat/y")
+	admin, err := AdminDir(wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	meta := Metadata{Creator: "t", Issue: 3307, CreatedAt: now, LeaseExpiresAt: now.Add(time.Hour), ReapOK: true}
+
+	if err := SaveMetadata(wt, meta); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	adminBytes, err := os.ReadFile(filepath.Join(admin, LeaseFileName))
+	if err != nil {
+		t.Fatalf("Save did not write the admin dir: %v", err)
+	}
+	treeBytes, err := os.ReadFile(filepath.Join(wt, MetadataFileName))
+	if err != nil {
+		t.Fatalf("Save did not write the in-tree mirror: %v", err)
+	}
+	if string(adminBytes) != string(treeBytes) {
+		t.Fatal("the mirror differs from the admin-dir lease")
+	}
+
+	// The admin dir wins when the two disagree.
+	stale := meta
+	stale.Issue = 1
+	if err := os.WriteFile(filepath.Join(wt, MetadataFileName), mustJSON(t, stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadMetadata(wt)
+	if err != nil || got == nil || got.Issue != 3307 {
+		t.Fatalf("Load with both: got %+v, %v; want the admin-dir lease (issue 3307)", got, err)
+	}
+
+	// Legacy-only: the admin dir holds none, the in-tree file is read.
+	if err := os.Remove(filepath.Join(admin, LeaseFileName)); err != nil {
+		t.Fatal(err)
+	}
+	got, err = LoadMetadata(wt)
+	if err != nil || got == nil || got.Issue != 1 {
+		t.Fatalf("Load legacy-only: got %+v, %v; want the in-tree lease (issue 1)", got, err)
+	}
+
+	// Neither: nil, no error.
+	if err := os.Remove(filepath.Join(wt, MetadataFileName)); err != nil {
+		t.Fatal(err)
+	}
+	got, err = LoadMetadata(wt)
+	if err != nil || got != nil {
+		t.Fatalf("Load with neither: got %+v, %v; want nil, nil", got, err)
+	}
+
+	// A non-worktree path still reads an in-tree file, the same fallback.
+	plain := t.TempDir()
+	if err := os.WriteFile(filepath.Join(plain, MetadataFileName), mustJSON(t, stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err = LoadMetadata(plain)
+	if err != nil || got == nil || got.Issue != 1 {
+		t.Fatalf("Load on a plain directory: got %+v, %v; want the in-tree lease", got, err)
+	}
+
+	// Save refuses a non-worktree path, naming it, and writes nothing there.
+	other := t.TempDir()
+	err = SaveMetadata(other, meta)
+	if !errors.Is(err, ErrNotLinkedWorktree) || !strings.Contains(err.Error(), other) {
+		t.Fatalf("Save on a plain directory: %v; want ErrNotLinkedWorktree naming %s", err, other)
+	}
+	if _, statErr := os.Stat(filepath.Join(other, MetadataFileName)); !os.IsNotExist(statErr) {
+		t.Fatal("Save wrote an in-tree lease on a path it refused")
+	}
+}
+
+func mustJSON(t *testing.T, meta Metadata) []byte {
+	t.Helper()
+	b, err := marshalMetadata(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
