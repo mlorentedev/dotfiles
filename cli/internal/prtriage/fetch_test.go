@@ -788,6 +788,24 @@ func TestFetchMatchesARowOnEitherAnchorOfAShiftedFinding(t *testing.T) {
 	}
 }
 
+// Two findings can come to share a current line: a push removes lines above
+// A (original 9, now 4) and pushes B (original 4) out of the diff. The one
+// row written for B, under the reviewer's line 4, must not clear A: a row
+// names the line the reviewer anchored, never the line the diff moved a
+// finding to (#3457 review).
+func TestFetchDoesNotClearAFindingOnAnotherFindingsRow(t *testing.T) {
+	responses := triagedPR10("| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |")
+	responses["/pulls/10/comments"] = `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":4,"original_line":9,"created_at":"2026-09-02T10:00:01Z"},
+	  {"id":2,"user":{"login":"github-actions[bot]"},"body":"**B**\n\nClass: REAL\ny","path":"cli/a.go","line":null,"original_line":4,"created_at":"2026-09-02T10:00:01Z"}]`
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 || len(got[0].Unreproduced) != 1 || got[0].Unreproduced[0].Finding.OriginalLine != 9 {
+		t.Fatalf("got %+v, want PR #10 held on finding A (original line 9) only", got)
+	}
+}
+
 // A gate that cannot read what it gates on fails closed: the PR stays listed.
 func TestFetchHoldsATriagedPRWhoseFindingsCannotBeRead(t *testing.T) {
 	fake := &fakeGH{responses: triagedPR10("| `cli/a.go:4` | apply | fixed |"), errs: map[string]error{"/pulls/10/comments": errors.New("boom")}}
