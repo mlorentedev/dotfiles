@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
@@ -50,6 +51,20 @@ func TestActiveLaneSurvivesGitClean(t *testing.T) {
 	}
 	if listed.State != worktree.StateActive || listed.LeaseLegacyOnly {
 		t.Errorf("worktree list after clean: state=%s legacy=%v reason=%q; want ACTIVE from the admin-dir lease", listed.State, listed.LeaseLegacyOnly, listed.StateReason)
+	}
+	rows, err := Status(Sources{
+		Now:   time.Now(),
+		Repo:  repoDir,
+		List:  func() ([]worktree.Info, error) { return infos, nil },
+		Forge: &fakeForge{},
+		Live:  func(string) Liveness { return LiveIdle },
+		Herdr: fakeFinder{},
+	})
+	if err != nil {
+		t.Fatalf("lane status after clean: %v", err)
+	}
+	if row := rowFor(t, rows, "feat/594-clean-survival"); row.State != worktree.StateActive {
+		t.Errorf("lane status after clean: state=%s reason=%q; want ACTIVE", row.State, row.StateReason)
 	}
 
 	// A commit through the installed guard: the hook reads the same lease.

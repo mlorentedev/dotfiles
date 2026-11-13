@@ -40,9 +40,9 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-594-excluded-from-git-is-not-safe-from-git-clean.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-595-excluded-from-git-is-not-safe-from-git-clean.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? yes: docs/adr/adr-062-the-lease-lives-in-the-worktree-git-dir.md
-- [x] New pattern candidate for `00_meta/patterns/`? no: one repository's lease; the clean-vs-exclude point is lesson 594 and would join a pattern only when a second project hits it
+- [x] New pattern candidate for `00_meta/patterns/`? no: one repository's lease; the clean-vs-exclude point is lesson 595 and would join a pattern only when a second project hits it
 
 ## Archive checklist
 

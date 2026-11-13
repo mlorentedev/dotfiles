@@ -38,7 +38,7 @@ owner: manu
 - [x] [AC1] Make the AC1 test pass (it depends on the guard and the Go seam together).
 - [x] [AC5] Failing test: `isWorktreeParked` recognises an admin-dir PARKED lease from the lane root and a subdirectory, and a legacy in-tree one.
 - [x] [AC5] Implement in `cli/internal/mem/session_end.go` through `readGitdirPointer`.
-- [x] Docs: runbook `guide-persistent-named-lanes.md` (lease location, re-init migrates it, mixed-version note), `docs/lessons/lesson-594-<slug>.md` for the "excluded is not ignored by clean" class and the migration shape.
+- [x] Docs: runbook `guide-persistent-named-lanes.md` (lease location, re-init migrates it, mixed-version note), `docs/lessons/lesson-595-<slug>.md` (594 was taken by #3442 while this branch was open) for the "excluded is not ignored by clean" class and the migration shape.
 - [x] File the follow-up ticket (#3443, HARNESS-194): remove the mirror, the legacy in-tree read and the `.dotf-worktree.json` exclude lines once a release has shipped with the mirror and `worktree list` reports no legacy-only lease; link it from `proposal.md` Out of scope.
 
 ## Closing

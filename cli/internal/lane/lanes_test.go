@@ -506,6 +506,9 @@ func TestLaneInitMigratesInTreeLeases(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Errorf("the migrated lease differs from the in-tree one:\nbefore: %s\nafter:  %s", before, after)
 	}
+	if changed, err := InitLanes(repoDir, wtRoot); err != nil || changed != 0 {
+		t.Errorf("InitLanes with the admin-dir lease and the mirror still present = %d, %v; want 0, nil", changed, err)
+	}
 
 	if err := os.Remove(filepath.Join(lanePath, worktree.MetadataFileName)); err != nil {
 		t.Fatal(err)
