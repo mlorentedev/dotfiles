@@ -53,5 +53,5 @@ owner: manu
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/CLI-133-update-self-install/` -> `specs/archive/CLI-133-update-self-install/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3433 closed by the merge of #3441 on 2026-11-13
 - [x] Promotions above executed (if any)

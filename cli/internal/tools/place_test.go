@@ -174,3 +174,29 @@ func TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld(t *testing.T) {
 		t.Errorf("dst holds %q, want the new release", got)
 	}
 }
+
+// The sweep removes only what replaceFile set aside: a sibling whose name merely
+// starts with <base>.old belongs to someone else. No fixture ends in a dot:
+// Windows strips a trailing dot, so "foo.old." would be "foo.old" there.
+func TestRemoveAsideLeavesUnrelatedSiblings(t *testing.T) {
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "foo")
+	for _, name := range []string{"foo.old", "foo.old.1731400000123456789", "foo.older", "foo.old-backup", "foo.old.x1"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	removeAside(dst)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	for _, e := range entries {
+		left = append(left, e.Name())
+	}
+	want := []string{"foo.old-backup", "foo.old.x1", "foo.older"}
+	if strings.Join(left, ",") != strings.Join(want, ",") {
+		t.Errorf("after the sweep: %v, want %v", left, want)
+	}
+}
