@@ -253,7 +253,7 @@ _write_849_feed() {
     [[ "$output" != *$'\r'* ]] || false
     [[ "$output" != *$'\033'* ]] || false
     refute_grep $'[\r\033]' "$REPO_FIXTURE/summary.md"
-    grep -qF 'breaks ::error::injected [31m' "$REPO_FIXTURE/summary.md"
+    grep -qF 'breaks ::error::injected \[31m' "$REPO_FIXTURE/summary.md"
 }
 
 # The runner trims leading whitespace before it reads a workflow command, so the
@@ -298,6 +298,34 @@ _write_849_feed() {
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     grep -qF '&lt;img src=x onerror=alert(1)&gt; breaks' "$REPO_FIXTURE/summary.md"
     refute_grep_fixed '<img' "$REPO_FIXTURE/summary.md"
+}
+
+# #3414: the cell escape covered the table and raw HTML but not markdown's
+# inline syntax, so a title rendered a live image or link in the summary.
+@test "adjacency: markdown link and image syntax in an issue title renders as text" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 903 'BUG-7: scripts/tool.sh ![t](https://example.invalid/p.gif) [x](https://example.invalid)' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF '\!\[t\](https://example.invalid/p.gif) \[x\](https://example.invalid)' "$REPO_FIXTURE/summary.md"
+    refute_grep_fixed '![t]' "$REPO_FIXTURE/summary.md"
+    refute_grep_fixed ' [x]' "$REPO_FIXTURE/summary.md"
+}
+
+# A backslash already in the title must not cancel the escape: `\[x\](u)`
+# escaped naively becomes `\\[x\\](u)`, which renders a live link (#3424 review).
+@test "adjacency: a backslash in an issue title cannot cancel the link escape" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 904 'BUG-8: scripts/tool.sh \[x\](https://example.invalid) a|b' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF 'tool.sh \\\[x\\\](https://example.invalid) a\|b |' "$REPO_FIXTURE/summary.md"
 }
 
 @test "adjacency: --help documents the flag" {

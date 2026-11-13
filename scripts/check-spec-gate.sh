@@ -541,6 +541,16 @@ _summary_cell() {
     printf '%s' "$1" | sed -e 's/|/\\|/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
 }
 
+# The title cell is markdown text, not a code span: link and image syntax would
+# render a live link or image from a title anyone can write (#3414). A backslash
+# before ASCII punctuation is markdown's own escape. A backslash already in the
+# title is doubled first, or `\[x\](u)` would become `\\[x\\](u)`, a live link
+# again. Then the cell escape, whose `\|` must not be doubled. Not applied to the
+# path cell, whose code span would show the backslashes.
+_summary_title() {
+    _summary_cell "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/\[/\\[/g' -e 's/]/\\]/g' -e 's/!/\\!/g')"
+}
+
 # A title printed on its own stdout line: the runner trims leading whitespace and
 # reads "::cmd::" (or the legacy "##[cmd]") as a workflow command (#3389).
 _break_commands() {
@@ -566,7 +576,7 @@ _emit_adjacency_ci_artifacts() {
                 # for the step-summary table, not command substitution.
                 # Clip before escaping: an entity cut in half would show on the page.
                 printf '| #%s | `%s` | %s |\n' "$num" "$(_summary_cell "$file_path")" \
-                    "$(_summary_cell "$(printf '%.88s' "$haystack")")"
+                    "$(_summary_title "$(printf '%.88s' "$haystack")")"
             done <<< "$rows"
         } >> "$GITHUB_STEP_SUMMARY"
     fi
