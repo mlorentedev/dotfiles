@@ -162,6 +162,12 @@ listing included, so the preview prints only the `needs root` reason; `apt list 
 outdated. When the installed `dotf` is not the pin, it runs the
 installer instead, which installs the pin and converges.
 
+A failed installer run is recorded one of two ways. `install-failed` means the pinned binary did not land:
+look at the download or checksum lines above the message. `converge-failed` with "installed; its converge
+failed at <steps>" means the pin is in place and a converge step failed, so look at that step in the converge
+report (`<state dir>/converge/last.json`), not at the installer. The second is recognised by a failed converge
+report that finished after the installer started (#3395).
+
 ## Diagnose
 
 Every `dotf update`, a skip included, writes `<state dir>/update/last.json` (`$XDG_STATE_HOME/dotfiles`,
