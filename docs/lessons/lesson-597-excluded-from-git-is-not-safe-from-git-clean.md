@@ -1,5 +1,5 @@
 ---
-id: "lesson-595-excluded-from-git-is-not-safe-from-git-clean"
+id: "lesson-597-excluded-from-git-is-not-safe-from-git-clean"
 type: lesson
 status: active
 title: "Excluded from git is not safe from git clean"
