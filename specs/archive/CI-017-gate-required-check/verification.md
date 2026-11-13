@@ -32,6 +32,16 @@ owner: manu
 - PR 2 drops `test-windows`' 13 step-level guards, which the job-level `if:` makes redundant, and reduces the two compound ones to their remaining condition (`failure()`; `push` and a cache miss).
 - `integration`, `test-macos` and `pi-nan-package` become blocking through `ci-gate` (owner, 2026-11-12). Last 32 runs on main: `integration` failed 1, the other two 0. A job that turns flaky is quarantined with a ticket, not left non-blocking.
 
+## Review dispositions
+
+The closing review (`review.md`, PASS WITH GAPS) left five items; the PR author disposed them:
+
+- Finding 1 (Major, job-level guard's push half untested) -> ticketed #3446, with finding 3.
+- Finding 2 (Minor, f2's command only passes on the PR head it names) -> declined for this contract: the criterion was reproduced from live runs (`ci-gate` failure, cancelled and skip-plus-success runs cited in `review.md`); the command is a snapshot by construction, since a docs-only commit's `ci-gate` is not `success`.
+- Finding 3 (Minor, no test pins the required set) -> ticketed #3446.
+- Finding 4 (Question, `gate` vs `ci-gate`) -> ticketed #3447 for the owner.
+- Finding 5 (surface only, per-job granularity) -> no action: the accepted cost of one required context per workflow.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
@@ -42,7 +52,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/CI-017-gate-required-check/` -> `specs/archive/CI-017-gate-required-check/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/CI-017-gate-required-check/` -> `specs/archive/CI-017-gate-required-check/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)

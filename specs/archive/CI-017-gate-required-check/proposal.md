@@ -1,7 +1,7 @@
 ---
 id: "CI-017-gate-required-check"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-12"
 issue: "mlorentedev/dotfiles#3306"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ci, gate]
