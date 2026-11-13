@@ -46,31 +46,30 @@ created: "2026-11-12"
 
 ## Implementation — PR 2: `dotf update` onto it
 
-- [ ] Rebase on `origin/main` once #3428 has landed.
-- [ ] [P] [AC2] In `internal/doctor/config_test.go`, add `TestParseVersions`
-  (reader form). In `internal/update/update_test.go`, add
+- [x] Merge `origin/main` once #3428 has landed (merged, not rebased: no force-push). #3428 landed while PR 1 was in review, so both halves ship as one PR, #3441.
+- [x] [P] [AC2] In `internal/update/update_test.go`, add
   `TestRun_PinComesFromTheUpstream` (Git fake answers `show @{u}:versions.conf`)
   and `TestRun_PinFallsBackToTheCheckout` (show fails: local pin used, message
   says so). Expected: FAIL.
-- [ ] [AC2] Split `doctor.ParseVersionsConf` into `ParseVersions(io.Reader)` and
+- [x] [AC2] Split `doctor.ParseVersionsConf` into `ParseVersions(io.Reader)` and
   the path wrapper. In `update`, read the pin from `@{u}:versions.conf` (fetching
   first on a dirty checkout, which `Assess` leaves unfetched), else `Deps.Pin`.
   Rerun. Expected: PASS.
-- [ ] [P] [AC1] Add `TestRun_InstallsThePinOnADriftedCheckout` (table: dirty,
+- [x] [P] [AC1] Add `TestRun_InstallsThePinOnADriftedCheckout` (table: dirty,
   ahead, diverged): install called with the upstream pin, converge not called,
   status unchanged, message names the install and the skipped converge, nil
   error. Add `TestRun_OfflineInstallsNothing`. Expected: FAIL.
-- [ ] [P] [AC5] Change `Deps.Install` to return the installed path and add
+- [x] [P] [AC5] Change `Deps.Install` to return the installed path and add
   `Deps.ConvergeWith(exe string) error`; add
   `TestRun_ConvergesWithTheInstalledBinary` and
   `TestRun_ConvergeFailureAfterTheInstall` (status `converge-failed`, non-nil
   error). Expected: FAIL.
-- [ ] [AC1] [AC5] Rework `update.Run`: one deployable/drift classification, the
+- [x] [AC1] [AC5] Rework `update.Run`: one deployable/drift classification, the
   install for every checkout state but `offline` and `not-a-repo`, the converge
   only when deployable. Remove `skipDrift`'s hint and the BUG-172
   `InstallerConverge` seam. Keep `Run` under 40 lines (closes #3427). Rerun.
   Expected: PASS.
-- [ ] [P] [AC6] Rewrite `internal/cmd/update_pin_test.go` on a fake release:
+- [x] [P] [AC6] Rewrite `internal/cmd/update_pin_test.go` on a fake release:
   an `httptest` server serving the test binary as `dotf` in a `.tar.gz` (`.zip`
   on Windows), the test binary acting as the fake dotf through a helper env var
   (`--version` prints the pin, `converge` records its args and exits with a
@@ -78,7 +77,7 @@ created: "2026-11-12"
   skips the converge on a diverged one; a failed converge is `converge-failed`;
   a bad checksum is `install-failed` and leaves the target untouched. No
   `runtime.GOOS` skip. Expected: FAIL.
-- [ ] [AC6] In `internal/cmd/update.go`, wire `Install` to
+- [x] [AC6] In `internal/cmd/update.go`, wire `Install` to
   `tools.Installer.InstallSelf(tools.DotfRelease(pin), <resolved executable>)`
   and `ConvergeWith` to `exec.Command(exe, "converge")` with
   `DOTFILES_REPO_DIR` set; delete `runInstaller`, `installerInvocation` and
