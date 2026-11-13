@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assert no setup twin globally npm-installs a tool packages.json owns (ADR-036).
+"""Assert no setup twin globally npm-installs a tool packages.json or mise owns (ADR-036).
 
 A tool whose packages.json source is `npm` is converged by `dotf tools install`;
 a setup twin that also runs `npm install -g` on it installs it twice, from two
@@ -31,6 +31,10 @@ This matches the property instead. For each global npm install command in a twin
 Comment lines and trailing comments are skipped. Usage:
 
     python3 tests/lib/npm-global-scan.py <packages.json> <twin>...
+    python3 tests/lib/npm-global-scan.py --owned <packages.json>   # the owner list
+
+The owner list is packages.json's npm entries plus the npmBackend map in
+cli/internal/tools/mise.go, read from packages.json's repository (#2438).
 
 Exit 0 with a count of the global installs checked, or 1 naming every offender.
 A twin with no global npm install at all passes: that is ADR-036's end state.
@@ -39,6 +43,7 @@ tests/setup-linux.bats, not by requiring the twins to carry an install.
 """
 
 import json
+import os
 import re
 import sys
 
@@ -217,11 +222,37 @@ def scan(owned, path):
     return bad, seen
 
 
-def main(argv):
-    owned = {t["source"]["package"] for t in json.load(open(argv[1]))["tools"]
+# mise's npm backend owns the npm-package CLIs it pins (#2438): the map lives in
+# cli/internal/tools/mise.go, beside packages.json's repository root. Reading it
+# here keeps one owner list for the scan; an empty or missing map fails closed.
+NPM_BACKEND_RE = re.compile(r"var npmBackend = map\[string\]string\{(.*?)\n\}", re.S)
+NPM_ENTRY_RE = re.compile(r'"[^"]+":\s*"npm:([^"]+)"')
+
+
+def mise_npm_packages(catalog):
+    src = os.path.join(os.path.dirname(os.path.abspath(catalog)), "cli", "internal", "tools", "mise.go")
+    if not os.path.exists(src):
+        return set()
+    block = NPM_BACKEND_RE.search(open(src).read())
+    if not block or not NPM_ENTRY_RE.findall(block.group(1)):
+        raise SystemExit(f"{src}: no npmBackend entries read; the scan cannot say what mise owns")
+    return set(NPM_ENTRY_RE.findall(block.group(1)))
+
+
+def owned_packages(catalog):
+    """Every npm package something other than a setup twin installs."""
+    owned = {t["source"]["package"] for t in json.load(open(catalog))["tools"]
              if t["source"]["type"] == "npm"}
+    return owned | mise_npm_packages(catalog)
+
+
+def main(argv):
+    if argv[1:2] == ["--owned"]:
+        print("\n".join(sorted(owned_packages(argv[2]))))
+        return 0
+    owned = owned_packages(argv[1])
     if not owned:
-        print("packages.json owns no npm tool, so the check would be vacuous")
+        print("neither packages.json nor mise's npm backend owns an npm tool, so the check would be vacuous")
         return 1
     bad, seen = [], 0
     for path in argv[2:]:
@@ -231,7 +262,7 @@ def main(argv):
     if bad:
         print("\n".join(bad))
         return 1
-    print(f"{seen} global npm install(s) checked, none of a catalog-owned tool")
+    print(f"{seen} global npm install(s) checked, none of an owned tool")
     return 0
 
 

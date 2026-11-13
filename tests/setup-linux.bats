@@ -2,6 +2,7 @@
 # Tests for setup-linux.sh
 
 load 'lib/refute'
+load 'lib/mise-owned'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -327,24 +328,24 @@ setup() {
 # that the catalog used to `npm install -g` on every machine, after a 404 on the
 # scoped name was "fixed" by dropping the scope. The refute below keeps any
 # obsidian npm entry from returning under either name.
-@test "parity: yarn is a catalog tool and obsidian is not an npm tool (OPS-042, #1615)" {
+@test "parity: yarn is a mise npm-backend CLI and obsidian is not an npm tool (OPS-042, #1615, #2438)" {
     [ -z "$(jq -r '.tools[] | select(.source.type=="npm" and (.name=="obsidian" or .source.package=="obsidian-cli")) | .name' "$DOTFILES_DIR/packages.json")" ]
-    [ "$(jq -r '.tools[] | select(.name=="yarn") | "\(.source.type) \(.source.package) \(.version)"' "$DOTFILES_DIR/packages.json")" = "npm yarn 1.22.22" ]
+    assert_mise_npm_cli yarn yarn
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-linux.sh"
     refute_grep 'obsidian-cli' "$DOTFILES_DIR/setup-windows.ps1"
     refute_grep '^OBSIDIAN_VERSION=' "$DOTFILES_DIR/versions.conf"
-    refute_grep '^YARN_VERSION=' "$DOTFILES_DIR/versions.conf"
 }
 
 # ADR-036: a tool packages.json installs through npm is converged by
-# `dotf tools install`, so neither setup twin may `npm install -g` it as well.
+# `dotf tools install`, and one mise's npm backend owns by `dotf tools sync`
+# (#2438), so neither setup twin may `npm install -g` it as well.
 # This matches the property, not a spelling: OPS-042's guard grepped for the two
 # forms it had deleted, and `npm install -g yarn@1.22.22` passed it (#1864). The
 # scan lives in tests/lib/npm-global-scan.py, which says what it resolves.
-@test "parity: neither setup twin npm-installs a tool packages.json owns (ADR-036, #1864)" {
+@test "parity: neither setup twin npm-installs a tool packages.json or mise owns (ADR-036, #1864)" {
     run python3 "$DOTFILES_DIR/tests/lib/npm-global-scan.py" "$DOTFILES_DIR/packages.json" \
         "$DOTFILES_DIR/setup-linux.sh" "$DOTFILES_DIR/setup-windows.ps1"
-    [ "$status" -eq 0 ] || { echo "a setup twin installs a catalog-owned npm tool: $output"; false; }
+    [ "$status" -eq 0 ] || { echo "a setup twin installs an owned npm tool: $output"; false; }
 }
 
 # The scan's own contract, on fixtures rather than on the twins, so it holds
@@ -399,14 +400,14 @@ setup() {
         $'npm install -g foo \\ \n    yarn'
         $'PI_PKG="@earendil-works/pi-coding-agent${PI_VERSION:+@$PI_VERSION}"\nnpm install -g --prefix "$HOME/.local" "$PI_PKG"'
     )
-    # The hostile fixtures are hostile only while packages.json owns these
-    # through npm. Say so here, so a catalog migration reads as one, not as a
-    # broken scan.
+    # The hostile fixtures are hostile only while something owns these through
+    # npm (packages.json or mise's npm backend). Say so here, so a migration that
+    # drops an owner reads as one, not as a broken scan.
+    run python3 "$scan" --owned "$DOTFILES_DIR/packages.json"
+    [ "$status" -eq 0 ] || { echo "owner list unreadable: $output"; false; }
     for pkg in yarn opencode-ai @bitwarden/cli @github/copilot; do
-        run python3 -c 'import json, sys
-sys.exit(0 if any(t["source"]["type"] == "npm" and t["source"].get("package") == sys.argv[2]
-                  for t in json.load(open(sys.argv[1]))["tools"]) else 1)' "$DOTFILES_DIR/packages.json" "$pkg"
-        [ "$status" -eq 0 ] || { echo "the fixtures assume packages.json owns $pkg through npm; pick another owned package"; false; }
+        printf '%s\n' "$output" | grep -qxF -- "$pkg" ||
+            { echo "the fixtures assume $pkg is npm-owned; pick another owned package"; false; }
     done
     # A rejection is a verdict naming the line, not just exit 1: a traceback
     # exits 1 too.
