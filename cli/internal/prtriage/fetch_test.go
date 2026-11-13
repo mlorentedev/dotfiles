@@ -753,6 +753,22 @@ func TestFetchClearsATriagedPRWhoseRealFindingWasReproduced(t *testing.T) {
 	}
 }
 
+// A push after the review moves the finding's line out of the diff, and
+// GitHub then answers line null with original_line still set. The row the
+// author wrote names the original line, and it must keep matching: read as
+// 0, the finding could never be triaged and the PR stayed held (#3455).
+func TestFetchKeepsTheOriginalLineOfAFindingThatLeftTheDiff(t *testing.T) {
+	responses := triagedPR10("| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |")
+	responses["/pulls/10/comments"] = `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":null,"original_line":4,"created_at":"2026-09-02T10:00:01Z"}]`
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("got %+v, want an empty queue: the row names the line the reviewer anchored", got)
+	}
+}
+
 // A gate that cannot read what it gates on fails closed: the PR stays listed.
 func TestFetchHoldsATriagedPRWhoseFindingsCannotBeRead(t *testing.T) {
 	fake := &fakeGH{responses: triagedPR10("| `cli/a.go:4` | apply | fixed |"), errs: map[string]error{"/pulls/10/comments": errors.New("boom")}}
