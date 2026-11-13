@@ -68,10 +68,12 @@ dir is reachable wherever git works, which every dotf command already requires.
    non-lane worktrees would be the next class of this defect.
 2. **Read precedence is admin dir, then the legacy in-tree file.** `Load`
    returns the admin-dir lease when present, the in-tree lease only when the
-   admin dir holds none, and `nil` with neither. `Save` writes the admin dir and
-   removes an in-tree copy it finds, so the first write after updating migrates
-   the lease. `dotf lane init`, the re-init step the runbook already prescribes
-   after updating, migrates each lane's lease and counts it in `changed`.
+   admin dir holds none (a non-worktree path reaches the same fallback), and
+   `nil` with neither. `Save` writes the admin dir; the in-tree copy follows the
+   overlap policy below, open for the owner. `dotf lane init`, the re-init step
+   the runbook already prescribes after updating, migrates each lane's lease and
+   counts it in `changed`. The admin-dir file gets its own constant; the in-tree
+   name stays on the exclude, clean and audit paths that name the tree file.
 3. **`Save` refuses a path that is not a linked worktree** (a main checkout, a
    plain directory, a submodule whose `.git` points into `modules/`), naming the
    path. It never falls back to writing in the tree: a silent fallback is how a
@@ -99,15 +101,24 @@ dir is reachable wherever git works, which every dotf command already requires.
   `git worktree remove` and after `rm -rf` plus `git worktree prune`; a
   worktree re-created at the same path starts without a lease, as `sweep` and
   `adopt` already expect of a worktree nobody leased.
-- **Mixed versions on one seat.** Old binary with the new guard: the old binary
-  writes in the tree and the new guard falls back to it. New binary with the old
-  guard: a lane leased only in the admin dir is blocked by the old rule 5b until
-  the hooks path is redeployed; the guard and the binary ship in one release and
-  `dotf update` runs `converge`, which redeploys it, so the window is a binary
-  installed by hand. An old binary run after a new one (a dev build on a seat
-  with a newer release, or the reverse) writes a fresh in-tree lease with
-  `reap_ok: true` and no lane name when it finds none; the new reader prefers
-  the admin dir and the next `Save` deletes the stray copy. Not a supported
+- **Mixed versions on one seat, and the open overlap policy.** The guard runs
+  from the machine-wide `core.hooksPath`, which `converge`'s `git-hooks` step
+  redeploys; it does not travel with the binary. `dotf update` runs `converge`,
+  and that converge failed on the authoring host on 2026-11-12 (#3395), so a
+  new binary against an old guard is a state a seat can stay in. Old binary with
+  the new guard: the old binary writes in the tree and the new guard falls back
+  to it. New binary with the old guard: a lane leased only in the admin dir is
+  blocked by the old rule 5b, and the old FIX (`lane init && lane switch`) no
+  longer writes the tree file, so the block does not clear. Two policies, the
+  owner's call (spec, Risks): **(A)** `Save` mirrors the lease in the tree for
+  one release and `Load` prefers the admin dir, so an old guard keeps working
+  and `git clean` can at worst reproduce today's block on an old guard; or
+  **(B)** `Save` removes the in-tree copy and a seat whose converge failed is
+  blocked until `dotf hooks deploy` runs, with `dotf doctor`'s guard check as
+  the signal. Recommendation: A. An old binary run after a new one (a dev build
+  on a seat with a newer release, or the reverse) finds the mirror under A; under
+  B it writes a fresh in-tree lease with `reap_ok: true` and no lane name, which
+  the new reader ignores in favour of the admin dir. Not a supported
   configuration; stated so it can be recognised.
 - Test fixtures that wrote the in-tree file by hand keep passing through the
   fallback, which is why the spec moves the ones that run in a real linked
