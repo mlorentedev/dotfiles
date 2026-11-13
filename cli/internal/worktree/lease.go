@@ -87,21 +87,23 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 		return fmt.Errorf("writing the worktree metadata mirror: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(admin, LeaseFileName), data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
-		restoreMirror(mirror, previous, readErr)
+		if restoreErr := restoreMirror(mirror, previous, readErr); restoreErr != nil {
+			return fmt.Errorf("writing worktree metadata: %w (and the in-tree mirror could not be put back, so it is ahead of the lease: %v)", err, restoreErr)
+		}
 		return fmt.Errorf("writing worktree metadata: %w", err)
 	}
 	return nil
 }
 
 // restoreMirror puts the in-tree mirror back to what it held before a Save
-// whose admin-dir write failed: the previous bytes, or no file. Best effort,
-// since the error that matters is the one already being returned.
-func restoreMirror(mirror string, previous []byte, readErr error) {
+// whose admin-dir write failed: the previous bytes, or no file. Its error is
+// reported alongside the one that matters, because a mirror left ahead of the
+// lease is what an old guard would read.
+func restoreMirror(mirror string, previous []byte, readErr error) error {
 	if readErr != nil {
-		_ = os.Remove(mirror)
-		return
+		return os.Remove(mirror)
 	}
-	_ = os.WriteFile(mirror, previous, 0o644) // #nosec G306 -- the lease is not a secret
+	return os.WriteFile(mirror, previous, 0o644) // #nosec G306 -- the lease is not a secret
 }
 
 // LeaseLegacyOnly reports whether worktreePath's lease exists only at the
