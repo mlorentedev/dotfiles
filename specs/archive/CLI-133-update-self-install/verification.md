@@ -34,18 +34,18 @@ owner: manu
 - **The BUG-172 report reader is gone.** With the install and the converge as two Go steps, their errors are distinct, so `InstallerConverge`, `failedConvergeSince` and their tests are deleted. This also retires the two CodeRabbit findings deferred from #3428 (a same-second stale report; the runbook overstating `install-failed`).
 - **Release URL seam is a package variable, not `DOTF_RELEASE_BASE`.** The installers' variable means `<host>/releases/download`; `tools.Installer.BaseURL` means the host before `<owner>/<repo>`. Reusing the name with another shape would be a second contract; tests set the variable instead.
 - **The pin is parsed in the command layer.** `update` cannot import `doctor` (doctor imports update), so `Deps.Pin(ref)` takes the ref and `cmd` reads `git show <ref>:versions.conf` through `doctor.ParseVersions`, split out of `ParseVersionsConf`.
-- **A held `.old` is not an error** (advisor, before review). On Windows the previous copy is often still running (a `dotf secrets run` wrapper), so `<dst>.old` cannot be removed on the next update. The first draft returned an error there, which would have failed every second update on Windows while Unix, where unlinking a running binary is allowed, stayed green. Now the current binary goes aside under a unique `<dst>.old.<n>` and every `<dst>.old*` is swept best-effort. Mutation: restoring the error return fails `TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld` on macOS. Lesson 594.
+- **A held `.old` is not an error** (advisor, before review). On Windows the previous copy is often still running (a `dotf secrets run` wrapper), so `<dst>.old` cannot be removed on the next update. The first draft returned an error there, which would have failed every second update on Windows while Unix, where unlinking a running binary is allowed, stayed green. Now the current binary goes aside under a unique `<dst>.old.<n>` and every `<dst>.old*` is swept best-effort. Mutation: restoring the error return fails `TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld` on macOS. Lesson 595.
 - **`update.Run` is 23 lines** after the rework, closing #3427.
 
 ## Review findings (review.md, PASS at d738f8bb)
 
 - **Minor, POSIX window between the two renames** — declined. One replacement path on every OS is the point (AC4, agnostic CLI): a Unix-only `os.Rename(staged, dst)` branch would leave the Windows path exercised by one CI leg only. The window is two consecutive renames in one directory; a concurrent `dotf` started inside it fails to start and is rerun, it never runs a partial binary.
-- **Minor, a held `<dst>.old` aborts the next update on Windows** — applied in `86802fc6`, after the reviewed commit: unique aside name plus a best-effort sweep, `TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld` (decision above, lesson 594).
+- **Minor, a held `<dst>.old` aborts the next update on Windows** — applied in `86802fc6`, after the reviewed commit: unique aside name plus a best-effort sweep, `TestPlaceBinarySetsAsideAgainWhileAnOldCopyIsHeld` (decision above, lesson 595).
 - **Minor, `convergeWith` does not pass stdin** — applied: the child converge now inherits `c.InOrStdin()`, so an interactive `dotf update` behaves like an interactive `dotf converge`.
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-594-a-binary-that-replaces-itself-must-survive-its-own-previous-copy.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-595-a-binary-that-replaces-itself-must-survive-its-own-previous-copy.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: ADR-019 (fast-forward only) still governs the checkout; installing the pinned release is the existing DOTF_VERSION contract executed in Go, recorded in the spec and the runbook
 - [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: self-replacement of a running binary occurs only in dotf
 

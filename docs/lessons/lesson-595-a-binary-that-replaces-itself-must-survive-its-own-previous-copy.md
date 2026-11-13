@@ -1,5 +1,5 @@
 ---
-id: "lesson-594-a-binary-that-replaces-itself-must-survive-its-own-previous-copy"
+id: "lesson-595-a-binary-that-replaces-itself-must-survive-its-own-previous-copy"
 type: lesson
 status: active
 title: "A binary that replaces itself must survive its own previous copy"
