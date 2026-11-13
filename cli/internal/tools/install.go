@@ -819,12 +819,29 @@ func removeAside(dst string) {
 	if err != nil {
 		return
 	}
-	prefix := filepath.Base(dst) + ".old"
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), prefix) {
+		if isAside(filepath.Base(dst), e.Name()) {
 			_ = os.Remove(filepath.Join(filepath.Dir(dst), e.Name()))
 		}
 	}
+}
+
+// isAside reports whether name is a copy replaceFile set aside for base:
+// exactly <base>.old or <base>.old.<digits>. A sibling such as <base>.older or
+// <base>.old-backup is someone else's file.
+func isAside(base, name string) bool {
+	rest, ok := strings.CutPrefix(name, base+".old")
+	if !ok {
+		return false
+	}
+	if rest == "" {
+		return true
+	}
+	digits, ok := strings.CutPrefix(rest, ".")
+	if !ok || digits == "" {
+		return false
+	}
+	return strings.Trim(digits, "0123456789") == ""
 }
 
 // verifyChecksum confirms assetPath's sha256 matches the entry for assetName in
