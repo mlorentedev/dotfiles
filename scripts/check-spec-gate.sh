@@ -535,6 +535,25 @@ _adjacent_open_issues() {
     return 0
 }
 
+# The first $1 bytes of $2, backed off to the last whole UTF-8 character: the
+# rule of gate.Clip in `dotf gate spec`. printf '%.88s' counted bytes in bash and
+# characters in zsh under a UTF-8 locale, so the two shells and Go disagreed on a
+# title whose multibyte character straddles the cut, and bash emitted half of it
+# (#3413). Measured in bytes under LC_ALL=C in both shells; a UTF-8 continuation
+# byte (0x80-0xBF) at the cut means the character started before it.
+_clip_utf8() {
+    local LC_ALL=C
+    local n="$1" s="$2" b
+    if [ "${#s}" -le "$n" ]; then printf '%s' "$s"; return 0; fi
+    while [ "$n" -gt 0 ]; do
+        printf -v b '%d' "'${s:$n:1}"
+        if [ "$b" -lt 0 ]; then b=$((b + 256)); fi
+        if [ "$b" -lt 128 ] || [ "$b" -ge 192 ]; then break; fi
+        n=$((n - 1))
+    done
+    printf '%s' "${s:0:$n}"
+}
+
 # A step-summary table cell: a pipe would split the cell, and the summary renders
 # inline HTML, so angle brackets in an issue title would reach it as tags (#3389).
 _summary_cell() {
@@ -576,7 +595,7 @@ _emit_adjacency_ci_artifacts() {
                 # for the step-summary table, not command substitution.
                 # Clip before escaping: an entity cut in half would show on the page.
                 printf '| #%s | `%s` | %s |\n' "$num" "$(_summary_cell "$file_path")" \
-                    "$(_summary_title "$(printf '%.88s' "$haystack")")"
+                    "$(_summary_title "$(_clip_utf8 88 "$haystack")")"
             done <<< "$rows"
         } >> "$GITHUB_STEP_SUMMARY"
     fi
@@ -603,7 +622,7 @@ _report_adjacent_issues() {
     while IFS=$'\t' read -r num file_path haystack; do
         if [[ -z "$num" ]]; then continue; fi
         printf '         #%-6s names %s\n' "$num" "$file_path"
-        printf '                 %.88s\n' "$(_break_commands "$haystack")"
+        printf '                 %s\n' "$(_clip_utf8 88 "$(_break_commands "$haystack")")"
     done <<< "$rows"
     printf '       One of these may describe the same defect on an input shape this\n'
     printf '       change does not cover. Fold it in, or record why it is separate,\n'

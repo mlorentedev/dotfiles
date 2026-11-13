@@ -328,6 +328,28 @@ _write_849_feed() {
     grep -qF 'tool.sh \\\[x\\\](https://example.invalid) a\|b |' "$REPO_FIXTURE/summary.md"
 }
 
+# #3413: printf '%.88s' counts bytes in bash, so a multibyte character that
+# straddles byte 88 was cut in half; gate.Clip backs off to the character
+# boundary. Both now emit the same whole-character prefix on stdout and in the
+# step summary.
+@test "adjacency: a multibyte character straddling byte 88 is clipped whole" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    local pad title
+    pad="scripts/tool.sh $(printf 'a%.0s' {1..71})"
+    title="${pad}"$'\xc3\xb1'"b"
+    printf '%s\t%s\n' 906 "$title" > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"${pad}"$'\n'* ]] || false
+    [[ "$output" != *$'\xc3'* ]] || false
+    grep -qF "| ${pad} |" "$REPO_FIXTURE/summary.md"
+    # A lone 0xC3 is not a valid pattern under a UTF-8 locale: count bytes.
+    [ "$(LC_ALL=C grep -c $'\xc3' "$REPO_FIXTURE/summary.md")" = 0 ]
+}
+
 @test "adjacency: --help documents the flag" {
     spec_gate_both --help
     [ "$status" -eq 0 ]

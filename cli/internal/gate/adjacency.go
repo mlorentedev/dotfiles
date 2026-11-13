@@ -80,11 +80,9 @@ func firstMatch(text string, files []string) string {
 	return ""
 }
 
-// Clip is s cut to at most n bytes, backed off to the last whole character.
-// On ASCII text it is the script's printf '%.88s'. Where the cut lands inside
-// a character the shells already disagree with each other, bash counting
-// bytes and zsh characters, and a cut mid-rune would put invalid UTF-8 in an
-// annotation and a Markdown table: a whole character is the better answer.
+// Clip is s cut to at most n bytes, backed off to the last whole character,
+// so a cut never puts invalid UTF-8 in an annotation or a Markdown table. The
+// script's _clip_utf8 applies the same rule in bash and zsh (#3413).
 func Clip(s string, n int) string {
 	if len(s) <= n {
 		return s
