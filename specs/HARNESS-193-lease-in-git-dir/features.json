@@ -8,14 +8,14 @@
   },
   {
     "id": "HARNESS-193-lease-in-git-dir-f2",
-    "behavior": "AC2: LoadMetadata prefers the admin dir and falls back to the in-tree lease; SaveMetadata writes the admin dir, applies the overlap policy to the in-tree copy and refuses a non-worktree path",
+    "behavior": "AC2: LoadMetadata prefers the admin dir and falls back to the in-tree lease; SaveMetadata writes the admin dir and the in-tree mirror, and refuses a non-worktree path",
     "verification": "cd cli && grep -q 'func TestLeaseLivesInTheWorktreeGitDir(' internal/worktree/*_test.go && go test ./internal/worktree/ -run 'TestLeaseLivesInTheWorktreeGitDir$|TestAdminDir' -count=1",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-193-lease-in-git-dir-f3",
-    "behavior": "AC3: dotf lane init migrates in-tree leases into the admin dir (changed=n) and a second run reports changed=0",
+    "behavior": "AC3: dotf lane init copies legacy-only leases into the admin dir (changed=n, keyed on the admin dir) and a second run reports changed=0",
     "verification": "cd cli && grep -q 'func TestLaneInitMigratesInTreeLeases(' internal/lane/*_test.go && go test ./internal/lane/ -run 'TestLaneInitMigratesInTreeLeases$' -count=1",
     "state": "pending",
     "evidence": ""
@@ -36,7 +36,7 @@
   },
   {
     "id": "HARNESS-193-lease-in-git-dir-f6",
-    "behavior": "AC6: worktree list names a lease still at the legacy location; every existing test in worktree, lane, cmd and mem passes",
+    "behavior": "AC6: worktree list names a legacy-only lease (admin dir empty, in-tree present) and not one the admin dir holds; every existing test in worktree, lane, cmd and mem passes",
     "verification": "cd cli && grep -q 'func TestListNamesALegacyLocationLease(' internal/worktree/*_test.go && go test ./internal/worktree/ ./internal/lane/ ./internal/cmd/ ./internal/mem/ -count=1",
     "state": "pending",
     "evidence": ""

@@ -16,7 +16,10 @@ created: "2026-11-12"
 
 Proposed 2026-11-12 (direction chosen by the owner on #3307; the spec is
 `specs/HARNESS-193-lease-in-git-dir/`). Amends ADR-061's consequence "the lease
-stays in the worktree and stays deletable by `git clean -fdx`".
+stays in the worktree and stays deletable by `git clean -fdx`". The owner
+delegated the review of this draft and its open overlap policy to the PR author
+on 2026-11-12; the policy below is decided on that delegation and the owner can
+overrule it before the mirror ships.
 
 ## Context
 
@@ -69,11 +72,14 @@ dir is reachable wherever git works, which every dotf command already requires.
 2. **Read precedence is admin dir, then the legacy in-tree file.** `Load`
    returns the admin-dir lease when present, the in-tree lease only when the
    admin dir holds none (a non-worktree path reaches the same fallback), and
-   `nil` with neither. `Save` writes the admin dir; the in-tree copy follows the
-   overlap policy below, open for the owner. `dotf lane init`, the re-init step
-   the runbook already prescribes after updating, migrates each lane's lease and
-   counts it in `changed`. The admin-dir file gets its own constant; the in-tree
-   name stays on the exclude, clean and audit paths that name the tree file.
+   `nil` with neither. `Save` writes the admin dir and, for one release, the same
+   bytes to the in-tree file (the overlap policy below). A lease is *legacy-only*
+   when the admin dir holds none and the in-tree file exists. `dotf lane init`,
+   the re-init step the runbook already prescribes after updating, copies each
+   lane's legacy-only lease into the admin dir and counts that lane in `changed`,
+   keyed on the admin dir; a non-lane worktree migrates on its next `Save`. The
+   admin-dir file gets its own constant; the in-tree name stays on the exclude,
+   clean and audit paths that name the tree file.
 3. **`Save` refuses a path that is not a linked worktree** (a main checkout, a
    plain directory, a submodule whose `.git` points into `modules/`), naming the
    path. It never falls back to writing in the tree: a silent fallback is how a
@@ -84,13 +90,14 @@ dir is reachable wherever git works, which every dotf command already requires.
    applies for the memory thread. `mem` cannot import `worktree` (the dependency
    runs the other way), so its parked-lane check keeps its own pointer reader
    and reads the lease at the same path.
-5. **The guard's rules 5 and 6 read `$git_dir/dotf-worktree.json` first and
-   `$top/.dotf-worktree.json` only when the first is absent**, the same
-   precedence as Go, so the shell and Go readers cannot disagree about which
-   lease is in force.
-6. **The legacy read path and the `info/exclude` line for the in-tree file are
-   kept for one release** and removed under their own ticket, filed from the
-   spec.
+5. **The guard's rule 5 and rule 6's detached-HEAD test read
+   `$git_dir/dotf-worktree.json` first and `$top/.dotf-worktree.json` only when
+   the first is absent**, the same precedence as Go, so the shell and Go readers
+   cannot disagree about which lease is in force.
+6. **The mirror, the legacy read path and the `info/exclude` line for the
+   in-tree file are kept for one release** and removed under their own ticket,
+   filed from the spec, once a release has shipped with the mirror and
+   `dotf worktree list` reports no legacy-only lease on the owner's seats.
 
 ## Consequences
 
@@ -101,32 +108,37 @@ dir is reachable wherever git works, which every dotf command already requires.
   `git worktree remove` and after `rm -rf` plus `git worktree prune`; a
   worktree re-created at the same path starts without a lease, as `sweep` and
   `adopt` already expect of a worktree nobody leased.
-- **Mixed versions on one seat, and the open overlap policy.** The guard runs
-  from the machine-wide `core.hooksPath`, which `converge`'s `git-hooks` step
+- **Mixed versions on one seat, and the overlap policy.** The guard runs from
+  the machine-wide `core.hooksPath`, which `converge`'s `git-hooks` step
   redeploys; it does not travel with the binary. `dotf update` runs `converge`,
   and that converge failed on the authoring host on 2026-11-12 (#3395), so a
-  new binary against an old guard is a state a seat can stay in. Old binary with
-  the new guard: the old binary writes in the tree and the new guard falls back
-  to it. New binary with the old guard: a lane leased only in the admin dir is
-  blocked by the old rule 5b, and the old FIX (`lane init && lane switch`) no
-  longer writes the tree file, so the block does not clear. Two policies, the
-  owner's call (spec, Risks): **(A)** `Save` mirrors the lease in the tree for
-  one release and `Load` prefers the admin dir, so an old guard keeps working
-  and `git clean` can at worst reproduce today's block on an old guard; or
-  **(B)** `Save` removes the in-tree copy and a seat whose converge failed is
-  blocked until `dotf hooks install` runs, with `dotf doctor`'s guard check as
-  the signal. Recommendation: A. An old binary run after a new one (a dev build
-  on a seat with a newer release, or the reverse) finds the mirror under A; under
-  B it writes a fresh in-tree lease with `reap_ok: true` and no lane name, which
-  the new reader ignores in favour of the admin dir. Not a supported
-  configuration; stated so it can be recognised.
+  new binary against an old guard is a state a seat can stay in; and between
+  this merge and the next release the pinned binary on `PATH`, the one the hooks
+  call, is the old one. Without a mirror, a lane leased only in the admin dir is
+  blocked by the old rule 5b and the old FIX (`lane init && lane switch`) no
+  longer writes the tree file, so the block does not clear until
+  `dotf hooks install` runs. The alternative, accepting that window with
+  `dotf doctor`'s guard check as the signal, was rejected: a mirror can be
+  dropped later, a blocked seat cannot be unblocked after the fact. So `Save`
+  mirrors for one release and `Load` prefers the admin dir; `git clean` can at
+  worst reproduce today's block on an old guard, and the mirror is rewritten by
+  the next `Save`.
+- **An old binary writing while a new one reads.** The old binary's writes reach
+  the mirror alone, so after an old `lane park`, `lane switch`, `sweep` park or
+  `lane next` renewal the admin copy is stale and the new reader prefers it.
+  Traced through every production writer (spec, Risks): the reachable outcomes
+  are a WIP-cap refusal, a guard block with its FIX, or a `sweep` reap verdict
+  reached earlier on a worktree that is clean, past grace and merged, the
+  verdict today's `sweep` reaches a day later. Named lanes are never deleted.
+  The precedence stands; the window closes with the release that puts the new
+  binary on `PATH`.
 - Test fixtures that wrote the in-tree file by hand keep passing through the
   fallback, which is why the spec moves the ones that run in a real linked
   worktree to the admin dir: a fixture that passes for the wrong reason is
   coverage of the path being retired.
-- `dotf worktree list` names a lease still at the legacy location, so a seat can
-  see what the re-init has yet to migrate; a `doctor` entry for it belongs to
-  the seat-wide sweep entry (#3327).
+- `dotf worktree list` names a legacy-only lease, so a seat can see which
+  worktrees no `Save` has reached since the update; a `doctor` entry for it
+  belongs to the seat-wide sweep entry (#3327).
 - Windows is unverified on the authoring box; the pointer file is read with
   `filepath.Clean`, which normalises either separator, and the Go tests run on
   all three CI legs.
