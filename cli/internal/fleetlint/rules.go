@@ -19,8 +19,9 @@ const (
 
 var shaRef = regexp.MustCompile(`@[0-9a-f]{40}$`)
 
-// lintWorkflow applies every rule to one workflow file.
-func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, error) {
+// lintWorkflow applies every rule to one workflow file; the branch rule only
+// when branches is set.
+func lintWorkflow(path string, data []byte, defaultBranch string, branches bool) ([]Finding, error) {
 	docs, err := decodeDocs(data)
 	if err != nil {
 		return nil, err
@@ -36,11 +37,13 @@ func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, er
 		if rerunsOnPush(on) {
 			out = append(out, cancelFinding(path, root, onKey)...)
 		}
-		bf, err := branchFindings(path, on, defaultBranch)
-		if err != nil {
-			return nil, err
+		if branches {
+			bf, err := branchFindings(path, on, defaultBranch)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, bf...)
 		}
-		out = append(out, bf...)
 		jobs := mapValue(root, "jobs")
 		if jobs == nil || jobs.Kind != yaml.MappingNode {
 			continue

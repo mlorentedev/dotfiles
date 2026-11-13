@@ -39,6 +39,22 @@ var actionDirs = []string{".github/actions", ".gitea/actions"}
 // the exceptions file's own, sorted by file, line and rule. An unreadable file
 // is an error, never an empty result.
 func Lint(dir, defaultBranch string) ([]Finding, error) {
+	return LintRules(dir, defaultBranch, nil)
+}
+
+// LintRules is Lint keeping only the findings of the rules in only, every rule
+// when only is empty. The branch rule runs only when it, or the exception
+// check that judges its exceptions, is selected: no other rule needs the
+// default branch, so a selection without them passes where none is known.
+func LintRules(dir, defaultBranch string, only []string) ([]Finding, error) {
+	all, err := lint(dir, defaultBranch, len(only) == 0 || slices.Contains(only, RuleBranchFilter) || slices.Contains(only, RuleException))
+	if err != nil || len(only) == 0 {
+		return all, err
+	}
+	return slices.DeleteFunc(all, func(f Finding) bool { return !slices.Contains(only, f.Rule) }), nil
+}
+
+func lint(dir, defaultBranch string, branches bool) ([]Finding, error) {
 	var all []Finding
 	for _, wd := range workflowDirs {
 		files, err := workflowFiles(filepath.Join(dir, wd))
@@ -47,7 +63,7 @@ func Lint(dir, defaultBranch string) ([]Finding, error) {
 		}
 		for _, f := range files {
 			found, err := lintFile(dir, f, func(rel string, data []byte) ([]Finding, error) {
-				return lintWorkflow(rel, data, defaultBranch)
+				return lintWorkflow(rel, data, defaultBranch, branches)
 			})
 			if err != nil {
 				return nil, err

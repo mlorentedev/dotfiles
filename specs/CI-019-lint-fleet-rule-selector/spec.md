@@ -20,6 +20,7 @@ The ci-workflows `hygiene` composite (CI-005) is meant to replace the fleet's ve
 ## Scope
 
 - `--rule <id>`, repeatable: report only findings of the named rules. Exit 1 means a finding of a selected rule; findings of other rules neither print nor count. An unknown id is a usage error (exit 2) that lists the known ids. Works with `--dir` and `--fleet`, and the `--summary` table holds only the selected findings.
+- A selection without `fleet/branch-filter` or `fleet/exception` does not run the branch rule, so it needs no default branch: an `actions/checkout` clone has no `origin/HEAD`, and the pin check must not fail there on a rule it did not select. `fleet/exception` keeps the need, since judging a branch-filter exception stale takes the branch rule's findings.
 - Selection happens after exceptions are applied, so an exception for an unselected rule still silences its finding and is still checked for staleness; a stale one shows only when `fleet/exception` is selected.
 - `fleet/sha-pin` also reads `runs.steps[].uses` in `.github/actions/<name>/action.yml` and `action.yaml` (and `.gitea/actions/<name>/`, as workflows are read on both forges). Exceptions name such a file by its path, as for a workflow.
 
@@ -66,6 +67,27 @@ ci-workflows: main 0 findings (exit 0); branch 0 findings (exit 0); --rule fleet
 pollex: main 20 findings (exit 1); branch 20 findings (exit 1); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
 kubelab: main 57 findings (exit 1); branch 57 findings (exit 1); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
 hive: main 22 findings (exit 1); branch 22 findings (exit 1); --rule fleet/sha-pin exit 0: [OK] no fleet lint findings
+```
+
+- The branch-free selection, and its mutations on a copy:
+
+```
+$ mutations of the branch-free selection, on a copy
+branch rule always runs: caught
+branch rule skipped under its own selection: caught
+exception selection needs no branch: caught
+branch rule never runs: caught
+selection filter dropped: caught
+```
+
+```
+$ # a ci-workflows tree with no .git, so no origin/HEAD, as in an actions/checkout clone
+$ dotf lint fleet --dir <copy> --rule fleet/sha-pin   # this branch
+[OK] no fleet lint findings
+exit=0
+$ dotf lint fleet --dir <copy> --rule fleet/branch-filter
+[ERROR] .github/workflows/lint.yml: a workflow filters on branches and the default branch is unknown: pass --default-branch
+exit=2
 ```
 
 - A copy of ci-workflows with `actions/setup-node` in `.github/actions/setup-node/action.yml` moved to `@v9`: `--rule fleet/sha-pin` exits 1 with `.github/actions/setup-node/action.yml:58: fleet/sha-pin: actions/setup-node@v9 is not pinned by a full commit SHA`.

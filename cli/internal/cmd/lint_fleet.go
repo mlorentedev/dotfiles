@@ -51,6 +51,8 @@ are still checked.
 --rule <id>, repeatable, reports only the named rules: findings of the
 others neither print nor count toward the exit code. Exceptions are
 applied first, so a stale one shows only under --rule fleet/exception.
+A selection without fleet/branch-filter or fleet/exception needs no
+default branch.
 
 fleet/sha-pin also reads the steps of each local composite action,
 .github/actions/<name>/action.yml (or .gitea/actions, or action.yaml).
@@ -103,11 +105,7 @@ func lintRepo(deps lintFleetDeps, dir, defaultBranch string) ([]fleetlint.Findin
 	if defaultBranch == "" {
 		defaultBranch = deps.branchOf(dir)
 	}
-	findings, err := fleetlint.Lint(dir, defaultBranch)
-	if err != nil || len(deps.only) == 0 {
-		return findings, err
-	}
-	return slices.DeleteFunc(findings, func(f fleetlint.Finding) bool { return !slices.Contains(deps.only, f.Rule) }), nil
+	return fleetlint.LintRules(dir, defaultBranch, deps.only)
 }
 
 func runLintFleet(stdout, stderr io.Writer, deps lintFleetDeps, dir, defaultBranch, summary string) error {

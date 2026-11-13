@@ -46,7 +46,9 @@ dotf lint fleet --dir . --rule fleet/sha-pin  # one rule only; repeat --rule for
 
 `--rule` reports only the named rules: findings of the others neither print, enter the summary table, nor count
 toward the exit code, so a check that owns one rule (the ci-workflows `hygiene` composite runs `fleet/sha-pin`) is
-not turned red by another. Exceptions are applied first: a stale one shows only under `--rule fleet/exception`. An
+not turned red by another. Exceptions are applied first: a stale one shows only under `--rule fleet/exception`. A
+selection without `fleet/branch-filter` or `fleet/exception` does not run the branch rule and needs no default
+branch, so `--rule fleet/sha-pin` works in an `actions/checkout` clone without `--default-branch`. An
 id that names no rule is exit 2 and lists the rules.
 
 `--fleet` checks each checkout against the branch its own `origin/HEAD` names and prefixes each finding with the

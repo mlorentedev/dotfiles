@@ -215,3 +215,20 @@ func TestLintFleetUnknownRule(t *testing.T) {
 		t.Errorf("unknown rule: exit %d, %q", code, out)
 	}
 }
+
+// A selection that leaves out the branch rule needs no default branch: an
+// actions/checkout clone has no origin/HEAD, and a pin check there must not
+// fail on a rule it did not ask for. The branch rule, and the exception
+// check that judges its exceptions, still need one.
+func TestLintFleetRuleSelectorNeedsNoBranchForOtherRules(t *testing.T) {
+	dir := t.TempDir()
+	writeWorkflow(t, dir, "on:\n  push:\n    branches: [master]\njobs:\n  a:\n    runs-on: x\n    timeout-minutes: 5\n    steps:\n      - uses: owner/setup@v4\n")
+	if out, code := runLintFleetCmd(t, "--dir", dir, "--rule", "fleet/sha-pin"); code != 1 || !strings.Contains(out, "ci.yml:9: fleet/sha-pin") {
+		t.Errorf("pin rule, no default branch: exit %d, %q", code, out)
+	}
+	for _, rule := range []string{"fleet/branch-filter", "fleet/exception"} {
+		if out, code := runLintFleetCmd(t, "--dir", dir, "--rule", rule); code != 2 || !strings.Contains(out, "--default-branch") {
+			t.Errorf("%s, no default branch: exit %d, %q", rule, code, out)
+		}
+	}
+}
