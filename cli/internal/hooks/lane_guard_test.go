@@ -136,8 +136,18 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	// 3a. The block says what it found. At the main checkout it names the main
 	// checkout; in a linked worktree that happens to hold main it names that
 	// worktree and never "the main checkout", with the recovery for each.
-	if out, _ := runLaneGuardInDir(t, script, laneRepo); !strings.Contains(out, "'main' at the main checkout") {
-		t.Fatalf("expected the main-checkout block to say so, got:\n%s", out)
+	if out, err := runLaneGuardInDir(t, script, laneRepo); err == nil || !strings.Contains(out, "'main' at the main checkout") {
+		t.Fatalf("expected the main-checkout block to say so, got err=%v out=%s", err, out)
+	}
+	// From a subdirectory git answers --git-dir absolute and --git-common-dir
+	// relative to that subdirectory; the guard must still know it is the main
+	// checkout rather than a linked worktree.
+	subdir := filepath.Join(laneRepo, "sub", "dir")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runLaneGuardInDir(t, script, subdir); err == nil || !strings.Contains(out, "'main' at the main checkout") {
+		t.Fatalf("expected the block to name the main checkout from a subdirectory too, got err=%v out=%s", err, out)
 	}
 	mainRepo := filepath.Join(t.TempDir(), "main-repo")
 	initGitRepoForLaneGuard(t, mainRepo, "main")
@@ -256,8 +266,8 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	if out, err := runLaneGuardInDir(t, script, detachedMain); err == nil || !strings.Contains(out, "at the main checkout") {
 		t.Fatalf("expected a detached HEAD at the main checkout to be blocked with the main-checkout message, got err=%v out=%s", err, out)
 	}
-	if out, _ := runLaneGuardInDir(t, script, detachedMain); !strings.Contains(out, "dotf lane switch <type>/<issue>-<slug>") || strings.Contains(out, "worktree adopt") {
-		t.Fatalf("the main checkout is no worktree to adopt: its recovery is lane switch, got:\n%s", out)
+	if out, err := runLaneGuardInDir(t, script, detachedMain); err == nil || !strings.Contains(out, "dotf lane switch <type>/<issue>-<slug>") || strings.Contains(out, "worktree adopt") {
+		t.Fatalf("the main checkout is no worktree to adopt: its recovery is lane switch, got err=%v out=%s", err, out)
 	}
 
 	// 7. Commit inside copilot-worktrees/ for a .dotf/lanes.json repo -> blocked (m4).

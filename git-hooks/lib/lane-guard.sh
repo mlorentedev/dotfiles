@@ -31,6 +31,11 @@ set -u
 top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -n "$top" ] || exit 0
 
+# git answers --git-dir absolute but --git-common-dir relative to the cwd when
+# run from a subdirectory, and the two are made absolute against $top below.
+# Standing at $top makes every relative answer mean the same directory.
+cd "$top" || exit 0
+
 git_dir="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
 case "$git_dir" in
   /*|[A-Za-z]:/*|[A-Za-z]:\\*) ;;
