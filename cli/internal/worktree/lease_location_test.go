@@ -276,3 +276,40 @@ func TestSaveMetadataPutsTheMirrorBackWhenTheAdminDirRefuses(t *testing.T) {
 		t.Errorf("a failed Save left a mirror behind (err=%v)", err)
 	}
 }
+
+// A mirror that exists but cannot be read is one Save could not put back, so
+// Save refuses before writing anything: the unreadable file is still there,
+// unchanged, and the admin-dir lease is as it was.
+func TestSaveMetadataRefusesWhenTheMirrorCannotBeRead(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a write-only file does not refuse a read here")
+	}
+	_, wt := linkedWorktree(t, "feat/unreadable")
+	old := Metadata{Lane: "feat-lane-primary", State: string(StateActive)}
+	if err := SaveMetadata(wt, old); err != nil {
+		t.Fatal(err)
+	}
+	mirror := filepath.Join(wt, MetadataFileName)
+	if err := os.Chmod(mirror, 0o200); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(mirror, 0o644) })
+
+	err := SaveMetadata(wt, Metadata{Lane: "feat-lane-primary", State: string(StateParked)})
+	if err == nil || !strings.Contains(err.Error(), "mirror") {
+		t.Fatalf("Save with an unreadable mirror: %v; want an error naming the mirror", err)
+	}
+	if err := os.Chmod(mirror, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(mirror)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, mustJSON(t, old)) {
+		t.Errorf("Save changed a mirror it could not read:\n%s", got)
+	}
+	if meta, err := LoadMetadata(wt); err != nil || meta == nil || meta.State != string(StateActive) {
+		t.Errorf("LoadMetadata after the refused Save = %+v, %v; want the previous ACTIVE lease", meta, err)
+	}
+}

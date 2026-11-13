@@ -83,7 +83,12 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 		return err
 	}
 	mirror := filepath.Join(worktreePath, MetadataFileName)
-	previous, readErr := os.ReadFile(mirror)                  // #nosec G304 -- the mirror path this package composed
+	previous, readErr := os.ReadFile(mirror) // #nosec G304 -- the mirror path this package composed
+	if readErr != nil && !os.IsNotExist(readErr) {
+		// A mirror that exists but cannot be read cannot be put back either,
+		// so nothing is written: the one that is there stays as it is.
+		return fmt.Errorf("reading the worktree metadata mirror before replacing it: %w", readErr)
+	}
 	if err := os.WriteFile(mirror, data, 0o644); err != nil { // #nosec G306 -- the lease is not a secret
 		return fmt.Errorf("writing the worktree metadata mirror: %w", err)
 	}
@@ -97,11 +102,12 @@ func SaveMetadata(worktreePath string, meta Metadata) error {
 }
 
 // restoreMirror puts the in-tree mirror back to what it held before a Save
-// whose admin-dir write failed: the previous bytes, or no file. Its error is
-// reported alongside the one that matters, because a mirror left ahead of the
-// lease is what an old guard would read.
+// whose admin-dir write failed: the previous bytes, or no file when readErr
+// says there was none (any other read error stopped the Save before it
+// wrote). Its error is reported alongside the one that matters, because a
+// mirror left ahead of the lease is what an old guard would read.
 func restoreMirror(mirror string, previous []byte, readErr error) error {
-	if readErr != nil {
+	if os.IsNotExist(readErr) {
 		return os.Remove(mirror)
 	}
 	return os.WriteFile(mirror, previous, 0o644) // #nosec G306 -- the lease is not a secret
