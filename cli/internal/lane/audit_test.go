@@ -268,10 +268,26 @@ func TestAuditLanes_ReportsABrokenLane(t *testing.T) {
 	t.Run("no lease", func(t *testing.T) {
 		repoDir, wtRoot := initialisedLaneRepo(t)
 		lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
+		admin, err := worktree.AdminDir(lanePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, lease := range []string{filepath.Join(admin, worktree.LeaseFileName), filepath.Join(lanePath, worktree.MetadataFileName)} {
+			if err := os.Remove(lease); err != nil {
+				t.Fatal(err)
+			}
+		}
+		wantFindings(t, audit(t, repoDir, wtRoot), 1, LaneFeatPrimary, "no lease", "dotf lane init")
+	})
+	t.Run("the in-tree mirror gone is not a missing lease", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		lanePath := filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary)
 		if err := os.Remove(filepath.Join(lanePath, worktree.MetadataFileName)); err != nil {
 			t.Fatal(err)
 		}
-		wantFindings(t, audit(t, repoDir, wtRoot), 1, LaneFeatPrimary, "no lease", "dotf lane init")
+		if a := audit(t, repoDir, wtRoot); len(a.Findings) != 0 {
+			t.Fatalf("want no finding with the admin-dir lease in place, got:\n%s", joined(a))
+		}
 	})
 	t.Run("no identity record", func(t *testing.T) {
 		repoDir, wtRoot := initialisedLaneRepo(t)

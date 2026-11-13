@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/gittest"
+
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
@@ -30,7 +32,7 @@ type fakeBackend struct {
 
 func newFake(t *testing.T, agent string) *fakeBackend {
 	t.Helper()
-	return &fakeBackend{agent: agent, created: t.TempDir()}
+	return &fakeBackend{agent: agent, created: linkedTempDir(t)}
 }
 
 // IdlePane answers for the one pane the tests use: f.idle says whether nothing
@@ -130,7 +132,7 @@ func TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone(
 // Twice is once: after the first run a workspace shows the branch, so the
 // second finds it open and starts nothing.
 func TestNext_RunTwiceStartsOneAgent(t *testing.T) {
-	shown := t.TempDir()
+	shown := linkedTempDir(t)
 	b := &fakeBackend{agent: "claude", existing: map[string]Worktree{"fix/first-thing": {Path: shown, Branch: "fix/first-thing", Open: true}}}
 	out, err := Handoff(opts(t), b, queue)
 	if err != nil || out.Started || !strings.Contains(out.Note, "no second agent") {
@@ -145,7 +147,7 @@ func TestNext_RunTwiceStartsOneAgent(t *testing.T) {
 
 // A worktree that exists but that no workspace shows is opened, not recreated.
 func TestNext_ReusesAWorktreeNothingShows(t *testing.T) {
-	idle := t.TempDir()
+	idle := linkedTempDir(t)
 	b := &fakeBackend{agent: "pi", existing: map[string]Worktree{"fix/first-thing": {Path: idle, Branch: "fix/first-thing"}}}
 	out, err := Handoff(opts(t), b, queue)
 	if err != nil || !out.Started {
@@ -272,7 +274,7 @@ func TestNext_APathWithASpaceReachesNoPane(t *testing.T) {
 	spaced := filepath.Join(t.TempDir(), "Jane Doe")
 	b := newFake(t, "claude")
 	b.created = filepath.Join(spaced, "worktrees", "my repo", "fix-first-thing")
-	if err := os.MkdirAll(b.created, 0o755); err != nil {
+	if _, err := gittest.LinkWorktree(filepath.Join(spaced, "my repo"), b.created); err != nil {
 		t.Fatal(err)
 	}
 	o := opts(t)
@@ -404,7 +406,7 @@ func TestNext_ABranchLeasedToAnotherIssueIsARefusalNotASilentSkip(t *testing.T) 
 		"no lease":                 {open: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := linkedTempDir(t)
 			if tc.leased != 0 {
 				if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: tc.leased}); err != nil {
 					t.Fatal(err)
@@ -455,7 +457,7 @@ func TestNext_AShownWorkspaceWithNoAgentInItIsStartedAgain(t *testing.T) {
 		"the backend cannot tell":          {leased: 7, created: old, idleErr: errors.New("socket closed"), refuse: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := linkedTempDir(t)
 			if tc.leased != 0 {
 				if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: tc.leased, CreatedAt: tc.created}); err != nil {
 					t.Fatal(err)
@@ -491,7 +493,7 @@ func TestNext_AShownWorkspaceWithNoAgentInItIsStartedAgain(t *testing.T) {
 
 // A dry run reports the restart and types nothing.
 func TestNext_ADryRunReportsTheRestartOfAnIdleWorkspace(t *testing.T) {
-	dir := t.TempDir()
+	dir := linkedTempDir(t)
 	if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: 7, CreatedAt: leaseNow.Add(-time.Hour)}); err != nil {
 		t.Fatal(err)
 	}

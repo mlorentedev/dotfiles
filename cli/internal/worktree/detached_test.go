@@ -27,7 +27,7 @@ func TestAddDetachedSavesALeaseFreeReapableLease(t *testing.T) {
 	var gotRepo, gotTarget, gotCommit string
 	runner := &MockAddRunner{OnWorktreeAddDetached: func(repo, target, commit string) error {
 		gotRepo, gotTarget, gotCommit = repo, target, commit
-		return os.MkdirAll(target, 0o755)
+		return fakeAdd(repo, target)
 	}}
 
 	info, err := AddDetachedWithRunner(opts, runner, now)
@@ -55,7 +55,7 @@ func TestAddDetachedSavesALeaseFreeReapableLease(t *testing.T) {
 }
 
 func TestAddDetachedRefusesAnExistingTargetAndMissingInputs(t *testing.T) {
-	runner := &MockAddRunner{OnWorktreeAddDetached: func(_, target, _ string) error { return os.MkdirAll(target, 0o755) }}
+	runner := &MockAddRunner{OnWorktreeAddDetached: func(repo, target, _ string) error { return fakeAdd(repo, target) }}
 
 	taken := detachedOpts(t)
 	if err := os.MkdirAll(filepath.Join(taken.WorktreeRoot, "myrepo", taken.Name), 0o755); err != nil {
@@ -104,13 +104,13 @@ func TestRealRunnerAddsADetachedWorktree(t *testing.T) {
 // author's own `worktree add --issue`, even while its lease is live.
 func TestAddWithIssueIgnoresALiveReviewWorktree(t *testing.T) {
 	now := time.Now()
-	review := t.TempDir()
+	review := linkedTempDir(t)
 	if err := SaveMetadata(review, Metadata{Kind: KindReview, ReapOK: true, LeaseExpiresAt: now.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	runner := &MockAddRunner{
 		OnWorktreeList: func(string) (string, error) { return "worktree " + review + "\nHEAD abc\ndetached\n\n", nil },
-		OnWorktreeAdd:  func(_, target, _, _ string) error { return os.MkdirAll(target, 0o755) },
+		OnWorktreeAdd:  func(repo, target, _, _ string) error { return fakeAdd(repo, target) },
 	}
 	if _, err := AddWithRunner(heldIssueOpts(t, 1649), runner, now); err != nil {
 		t.Fatalf("a review worktree blocked add --issue: %v", err)
