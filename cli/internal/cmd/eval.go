@@ -34,7 +34,7 @@ func newEvalCheckCmd() *cobra.Command {
 			"  - validates it against the case schema embedded in this binary;\n" +
 			"  - holds its reviewed_sha, verdict and key_author to its source's frontmatter;\n" +
 			"  - grades its key against its own source: every expected and optional entry\n" +
-			"    must match a row, one to one, and no decoy may match;\n" +
+			"    must match a row, one to one, and a planted reference may match no decoy;\n" +
 			"  - matches each decoy and noise entry against its recorded sample.\n" +
 			"It exits non-zero when any case fails. A repository without cases passes.",
 		Example:       "  dotf eval check\n  dotf eval check --repo-root ../kubelab",

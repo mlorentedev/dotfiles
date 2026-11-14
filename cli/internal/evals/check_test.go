@@ -89,7 +89,6 @@ func TestCheckReportsEachBrokenProperty(t *testing.T) {
 		{"expected anchor rotted", strings.Replace(goodCase, `"ClipFailsClosed"`, `"ClipFailsOpen"`, 1), "x-r1.json", sourceReview("FAIL", "nan/x", goodRows...), "deleted-test"},
 		{"optional entry unmatched", strings.Replace(goodCase, `["wording"]`, `["phrasing"]`, 1), "x-r1.json", sourceReview("FAIL", "nan/x", goodRows...), "wording"},
 		{"decoy sample does not match its anchors", strings.Replace(goodCase, `breaks on bash 3.2`, `breaks on zsh`, 1), "x-r1.json", sourceReview("FAIL", "nan/x", goodRows...), "bash32"},
-		{"source carries a decoy", goodCase, "x-r1.json", sourceReview("FAIL", "nan/x", append([]string{"| Minor | REAL | sh | fails on bash 3.2 | e | t | f |"}, goodRows...)...), "bash32"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -106,5 +105,59 @@ func TestCheckFindsNothingInARepositoryWithoutCases(t *testing.T) {
 	results, err := Check(t.TempDir())
 	if err != nil || len(results) != 0 {
 		t.Fatalf("results %v, err %v; want none and no error", results, err)
+	}
+}
+
+// A replay's source is a model's review, and a false claim it made is exactly
+// where a decoy comes from, so a decoy may match its own source. A decoy too
+// broad to be safe still fails the check: decoys are graded before expected
+// entries, so one that swallows a true row leaves that entry unmatched.
+func TestCheckLetsAReplaySourceCarryItsOwnDecoy(t *testing.T) {
+	review := sourceReview("FAIL", "nan/x", append([]string{"| Minor | REAL | sh | fails on bash 3.2 | e | t | f |"}, goodRows...)...)
+	if p := problemsOf(t, writeTree(t, goodCase, "x-r1.json", review)); len(p) != 0 {
+		t.Fatalf("a replay source carrying its own decoy was refused: %v", p)
+	}
+	tooBroad := strings.Replace(goodCase, `["bash 3.2"]`, `["ClipFailsClosed"]`, 1)
+	tooBroad = strings.Replace(tooBroad, `breaks on bash 3.2`, `ClipFailsClosed`, 1)
+	p := problemsOf(t, writeTree(t, tooBroad, "x-r1.json", sourceReview("FAIL", "nan/x", goodRows...)))
+	if !strings.Contains(strings.Join(p, "\n"), "deleted-test") {
+		t.Fatalf("a decoy swallowing an expected row passed: %v", p)
+	}
+}
+
+const plantedCase = `{
+  "id": "p1", "repo": "o/r", "kind": "planted", "role": "spec-reviewer",
+  "prompt": "harness/evals/planted/p1/prompt.md", "reference_answer": "harness/evals/planted/p1/reference.md",
+  "key_author": "human", "expected_verdict": "FAIL",
+  "expected": [{"id": "count", "severity_floor": "Major", "anchors_all": ["count++"], "confirmed_by": "planted"}],
+  "optional": [], "noise": [],
+  "decoys": [{"id": "bash32", "anchors_all": ["bash 3.2"], "reason": "false", "sample": "fails on bash 3.2"}]
+}`
+
+func writePlanted(t *testing.T, reference string) string {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, "harness", "evals", "planted", "p1")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"case.json": plantedCase, "prompt.md": "review this", "reference.md": reference} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+// A planted reference answer has no commit to name, so it carries a verdict and
+// no reviewed_sha; and being the ideal answer, it must not carry a decoy.
+func TestCheckHoldsAPlantedReferenceToTheIdealAnswer(t *testing.T) {
+	ideal := "---\nverdict: FAIL\n---\n\n" + tableHeader + "| Major | REAL | sh | `((count++))` exits under set -e | e | t | f |\n"
+	if p := problemsOf(t, writePlanted(t, ideal)); len(p) != 0 {
+		t.Fatalf("an ideal planted reference was refused: %v", p)
+	}
+	withDecoy := ideal + "| Minor | REAL | sh | fails on bash 3.2 | e | t | f |\n"
+	if p := problemsOf(t, writePlanted(t, withDecoy)); !strings.Contains(strings.Join(p, "\n"), "bash32") {
+		t.Fatalf("a planted reference carrying a decoy passed: %v", p)
 	}
 }

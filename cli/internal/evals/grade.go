@@ -214,9 +214,7 @@ func GradeAnswer(c Case, answer string) Grade {
 		Matched: []Match{}, Missed: []string{}, OptionalMatched: []Match{},
 		DecoyHits: []Match{}, Noise: []Match{}, Unadjudicated: []Row{},
 	}
-	if r, err := spec.ParseReview(answer); err == nil {
-		g.Verdict = string(r.Verdict)
-	}
+	g.Verdict = string(spec.FrontmatterVerdict(answer))
 	g.VerdictMatch = g.Verdict != "" && g.Verdict == c.ExpectedVerdict
 
 	var rows []Row

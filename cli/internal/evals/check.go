@@ -31,8 +31,9 @@ type CheckResult struct {
 
 // Check validates and self-grades every case under root. A case passes when it
 // matches the schema, agrees with its source's frontmatter, and its key graded
-// against its own source scores full recall, matches every optional entry, and
-// hits no decoy; and when each decoy and noise sample matches its own anchors.
+// against its own source scores full recall and matches every optional entry;
+// when a planted reference hits no decoy; and when each decoy and noise sample
+// matches its own anchors.
 //
 // The error is for a tree that cannot be read; a broken case is a problem in
 // its result, so one bad case never hides the rest.
@@ -126,8 +127,15 @@ func caseNameFor(rel string) string {
 }
 
 // frontmatterProblems holds the case's header to its source's. A case that
-// copies its sha or verdict wrong would replay a tree nobody reviewed.
+// copies its sha or verdict wrong would replay a tree nobody reviewed. A
+// planted reference names no commit, so only its verdict is held.
 func frontmatterProblems(c Case, source, field string) []string {
+	if c.Kind != "replay" {
+		if v := string(spec.FrontmatterVerdict(source)); v != c.ExpectedVerdict {
+			return []string{fmt.Sprintf("expected_verdict %s, but %s says %q", c.ExpectedVerdict, field, v)}
+		}
+		return nil
+	}
 	r, err := spec.ParseReview(source)
 	if err != nil {
 		return []string{fmt.Sprintf("%s: %v", field, err)}
@@ -136,13 +144,11 @@ func frontmatterProblems(c Case, source, field string) []string {
 	if string(r.Verdict) != c.ExpectedVerdict {
 		out = append(out, fmt.Sprintf("expected_verdict %s, but %s says %s", c.ExpectedVerdict, field, r.Verdict))
 	}
-	if c.Kind == "replay" {
-		if r.ReviewedSHA != c.ReviewedSHA {
-			out = append(out, fmt.Sprintf("reviewed_sha %s, but %s says %s", c.ReviewedSHA, field, r.ReviewedSHA))
-		}
-		if r.Reviewer != c.KeyAuthor {
-			out = append(out, fmt.Sprintf("key_author %s, but %s was written by %s", c.KeyAuthor, field, r.Reviewer))
-		}
+	if r.ReviewedSHA != c.ReviewedSHA {
+		out = append(out, fmt.Sprintf("reviewed_sha %s, but %s says %s", c.ReviewedSHA, field, r.ReviewedSHA))
+	}
+	if r.Reviewer != c.KeyAuthor {
+		out = append(out, fmt.Sprintf("key_author %s, but %s was written by %s", c.KeyAuthor, field, r.Reviewer))
 	}
 	return out
 }
@@ -166,8 +172,14 @@ func keyProblems(c Case, source, field string) []string {
 			out = append(out, fmt.Sprintf("optional %s matches no row of %s left after the expected entries", f.ID, field))
 		}
 	}
-	for _, m := range g.DecoyHits {
-		out = append(out, fmt.Sprintf("decoy %s matches line %d of %s, which the key calls true", m.ID, m.Row.Line, field))
+	// A replay source is a model's review and may carry the false claim its
+	// decoy was mined from. A planted reference is the ideal answer and may not.
+	// A decoy broad enough to swallow a true row is caught either way: decoys
+	// are graded first, so that row's expected entry is reported unmatched.
+	if c.Kind == "planted" {
+		for _, m := range g.DecoyHits {
+			out = append(out, fmt.Sprintf("decoy %s matches line %d of %s, which is the ideal answer", m.ID, m.Row.Line, field))
+		}
 	}
 	return out
 }

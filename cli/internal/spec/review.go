@@ -168,6 +168,14 @@ func normalizeVerdict(raw string) Verdict {
 	return Verdict(strings.ToUpper(verdictSeparators.ReplaceAllString(s, "-")))
 }
 
+// FrontmatterVerdict reads only the frontmatter's verdict, normalized as the
+// gate normalizes it, or "" when there is none. It checks nothing else: a
+// grader scoring an eval answer needs the verdict of a review that has no
+// commit to name, and must not treat that as the gate would (ADR-063).
+func FrontmatterVerdict(content string) Verdict {
+	return normalizeVerdict(frontmatterFields(content)["verdict"])
+}
+
 func ParseReview(content string) (Review, error) {
 	return parseReviewAs(content, ReviewFile)
 }
