@@ -43,7 +43,9 @@ owner: manu
 ### Slice C: tell the session where it stands (AC3)
 - [ ] [P] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
 - [ ] [AC3] Print the line from `dotf mem resume` and `dotf mem session-start`. Golden tests for all three states.
-- [ ] [AC3] Bind `mem session-start` in `harness/manifest.json` for agy (`bind_named`) and the pi and opencode gate extensions. Add a test that every harness with a session-start surface is bound.
+- [ ] [AC3] Failing test: every manifest entry with a session-start presence has a deployed carrier. It fails today for pi, opencode and agy.
+- [ ] [AC3] pi extension (`session_start`) and opencode plugin (`chat.system.transform`): run `dotf mem session-start` and inject its output into the session context. Keep them small and deploy them through dotf's existing deploy path, not bind (the manifest says `emit: false`).
+- [ ] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
 
 ### Slice D: the `worktree add` hint and `lane next` without herdr (AC4, AC5)
 - [ ] [P] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where`. No hint from `AddDetached`.

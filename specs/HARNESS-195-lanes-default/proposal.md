@@ -38,10 +38,11 @@ After this spec, in a repository that carries the committed `.dotf/lanes.json`:
    - "lane `<name>` ACTIVE on `<branch>`", when the session is in a lane;
    - "this repository runs lanes: start with `dotf lane switch <branch>`", when it is outside them.
 
-   - **claude:** through the bound `mem session-start` hook.
-   - **agy:** through a `mem session-start` entry added to its `bind_named` hooks document.
-   - **pi and opencode:** through their gate extensions' session-start presence (`session_start` and `chat.system.transform`), which run the same command.
-   - **copilot and codex:** they have no hook surface yet (#803). They get the line from `dotf mem resume`, which AGENTS.md tells every session to run first. This is stated as the one non-mechanical path, and it closes when they gain hooks.
+   - **claude:** through the `mem session-start` hook already bound in `harness/manifest.json`.
+   - **pi and opencode:** the manifest declares a `dotfiles-gate.ts` session-start extension for each, but nothing writes either file (`emit: false`; `docs/runbooks/guide-agent-provisioning.md` says "not written by bind"). Neither exists on the Mac. This spec builds one small extension per harness that runs `dotf mem session-start` at session start and adds its output to the session's context: pi's `session_start` event, and opencode's `chat.system.transform`, which injects into the system prompt rather than printing. dotf deploys both.
+   - **agy:** its hooks document has no session-start event, only `PreInvocation`, which fires before each turn. The spec binds a `PreInvocation` hook that prints the line once per session. Whether agy shows that hook's output to the model is unverified; the observed launch (AC9) decides. If it does not, agy joins copilot and codex below.
+   - **copilot and codex:** they have no hook surface yet (#803). They get the line from `dotf mem resume`, which AGENTS.md tells every session to run first. This is the one non-mechanical path, stated as such, and it closes when they gain hooks.
+
 4. **`dotf worktree add` coexists with lanes.** In a repository with active lanes it still creates the worktree, and prints the lane command to use instead. Detached worktrees, and those `spec review` creates, print nothing.
 5. **`dotf lane next` works without herdr.** With no backend, the printed commands enter the lane before they start the agent. The same commands run under zsh, bash and PowerShell.
 6. **More agents can be launched.** copilot and opencode gain launchers after an observed launch (the CLI-119 rule). codex and gemini gain theirs when they are installed and observed. An npm `.cmd` shim stays refused on Windows (#3442), and `dotf secrets run` stops reaching one (#3440).
@@ -71,7 +72,7 @@ These are true unknowns. The design decisions are recorded in **What**.
 
 - [ ] AC1. On a machine whose default branch carries `.dotf/lanes.json`, `dotf converge --only lanes` creates the three lanes and the activation record, and a second run reports `changed=0`. A marker that exists only in a working tree activates nothing.
 - [ ] AC2. With an activation record, the guard blocks a commit on `main` in the main checkout and lets a commit through on a branch worktree. Without one, it blocks nothing. In the deploy clone it never blocks. These are tested on Linux, macOS and Windows CI legs.
-- [ ] AC3. `dotf mem resume` and `dotf mem session-start` print the lane line from a lane and from a non-lane worktree of an active repository, and print nothing for a repository without lanes. The manifest binds the line for claude, agy, pi and opencode. A test fails if a harness with a session-start surface is left unbound.
+- [ ] AC3. `dotf mem resume` and `dotf mem session-start` print the lane line from a lane and from a non-lane worktree of an active repository, and print nothing for a repository without lanes. claude's hook, the pi and opencode extensions and agy's `PreInvocation` hook are deployed by dotf. A test fails if a harness whose manifest entry declares a session-start presence has nothing deployed to carry the line.
 - [ ] AC4. `dotf worktree add` in an active repository prints the `dotf lane switch` hint and still creates the worktree. `AddDetached` prints no hint.
 - [ ] AC5. `dotf lane next --dry-run` with no backend prints commands that end inside the lane directory before the agent command. A golden test covers the zsh, bash and PowerShell forms.
 - [ ] AC6. `launchers` holds an entry for each agent with a recorded observed launch (`LANE-READY`) in `verification.md`. `dotf secrets run` refuses an npm `.cmd` shim on Windows the same way `lane exec` does.
