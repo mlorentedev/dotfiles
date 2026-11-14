@@ -156,6 +156,7 @@ func TestEvalSlotRefusesALaunchItCannotKeepApart(t *testing.T) {
 		{"a run directory in the tree", func(l *EvalLaunch) { l.OutDir = filepath.Join(tree, "out") }, "replay tree"},
 		{"a run directory in the tree through a symlink", func(l *EvalLaunch) { l.OutDir = filepath.Join(link, "out") }, "replay tree"},
 		{"a run directory under specs/", func(l *EvalLaunch) { l.OutDir = filepath.Join(t.TempDir(), "specs", "X") }, "specs"},
+		{"a run directory under Specs/ on a case-insensitive disk", func(l *EvalLaunch) { l.OutDir = filepath.Join(t.TempDir(), "Specs", "X") }, "specs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if link == "" && strings.Contains(tc.name, "symlink") {

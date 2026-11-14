@@ -143,7 +143,7 @@ func checkEvalOutDir(tree, out string) error {
 		return fmt.Errorf("eval launch: the run directory %s is inside the replay tree %s, which is removed after the run", out, tree)
 	}
 	for _, part := range strings.Split(filepath.ToSlash(realOut), "/") {
-		if part == "specs" {
+		if strings.EqualFold(part, "specs") {
 			return fmt.Errorf("eval launch: the run directory %s is under a specs/ folder, where an answer would read as a review", out)
 		}
 	}
