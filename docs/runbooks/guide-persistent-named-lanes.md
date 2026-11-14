@@ -126,7 +126,8 @@ Rule summary:
 | 5a | Lease present and `state == "PARKED"` | **blocked** |
 | 5b | Identity record `$git_dir/dotf-lane` readable with a non-empty first line, or present but unreadable; no lease | **blocked** |
 | 6a | Branch is `main` or `master` | **blocked** |
-| 6b | Detached HEAD at the main checkout or in a linked worktree, no lease | **blocked** |
+| 6b | Detached HEAD at the main checkout, no lease | **blocked** |
+| 6c | Detached HEAD in a linked worktree, no lease | **blocked**; recover with `dotf worktree adopt` (keeps the worktree) or `git switch -c <type>/<issue>-<slug>` |
 
 The lease is one resolved path for both rules: `$git_dir/dotf-worktree.json`
 first, the legacy `$top/.dotf-worktree.json` second, the order `dotf` reads

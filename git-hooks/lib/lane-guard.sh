@@ -16,7 +16,8 @@
 #     or CHERRY_PICK_HEAD present in git-dir, fixing B6)
 #
 # In a repository carrying .dotf/lanes.json, it blocks:
-#   1. Direct commits on main/master at the main checkout (directs to `dotf lane switch`)
+#   1. Direct commits on main/master, at the main checkout or in a linked worktree
+#      that holds it (each message names which; both direct to a branch or lane)
 #   2. Commits inside a PARKED persistent lane (lease state == "PARKED")
 #   3. Commits inside a registered lane that carries no lease
 #      ($git_dir/dotf-worktree.json absent, and no legacy in-tree copy). A lane is recognised by the `dotf-lane` record `dotf lane init`
@@ -29,6 +30,11 @@ set -u
 
 top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -n "$top" ] || exit 0
+
+# git answers --git-dir absolute but --git-common-dir relative to the cwd when
+# run from a subdirectory, and the two are made absolute against $top below.
+# Standing at $top makes every relative answer mean the same directory.
+cd "$top" || exit 0
 
 git_dir="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
 case "$git_dir" in
@@ -132,11 +138,20 @@ elif [ -f "$git_dir/dotf-lane" ]; then
   fi
 fi
 
-# 6. Block direct commits on main/master or detached HEAD at the main repository checkout.
+# 6. Block direct commits on main/master, and detached HEAD without a lease, in the
+# main checkout or in any linked worktree. The wording follows what was detected.
 branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
-  echo "ERROR: direct commits on '$branch' are blocked in lane-managed repository ($top)." >&2
-  echo "FIX: use a persistent named lane instead: dotf lane switch <type>/<issue>-<slug>" >&2
+  # `$git_dir = $common_dir` is what makes a checkout the main one. A linked
+  # worktree can hold main while the main checkout sits on another branch, and
+  # must not be told it is "the main checkout".
+  if [ "$git_dir" = "$common_dir" ]; then
+    echo "ERROR: direct commits on '$branch' at the main checkout are blocked in lane-managed repository ($top)." >&2
+    echo "FIX: use a persistent named lane instead: dotf lane switch <type>/<issue>-<slug>" >&2
+  else
+    echo "ERROR: direct commits on '$branch' in the linked worktree $top are blocked in lane-managed repository ($main_root)." >&2
+    echo "FIX: leave '$branch' here: git switch -c <type>/<issue>-<slug>, or use a persistent named lane: dotf lane switch <type>/<issue>-<slug>" >&2
+  fi
   exit 1
 fi
 if [ -z "$branch" ] && [ -z "$lease" ]; then
@@ -145,10 +160,15 @@ if [ -z "$branch" ] && [ -z "$lease" ]; then
   # scratch worktree to "the main checkout" (#3324).
   if [ "$git_dir" = "$common_dir" ]; then
     echo "ERROR: detached HEAD commits at the main checkout are blocked in lane-managed repository ($top)." >&2
+    echo "FIX: use a persistent named lane instead: dotf lane switch <type>/<issue>-<slug>" >&2
   else
+    # A linked worktree is no lane: `lane switch` claims a different worktree
+    # and leaves this one as it is. Adopting keeps it and its commits; a
+    # branch ends the detached state (#3436).
     echo "ERROR: detached HEAD without a lease at $top is blocked in lane-managed repository ($main_root)." >&2
+    echo "FIX: keep this worktree detached with a lease: dotf worktree adopt" >&2
+    echo "     or leave the detached state: git switch -c <type>/<issue>-<slug>" >&2
   fi
-  echo "FIX: use a persistent named lane instead: dotf lane switch <type>/<issue>-<slug>" >&2
   exit 1
 fi
 

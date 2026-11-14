@@ -133,6 +133,38 @@ func TestPreCommitLaneGuard(t *testing.T) {
 		t.Fatalf("expected commit on main in .dotf/lanes.json repo to be blocked with 'dotf lane switch', got err=%v out=%s", err, out)
 	}
 
+	// 3a. The block says what it found. At the main checkout it names the main
+	// checkout; in a linked worktree that happens to hold main it names that
+	// worktree and never "the main checkout", with the recovery for each.
+	if out, err := runLaneGuardInDir(t, script, laneRepo); err == nil || !strings.Contains(out, "'main' at the main checkout") {
+		t.Fatalf("expected the main-checkout block to say so, got err=%v out=%s", err, out)
+	}
+	// From a subdirectory git answers --git-dir absolute and --git-common-dir
+	// relative to that subdirectory; the guard must still know it is the main
+	// checkout rather than a linked worktree.
+	subdir := filepath.Join(laneRepo, "sub", "dir")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runLaneGuardInDir(t, script, subdir); err == nil || !strings.Contains(out, "'main' at the main checkout") {
+		t.Fatalf("expected the block to name the main checkout from a subdirectory too, got err=%v out=%s", err, out)
+	}
+	mainRepo := filepath.Join(t.TempDir(), "main-repo")
+	initGitRepoForLaneGuard(t, mainRepo, "main")
+	writeLanesMarkerFixture(t, mainRepo)
+	if out, err := exec.Command("git", "-C", mainRepo, "switch", "-q", "-c", "parked-elsewhere").CombinedOutput(); err != nil {
+		t.Fatalf("switch: %v\n%s", err, string(out))
+	}
+	mainWT := filepath.Join(t.TempDir(), "main-wt")
+	if out, err := exec.Command("git", "-C", mainRepo, "worktree", "add", "-q", mainWT, "main").CombinedOutput(); err != nil {
+		t.Fatalf("worktree add main: %v\n%s", err, string(out))
+	}
+	out, err := runLaneGuardInDir(t, script, mainWT)
+	if err == nil || !strings.Contains(out, "'main' in the linked worktree") || !strings.Contains(out, "main-wt") ||
+		strings.Contains(out, "main checkout") || !strings.Contains(out, "git switch -c <type>/<issue>-<slug>") {
+		t.Fatalf("expected a linked worktree on main to be blocked as such, with its own recovery, got err=%v out=%s", err, out)
+	}
+
 	// 3b. Repo with ONLY .dotf/lane.json (the issue-queue config from #2532) ->
 	// allowed. The guard must not be switched on by another feature's file.
 	queueRepo := filepath.Join(t.TempDir(), "queue-repo")
@@ -200,12 +232,23 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	if out, err := exec.Command("git", "-C", laneRepo, "worktree", "add", "--detach", scratchWT, "HEAD").CombinedOutput(); err != nil {
 		t.Fatalf("worktree add scratch: %v\n%s", err, string(out))
 	}
-	out, err := runLaneGuardInDir(t, script, scratchWT)
+	out, err = runLaneGuardInDir(t, script, scratchWT)
 	if err == nil || !strings.Contains(out, "without a lease at") || !strings.Contains(out, "scratch-wt") {
 		t.Fatalf("expected a detached linked worktree without a lease to be blocked with its own path and state, got err=%v out=%s", err, out)
 	}
 	if strings.Contains(out, "main checkout") {
 		t.Fatalf("a linked worktree is not the main checkout; the message must not say so:\n%s", out)
+	}
+	// The block names the way out (#3436): adopt keeps this worktree and its
+	// commits, a branch ends the detached state. It must not send the user to
+	// `lane switch`, which claims a different worktree and leaves this one as is.
+	for _, want := range []string{"dotf worktree adopt", "git switch -c <type>/<issue>-<slug>"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected the leaseless detached block to name %q as recovery, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "dotf lane switch") {
+		t.Fatalf("a leaseless worktree is not a lane: lane switch is not its recovery:\n%s", out)
 	}
 	// The parenthesised repository is the main root, not the scratch path and
 	// not empty: git answers with the physical path, so compare base names.
@@ -256,6 +299,9 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	}
 	if out, err := runLaneGuardInDir(t, script, detachedMain); err == nil || !strings.Contains(out, "at the main checkout") {
 		t.Fatalf("expected a detached HEAD at the main checkout to be blocked with the main-checkout message, got err=%v out=%s", err, out)
+	}
+	if out, err := runLaneGuardInDir(t, script, detachedMain); err == nil || !strings.Contains(out, "dotf lane switch <type>/<issue>-<slug>") || strings.Contains(out, "worktree adopt") {
+		t.Fatalf("the main checkout is no worktree to adopt: its recovery is lane switch, got err=%v out=%s", err, out)
 	}
 
 	// 7. Commit inside copilot-worktrees/ for a .dotf/lanes.json repo -> blocked (m4).
