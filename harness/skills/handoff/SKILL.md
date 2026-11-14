@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 58553debada92546
+generated_sha: c60e3288c73ab06b
 id: handoff-skill
 type: skill
 status: active
@@ -130,6 +130,20 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 
   End your thread with `Journal: sessions/<file>` so the record is reachable from
   the index.
+
+  **A finished thread leaves MEMORY.md (MEMORY-019, MEMORY-020).** When the line
+  of work is done (merged or closed, nothing left for a next session), write its
+  last block with `--finished`:
+
+  ```bash
+  printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD" --agent <agent> --finished
+  ```
+
+  The entry moves byte-identical to `archive/superseded-handoffs-<date>.md` and
+  the thread file to `archive/threads/`, so the index a session start loads holds
+  only live work. The flag is explicit: `Next action: None` is never read as
+  finished. A thread that still has `Awaiting Manu` items is refused; answer or
+  move them first. Parking a named lane archives its branch's thread the same way.
 
 ### 1b. Session record — append-only history (`sessions/<date>-<project>-<agent>-<thread>.md`)
 
