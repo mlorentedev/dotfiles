@@ -48,7 +48,11 @@ owner: manu
 - [x] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
 - [x] [AC3] Print the line from `dotf mem resume` and `dotf mem session-start`. Golden tests for all three states.
 - [x] [AC3] Failing test: every manifest entry with a session-start presence has a deployed carrier. It fails today for pi, opencode and agy.
-  - As built (C1): `TestEveryPresenceTargetHasADeployedCarrier` lists those three in the `carrierGaps` table and asserts it is exact. The slice that deploys a carrier deletes its row.
+> Slice C1 as built (for C2 and D2):
+> - `lane.Where(cwd)` returns a `Position`; `Position.Line()` is the line, or "" when inactive. Active means the record `Activate` writes exists in the git common dir, so a lane with no record behind it is inactive. A parked lane (detached HEAD) prints `` `(detached)` `` as its branch.
+> - `mem` cannot import `lane` (lane imports mem), so the command layer resolves the line (`laneLine` in `cli/internal/cmd/mem_lane_line.go`) and hands it to `mem.BriefOptions.LaneLine` and `mem.ClaudeContextInput.LaneLine`. `mem resume` prints it as its first line. An unreadable directory reports on stderr and prints no line; it never fails the command.
+> - `TestEveryPresenceTargetHasADeployedCarrier` reads each manifest target's `events.presence`. A target has a carrier when it emits a hook on that event running `mem session-start` or `mem resume`, or, for an `emit: false` extension, when an `ai/deploy.json` entry writes a file with the same last two path elements. Its `carrierGaps` table lists pi, opencode and agy and is asserted exact, so C2 deletes each row as it adds the carrier, and adapts the agy hook's command to one of the two prefixes.
+
 - [ ] [AC3] pi extension (`session_start`) and opencode plugin (`chat.system.transform`): run `dotf mem session-start` and inject its output into the session context. Keep them small and deploy them through dotf's existing deploy path, not bind (the manifest says `emit: false`).
 - [ ] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
 
