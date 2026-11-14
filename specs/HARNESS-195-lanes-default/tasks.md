@@ -23,7 +23,7 @@ owner: manu
 
 ## Implementation
 
-> One PR per slice, each at most 300 executable lines. Slices A, C, D and F are independent of each other (`[P]`). B depends on A, and G depends on all of them.
+> One PR per slice, each at most 300 executable lines. A, D1 and F are independent of each other (`[P]`). B and C depend on A, because both read the activation record A writes. D2 depends on C, because it calls `lane.Where`. E waits on observed launches, and G depends on all of them.
 
 ### Slice A: activation through converge (AC1)
 - [ ] [P] [AC1] Failing test: `lane.Activate` reads `.dotf/lanes.json` from the default branch's committed tree (`git show <remote>/<base>:…`), not from the working tree. A working-tree-only marker yields "not active".
@@ -41,15 +41,17 @@ owner: manu
 - [ ] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
 
 ### Slice C: tell the session where it stands (AC3)
-- [ ] [P] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
+- [ ] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
 - [ ] [AC3] Print the line from `dotf mem resume` and `dotf mem session-start`. Golden tests for all three states.
 - [ ] [AC3] Failing test: every manifest entry with a session-start presence has a deployed carrier. It fails today for pi, opencode and agy.
 - [ ] [AC3] pi extension (`session_start`) and opencode plugin (`chat.system.transform`): run `dotf mem session-start` and inject its output into the session context. Keep them small and deploy them through dotf's existing deploy path, not bind (the manifest says `emit: false`).
 - [ ] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
 
-### Slice D: the `worktree add` hint and `lane next` without herdr (AC4, AC5)
-- [ ] [P] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where`. No hint from `AddDetached`.
-- [ ] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms.
+### Slice D1: `lane next` without herdr (AC5)
+- [ ] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
+
+### Slice D2: the `worktree add` hint (AC4)
+- [ ] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
 
 ### Slice E: launchers (AC6, #3440, #3430)
 - [ ] [AC6] Fix #3440: `dotf secrets run` refuses an npm `.cmd` or `.bat` child on Windows, using the same function as `lane exec` (`refuseBatchShim`). Test first.

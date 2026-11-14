@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-195-lanes-default"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-11-13"
 issue: "mlorentedev/dotfiles#3432"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
