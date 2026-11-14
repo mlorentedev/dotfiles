@@ -399,46 +399,74 @@ func ReviewPromptIn(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skill
 // ReviewPromptForScope is ReviewPromptIn for a scope that may be an initial
 // review (CLI-132), whose baseline is the empty tree rather than a commit.
 func ReviewPromptForScope(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPath string, scope ReviewScope) string {
+	return reviewPrompt(slot, specID, repoRoot, reviewerID, runner, skillPath, scope, promptTarget{
+		verdict: fmt.Sprintf("specs/%s/%s", specID, slot.Review),
+	})
+}
+
+// promptTarget is what differs between a review and an evaluation run of the
+// same prompt: where the verdict is written, and whether the run signs.
+type promptTarget struct {
+	verdict string // the path the reviewer writes its verdict to, as shown
+	eval    bool   // an evaluation run: graded against a key, never a signature
+}
+
+func reviewPrompt(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPath string, scope ReviewScope, target promptTarget) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Perform an adversarial review of the spec `%s`.\n\n", specID)
 	fmt.Fprintf(&b, "Repo: %s\n\n", repoRoot)
 	writeReviewScope(&b, scope)
-	fmt.Fprintf(&b, "You are running as `%s` (runner `%s`), drawn from harness/reviewer-pool.json\n"+
-		"for this review. That is your identity for this run, stated by the launcher that resolved\n"+
-		"it -- do not infer it from the doctrine you are about to read. The pool's exclusions were\n"+
-		"applied at draw time, so reading one and concluding you must be the wrong model to review\n"+
-		"this is a misreading: you are the model that was drawn.\n\n", reviewerID, runner)
+	if target.eval {
+		fmt.Fprintf(&b, "You are running as `%s` (runner `%s`), a candidate from harness/evals/candidates.json\n"+
+			"for this run. That is your identity for this run, stated by the launcher that resolved\n"+
+			"it -- do not infer it from the doctrine you are about to read.\n\n", reviewerID, runner)
+	} else {
+		fmt.Fprintf(&b, "You are running as `%s` (runner `%s`), drawn from harness/reviewer-pool.json\n"+
+			"for this review. That is your identity for this run, stated by the launcher that resolved\n"+
+			"it -- do not infer it from the doctrine you are about to read. The pool's exclusions were\n"+
+			"applied at draw time, so reading one and concluding you must be the wrong model to review\n"+
+			"this is a misreading: you are the model that was drawn.\n\n", reviewerID, runner)
+	}
 	fmt.Fprintf(&b, "Read and follow the skill at %s exactly — its workflow, its severity x reality\n"+
 		"classification, its test-traceability gate, its evaluator rubric, and its output format.\n"+
 		"Read that file first; it defines the whole deliverable.\n\n", skillPath)
 	b.WriteString("Mechanical constraints:\n")
-	fmt.Fprintf(&b, "- Write your verdict to `specs/%s/%s`, overwriting what is there. The YAML\n"+
-		"  frontmatter is part of the deliverable; `dotf spec archive` parses it and refuses a\n"+
-		"  malformed one.\n", specID, slot.Review)
+	parser := "`dotf spec archive` parses it and refuses a\n  malformed one"
+	if target.eval {
+		parser = "the grader parses it, and a malformed one\n  is scored as a format failure"
+	}
+	fmt.Fprintf(&b, "- Write your verdict to `%s`, overwriting what is there. The YAML\n"+
+		"  frontmatter is part of the deliverable; %s.\n", target.verdict, parser)
 	// Write first (CLI-094, #2448): a run the cap or the stall detector stops
 	// writes no verdict, and a reviewer that verifies hard does not re-read the
 	// clock. Asked at turn one, a provisional record is something a model
 	// follows; asked at the soft mark, after hundreds of tool calls, it was not.
-	fmt.Fprintf(&b, "- As your first action, before you explore, write a provisional `specs/%s/%s`:\n"+
+	fmt.Fprintf(&b, "- As your first action, before you explore, write a provisional `%s`:\n"+
 		"  frontmatter with `verdict: PENDING` and `reviewer: %s`, then the findings so far.\n"+
 		"  Keep refining it as you verify, and replace it with your real verdict at the end.\n"+
 		"  A run that is stopped (the time cap, or a tool call that never returns) writes no verdict, so\n"+
-		"  that provisional file is all it leaves behind; `dotf spec archive` refuses it by name.\n", specID, slot.Review, reviewerID)
+		"  that provisional file is all it leaves behind; `dotf spec archive` refuses it by name.\n", target.verdict, reviewerID)
 	if slot.Name == SecondSigner.Name {
 		fmt.Fprintf(&b, "- You are the SECOND signer, of a different vendor than the first. Do NOT read\n"+
 			"  `specs/%s/%s` or its transcript: your verdict must be independent of it, and the\n"+
 			"  archive counts the two only because neither saw the other.\n", specID, ReviewFile)
 	}
-	fmt.Fprintf(&b, "- Set `reviewer:` to exactly `%s`. That string is matched against this repo's\n"+
-		"  reviewer pool, so any other spelling is refused even when the model is correct.\n", reviewerID)
+	if target.eval {
+		fmt.Fprintf(&b, "- Set `reviewer:` to exactly `%s`. That string names this run's answer.\n", reviewerID)
+	} else {
+		fmt.Fprintf(&b, "- Set `reviewer:` to exactly `%s`. That string is matched against this repo's\n"+
+			"  reviewer pool, so any other spelling is refused even when the model is correct.\n", reviewerID)
+	}
 	b.WriteString("- Set `reviewed_sha` to the output of `git rev-parse HEAD`.\n")
 	b.WriteString("- Do NOT modify `proposal.md`, `tasks.md`, `features.json` or a fast-track `spec.md`. Those are the contract\n" +
 		"  files your review describes, and their digests are recorded when it starts; on a full spec\n" +
 		"  the archive's staleness check compares them, so editing one would invalidate your own\n" +
 		"  review. If you believe one needs changing, say so as a finding instead.\n")
-	fmt.Fprintf(&b, "- To check the `contract_digests` in review-request.json, compare them with the output of\n"+
-		"  `dotf spec digest %s`, never with sha256sum: they are taken over a normalised form, so a\n"+
-		"  raw hash differs from them without the contract having changed.\n", specID)
+	if !target.eval {
+		fmt.Fprintf(&b, "- To check the `contract_digests` in review-request.json, compare them with the output of\n"+
+			"  `dotf spec digest %s`, never with sha256sum: they are taken over a normalised form, so a\n"+
+			"  raw hash differs from them without the contract having changed.\n", specID)
+	}
 	b.WriteString("- Do not commit, push, or comment on the PR. Writing the review is the deliverable.\n")
 	// The archive gate's rules are implemented in the dotfiles checkout, which is
 	// not the repository under review. A reviewer verifying the gate goes looking
