@@ -150,7 +150,7 @@ func (failingClaims) Release(int, bool) error    { return errors.New("remote unr
 // A branch a workspace already shows was claimed when it was started: a second
 // run must not read its own earlier claim as a loss and move to the next item.
 func TestHandoffDoesNotClaimAWorktreeThatExists(t *testing.T) {
-	shown := t.TempDir()
+	shown := linkedTempDir(t)
 	b := &fakeBackend{agent: "claude", existing: map[string]Worktree{"fix/first-thing": {Path: shown, Branch: "fix/first-thing", Open: true}}}
 	c := &fakeClaims{}
 	o := opts(t)

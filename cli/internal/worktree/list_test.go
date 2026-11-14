@@ -28,6 +28,7 @@ func TestListWorktrees(t *testing.T) {
 		LeaseExpiresAt: time.Now().Add(-1 * time.Hour),
 		ReapOK:         true,
 	}
+	linkFake(t, mainRepo, wt1)
 	_ = SaveMetadata(wt1, meta1)
 
 	// Mock porcelain output
@@ -112,6 +113,7 @@ func TestListWithRunnerDirtyErrorFailsClosed(t *testing.T) {
 		LeaseExpiresAt: time.Now().Add(-1 * time.Hour),
 		ReapOK:         true,
 	}
+	linkFake(t, mainRepo, wt1)
 	_ = SaveMetadata(wt1, meta)
 
 	mockPorcelain := "worktree " + mainRepo + "\n" +

@@ -344,7 +344,7 @@ func auditLease(name, path string) []Finding {
 	case err != nil:
 		return []Finding{{name, "lease unreadable: " + err.Error(), "dotf lane init"}}
 	case meta == nil:
-		return []Finding{{name, "has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there", "dotf lane init"}}
+		return []Finding{{name, "has no lease (" + worktree.LeaseFileName + " in its git admin dir), so the guard refuses commits there", "dotf lane init"}}
 	case meta.Lane != name:
 		return []Finding{{name, fmt.Sprintf("lease names lane %q", meta.Lane), "dotf lane init"}}
 	case !strings.EqualFold(meta.State, string(worktree.StateActive)) && !strings.EqualFold(meta.State, string(worktree.StateParked)):

@@ -271,19 +271,19 @@ func buildRecord(date, project, agent, sid, block string) string {
 }
 
 // isWorktreeParked returns true when cwd (or an ancestor worktree root) holds a
-// .dotf-worktree.json with state == "PARKED" (HARNESS-186, B3), so SessionEnd
+// lease with state == "PARKED" (HARNESS-186, B3), so SessionEnd
 // never writes a detached <lane>@<host> fallback journal for a parked lane.
 func isWorktreeParked(cwd string) bool {
 	for dir := filepath.Clean(cwd); ; {
-		data, err := os.ReadFile(filepath.Join(dir, ".dotf-worktree.json"))
-		if err == nil {
-			var meta struct {
-				State string `json:"state"`
+		// The lease lives in the worktree's git admin dir (ADR-062); the
+		// in-tree file is the fallback for one written before the move.
+		if admin, ok := readGitdirPointer(filepath.Join(dir, ".git")); ok {
+			if parked, found := leaseParked(filepath.Join(admin, "dotf-worktree.json")); found {
+				return parked
 			}
-			if json.Unmarshal(data, &meta) == nil && strings.EqualFold(meta.State, "PARKED") {
-				return true
-			}
-			return false
+		}
+		if parked, found := leaseParked(filepath.Join(dir, ".dotf-worktree.json")); found {
+			return parked
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -291,4 +291,17 @@ func isWorktreeParked(cwd string) bool {
 		}
 		dir = parent
 	}
+}
+
+// leaseParked reads one lease file: found says whether it exists, parked
+// whether its state is PARKED. An unparseable lease is found and not parked.
+func leaseParked(path string) (parked, found bool) {
+	data, err := os.ReadFile(path) // #nosec G304 -- a lease path this function composed
+	if err != nil {
+		return false, false
+	}
+	var meta struct {
+		State string `json:"state"`
+	}
+	return json.Unmarshal(data, &meta) == nil && strings.EqualFold(meta.State, "PARKED"), true
 }

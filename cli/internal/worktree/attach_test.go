@@ -19,9 +19,9 @@ func TestAddAttachesToAnExistingOriginBranchWhateverItsName(t *testing.T) {
 	var attached []string
 	runner := &MockAddRunner{
 		OnExistingBranch: func(_, branch string) (string, bool) { return "origin", branch == "deploy/errors-1.3.0" },
-		OnWorktreeAttach: func(_, target, branch, remote string) error {
+		OnWorktreeAttach: func(repo, target, branch, remote string) error {
 			attached = append(attached, branch, remote)
-			return os.MkdirAll(target, 0o755)
+			return fakeAdd(repo, target)
 		},
 		OnWorktreeAdd: func(_, _, _, _ string) error { t.Fatal("add created a branch that exists"); return nil },
 	}
@@ -94,7 +94,7 @@ func TestAddOffersNoCommandWhenTheSlugIsNoValidBranch(t *testing.T) {
 func TestAddAcceptsASlashInTheSlugWhenTheBranchIsNamed(t *testing.T) {
 	repo := filepath.Join(t.TempDir(), "myrepo")
 	_ = os.MkdirAll(filepath.Join(repo, ".git", "info"), 0o755)
-	runner := &MockAddRunner{OnWorktreeAdd: func(_, target, _, _ string) error { return os.MkdirAll(target, 0o755) }}
+	runner := &MockAddRunner{OnWorktreeAdd: func(repo, target, _, _ string) error { return fakeAdd(repo, target) }}
 	if _, err := AddWithRunner(AddOptions{RepoRoot: repo, WorktreeRoot: t.TempDir(), Slug: "a/b", Branch: "fix/x"}, runner, time.Now()); err != nil {
 		t.Fatal(err)
 	}

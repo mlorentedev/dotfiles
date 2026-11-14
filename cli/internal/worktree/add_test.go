@@ -75,7 +75,7 @@ func TestAddWorktreeWithRunner(t *testing.T) {
 		OnWorktreeAdd: func(repo, target, branch, base string) error {
 			executedCommands = append(executedCommands, target)
 			// Simulate git creating target directory
-			_ = os.MkdirAll(target, 0o755)
+			_ = fakeAdd(repo, target)
 			return nil
 		},
 	}
@@ -161,7 +161,7 @@ func (m *MockAddRunner) WorktreeAttach(repo, target, branch, remote string) erro
 	if m.OnWorktreeAttach != nil {
 		return m.OnWorktreeAttach(repo, target, branch, remote)
 	}
-	return os.MkdirAll(target, 0o755)
+	return fakeAdd(repo, target)
 }
 
 func (m *MockAddRunner) DefaultBase(repo string) (string, error) {

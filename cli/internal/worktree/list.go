@@ -1,7 +1,6 @@
 package worktree
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -288,16 +287,6 @@ func (m *MockGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
 	return m.OrphanBranches[branch], nil
 }
 
-// SaveMetadata writes metadata to .dotf-worktree.json in target directory.
-func SaveMetadata(worktreePath string, meta Metadata) error {
-	metaPath := filepath.Join(worktreePath, MetadataFileName)
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshaling metadata: %w", err)
-	}
-	return os.WriteFile(metaPath, data, 0o644)
-}
-
 func isMainWorktree(path string, index int) bool {
 	// In Git architecture, the main worktree has a .git directory, while linked worktrees have a .git file.
 	fi, err := os.Stat(filepath.Join(path, ".git"))
@@ -369,6 +358,10 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			info.PRMergedUnknown = mergeErr.Error()
 		}
 		info.State, info.StateReason = Classify(info, now)
+		if meta != nil && LeaseLegacyOnly(raw.Path) {
+			info.LeaseLegacyOnly = true
+			info.StateReason += legacyLeaseNote
+		}
 		list = append(list, info)
 	}
 
@@ -431,3 +424,8 @@ func gitIn(dir string, args ...string) *exec.Cmd {
 	cmd.Env = gitenv.WithoutRepository(os.Environ())
 	return cmd
 }
+
+// legacyLeaseNote is appended to the reason of a worktree whose lease the
+// admin dir does not hold yet: the next write of the lease moves it, and the
+// follow-up that drops the in-tree fallback must find no worktree carrying it.
+const legacyLeaseNote = "; lease at the legacy in-tree location only, the next lease write moves it into the worktree's git dir"

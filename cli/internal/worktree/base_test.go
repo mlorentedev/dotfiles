@@ -21,7 +21,7 @@ func TestAddCreatesFromTheRemoteDefaultBranch(t *testing.T) {
 	var gotBase string
 	runner := &MockAddRunner{
 		OnDefaultBase: func(string) (string, error) { return "origin/master", nil },
-		OnWorktreeAdd: func(_, target, _, base string) error { gotBase = base; return os.MkdirAll(target, 0o755) },
+		OnWorktreeAdd: func(repo, target, _, base string) error { gotBase = base; return fakeAdd(repo, target) },
 	}
 	if _, err := AddWithRunner(addTestOpts(t), runner, time.Now()); err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func TestAddKeepsAnExplicitBase(t *testing.T) {
 	opts := addTestOpts(t)
 	opts.BaseRef = "feat/parent"
 	var gotBase string
-	runner := &MockAddRunner{OnWorktreeAdd: func(_, target, _, base string) error { gotBase = base; return os.MkdirAll(target, 0o755) }}
+	runner := &MockAddRunner{OnWorktreeAdd: func(repo, target, _, base string) error { gotBase = base; return fakeAdd(repo, target) }}
 	if _, err := AddWithRunner(opts, runner, time.Now()); err != nil {
 		t.Fatal(err)
 	}

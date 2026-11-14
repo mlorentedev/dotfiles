@@ -60,6 +60,7 @@ func newReviewSweep(t *testing.T, lease time.Duration, saved bool, now time.Time
 			t.Fatal(err)
 		}
 	}
+	linkFake(t, s.repo, s.wt)
 	if err := SaveMetadata(s.wt, Metadata{Kind: KindReview, ReapOK: true, OutputSaved: saved,
 		CreatedAt: now.Add(-3 * time.Hour), LeaseExpiresAt: now.Add(lease)}); err != nil {
 		t.Fatal(err)

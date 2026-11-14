@@ -118,8 +118,13 @@ func TestParkSingleNamedLane_Outcomes(t *testing.T) {
 		}
 		repo, info, tip := parkLaneFixture(t)
 		heads := func(_, _ string) ([]string, error) { return []string{tip}, nil }
-		// The lease is written in place, so the file itself refuses.
-		lease := filepath.Join(info.Path, MetadataFileName)
+		// The lease is written in place, so the file itself refuses: the
+		// admin-dir copy, the one every reader prefers (ADR-062).
+		admin, err := AdminDir(info.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lease := filepath.Join(admin, LeaseFileName)
 		if err := os.Chmod(lease, 0o444); err != nil {
 			t.Fatal(err)
 		}
