@@ -189,7 +189,7 @@ such a spec from git's empty tree instead: the reviewer reads the two-dot
 ` + "`git diff <empty-tree> HEAD`" + `, which holds the root commit's implementation and
 every later correction, and the review request records the scope, the root
 commit and the tree. --initial is refused for any other spec.`,
-		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-4-argon-high\n" +
+		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.8-flash-high\n" +
 			"  dotf spec review FEAT-012-reviewer-pool --second\n  dotf spec review FEAT-012-reviewer-pool --fallback-reason rate-limit\n" +
 			"  dotf spec review FEAT-002-first-commit --initial --dry-run",
 		Args:         cobra.ExactArgs(1),
