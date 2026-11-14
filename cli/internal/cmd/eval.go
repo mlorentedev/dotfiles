@@ -77,19 +77,21 @@ func newEvalRunCmd() *cobra.Command {
 	var (
 		root       string
 		candidates []string
+		caseIDs    []string
 		epochs     int
 		maxRuns    int
 		planOnly   bool
 	)
 	c := &cobra.Command{
 		Use:   "run",
-		Short: "Replay the eval cases for named candidates and grade each run",
+		Short: "Plan an evaluation run of the eval cases for named candidates (launching is not implemented yet)",
 		Long: "run builds the matrix of every eval case × each --candidate × --epochs, and\n" +
 			"refuses it above --max-runs: the cap is what authorises spend. --plan prints the\n" +
 			"matrix and each candidate's estimate (NaN credits, agy runs) and launches nothing.\n" +
 			"A corpus whose keys fail `dotf eval check` is not run. Candidates come from\n" +
-			evals.CandidatesFile + ", never from the reviewer pool.",
-		Example:       "  dotf eval run --plan --candidate nan/glm5.3-flash\n  dotf eval run --plan --candidate agy/gemini-4-hydrogen-high --epochs 1",
+			evals.CandidatesFile + ", never from the reviewer pool. Only --plan works so far:\n" +
+			"launching and grading candidates is not implemented yet.",
+		Example:       "  dotf eval run --plan --candidate nan/glm5.3-flash\n  dotf eval run --plan --candidate agy/gemini-4-hydrogen-high --case harness-088-r2 --epochs 1",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -102,6 +104,9 @@ func newEvalRunCmd() *cobra.Command {
 			}
 			cases, err := evals.LoadCases(root)
 			if err != nil {
+				return fmt.Errorf("eval run: %w", err)
+			}
+			if cases, err = evals.SelectCases(cases, caseIDs); err != nil {
 				return fmt.Errorf("eval run: %w", err)
 			}
 			cs, err := evals.LoadCandidates(root)
@@ -125,6 +130,7 @@ func newEvalRunCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&root, "repo-root", "", "repository holding the cases and candidates (default: the current one)")
 	c.Flags().StringArrayVar(&candidates, "candidate", nil, "candidate id from "+evals.CandidatesFile+" (repeatable)")
+	c.Flags().StringArrayVar(&caseIDs, "case", nil, "case id to run (repeatable; default: every case)")
 	c.Flags().IntVar(&epochs, "epochs", evals.DefaultEpochs, "runs per (candidate, case)")
 	c.Flags().IntVar(&maxRuns, "max-runs", evals.DefaultMaxRuns, "the most runs this invocation may launch")
 	c.Flags().BoolVar(&planOnly, "plan", false, "print the matrix and the estimate, and launch nothing")

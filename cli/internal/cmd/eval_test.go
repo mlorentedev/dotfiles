@@ -82,3 +82,14 @@ func TestEvalRunWithoutPlanSaysItCannotRunYet(t *testing.T) {
 		t.Fatalf("a run without --plan: %v", err)
 	}
 }
+
+func TestEvalRunPlanNarrowsToTheNamedCases(t *testing.T) {
+	stdout, _, err := execute(t, "eval", "run", "--plan", "--repo-root", evalRepoRoot(t),
+		"--candidate", "nan/glm5.3-flash", "--case", "harness-088-r2", "--epochs", "1")
+	if err != nil {
+		t.Fatalf("--case: %v\n%s", err, stdout)
+	}
+	if !strings.Contains(stdout, "1 cases × 1 candidates × 1 epochs = 1 runs") || strings.Contains(stdout, "memory-017") {
+		t.Errorf("--case did not narrow the matrix:\n%s", stdout)
+	}
+}

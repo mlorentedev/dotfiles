@@ -3,6 +3,7 @@ package evals
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
@@ -34,7 +35,8 @@ type Basis string
 
 const (
 	// BasisDefault is the kind's declared envelope, for a case that has never
-	// run. It is priced as an upper bound.
+	// run. Only its rate is an upper bound: the envelope itself was measured on
+	// another model and case.
 	BasisDefault Basis = "default"
 )
 
@@ -60,6 +62,8 @@ type Plan struct {
 	Runs      int
 	MaxRuns   int
 	Estimates []Estimate
+	// Envelopes are the token envelopes the NaN estimates priced, by case kind.
+	Envelopes map[string]int
 }
 
 // BuildPlan builds the cases × candidates × epochs matrix and estimates each
@@ -77,8 +81,13 @@ func BuildPlan(cases []Case, cs Candidates, ids []string, epochs, maxRuns int) (
 	case maxRuns < 1:
 		return Plan{}, fmt.Errorf("--max-runs must be at least 1, got %d", maxRuns)
 	}
-	p := Plan{MaxRuns: maxRuns}
+	p := Plan{MaxRuns: maxRuns, Envelopes: map[string]int{}}
+	named := map[string]bool{}
 	for _, id := range ids {
+		if named[id] {
+			return Plan{}, fmt.Errorf("candidate %s is named twice, which would run its matrix twice", id)
+		}
+		named[id] = true
 		entry, err := cs.Resolve(id)
 		if err != nil {
 			return Plan{}, err
@@ -88,13 +97,18 @@ func BuildPlan(cases []Case, cs Candidates, ids []string, epochs, maxRuns int) (
 			return Plan{}, err
 		}
 		p.Estimates = append(p.Estimates, est)
+		if est.Unit == UnitNaNCredits {
+			for _, c := range cases {
+				p.Envelopes[c.Kind] = cs.Envelopes[c.Kind]
+			}
+		}
 		for _, c := range cases {
 			p.Cells = append(p.Cells, Cell{Case: c.ID, Kind: c.Kind, Candidate: id, Epochs: epochs})
 			p.Runs += epochs
 		}
 	}
 	if p.Runs > maxRuns {
-		return p, fmt.Errorf("%w: %d runs, cap %d; name fewer candidates or cases, or raise --max-runs", ErrOverCap, p.Runs, maxRuns)
+		return p, fmt.Errorf("%w: %d runs, cap %d; name fewer candidates or cases (--case), lower --epochs, or raise --max-runs", ErrOverCap, p.Runs, maxRuns)
 	}
 	return p, nil
 }
@@ -110,8 +124,7 @@ func estimate(e spec.ReviewerEntry, cs Candidates, cases []Case, epochs int) (Es
 			return Estimate{}, fmt.Errorf("candidate %s declares no credits_per_mtok in %s, so its runs cannot be priced", e.ID, CandidatesFile)
 		}
 		// The envelopes are measured totals with no input/output split, so each
-		// token is priced at the higher rate: an upper bound, never an
-		// underestimate.
+		// token is priced at the higher rate rather than at an invented split.
 		rate := max(rates.Input, rates.Output)
 		var tokens int
 		for _, c := range cases {
@@ -127,7 +140,38 @@ func estimate(e spec.ReviewerEntry, cs Candidates, cases []Case, epochs int) (Es
 	}
 }
 
-// Render prints the plan: the matrix, then each candidate's estimate.
+// SelectCases narrows cases to the named ids, in corpus order. No ids keeps
+// every case; an unknown or repeated id is refused.
+func SelectCases(cases []Case, ids []string) ([]Case, error) {
+	if len(ids) == 0 {
+		return cases, nil
+	}
+	want := map[string]bool{}
+	for _, id := range ids {
+		if want[id] {
+			return nil, fmt.Errorf("case %s is named twice", id)
+		}
+		want[id] = true
+	}
+	known := make([]string, 0, len(cases))
+	var out []Case
+	for _, c := range cases {
+		known = append(known, c.ID)
+		if want[c.ID] {
+			out = append(out, c)
+			delete(want, c.ID)
+		}
+	}
+	for _, id := range ids {
+		if want[id] {
+			return nil, fmt.Errorf("case %s is not in the corpus; the cases are: %s", id, strings.Join(known, ", "))
+		}
+	}
+	return out, nil
+}
+
+// Render prints the plan: the matrix, each candidate's estimate, a total per
+// unit (NaN bills every model from one pool), and the envelopes it priced.
 func (p Plan) Render() string {
 	var b strings.Builder
 	candidates := len(p.Estimates)
@@ -145,13 +189,40 @@ func (p Plan) Render() string {
 		fmt.Fprintf(&b, "%-32s %-8s %-32s %d\n", c.Case, c.Kind, c.Candidate, c.Epochs)
 	}
 	b.WriteString("\nEstimate:\n")
+	totals := map[Unit]float64{}
+	var units []Unit
 	for _, e := range p.Estimates {
+		if _, seen := totals[e.Unit]; !seen {
+			units = append(units, e.Unit)
+		}
+		totals[e.Unit] += e.Amount
 		switch e.Unit {
 		case UnitNaNCredits:
-			fmt.Fprintf(&b, "  %-32s at most %.1f %s (%s envelope, priced at the higher of the input and output rates)\n", e.Candidate, e.Amount, e.Unit, e.Basis)
+			fmt.Fprintf(&b, "  %-32s %.1f %s (%s envelope)\n", e.Candidate, e.Amount, e.Unit, e.Basis)
 		default:
 			fmt.Fprintf(&b, "  %-32s %.0f %s (its quota cannot be read)\n", e.Candidate, e.Amount, e.Unit)
 		}
+	}
+	for _, u := range units {
+		if u == UnitNaNCredits {
+			fmt.Fprintf(&b, "Total: %.1f %s\n", totals[u], u)
+		} else {
+			fmt.Fprintf(&b, "Total: %.0f %s\n", totals[u], u)
+		}
+	}
+	if len(p.Envelopes) > 0 {
+		kinds := make([]string, 0, len(p.Envelopes))
+		for k := range p.Envelopes {
+			kinds = append(kinds, k)
+		}
+		sort.Strings(kinds)
+		parts := make([]string, 0, len(kinds))
+		for _, k := range kinds {
+			parts = append(parts, fmt.Sprintf("%d tokens per %s run", p.Envelopes[k], k))
+		}
+		fmt.Fprintf(&b, "\nNaN envelopes (%s): %s.\n"+
+			"Measured on another model and case, so a run may spend more. Each token is\n"+
+			"priced at the higher of the model's input and output rates.\n", CandidatesFile, strings.Join(parts, ", "))
 	}
 	return b.String()
 }

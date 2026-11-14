@@ -219,3 +219,55 @@ func TestCandidateRatesMatchTheNaNReadme(t *testing.T) {
 		}
 	}
 }
+
+const twoNaN = `{
+ "default_envelope_tokens": {"replay": 200000, "planted": 100000},
+ "candidates":[
+  {"id":"nan/a","runner":"pi","provider":"nan","model":"a","secret_id":"NAN_API_KEY","vendor":"v","credits_per_mtok":{"input":1,"cached":1,"output":10}},
+  {"id":"nan/b","runner":"pi","provider":"nan","model":"b","secret_id":"NAN_API_KEY","vendor":"v","credits_per_mtok":{"input":1,"cached":1,"output":20}}
+]}`
+
+// NaN bills every model from one pool, so the plan totals each unit across
+// candidates; and it names the envelope it priced, which is a measurement of
+// another model, not a bound on this one.
+func TestPlanRenderTotalsEachUnitAndNamesTheEnvelope(t *testing.T) {
+	p, err := BuildPlan(planCases(), loadPriced(t, twoNaN), []string{"nan/a", "nan/b"}, 1, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := p.Render()
+	// (2×200K + 100K) × 10/1M = 5, and × 20/1M = 10.
+	for _, want := range []string{"Total: 15.0 NaN credits", "200000 tokens per replay run", "100000 tokens per planted run"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the plan lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "at most") {
+		t.Errorf("an envelope measured on another model bounds nothing:\n%s", out)
+	}
+}
+
+// A candidate named twice would double the matrix and its spend unseen.
+func TestPlanRefusesACandidateNamedTwice(t *testing.T) {
+	_, err := BuildPlan(planCases(), loadPriced(t, twoNaN), []string{"nan/a", "nan/a"}, 1, 30)
+	if err == nil || !strings.Contains(err.Error(), "nan/a") {
+		t.Fatalf("a candidate named twice: %v", err)
+	}
+}
+
+// --case narrows the corpus, for a one-case trial before a full run.
+func TestSelectCasesNarrowsToTheNamedOnes(t *testing.T) {
+	got, err := SelectCases(planCases(), []string{"p1", "a-r1"})
+	if err != nil || len(got) != 2 || got[0].ID != "a-r1" || got[1].ID != "p1" {
+		t.Fatalf("SelectCases = %+v, %v", got, err)
+	}
+	if all, err := SelectCases(planCases(), nil); err != nil || len(all) != 3 {
+		t.Fatalf("no --case keeps every case: %+v, %v", all, err)
+	}
+	if _, err := SelectCases(planCases(), []string{"zz"}); err == nil || !strings.Contains(err.Error(), "b-r2") {
+		t.Errorf("an unknown case must be refused, listing the known ones: %v", err)
+	}
+	if _, err := SelectCases(planCases(), []string{"p1", "p1"}); err == nil {
+		t.Error("a case named twice must be refused")
+	}
+}
