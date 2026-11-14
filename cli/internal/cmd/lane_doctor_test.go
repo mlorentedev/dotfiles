@@ -20,6 +20,10 @@ func laneDoctorRepo(t *testing.T, init bool, marker string) string {
 		if _, err := lane.InitLanes(repo, os.Getenv("WORKTREE_ROOT")); err != nil {
 			t.Fatal(err)
 		}
+		// Init no longer writes the marker; a coherent repository has it.
+		if marker == "" {
+			marker = coherentMarker
+		}
 	}
 	if marker != "" {
 		path := filepath.Join(repo, filepath.FromSlash(lane.LanesMarkerFile))

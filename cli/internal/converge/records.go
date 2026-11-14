@@ -144,6 +144,7 @@ func Registry(o Options) []Reconciler {
 		tsBridgeClient{},
 		gitLFS{run: o.GitRun, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
+		lanes{resolve: o.ResolvePath, has: onPath},
 		envPersist{launchctl: o.Launchctl, uid: o.UID, userEnv: o.UserEnv, userPath: o.UserPath, expand: env.ExpandUserPath, bins: o.ToolsBinDirs},
 		selfDeploy{scheduler: o.Scheduler},
 		hiveUpgradeRetire{scheduler: o.Scheduler},

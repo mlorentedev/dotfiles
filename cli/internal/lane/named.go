@@ -26,9 +26,9 @@ const (
 )
 
 // LanesMarkerFile is the committed declaration that a repository runs the
-// persistent named lane system, and the only thing the pre-commit lane guard
-// keys off. It carries no paths and no host names, so the same marker is valid
-// on every OS, agent host and seat.
+// persistent named lane system. A machine activates from the copy on the
+// default branch (Activate), never from a working tree. It carries no paths and
+// no host names, so the same marker is valid on every OS, agent host and seat.
 const LanesMarkerFile = ".dotf/lanes.json"
 
 // CanonicalLanes lists the 3 persistent worktree lanes per repository (HARNESS-186).
@@ -97,17 +97,13 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 	// worktree that path is a pointer FILE, so the exclusion silently did
 	// nothing there and the metadata showed up as untracked — the BUG-043 shape
 	// on the Go side. Both errors are returned rather than discarded: a missing
-	// exclusion makes every `git status` dirty, and the marker below is written
-	// only after this succeeds, so a failed init leaves the lane guard INACTIVE
-	// instead of half-configured.
+	// exclusion makes every `git status` dirty.
 	gitCommonDir, err := resolveGitCommonDir(absRepo)
 	if err != nil {
 		return 0, err
 	}
-	// Refuse before writing anything: a marker left behind by a refused init
-	// would arm the guard in a repository that has no lanes to switch to.
-	// Lstat, not Stat: a dangling symlink is a directory entry git worktree
-	// add refuses, and Stat would report it absent.
+	// Refuse before writing anything. Lstat, not Stat: a dangling symlink is a
+	// directory entry git worktree add refuses, and Stat would report it absent.
 	for _, name := range CanonicalLanes {
 		lanePath := filepath.Join(repoWTRoot, name)
 		if err := refuseStranger(absRepo, gitCommonDir, lanePath); err != nil {
@@ -129,12 +125,6 @@ func initLanesLocked(absRepo, absWTRoot string) (int, error) {
 		if created {
 			changed++
 		}
-	}
-	// The marker arms the guard, so it is written last: a provision that
-	// failed, or a record that could not be written, leaves no marker behind,
-	// and the next init adopts whatever was provisioned and retries the rest.
-	if _, err := writeLanesMarker(absRepo); err != nil {
-		return changed, err
 	}
 	return changed, nil
 }
@@ -317,9 +307,9 @@ func saveLaneMetadata(lanePath string, meta worktree.Metadata) error {
 }
 
 // writeLanesMarker idempotently writes .dotf/lanes.json into absRepo and reports
-// whether the file changed. The marker is the named lane system's own opt-in: it
-// is written by `dotf lane init` and read by the pre-commit guard, so no other
-// feature's config file can switch the guard on.
+// whether the file changed. The marker is the named lane system's own opt-in,
+// and it is committed: a machine activates from the copy on the default branch
+// (Activate), never from this write, so `dotf lane init` leaves it alone.
 //
 // canonical_lanes is policy owned by this command and is always rewritten.
 // third_party_roots is host-owned data, so roots already declared on disk are

@@ -10,13 +10,17 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
-// initialisedLaneRepo is a repository with the three lanes provisioned, the
-// starting state of every audit case that breaks one thing.
+// initialisedLaneRepo is a repository with the three lanes provisioned and the
+// marker in place, the starting state of every audit case that breaks one thing.
+// Init no longer writes the marker, so the fixture does.
 func initialisedLaneRepo(t *testing.T) (repoDir, wtRoot string) {
 	t.Helper()
 	repoDir, wtRoot = setupLaneTestRepo(t)
 	if _, err := InitLanes(repoDir, wtRoot); err != nil {
 		t.Fatalf("lane init: %v", err)
+	}
+	if _, err := writeLanesMarker(repoDir); err != nil {
+		t.Fatal(err)
 	}
 	return repoDir, wtRoot
 }
@@ -168,6 +172,9 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 		repoDir, wtRoot := setupLaneTestRepo(t)
 		runGitLaneTest(t, repoDir, "config", "worktree.useRelativePaths", "true")
 		if _, err := InitLanes(repoDir, wtRoot); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := writeLanesMarker(repoDir); err != nil {
 			t.Fatal(err)
 		}
 		gitDir, _, err := worktreeGitDirs(filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary))

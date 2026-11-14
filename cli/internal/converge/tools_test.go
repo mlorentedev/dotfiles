@@ -135,6 +135,8 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // system-upgrade follows tools: tools installs what is absent, and it moves
 // what is already there (TOOL-036). cache-gc follows system-upgrade, the
 // other step a quiet day of `dotf update` runs (#3367).
+// lanes follows git-hooks: the record it writes arms the guard that step wires
+// (HARNESS-195).
 // agent-extensions comes after tools, whose PATH reaches the claude mise
 // installs, and last among the native steps, so a plugin that cannot install
 // stops nothing else (#2387). The setup script runs last, after every native
@@ -144,7 +146,7 @@ func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,system-upgrade,cache-gc,pwsh-modules,pi-settings,configs-deploy,orca-hooks,shell-completions,records-bind,git-config,ts-bridge-client,git-lfs,git-hooks,env-persist,self-deploy,hive-upgrade-retire,workstation-target,agent-extensions,legacy-setup" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,system-upgrade,cache-gc,pwsh-modules,pi-settings,configs-deploy,orca-hooks,shell-completions,records-bind,git-config,ts-bridge-client,git-lfs,git-hooks,lanes,env-persist,self-deploy,hive-upgrade-retire,workstation-target,agent-extensions,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }
