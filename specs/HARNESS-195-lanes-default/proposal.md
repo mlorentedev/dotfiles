@@ -51,6 +51,7 @@ After this spec, in a repository that carries the committed `.dotf/lanes.json`:
    - expired leases;
    - a deployed `lane-guard.sh` that lags the repository's copy.
 8. **The doctrine names one way in.** In a repository with lanes, AGENTS.md and the `using-git-worktrees`, `handoff` and `autopilot` skills say that work starts with `dotf lane switch` or `dotf lane next`. AGENTS.md's implementation tiers stop being called "lanes", because the name collides with ADR-060's lanes.
+9. **A launch names its model.** `dotf worktree add --agent <harness> --model <id>`, `dotf lane exec --model <id>` and `dotf lane next --model <id>` start the agent on that model instead of the harness's default (folded from #3485: pi's default differs from the model meant for it, and claude and opencode defaults are overridden the same way). The id travels to `herdr agent start` as a trailing agent argument (`-- --model <id>`) and into the launch argv right after the agent's executable, never through a shell. `--model` without `--agent` is refused on `worktree add`; a blank or flag-shaped id is refused everywhere; an id the shells read apart (brackets, spaces) is refused by `lane next`, whose line is typed into a shell.
 
 ## Out of scope
 
@@ -79,6 +80,7 @@ These are true unknowns. The design decisions are recorded in **What**.
 - [ ] AC7. `dotf lane doctor` reports a detached worktree with no lease, an expired lease, and a drifted deployed guard, each with its fix. Exit status is unchanged for warnings.
 - [ ] AC8. AGENTS.md, the `dotf init` template that seeds other repositories' AGENTS.md (`cli/internal/initrepo/templates/agents-spec-section.md`) and the three skills name the lane entrances. Neither AGENTS.md nor the template calls the implementation tiers "lanes", and a test fails if either does again.
 - [ ] AC9. dotfiles is active on the Mac, the Linux guest and the Windows guest. A real session of each launched agent starts in a lane and reports it through AC3's line. The evidence is recorded in `verification.md`.
+- [ ] AC10. `dotf worktree add --agent X --model M` forwards `-- --model M` to `herdr agent start`; `dotf lane exec --model M` and the line `dotf lane next --model M` types place `--model M` right after the agent executable for every agent in `launchers`; `--model` without `--agent`, a blank or flag-shaped id, and (for `lane next`) an id the shells read apart are refused before anything is created. Each launchable agent was observed accepting `--model <id>`.
 
 ## References
 

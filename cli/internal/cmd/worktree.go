@@ -280,6 +280,7 @@ func newWorktreeAddCmd() *cobra.Command {
 		ttl        time.Duration
 		agent      string
 		promptFile string
+		model      string
 	)
 
 	cmd := &cobra.Command{
@@ -303,9 +304,10 @@ creates the worktree and prints a hint on stderr naming dotf lane switch <branch
 
 --agent <harness> then opens the worktree in herdr and starts that agent in its
 root pane, named after the worktree directory; --prompt-file sends the file as
-its first prompt. add returns once the prompt is sent, without waiting on the
-agent. With herdr absent, its server down, or an agent of that name live, add
-refuses before creating anything.`,
+its first prompt, and --model starts it on that model id instead of its own
+default. add returns once the prompt is sent, without waiting on the agent.
+With herdr absent, its server down, or an agent of that name live, add refuses
+before creating anything.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			slug := args[0]
@@ -329,6 +331,16 @@ refuses before creating anything.`,
 			launch, err := prepareAgent(agent, promptFile, slug, branch, customPath)
 			if err != nil {
 				return err
+			}
+			if c.Flags().Changed("model") {
+				if launch == nil {
+					return errors.New("--model needs --agent")
+				}
+				m := strings.TrimSpace(model)
+				if m == "" || m[0] == '-' {
+					return fmt.Errorf("--model must be a model id, not %q", model)
+				}
+				launch.Model = m
 			}
 
 			info, err := worktree.Add(opts)
@@ -367,6 +379,7 @@ refuses before creating anything.`,
 	cmd.Flags().DurationVar(&ttl, "ttl", 24*time.Hour, "initial lease duration before eligible for reap")
 	cmd.Flags().StringVar(&agent, "agent", "", "start this harness (claude, codex, pi, agy, opencode, copilot) in herdr on the new worktree")
 	cmd.Flags().StringVar(&promptFile, "prompt-file", "", "with --agent, send this file as the agent's first prompt")
+	cmd.Flags().StringVar(&model, "model", "", "with --agent, start the agent on this model id instead of its default")
 
 	return cmd
 }

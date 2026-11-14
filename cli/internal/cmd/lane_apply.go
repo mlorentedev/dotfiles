@@ -72,7 +72,7 @@ func realLaneVerbs(c *cobra.Command, src lane.Sources) lane.Verbs {
 			return len(report.Reaped), reportSweepThreads(c.ErrOrStderr(), report)
 		},
 		Next: func() (bool, error) {
-			out, err := doLaneNext(c, "", false)
+			out, err := doLaneNext(c, "", "", false)
 			if err != nil {
 				return false, err
 			}
