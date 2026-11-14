@@ -131,13 +131,15 @@ archive a spec. CLI subcommands via `dotf spec …` (Go CLI, works in CI/Windows
 (`SDD-012b`). Verbatim copy of `idPattern` in `cli/internal/spec/spec.go`, held
 to it by `TestIDPatternProseMatchesCode`; do not reword it.
 
-**The Lane Decisor Rule:** The agent MUST declare the chosen lane on the VERY FIRST LINE of its response before taking any action (e.g., `Lane: Fast-Track Development`).
+**The Tier Rule:** The agent MUST declare the chosen tier on the VERY FIRST LINE of its response before taking any action (e.g., `Tier: Fast-Track Development`).
 
-**Implementation Lanes:**
+**Implementation Tiers:**
 - **0. Answer:** Read-only questions, codebase exploration, debugging without writing code.
 - **1. Inline Direct:** <30 LOC diff, understood change, single component.
 - **2. Fast-Track Development (FTD):** 30–150 LOC, ordinary changes, low ambiguity. 1 document `spec.md`, simple branch, no worktree overhead, observable evidence required.
 - **3. Full SDD:** >150 LOC, public contracts, architecture, or high ambiguity. Triad of docs (`proposal.md`, `tasks.md`, `verification.md`).
+
+**Where work starts.** In a repository that runs persistent named lanes (the session-start line says `lane <name> ACTIVE` or `this repository runs lanes`), work starts in a lane, and there is one way in: `dotf lane switch <branch>` puts a branch in a free lane, and `dotf lane next` starts the next queued issue. Do not run `dotf worktree add` there, and do not commit to main in the main checkout: the lane guard blocks it. Lanes are persistent worktrees (ADR-060); they are unrelated to the three implementation tiers above.
 
 ### Discipline Gate (NON-NEGOTIABLE)
 

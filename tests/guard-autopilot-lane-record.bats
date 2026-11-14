@@ -1,38 +1,38 @@
 #!/usr/bin/env bats
 # GUARD: the autopilot skill routes a run into a persistent lane only on the
-# ADR-060 marker, and never creates that marker itself (#3426).
+# activation record, and never creates that record itself (#3426, #3432).
 #
 # `.dotf/lane.json` is the CLI-129 queue contract: a repository can carry it and
 # run no lanes, so testing it sent runs down the lane branch on repositories
-# that never opted in. Activating a repository belongs to `dotf converge --only
-# lanes`, which writes the record the guard arms from (#3437), so an unattended
-# run must not run `dotf lane init` to do it. The skill still decides by the
-# marker, not the record: HARNESS-195 Slice G switches it.
+# that never opted in. The committed marker `.dotf/lanes.json` declares a
+# repository but arms nothing: a machine runs lanes once `dotf converge --only
+# lanes` writes the activation record into the git common dir, which is the fact
+# the lane guard arms from (#3437), so the skill tests that record. An
+# unattended run must not run `dotf lane init` to create it.
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
     SKILL="$REPO/harness/skills/autopilot/SKILL.md"
-    # The marker is read from the Go constant, not restated here.
-    MARKER="$(sed -n 's/^const LanesMarkerFile = "\(.*\)"$/\1/p' "$REPO/cli/internal/lane/named.go")"
+    # The record's name is read from the Go constant, not restated here.
+    RECORD="$(sed -n 's/^const ActivationFile = "\(.*\)"$/\1/p' "$REPO/cli/internal/lane/activate.go")"
 }
 
-@test "the lane marker constant is readable from named.go" {
-    [ "$MARKER" = ".dotf/lanes.json" ] || { printf 'got [%s]\n' "$MARKER" >&2; false; }
+@test "the activation record constant is readable from activate.go" {
+    [ "$RECORD" = "dotf-lanes-active" ] || { printf 'got [%s]\n' "$RECORD" >&2; false; }
 }
 
-@test "autopilot decides on a lane by testing exactly LanesMarkerFile" {
-    [ -n "$MARKER" ] || { printf 'LanesMarkerFile not read from named.go\n' >&2; false; }
-    cond="$(grep -E '^[[:space:]]*if \[ -[a-z] [^]]*\.dotf/lanes?\.json' "$SKILL")" || false
+@test "autopilot decides on a lane by testing exactly the activation record in the git common dir" {
+    [ -n "$RECORD" ] || { printf 'ActivationFile not read from activate.go\n' >&2; false; }
+    cond="$(grep -E '^[[:space:]]*if \[ -f .*git-common-dir' "$SKILL")" || false
     [ -n "$cond" ] || false
     n="$(printf '%s\n' "$cond" | wc -l | tr -d ' ')"
     [ "$n" = "1" ] || { printf 'expected one lane condition, got %s\n' "$n" >&2; false; }
-    [ "${cond#*"$MARKER"}" != "$cond" ] || { printf 'lane condition does not name %s: %s\n' "$MARKER" "$cond" >&2; false; }
+    [ "${cond#*"/$RECORD"}" != "$cond" ] || { printf 'lane condition does not name %s: %s\n' "$RECORD" "$cond" >&2; false; }
 }
 
-@test "autopilot names no .dotf lane marker other than LanesMarkerFile in executable lines" {
-    [ -n "$MARKER" ] || { printf 'LanesMarkerFile not read from named.go\n' >&2; false; }
-    # Comment lines may explain the difference; a command must not name the other file.
-    bad="$(grep -nE '\.dotf/lanes?\.json' "$SKILL" | grep -v ':[[:space:]]*#' | grep -vF "$MARKER" || true)"
+@test "autopilot tests no .dotf lane file in executable lines" {
+    # Comment lines explain the difference; a command must not decide on either file.
+    bad="$(grep -nE '\.dotf/lanes?\.json' "$SKILL" | grep -v ':[[:space:]]*#' || true)"
     [ -z "$bad" ] || { printf '%s\n' "$bad" >&2; false; }
 }
 
@@ -48,8 +48,8 @@ setup() {
 }
 
 @test "a failed lane switch parks as wip-cap and ends the run, never falling through to worktree add" {
-    # The lane branch is the text between the marker test and its `else`.
-    branch="$(awk '/^[[:space:]]*if \[ -f \.dotf\/lanes\.json \]/{f=1; next} f && /^[[:space:]]*else[[:space:]]*$/{exit} f' "$SKILL")"
+    # The lane branch is the text between the record test and its `else`.
+    branch="$(awk '/^[[:space:]]*if \[ -f .*git-common-dir/{f=1; next} f && /^[[:space:]]*else[[:space:]]*$/{exit} f' "$SKILL")"
     [ -n "$branch" ] || false
     # The switch's exit status is tested, and the failure arm names the park and exits.
     printf '%s\n' "$branch" | grep -qE '^[[:space:]]*if ! .*dotf lane switch "\$BRANCH"' || false
