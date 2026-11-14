@@ -73,6 +73,12 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		rep.Warn(s.ConfigPath() + " is not what versions.conf renders (run: dotf tools sync)")
 	}
 	if len(p.Missing) > 0 {
+		// A pin another config holds is not the sync's to fix: it would install
+		// dotfiles' version and lose to that file again (#3524).
+		if cause, fix := s.ShadowNote(p.Missing); cause != "" {
+			rep.Fail("not running at their pin through mise: " + strings.Join(p.Missing, ", ") + "; " + cause + "\n         FIX: " + fix)
+			return
+		}
 		rep.Fail("not running at their pin through mise: " + strings.Join(p.Missing, ", ") + " (run: dotf tools sync)")
 		return
 	}
