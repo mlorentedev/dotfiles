@@ -42,6 +42,9 @@ type Backend interface {
 	// CreatePR opens a pull request from a branch of the same repository and
 	// returns its URL. It never merges.
 	CreatePR(ctx context.Context, r Repo, in NewPR) (string, error)
+	// ReadyPR marks draft pull request number ready for review and returns
+	// its URL. A pull request that is already ready is not written.
+	ReadyPR(ctx context.Context, r Repo, number int) (string, error)
 }
 
 // NewPR is what an agent supplies to open a pull request. Head and Base are

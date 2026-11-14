@@ -59,15 +59,85 @@ func (g Gitea) EditIssue(ctx context.Context, r Repo, number int, in IssueEdit) 
 	return g.writeURL(ctx, http.MethodPatch, g.repoPath(r, fmt.Sprintf("issues/%d", number)), editPayload(in))
 }
 
-// CreatePR implements Backend. Gitea's pull request API has no draft field (a
-// draft is a title prefix the instance configures), so a draft request is
-// refused rather than guessed.
-func (g Gitea) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
-	if in.Draft {
-		return "", fmt.Errorf("ERROR: --draft is not supported on %s. WHY: Gitea marks a draft with a configurable title prefix, not a field, and dotf forge does not guess it. FIX: open the pull request without --draft", r.Host)
+// giteaWIPPrefixes are Gitea's default WORK_IN_PROGRESS_PREFIXES. A title that
+// starts with one, in any case, makes the pull request a draft; Gitea has no
+// draft field on create or edit, and no API that reads an instance's own list.
+var giteaWIPPrefixes = []string{"WIP:", "[WIP]"}
+
+// giteaPull is the part of a Gitea pull request dotf reads back.
+type giteaPull struct {
+	Title   string `json:"title"`
+	Draft   bool   `json:"draft"`
+	HTMLURL string `json:"html_url"`
+}
+
+// pull sends one request whose answer is a pull request and decodes it.
+func (g Gitea) pull(ctx context.Context, method, path string, payload any) (giteaPull, error) {
+	raw, err := g.do(ctx, method, path, payload)
+	if err != nil {
+		return giteaPull{}, err
 	}
-	return g.writeURL(ctx, http.MethodPost, g.repoPath(r, "pulls"),
-		map[string]string{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base})
+	var p giteaPull
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return giteaPull{}, fmt.Errorf("gitea %s %s: the answer is not a pull request: %w", method, path, err)
+	}
+	return p, nil
+}
+
+// CreatePR implements Backend. A draft is opened with a "WIP: " title, and the
+// draft field of the answer says whether the instance recognised it: Gitea
+// exposes no API for its prefixes, so the prefix is verified, never assumed.
+func (g Gitea) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
+	path := g.repoPath(r, "pulls")
+	if !in.Draft {
+		return g.writeURL(ctx, http.MethodPost, path,
+			map[string]string{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base})
+	}
+	// A title that already carries a prefix keeps one, or pr ready would
+	// strip one of two and still read a draft.
+	title, _ := stripWIPPrefix(in.Title)
+	p, err := g.pull(ctx, http.MethodPost, path,
+		map[string]string{"title": giteaWIPPrefixes[0] + " " + title, "body": in.Body, "head": in.Head, "base": in.Base})
+	if err != nil {
+		return "", err
+	}
+	if !p.Draft {
+		return "", fmt.Errorf("ERROR: %s was opened ready, not as a draft. WHY: %s does not treat a %q title prefix as work in progress. FIX: retitle it with the prefix that instance's WORK_IN_PROGRESS_PREFIXES names", p.HTMLURL, r.Host, giteaWIPPrefixes[0])
+	}
+	return p.HTMLURL, nil
+}
+
+// ReadyPR implements Backend. The draft prefix is removed from the title and
+// the answer must say draft: false; a title that is a draft by a prefix dotf
+// does not know is an error, not a guess. A ready pull request is not written.
+func (g Gitea) ReadyPR(ctx context.Context, r Repo, number int) (string, error) {
+	path := g.repoPath(r, fmt.Sprintf("pulls/%d", number))
+	p, err := g.pull(ctx, http.MethodGet, path, nil)
+	if err != nil || !p.Draft {
+		return p.HTMLURL, err
+	}
+	title, ok := stripWIPPrefix(p.Title)
+	if ok {
+		p, err = g.pull(ctx, http.MethodPatch, path, map[string]string{"title": title})
+		if err != nil {
+			return "", err
+		}
+	}
+	if p.Draft {
+		return "", fmt.Errorf("ERROR: %s is still a draft. WHY: its title %q starts with a work-in-progress prefix of %s other than %s. FIX: remove that prefix from the title", p.HTMLURL, p.Title, r.Host, strings.Join(giteaWIPPrefixes, " or "))
+	}
+	return p.HTMLURL, nil
+}
+
+// stripWIPPrefix removes one leading default prefix, in any case, and the
+// spaces after it.
+func stripWIPPrefix(title string) (string, bool) {
+	for _, prefix := range giteaWIPPrefixes {
+		if len(title) >= len(prefix) && strings.EqualFold(title[:len(prefix)], prefix) {
+			return strings.TrimLeft(title[len(prefix):], " "), true
+		}
+	}
+	return title, false
 }
 
 // LandedHeads implements Backend. It asks for the pull request of branch against
