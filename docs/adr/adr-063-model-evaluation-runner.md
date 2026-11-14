@@ -315,23 +315,18 @@ login that CI does not hold, and its quota is the owner's. A scheduled run in ci
 
 ## Decisions for the owner
 
-1. **WIP limit.** `specs/` holds 10 active specs at the ADR-043 limit, so this PR's scaffold commit
-   uses `--over-wip-limit`. (A) Keep it. (B) Drop that commit and scaffold when a slot frees.
-   (C) Abandon a stalled spec first.
-   *Recommended: A.* You asked for the scaffold in this PR, it is its own commit so B costs one
-   revert, and the override is recorded in the proposal's frontmatter.
-2. **Build or adopt.** (A) Build in Go, as decided above. (B) Adopt inspect-ai and amend ADR-020 §2.
+1. **Build or adopt.** (A) Build in Go, as decided above. (B) Adopt inspect-ai and amend ADR-020 §2.
    *Recommended: A.* With either framework, the solver and the grader are still ours.
-3. **What counts toward recall.** (A) Only confirmed findings; label-only `REAL` goes in `optional`.
+2. **What counts toward recall.** (A) Only confirmed findings; label-only `REAL` goes in `optional`.
    (B) Every finding labelled `REAL`.
    *Recommended: A.* B rewards agreeing with the key author's mistakes.
-4. **Budget defaults.** (A) N=3 epochs and a cap of 30 runs per invocation. (B) N=5 and 60.
+3. **Budget defaults.** (A) N=3 epochs and a cap of 30 runs per invocation. (B) N=5 and 60.
    *Recommended: A* for the first slice: 5 replays × 3 candidates × 3 epochs = 45 runs, so it is
    planned in two invocations or raised explicitly.
-5. **Retirements.** Retire `nan-quality-bench.sh` and `tests/evals/harness-evals.json` in the
+4. **Retirements.** Retire `nan-quality-bench.sh` and `tests/evals/harness-evals.json` in the
    `dotf eval run` slice: (A) yes, (B) keep them.
    *Recommended: A.*
-6. **Scheduled runs.** (A) Defer, with the triggers in §7. (B) Schedule NaN and Anthropic runs in
+5. **Scheduled runs.** (A) Defer, with the triggers in §7. (B) Schedule NaN and Anthropic runs in
    ci-workflows now.
    *Recommended: A.*
 
