@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -223,11 +224,47 @@ func (in *Installer) defaults() {
 		in.IsRoot = func() bool { return os.Geteuid() == 0 }
 	}
 	if in.Run == nil {
-		in.Run = func(name string, args ...string) error {
-			cmd := exec.Command(name, args...)
-			cmd.Stdout, cmd.Stderr = in.Out, in.Out
-			return cmd.Run()
+		in.Run = boundedRun(in.Out, wingetCallTimeout)
+	}
+}
+
+// wingetCallTimeout bounds one winget call. A winget that hangs after it has
+// printed its error left the first converge of a clean Windows guest silent
+// for 2h, until the harness gave up (#3489); the longest honest call is Docker
+// Desktop's installer, which takes minutes.
+const wingetCallTimeout = 30 * time.Minute
+
+// wingetKillGrace is how long a killed winget gets to release its output
+// pipes: a grandchild installer that holds them would otherwise keep Wait
+// blocked after the kill.
+const wingetKillGrace = 10 * time.Second
+
+// isWinget reports whether name is the winget executable, by its bare name or
+// a path to it.
+func isWinget(name string) bool {
+	base := strings.ToLower(name[strings.LastIndexAny(name, `/\`)+1:])
+	return base == "winget" || base == "winget.exe"
+}
+
+// boundedRun streams name's output to out like a plain exec, and ends a winget
+// call that outlives limit with an error that says so. Other commands are not
+// bounded: an npm or package-manager install has no cap worth guessing.
+func boundedRun(out io.Writer, limit time.Duration) func(name string, args ...string) error {
+	return func(name string, args ...string) error {
+		ctx := context.Background()
+		if isWinget(name) {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, limit)
+			defer cancel()
 		}
+		cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // a package manager the catalog names
+		cmd.Stdout, cmd.Stderr = out, out
+		cmd.WaitDelay = wingetKillGrace
+		err := cmd.Run()
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("%s did not finish in %s and was stopped: %w", name, limit, err)
+		}
+		return err
 	}
 }
 
