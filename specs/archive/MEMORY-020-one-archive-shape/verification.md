@@ -42,7 +42,7 @@ owner: manu
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/MEMORY-020-one-archive-shape/` -> `specs/archive/MEMORY-020-one-archive-shape/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/MEMORY-020-one-archive-shape/` -> `specs/archive/MEMORY-020-one-archive-shape/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
