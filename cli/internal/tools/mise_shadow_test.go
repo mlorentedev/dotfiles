@@ -53,7 +53,7 @@ func TestSync_NamesTheConfigThatShadowsAPin(t *testing.T) {
 	// pinned versions beside them and the foreign config keeps winning.
 	pending := []MiseTool{{"node", "24.19.0"}, {"python", "3.12.13"}}
 	nodeLs := "[" + miseLsEntry("24.22.1", "", "", false) + "," + miseLsEntry("24.19.0", "24.19.0", foreign, true) + "]"
-	pythonLs := "[" + miseLsEntry("3.12.13", "3.12", foreign, true) + "]"
+	pythonLs := "[" + miseLsEntry("3.12.13", "3.12.13", foreign, true) + "]"
 
 	for _, tc := range []struct {
 		name    string
@@ -66,7 +66,7 @@ func TestSync_NamesTheConfigThatShadowsAPin(t *testing.T) {
 			ls:   map[string]string{"node": nodeLs, "python": pythonLs},
 			want: []string{
 				"not running at their pin: node, python",
-				foreign + " pins node 24.19.0, python 3.12",
+				foreign + " pins node 24.19.0, python 3.12.13",
 				"outranks " + own,
 				fix,
 			},
@@ -76,7 +76,7 @@ func TestSync_NamesTheConfigThatShadowsAPin(t *testing.T) {
 			ls:   map[string]string{"node": nodeLs, "python": "[" + miseLsEntry("3.12.13", "3.13.1", own, true) + "]"},
 			want: []string{"not running at their pin: node, python", foreign + " pins node 24.19.0", fix},
 			// python's active entry is dotfiles' own file: no claim about it.
-			notWant: []string{"python 3.12"},
+			notWant: []string{"python 3.12.13"},
 		},
 		{
 			name:    "dotfiles' own file is the active one: a genuine mismatch",
