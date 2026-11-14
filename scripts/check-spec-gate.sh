@@ -840,11 +840,26 @@ cat >&2 <<EOF
              "## SDD skip rationale" section in the PR body.
 
        If this already archived a spec to satisfy archive-on-merge but still
-       failed here: open the PR first (scripts/spec-gate-prepush.sh, wired to
-       this hook, resolves its labels/body/author live via \`gh\` once one
-       exists). Before a PR exists there is nothing to resolve; SDD_PR_BODY can
-       be set by hand for a one-off check: SDD_PR_BODY='Closes #N' $0 ...
+       failed here: the PR body or a commit message must close the spec's
+       issue ("Closes #N"), and the spec's proposal.md must name that issue.
 
-       Reference: AGENTS.md "Discipline Gate (NON-NEGOTIABLE)" section.
 EOF
+# No PR context: the push hook (scripts/spec-gate-prepush.sh) found no open PR
+# for this branch, so option (b) cannot be read from anywhere. That is every
+# first push, and a push to a branch whose PR already merged (#3444). Name the
+# way through for both instead of a PR the author cannot open yet.
+if [[ -z "$SDD_LABELS" && -z "$SDD_PR_BODY" ]]; then
+    cat >&2 <<'EOF'
+       No PR was found for this branch, so its label and body were not read:
+         - First push: hand the hook the label and body the PR will carry,
+             SDD_LABELS=skip-sdd SDD_PR_BODY="$(cat body.md)" git push
+           then open the PR with that same label and body. CI's spec-gate
+           reads them again from the PR. A spec archived for archive-on-merge
+           goes the same way: SDD_PR_BODY='Closes #N' git push
+         - The branch's PR already merged: this push would never reach the
+           base branch. Re-land the commits on a fresh branch from it.
+
+EOF
+fi
+printf '       Reference: AGENTS.md "Discipline Gate (NON-NEGOTIABLE)" section.\n' >&2
 exit 1
