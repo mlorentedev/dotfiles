@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/evals"
 )
 
 func TestEvalCheckPassesARepositoryWithoutCases(t *testing.T) {
@@ -91,5 +94,22 @@ func TestEvalRunPlanNarrowsToTheNamedCases(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "1 cases × 1 candidates × 1 epochs = 1 runs") || strings.Contains(stdout, "memory-017") {
 		t.Errorf("--case did not narrow the matrix:\n%s", stdout)
+	}
+}
+
+// The command's filesystem reads go through evalRunDeps, so a failing loader
+// is reported without touching a corpus on disk.
+func TestEvalRunReportsAFailingLoader(t *testing.T) {
+	var out strings.Builder
+	deps := evalRunDeps{
+		loadCases: func(string) ([]evals.Case, error) { return nil, errors.New("corpus unreadable") },
+		loadCandidates: func(string) (evals.Candidates, error) {
+			t.Error("candidates read after the corpus failed")
+			return evals.Candidates{}, nil
+		},
+	}
+	err := runEvalRun(&out, deps, evalRunOpts{root: "/nowhere", candidates: []string{"nan/x"}, epochs: 1, maxRuns: 30, planOnly: true})
+	if err == nil || !strings.Contains(err.Error(), "corpus unreadable") || out.Len() != 0 {
+		t.Fatalf("err %v, output %q", err, out.String())
 	}
 }

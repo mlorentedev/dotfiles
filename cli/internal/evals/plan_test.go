@@ -3,6 +3,7 @@ package evals
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -283,5 +284,35 @@ func TestPlanPricesAtTheHighestOfTheThreeRates(t *testing.T) {
 	}
 	if want := 200000 * 30 / 1e6; p.Estimates[0].Amount != want {
 		t.Errorf("estimate %v, want %v at the cached rate", p.Estimates[0].Amount, want)
+	}
+}
+
+// Flags reach BuildPlan unchecked, so counts that cannot be represented are
+// refused rather than wrapped into a small number that passes the cap.
+func TestPlanRefusesCountsThatOverflow(t *testing.T) {
+	cs := loadPriced(t, pricedCandidates)
+	p, err := BuildPlan(planCases(), cs, []string{"nan/glm5.3-flash"}, math.MaxInt, math.MaxInt)
+	if !errors.Is(err, ErrOverCap) {
+		t.Fatalf("epochs and cap at MaxInt over 3 cases: err = %v, plan runs %d", err, p.Runs)
+	}
+	p, err = BuildPlan(planCases(), cs, []string{"nan/glm5.3-flash"}, math.MaxInt/2, math.MaxInt)
+	if err != nil {
+		for _, e := range p.Estimates {
+			if e.Amount <= 0 {
+				t.Errorf("an overflowing estimate came out as %v", e.Amount)
+			}
+		}
+	}
+}
+
+// A small spend must not print as zero, the one number the plan never shows.
+func TestPlanRenderShowsASmallEstimateAsNonZero(t *testing.T) {
+	body := strings.Replace(pricedCandidates, `"replay": 200000`, `"replay": 100`, 1)
+	p, err := BuildPlan([]Case{{ID: "a-r1", Kind: "replay"}}, loadPriced(t, body), []string{"nan/glm5.3-flash"}, 1, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out := p.Render(); strings.Contains(out, " 0.0 NaN credits") || !strings.Contains(out, "0.00175 NaN credits") {
+		t.Errorf("100 tokens at 17.5 per 1M is 0.00175 credits:\n%s", out)
 	}
 }

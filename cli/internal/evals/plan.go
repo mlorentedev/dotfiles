@@ -3,7 +3,9 @@ package evals
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
@@ -81,6 +83,11 @@ func BuildPlan(cases []Case, cs Candidates, ids []string, epochs, maxRuns int) (
 	case maxRuns < 1:
 		return Plan{}, fmt.Errorf("--max-runs must be at least 1, got %d", maxRuns)
 	}
+	// Flags reach here unchecked: a run count that cannot be represented is
+	// refused before anything multiplies it.
+	if cells := len(ids) * len(cases); epochs > math.MaxInt/cells {
+		return Plan{}, fmt.Errorf("%w: %d cells × %d epochs cannot be counted; lower --epochs", ErrOverCap, cells, epochs)
+	}
 	p := Plan{MaxRuns: maxRuns, Envelopes: map[string]int{}}
 	named := map[string]bool{}
 	for _, id := range ids {
@@ -117,7 +124,7 @@ func BuildPlan(cases []Case, cs Candidates, ids []string, epochs, maxRuns int) (
 func estimate(e spec.ReviewerEntry, cs Candidates, cases []Case, epochs int) (Estimate, error) {
 	switch {
 	case e.Runner == "agy":
-		return Estimate{Candidate: e.ID, Unit: UnitAgyRuns, Amount: float64(len(cases) * epochs), Basis: BasisDefault}, nil
+		return Estimate{Candidate: e.ID, Unit: UnitAgyRuns, Amount: float64(len(cases)) * float64(epochs), Basis: BasisDefault}, nil
 	case e.Runner == "pi" && e.Provider == "nan":
 		rates, ok := cs.Credits[e.ID]
 		if !ok {
@@ -138,7 +145,7 @@ func estimate(e spec.ReviewerEntry, cs Candidates, cases []Case, epochs int) (Es
 			}
 			tokens += n
 		}
-		return Estimate{Candidate: e.ID, Unit: UnitNaNCredits, Amount: float64(tokens*epochs) * rate / 1e6, Basis: BasisDefault}, nil
+		return Estimate{Candidate: e.ID, Unit: UnitNaNCredits, Amount: float64(tokens) * float64(epochs) * rate / 1e6, Basis: BasisDefault}, nil
 	default:
 		return Estimate{}, fmt.Errorf("candidate %s: no estimator for runner %s with provider %q", e.ID, e.Runner, e.Provider)
 	}
@@ -202,14 +209,14 @@ func (p Plan) Render() string {
 		totals[e.Unit] += e.Amount
 		switch e.Unit {
 		case UnitNaNCredits:
-			fmt.Fprintf(&b, "  %-32s %.1f %s (%s envelope)\n", e.Candidate, e.Amount, e.Unit, e.Basis)
+			fmt.Fprintf(&b, "  %-32s %s %s (%s envelope)\n", e.Candidate, formatCredits(e.Amount), e.Unit, e.Basis)
 		default:
 			fmt.Fprintf(&b, "  %-32s %.0f %s (its quota cannot be read)\n", e.Candidate, e.Amount, e.Unit)
 		}
 	}
 	for _, u := range units {
 		if u == UnitNaNCredits {
-			fmt.Fprintf(&b, "Total: %.1f %s\n", totals[u], u)
+			fmt.Fprintf(&b, "Total: %s %s\n", formatCredits(totals[u]), u)
 		} else {
 			fmt.Fprintf(&b, "Total: %.0f %s\n", totals[u], u)
 		}
@@ -229,4 +236,13 @@ func (p Plan) Render() string {
 			"priced at the highest of the model's input, cached and output rates.\n", CandidatesFile, strings.Join(parts, ", "))
 	}
 	return b.String()
+}
+
+// formatCredits prints an amount to one decimal, and a small one in full: a
+// positive spend must never read as zero.
+func formatCredits(v float64) string {
+	if v < 0.1 {
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	}
+	return strconv.FormatFloat(v, 'f', 1, 64)
 }
