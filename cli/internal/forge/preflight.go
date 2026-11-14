@@ -60,25 +60,25 @@ func newChecks(declared *Protection, live Protection) []Check {
 }
 
 // mergedPullsQuery asks for the branch's merged pull requests, newest update
-// first, and only the two fields the window reads. The REST list it replaces
-// returned every closed pull request with its full repository payload, 1.9 MB
+// first, the same 100 the REST page held, and only the two fields the window
+// reads. The REST list it replaces returned every closed pull request with its full repository payload, 1.9 MB
 // on dotfiles, and a slow moment of the API ran it past the call's deadline
 // (#3434). Only merged ones are asked for, so an abandoned change never takes a
 // slot. It costs one point of the GraphQL quota.
 const mergedPullsQuery = `query($owner: String!, $name: String!, $base: String!) {
   repository(owner: $owner, name: $name) {
-    pullRequests(baseRefName: $base, states: MERGED, first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) {
+    pullRequests(baseRefName: $base, states: MERGED, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
       nodes { mergedAt headRefOid }
     }
   }
 }`
 
 // mergedHeads returns the head SHAs of the branch's most recently merged pull
-// requests, newest merge first. GitHub cannot order by merge time, so the 30
+// requests, newest merge first. GitHub cannot order by merge time, so the 100
 // most recently updated merged pull requests are read and ordered by mergedAt
 // here: ordering by update alone would let an old pull request that was merely
 // commented on stand in for a recent merge. Every merge updates its pull
-// request, so the newest merges are among those 30 unless 25 older merged pull
+// request, so the newest merges are among those 100 unless 95 older merged pull
 // requests were touched since the fifth-newest merge.
 func mergedHeads(repo, branch string, run Runner) ([]string, error) {
 	owner, name, _ := strings.Cut(repo, "/")
