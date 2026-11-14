@@ -66,29 +66,6 @@ func TestLaneInitIdempotent(t *testing.T) {
 		t.Fatalf("first InitLanes changed = %d, want 3", changed)
 	}
 
-	// The opt-in marker is the lane system's own: written by init, carrying no
-	// paths so it is valid on any OS, host and seat.
-	markerPath := filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))
-	firstMarker, err := os.ReadFile(markerPath)
-	if err != nil {
-		t.Fatalf("lane init did not write %s: %v", LanesMarkerFile, err)
-	}
-	var marker lanesMarker
-	if err := json.Unmarshal(firstMarker, &marker); err != nil {
-		t.Fatalf("%s is not valid JSON: %v\n%s", LanesMarkerFile, err, firstMarker)
-	}
-	if len(marker.CanonicalLanes) != len(CanonicalLanes) {
-		t.Errorf("%s canonical_lanes = %v, want %v", LanesMarkerFile, marker.CanonicalLanes, CanonicalLanes)
-	}
-	if len(marker.ThirdPartyRoots) == 0 {
-		t.Errorf("%s third_party_roots is empty; the guard needs at least one declared root", LanesMarkerFile)
-	}
-	for _, v := range append(append([]string{}, marker.CanonicalLanes...), marker.ThirdPartyRoots...) {
-		if strings.ContainsAny(v, `/\:`) {
-			t.Errorf("%s value %q looks like a path; the marker must stay machine-independent", LanesMarkerFile, v)
-		}
-	}
-
 	for _, name := range CanonicalLanes {
 		lanePath := filepath.Join(wtRoot, "dotfiles", name)
 		meta, err := worktree.LoadMetadata(lanePath)
@@ -108,21 +85,49 @@ func TestLaneInitIdempotent(t *testing.T) {
 	if changed2 != 0 {
 		t.Fatalf("second InitLanes changed = %d, want 0 (idempotent)", changed2)
 	}
-	secondMarker, err := os.ReadFile(markerPath)
-	if err != nil {
-		t.Fatalf("marker vanished after second InitLanes: %v", err)
+}
+
+// The marker the explicit writer produces carries no paths, so it is valid on
+// any OS, host and seat, and a re-run leaves it byte for byte as it was.
+func TestWriteLanesMarkerIsMachineIndependentAndStable(t *testing.T) {
+	repoDir, _ := setupLaneTestRepo(t)
+	if changed, err := WriteLanesMarker(repoDir); err != nil || !changed {
+		t.Fatalf("first write = %v, %v; want changed", changed, err)
 	}
-	if !bytes.Equal(firstMarker, secondMarker) {
+	markerPath := filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))
+	firstMarker, err := os.ReadFile(markerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var marker lanesMarker
+	if err := json.Unmarshal(firstMarker, &marker); err != nil {
+		t.Fatalf("%s is not valid JSON: %v\n%s", LanesMarkerFile, err, firstMarker)
+	}
+	if len(marker.CanonicalLanes) != len(CanonicalLanes) {
+		t.Errorf("%s canonical_lanes = %v, want %v", LanesMarkerFile, marker.CanonicalLanes, CanonicalLanes)
+	}
+	if len(marker.ThirdPartyRoots) == 0 {
+		t.Errorf("%s third_party_roots is empty; the guard needs at least one declared root", LanesMarkerFile)
+	}
+	for _, v := range append(append([]string{}, marker.CanonicalLanes...), marker.ThirdPartyRoots...) {
+		if strings.ContainsAny(v, `/\:`) {
+			t.Errorf("%s value %q looks like a path; the marker must stay machine-independent", LanesMarkerFile, v)
+		}
+	}
+	if changed, err := WriteLanesMarker(repoDir); err != nil || changed {
+		t.Fatalf("second write = %v, %v; want unchanged", changed, err)
+	}
+	if secondMarker, _ := os.ReadFile(markerPath); !bytes.Equal(firstMarker, secondMarker) {
 		t.Errorf("%s changed on re-run:\nfirst:  %s\nsecond: %s", LanesMarkerFile, firstMarker, secondMarker)
 	}
 }
 
 // TestLaneInitPreservesDeclaredThirdPartyRoots pins the ownership split: the
-// marker's canonical_lanes is policy rewritten from code on every init, while
+// marker's canonical_lanes is policy rewritten from code on every write, while
 // third_party_roots is host-owned data whose manual entries survive a re-run.
 // Without that, "adding a session host is a data change" would be false.
 func TestLaneInitPreservesDeclaredThirdPartyRoots(t *testing.T) {
-	repoDir, wtRoot := setupLaneTestRepo(t)
+	repoDir, _ := setupLaneTestRepo(t)
 
 	markerPath := filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))
 	if err := os.MkdirAll(filepath.Dir(markerPath), 0o755); err != nil {
@@ -132,8 +137,8 @@ func TestLaneInitPreservesDeclaredThirdPartyRoots(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := InitLanes(repoDir, wtRoot); err != nil {
-		t.Fatalf("InitLanes: %v", err)
+	if _, err := WriteLanesMarker(repoDir); err != nil {
+		t.Fatalf("WriteLanesMarker: %v", err)
 	}
 
 	body, err := os.ReadFile(markerPath)

@@ -49,9 +49,14 @@ func newLaneCmd() *cobra.Command {
 }
 
 func newLaneInitCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:          "init",
-		Short:        "Idempotently create the 3 persistent named lanes for this repository",
+	var writeMarker bool
+	c := &cobra.Command{
+		Use:   "init",
+		Short: "Idempotently create the 3 persistent named lanes for this repository",
+		Long: "Creates the lanes and nothing else: init never activates the repository. A machine\n" +
+			"activates through `dotf converge --only lanes`, from the " + lane.LanesMarkerFile + " committed on\n" +
+			"the default branch. --write-marker writes that file, for the one commit that declares\n" +
+			"the repository a lane repository.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -71,10 +76,18 @@ func newLaneInitCmd() *cobra.Command {
 			out := c.OutOrStdout()
 			_, _ = fmt.Fprintf(out, "lane init: %s (changed=%d)\n", repoRoot, changed)
 			_, _ = fmt.Fprintf(out, "lane init: worktree root %s\n", wtRoot)
-			_, _ = fmt.Fprintf(out, "lane init: guard marker %s — commit it to arm the pre-commit lane guard on every clone\n", lane.LanesMarkerFile)
+			if !writeMarker {
+				return nil
+			}
+			if _, err := lane.WriteLanesMarker(repoRoot); err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(out, "lane init: wrote %s — commit it to the default branch; each machine then activates with `dotf converge --only lanes`\n", lane.LanesMarkerFile)
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&writeMarker, "write-marker", false, "also write "+lane.LanesMarkerFile+" (to be committed)")
+	return c
 }
 
 func newLaneSwitchCmd() *cobra.Command {
