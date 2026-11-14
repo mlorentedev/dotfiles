@@ -19,7 +19,8 @@
         "50"
       ],
       "anchors_any": [
-        "ms",
+        "50ms",
+        "50 ms",
         "millisecond"
       ],
       "confirmed_by": "verification.md, Review dispositions: 'Applied (Minor): increased the blocking assertion window from 50 ms to 250 ms'"

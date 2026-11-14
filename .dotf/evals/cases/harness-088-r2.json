@@ -34,11 +34,13 @@
         "SessionEnd"
       ],
       "anchors_any": [
-        "\"claude\"",
-        "hardcode"
+        "collide",
+        "collision",
+        "ErrExist",
+        "discard"
       ],
-      "reason": "declined in verification.md, Round-2 findings: the session-end hook is registered only in Claude's binding (harness/manifest.json agents.bind[0].emit_hooks), so the agent it names is the one running and no second agent reaches it",
-      "sample": "| Major | REAL | multi-agent | `SessionEnd` hardcodes the agent name to \"claude\" in both the journal filename (`JournalName`) and the frontmatter (`buildRecord`) |"
+      "reason": "declined in verification.md, Round-2 findings: the session-end hook is registered only in Claude's binding (harness/manifest.json agents.bind[0].emit_hooks), so the agent it names is the one running and no second agent's journal can collide with it. The hardcoded name is true; the collision it claims is not",
+      "sample": "| Major | REAL | multi-agent | `SessionEnd` hardcodes the agent name to \"claude\" in both the journal filename (`JournalName`) and the frontmatter (`buildRecord`) regardless of the actual agent running. If multiple different agents run concurrently on the same project/day, they will collide on the filename. The first write succeeds, but the subsequent ones will hit `fs.ErrExist` (due to `O_EXCL`) and silently discard their session archives. |"
     }
   ],
   "noise": []

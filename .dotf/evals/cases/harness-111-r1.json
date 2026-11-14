@@ -8,8 +8,7 @@
   "key_author": "agy/gemini-3.1-pro-high",
   "reviewed_sha": "0a584d4ebf173fec0e02d77d70134b7712a3bb3b",
   "base_sha": "a76ea184ea20f8f54903df15c7d558074f22e241",
-  "base_derivation": "the review's Sources line (git diff a76ea184...HEAD)",
-  "fetch_ref": "refs/pull/1856/head",
+  "base_derivation": "the review's Sources line (git diff a76ea184...HEAD); reviewed_sha is reachable from main, so no fetch_ref is needed",
   "expected_verdict": "FAIL",
   "expected": [
     {
@@ -28,7 +27,8 @@
       "id": "cap-warning-one-unit",
       "severity_floor": "Minor",
       "anchors_all": [
-        "warn"
+        "warn",
+        "characters"
       ],
       "anchors_any": [
         "bytes",

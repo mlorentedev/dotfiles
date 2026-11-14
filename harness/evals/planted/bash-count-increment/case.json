@@ -28,7 +28,10 @@
       "anchors_all": [
         "symlink"
       ],
-      "note": "true of [ -f ], and the comment does not say whether links count"
+      "note": "true of [ -f ], and the comment does not say whether links count",
+      "anchors_any": [
+        "-f"
+      ]
     }
   ],
   "decoys": [
