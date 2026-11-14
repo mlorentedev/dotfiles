@@ -346,9 +346,11 @@ compared. A marker whose lanes are not provisioned on this machine also prints
 one line and exits 0: the marker is committed and travels with every clone, the lanes
 are per machine. Any incoherence prints one `ERROR`/`FIX` pair per finding on
 stdout and exits 1; the audit repairs nothing, the FIX line names the command
-that does. A linked worktree detached with no lease prints a `WARN`/`FIX` pair and
-does not change the exit code: it is not drift, but the guard refuses its commits
-while the lanes are active (#3436), so adopt it first (`dotf worktree adopt`).
+that does. A linked worktree with no lease prints a `WARN`/`FIX` pair and does not change
+the exit code. Detached, the guard refuses its commits while the lanes are active
+(#3436), so adopt it first (`dotf worktree adopt`); on a branch, the guard lets it
+commit but nothing tracks it and sweep can never reap it (#3438), and the FIX is
+the same adopt.
 The same pair, same exit code, reports a lease that has expired (the FIX is `dotf
 lane park <lane>` or `dotf worktree done <path>`; no command renews a lease) and a
 deployed `lane-guard.sh` that differs from the repository's copy (the FIX is `dotf

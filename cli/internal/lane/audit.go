@@ -108,13 +108,12 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	return a, err
 }
 
-// leaseWarnings walks the linked worktrees once and warns of the two states
-// the guard or sweep will act on before anyone looks: a detached worktree with
-// no lease, which guard rule 6 refuses and nothing in its path would have
-// adopted (#3436), and a lease that has run out. Lanes are audited on their own
-// for the leaseless case, so a worktree recorded as one is left out of it; a
-// worktree whose lease cannot be read is a different defect and is left out of
-// both.
+// leaseWarnings walks the linked worktrees once and warns of the states the
+// guard or sweep will act on before anyone looks: a worktree with no lease,
+// detached or on a branch (#3436, #3438), and a lease that has run out. Lanes
+// are audited on their own for the leaseless case, so a worktree recorded as one
+// is left out of it; a worktree whose lease cannot be read is a different
+// defect and is left out of both.
 func leaseWarnings(absRepo string, records map[string][]laneRecord, now time.Time) ([]Finding, error) {
 	out, err := exec.Command("git", "-C", absRepo, "worktree", "list", "--porcelain").Output()
 	if err != nil {
@@ -139,15 +138,28 @@ func leaseWarnings(absRepo string, records map[string][]laneRecord, now time.Tim
 		switch {
 		case lerr != nil:
 		case meta == nil:
-			if w.Detached && !slices.ContainsFunc(lanes, func(p string) bool { return samePath(p, w.Path) }) {
-				warns = append(warns, Finding{w.Path, "is detached and has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there while the lanes are active",
-					"dotf worktree adopt " + w.Path + ", or run git switch -c <type>/<issue>-<slug> inside it"})
+			if !slices.ContainsFunc(lanes, func(p string) bool { return samePath(p, w.Path) }) {
+				warns = append(warns, leaselessWarning(w))
 			}
 		case leaseExpired(meta, now):
 			warns = append(warns, expiredLease(w.Path, meta))
 		}
 	}
 	return warns, nil
+}
+
+// leaselessWarning names what a worktree with no lease costs. A detached one is
+// refused by guard rule 6 and nothing in its path would have adopted it (#3436).
+// A branch one commits freely (AC2), but no lease means `dotf worktree list` and
+// sweep cannot track it, so nobody learns when its work is over (#3438).
+func leaselessWarning(w worktree.RawWorktree) Finding {
+	adopt := "dotf worktree adopt " + w.Path
+	if w.Detached {
+		return Finding{w.Path, "is detached and has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there while the lanes are active",
+			adopt + ", or run git switch -c <type>/<issue>-<slug> inside it"}
+	}
+	return Finding{w.Path, "is on branch " + strings.TrimPrefix(w.Branch, "refs/heads/") + " and has no lease (" + worktree.MetadataFileName + "), so the guard lets it commit but sweep cannot track or reap it",
+		adopt}
 }
 
 // leaseExpired is true for a lease that carries an expiry and whose expiry has

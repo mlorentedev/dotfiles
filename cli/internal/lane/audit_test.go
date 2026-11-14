@@ -82,32 +82,45 @@ func TestAuditLanes_IsSilentOnACoherentRepository(t *testing.T) {
 	wantFindings(t, a, 0)
 }
 
-// A detached worktree with no lease is not drift, but the guard refuses its
-// commits the day the marker lands; the audit warns, naming the recovery, so
-// the owner sees it before then (#3436). Lanes, leased and branch worktrees
-// are not that state and stay out of it.
-func TestAuditLanes_WarnsOfLeaselessDetachedWorktrees(t *testing.T) {
+// A worktree with no lease is not drift, and the audit warns of both shapes. A
+// detached one the guard refuses to let commit while the lanes are active
+// (#3436); a branch one it lets through (AC2), but nothing tracks it, so sweep
+// can never reap it (#3438). Each warning names its own recovery. Lanes and
+// leased worktrees stay out of it.
+func TestAuditLanes_WarnsOfLeaselessWorktrees(t *testing.T) {
 	repoDir, wtRoot := initialisedLaneRepo(t)
 	base := filepath.Join(wtRoot, "dotfiles")
 	bare := filepath.Join(base, "feat-scratch")
 	leased := filepath.Join(base, "feat-leased")
+	onBranch := filepath.Join(base, "feat-branch")
 	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", bare, "HEAD")
 	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", leased, "HEAD")
-	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/on-a-branch", filepath.Join(base, "feat-branch"), "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/on-a-branch", onBranch, "HEAD")
 	if err := worktree.SaveMetadata(leased, worktree.Metadata{State: string(worktree.StateActive)}); err != nil {
 		t.Fatal(err)
 	}
 
 	a := audit(t, repoDir, wtRoot)
 	wantFindings(t, a, 0)
-	if len(a.Warnings) != 1 {
-		t.Fatalf("want one warning, for %s only, got %d: %+v", bare, len(a.Warnings), a.Warnings)
+	if len(a.Warnings) != 2 {
+		t.Fatalf("want two warnings, for %s and %s only, got %d: %+v", bare, onBranch, len(a.Warnings), a.Warnings)
 	}
-	w := a.Warnings[0].Warning()
-	for _, want := range []string{"WARN:", "feat-scratch", "no lease", "dotf worktree adopt", "git switch -c"} {
-		if !strings.Contains(w, want) {
-			t.Errorf("warning does not mention %q:\n%s", want, w)
+	byPath := map[string]string{}
+	for _, w := range a.Warnings {
+		byPath[filepath.Base(w.Subject)] = w.Warning()
+	}
+	for name, wants := range map[string][]string{
+		"feat-scratch": {"WARN:", "no lease", "detached", "dotf worktree adopt", "git switch -c"},
+		"feat-branch":  {"WARN:", "no lease", "feat/on-a-branch", "dotf worktree adopt"},
+	} {
+		for _, want := range wants {
+			if !strings.Contains(byPath[name], want) {
+				t.Errorf("warning for %s does not mention %q:\n%s", name, want, byPath[name])
+			}
 		}
+	}
+	if strings.Contains(byPath["feat-branch"], "git switch -c") {
+		t.Errorf("a branch worktree is not asked to leave its detached state:\n%s", byPath["feat-branch"])
 	}
 }
 

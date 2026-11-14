@@ -190,3 +190,23 @@ func TestLaneDoctor_AMarkerWithoutTheActivationRecordIsNotManaged(t *testing.T) 
 		}
 	}
 }
+
+// A branch worktree with no lease is a warning too (#3438): the guard lets it
+// commit, but nothing tracks it. The exit status stays what it was.
+func TestLaneDoctor_WarnsOfALeaselessBranchWorktreeWithoutFailing(t *testing.T) {
+	repo := laneDoctorRepo(t, true, "")
+	wt := filepath.Join(t.TempDir(), "on-a-branch")
+	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "-q", "-b", "fix/1-thing", wt, "HEAD").CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+	t.Chdir(repo)
+	stdout, stderr, err := execute(t, "lane", "doctor")
+	if err != nil || stderr != "" {
+		t.Fatalf("a warning must not fail the command: err=%v stderr=%q", err, stderr)
+	}
+	for _, want := range []string{"WARN: ", "on-a-branch", "fix/1-thing", "no lease", "dotf worktree adopt"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout lacks %q:\n%s", want, stdout)
+		}
+	}
+}
