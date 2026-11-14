@@ -1,7 +1,7 @@
 ---
 id: "ADR-063-model-evaluation-runner"
 type: adr
-status: proposed
+status: accepted
 owner: manu
 date: "2026-11-13"
 issue: "mlorentedev/dotfiles#1399"
@@ -14,8 +14,9 @@ created: "2026-11-13"
 
 ## Status
 
-Proposed 2026-11-13. The spec is `specs/HARNESS-101-model-eval-runner/`. The owner decides the
-points listed under *Decisions for the owner* before the spec leaves `draft`.
+Proposed 2026-11-13; accepted 2026-11-13. The spec is `specs/HARNESS-101-model-eval-runner/`. The six open
+points under *Decisions* were delegated by the owner and settled on 2026-11-13, in the session that wrote
+this ADR. Each answer stands until the owner reverses it, which takes one line on #1399.
 
 ## Context
 
@@ -158,7 +159,7 @@ The two schemas are also embedded in the `dotf` binary, and a test asserts the e
 
 `dotf eval run` runs from dotfiles and reads them there. `--repo <path>`, repeatable, adds another
 repository's cases. The vault never holds cases, because repositories do not depend on the store. A
-vault campaign whose synthesis adjudicates claims, such as the Fable correction ledger in
+vault campaign whose synthesis adjudicates claims, such as the Fable pass's corrections ledger (20 claims from the brief and a sibling model's report, each marked TRUE, PARTLY, FALSE or UNVERIFIED with `path:line`) in
 `10_projects/dotfiles/research/benchmarks/2026-09-23-gentle-ai/`, is a place to mine planted cases
 and decoys, nothing more.
 
@@ -198,12 +199,27 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
   fixed it, `verification.md` dispositioned it as real, or the owner adjudicated it. A finding
   that only carries the reviewer's own `REAL` label goes in `optional`.
 - **The key is self-consistent by construction.** Graded against its own `source_review`, a case
-  must score full recall with no decoy hit. `dotf eval check` asserts this for every case in the
+  must score full recall and match every `optional` entry, and it must agree with the source's
+  `reviewed_sha`, verdict and reviewer. `dotf eval check` asserts this for every case in the
   current repository, with no model involved, and each repository's CI runs it. It is the guard that keeps
   anchors from rotting.
-- **Planted cases** carry their input under `harness/evals/planted/<id>/` and use the same
-  `expected`/`decoys` fields. #3476's prompt is case one, and its false bash 3.2 claim is its first
-  decoy.
+- **Planted cases** live at `harness/evals/planted/<id>/`: `case.json`, `prompt.md` and
+  `reference.md`, the ideal answer the key is checked against. They use the same
+  `expected`/`decoys` fields and name `human` as `key_author`. #3476's prompt is case one, and its
+  false bash 3.2 claim is its first decoy.
+- **How a row is classed, in order** (amended 2026-11-14, HARNESS-101 slice 1):
+  - noise is discarded first;
+  - then a decoy match is a false positive, even when the row also names a real symbol;
+  - then rows are assigned one to one to `expected`, then to `optional`;
+  - anything left is unadjudicated.
+
+  A row below an entry's `severity_floor` does not satisfy it.
+- **Decoys and the self-check** (amended 2026-11-14). A decoy is usually mined from the source
+  review's own false claim, so a replay source may match its decoys. A planted reference is the
+  ideal answer and may not. A decoy broad enough to swallow a true row still fails the check,
+  because decoys are classed first and that row's `expected` entry goes unmatched. A source never
+  exercises a decoy that is not its own, so every decoy and noise entry carries a recorded `sample`
+  it must match.
 - **What the tree already records is not expected.** A finding that the replayed tree already dispositions (in `verification.md` or `tasks.md`) goes in `optional`, never in `expected`. A reviewer gets credit for repeating it, and no penalty for skipping it.
 - **Archived specs are never edited.** Reviewer artifacts are untouchable, so the key lives beside
   the archive, never inside it.
@@ -212,13 +228,17 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 
 1. Resolve `reviewed_sha`. If the clone lacks it, fetch the SHA itself, then `fetch_ref`, then verify. A branch rebased after its review would not carry the SHA on its PR ref.
    If it cannot be resolved, the case fails loudly as infrastructure; it is never scored zero.
-2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotf/evals/<run-id>/<case>-<epoch>/`,
+2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotfiles/evals/<run-id>/<case>-<epoch>/`,
    outside every repository tree, and remove it when the run ends.
 3. Launch through `internal/spec`'s review launcher in a new **eval slot**:
    - The candidate comes from `harness/evals/candidates.json`, using a pool entry's shape: runner,
      provider, model, secret id. The pool is not read.
    - The base is the case's `base_sha`, passed explicitly instead of resolved.
-   - The reviewer writes its verdict to the run directory, never to `specs/`.
+   - The reviewer writes its verdict inside the replay tree, to `.dotf-eval/review.md`, never to
+     `specs/`. The answer is then kept in the run directory, beside the launch request and the
+     transcript. Amended 2026-11-14: a verdict path outside the tree is out of reach of agy's
+     `--add-dir` scope and of the launcher's stray-write snapshot, which runs `git status` in
+     the verdict's folder.
 4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run. The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
 5. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
    still leaves (today's tools against old code) is listed once in the case's `noise`.
@@ -226,7 +246,8 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 The review gate cannot be satisfied by an eval run (C37), for three reasons:
 
 - the output never lands in a spec folder;
-- the recorded reviewer is prefixed `eval:`, which no pool id matches;
+- the recorded reviewer is prefixed `eval:`, and the gate refuses a signature or launch request
+  carrying that prefix before it consults the pool, which has no opinion in a repository without one;
 - a test in the same PR asserts that `checkReviewGate` refuses an eval record copied into a spec
   folder.
 
@@ -261,7 +282,7 @@ out of that model's reduced score. `nan/deepseek-v4-flash` authored 62 of the ar
   mean and minimum recall, decoy-hit rate, and median duration and tokens.
 - **Plan before spending.** `dotf eval run --plan` prints the matrix (cases × candidates × epochs) and
   an estimate per runner:
-  - **NaN:** credits, from a token envelope times the rates in `ai/nan/README.md`. The envelope is the median of earlier runs of that case. A case that has never run uses its kind's default, declared in `candidates.json` and seeded from #3273's measured adversarial review (200K in, 20K out). The plan labels each estimate `measured` or `default`, and never prints zero or unknown, because the cap is the only thing that authorises spend.
+  - **NaN:** credits, from a token envelope times the rates in `ai/nan/README.md`. The envelope is the median of earlier runs of that case. A case that has never run uses its kind's default, declared in `candidates.json` and seeded from #3476's measured AI-055 replays (104.5K total tokens for Hydrogen medium, 191.6K for high). #3273's 200K in / 20K out is an assumed call size, not a measurement. The plan labels each estimate `measured` or `default`, and never prints zero or unknown, because the cap is the only thing that authorises spend.
   - **Anthropic:** money, from the price rows `dotf pr route` already holds (ADR-046 §5), applied to the same envelope.
   - **Copilot:** premium requests on the seat.
   - **agy:** a run count, because its quota cannot be read.
@@ -285,7 +306,7 @@ the runner, result format and proposal stay the same:
 
 ### 6. Output
 
-Each run writes to `$XDG_STATE_HOME/dotf/evals/<run-id>/`:
+Each run writes to `$XDG_STATE_HOME/dotfiles/evals/<run-id>/`:
 
 - `results.json`, valid against `harness/evals/result.schema.json`. Every record carries its
   provenance: dotf version, corpus commit, skill digest, runner version, model id and date.
@@ -340,30 +361,16 @@ login that CI does not hold, and its quota is the owner's. A scheduled run in ci
 - `internal/spec` gains an eval slot, an internal API that is not a user flag. The surface of
   `dotf spec review` does not change.
 
-## Decisions for the owner
+## Decisions
 
-1. **Build or adopt.** (A) Build in Go, as decided above. (B) Adopt inspect-ai and amend ADR-020 §2.
-   *Recommended: A.* With either framework, the solver and the grader are still ours.
-2. **What counts toward recall.** (A) Only confirmed findings; label-only `REAL` goes in `optional`.
-   (B) Every finding labelled `REAL`.
-   *Recommended: A.* B rewards agreeing with the key author's mistakes.
-3. **Budget defaults.** (A) N=3 epochs and a cap of 30 runs per invocation. (B) N=5 and 60.
-   *Recommended: A* for the first slice: (5 replays + 2 planted) × 3 candidates × 3 epochs = 63 runs,
-   so it is planned in three invocations or raised explicitly.
-4. **Retirements.** Retire `nan-quality-bench.sh` and `tests/evals/harness-evals.json` in the
-   `dotf eval run` slice: (A) yes, (B) keep them.
-   *Recommended: A.*
-5. **Scheduled runs.** (A) Defer, with the triggers in §7. (B) Schedule NaN and Anthropic runs in
-   ci-workflows now.
-   *Recommended: A.*
-6. **Corpus scope.**
-   - Measured: kubelab has 73 rounds, 33 of them in the clone, and 16 Blocker or Major REAL rows. 15 of its keys come from the retired `gemini-3.1-pro-high` and `mimo-v2.5`.
-   - Measured: ts-bridge has 31 rounds, 24 in the clone, and 15 rows of the same kind. 27 of its reviews are by `deepseek-v4-flash`.
-   - All three repositories use the same findings-table header.
+Delegated by the owner and settled 2026-11-13. The options and reasoning that were put to the owner are in this ADR's history (#3484).
 
-   (A) Dotfiles only in the first slice, with the schema already carrying `repo`. kubelab and ts-bridge follow in their own PRs, with `dotf eval check` in their CI.
-   (B) Include kubelab now.
-   *Recommended: A.* The corpus is limited by curation time, not raw material. Proving the key format on 5 dotfiles cases first means a schema change is not paid for three times. kubelab is the next corpus, for its keys from retired models.
+1. **Build or adopt: build in Go.** ADR-020 §2 rules out a Python or Node runtime, and the grader is ours under either framework.
+2. **Recall counts only confirmed findings.** A finding labelled `REAL` but never confirmed goes in `optional`. **Added rule:** a replay case enters the corpus only if its `expected` holds at least one confirmed finding. Otherwise its recall is 0 over 0 and says nothing.
+3. **Budget: N=3 epochs and a cap of 30 runs per invocation.** The natural unit is one candidate per invocation: 7 cases × 3 epochs = 21 runs, under the cap. N=5 would spend about 25 Hydrogen replays of the owner's agy quota for little gain.
+4. **Retire `scripts/nan-quality-bench.sh` and `tests/evals/harness-evals.json`** in the `dotf eval run` slice. Neither has a key, and neither has a consumer.
+5. **Scheduled runs are deferred**, with the triggers in §7. agy cannot log in from CI, and the corpus does not exist yet.
+6. **Corpus scope: dotfiles only in the first slice.** The schema carries `repo` from the start. Dotfiles already holds keys no current candidate wrote: 27 reviews by `agy/gemini-3.1-pro-high` and 14 by `nan/mimo-v2.5`, both retired. The five first replay cases come from those. kubelab is the next corpus.
 
 ## References
 

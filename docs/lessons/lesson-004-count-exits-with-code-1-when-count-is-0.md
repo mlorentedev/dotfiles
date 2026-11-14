@@ -17,3 +17,5 @@ tags: [lesson, dotfiles]
 **Solution**: Replace `((count++))` with `count=$((count + 1))`. The `$((...))` form always returns exit code 0.
 
 **Rule**: Never use `((...))` for arithmetic that might evaluate to 0 under `set -e`. Use `var=$((expr))` assignment form instead.
+
+**Only from bash 4.1 (measured 2026-11-14).** macOS `/bin/bash` 3.2.57 does not apply `set -e` to a failing `(( ))`: the same script prints its count and exits 0 there, and exits 1 under bash 5.3. A Mac-only check therefore passes a script that dies on Linux. The planted eval case `harness/evals/planted/bash-count-increment/` records both results.

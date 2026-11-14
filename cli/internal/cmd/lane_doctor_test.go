@@ -34,6 +34,11 @@ func laneDoctorRepo(t *testing.T, init bool, marker string) string {
 		if err := os.WriteFile(path, []byte(marker), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		// A repository this machine runs lanes for carries the activation record.
+		common := filepath.Join(repo, ".git") // the main checkout
+		if err := os.WriteFile(filepath.Join(common, lane.ActivationFile), []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return repo
 }
@@ -145,9 +150,13 @@ func TestLaneDoctor_WarnsOfADriftedDeployedGuardWithoutFailing(t *testing.T) {
 // prefix, so the errors beneath it must not carry one: the line read
 // "lane doctor: lane doctor: reading ...".
 func TestLaneDoctor_AFailureToAuditCarriesItsPrefixOnce(t *testing.T) {
-	repo := laneDoctorRepo(t, false, "")
+	repo := laneDoctorRepo(t, false, coherentMarker)
 	// A directory where the marker should be: present, and not readable as one.
-	if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(lane.LanesMarkerFile)), 0o755); err != nil {
+	marker := filepath.Join(repo, filepath.FromSlash(lane.LanesMarkerFile))
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(marker, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
@@ -157,5 +166,47 @@ func TestLaneDoctor_AFailureToAuditCarriesItsPrefixOnce(t *testing.T) {
 	}
 	if n := strings.Count(stderr, "lane doctor:"); n != 1 {
 		t.Errorf("stderr carries the prefix %d times, want once:\n%s", n, stderr)
+	}
+}
+
+// Doctor and guard agree on what is managed (#3437): a repository whose working
+// tree carries the marker but which this machine never activated is one the guard
+// does not enforce, so doctor reports it as such and audits nothing, even a
+// marker that would be a finding.
+func TestLaneDoctor_AMarkerWithoutTheActivationRecordIsNotManaged(t *testing.T) {
+	repo := laneDoctorRepo(t, true, strings.Replace(coherentMarker, `"version":1`, `"version":7`, 1))
+	common := filepath.Join(repo, ".git") // the main checkout
+	if err := os.Remove(filepath.Join(common, lane.ActivationFile)); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	stdout, stderr, err := execute(t, "lane", "doctor")
+	if err != nil || stderr != "" || strings.Count(stdout, "\n") != 1 {
+		t.Fatalf("want exit 0 and one line, got err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	for _, want := range []string{"not lane-managed", "activation record", "dotf converge --only lanes"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout lacks %q: %q", want, stdout)
+		}
+	}
+}
+
+// A branch worktree with no lease is a warning too (#3438): the guard lets it
+// commit, but nothing tracks it. The exit status stays what it was.
+func TestLaneDoctor_WarnsOfALeaselessBranchWorktreeWithoutFailing(t *testing.T) {
+	repo := laneDoctorRepo(t, true, "")
+	wt := filepath.Join(t.TempDir(), "on-a-branch")
+	if out, err := exec.Command("git", "-C", repo, "worktree", "add", "-q", "-b", "fix/1-thing", wt, "HEAD").CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+	t.Chdir(repo)
+	stdout, stderr, err := execute(t, "lane", "doctor")
+	if err != nil || stderr != "" {
+		t.Fatalf("a warning must not fail the command: err=%v stderr=%q", err, stderr)
+	}
+	for _, want := range []string{"WARN: ", "on-a-branch", "fix/1-thing", "no lease", "dotf worktree adopt"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout lacks %q:\n%s", want, stdout)
+		}
 	}
 }

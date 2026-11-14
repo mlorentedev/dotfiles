@@ -1,0 +1,30 @@
+[
+  {
+    "id": "MEMORY-019-handoff-archive-finished-f1",
+    "behavior": "handoff-write --finished moves the entry to the dated archive byte-identical, keeps other threads, writes the thread file, reports on stderr",
+    "verification": "cd cli && go test ./internal/mem ./internal/cmd -run 'TestArchiveThreadDropsTheEntry|TestArchiveThreadRemovesAnExistingEntryOnly|TestAppendArchive|TestHandoffWriteFinishedArchivesTheThread' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-019-handoff-archive-finished-f2",
+    "behavior": "--finished with Awaiting Manu items is refused and writes nothing; a None-until thread without the flag stays",
+    "verification": "cd cli && go test ./internal/mem ./internal/cmd -run 'TestArchiveThreadRefusesAThreadAwaitingManu|TestHandoffWriteFinishedRefusesAwaitingAndNoneIsNotAMarker' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-019-handoff-archive-finished-f3",
+    "behavior": "another agent's finished write archives only its fork; the writer's archive keeps another agent's fork",
+    "verification": "cd cli && go test ./internal/mem -run 'Fork' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-019-handoff-archive-finished-f4",
+    "behavior": "a repeated finished write appends nothing; a dry run writes none of the three files and names the archive",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestHandoffWriteFinishedIsIdempotentAndDryRuns' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

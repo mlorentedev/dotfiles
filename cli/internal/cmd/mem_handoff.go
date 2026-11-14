@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -61,6 +63,14 @@ this write goes to <thread>+<agent> instead, and stderr names both agents and th
 key. An unstamped block's writer is read from its Journal line; a block nothing
 attributes is replaced as before. Without --agent nothing is stamped or forked.
 
+Pass --finished when the line of work is done. The thread file is written as
+always, and its entry leaves MEMORY.md for archive/superseded-handoffs-<date>.md
+beside it, appended as the block this write would have placed; stderr names the
+move. A thread with Awaiting Manu items is refused, because the archive would
+take those decisions off the file a session start reads. "Next action: None" is
+never read as finished: only the flag says so. Another agent's finished write
+archives only its own fork.
+
 Skills should call this instead of instructing an Edit: the merge is the part that
 was being got wrong, and it belongs where it can be tested.`,
 		SilenceUsage: true,
@@ -73,6 +83,7 @@ was being got wrong, and it belongs where it can be tested.`,
 	cmd.Flags().StringVar(&w.thread, "thread", "", "thread key (default: this checkout's branch)")
 	cmd.Flags().StringVar(&w.agent, "agent", "", "the agent writing, stamped into the heading; another agent's block is kept and the write goes to <thread>+<agent>")
 	cmd.Flags().BoolVar(&w.dryRun, "dry-run", false, "print the result instead of writing it")
+	cmd.Flags().BoolVar(&w.finished, "finished", false, "the line of work is done: archive the thread's entry out of MEMORY.md (refused while Awaiting Manu has items)")
 	return cmd
 }
 
@@ -82,6 +93,14 @@ type handoffWrite struct {
 	thread     string
 	agent      string
 	dryRun     bool
+	finished   bool
+}
+
+// archiveWrite is the dated archive a --finished write appends to.
+type archiveWrite struct {
+	path    string // the archive file
+	text    string // what it holds after the write
+	changed bool   // false when it already held the block
 }
 
 func (w *handoffWrite) run(cmd *cobra.Command) error {
@@ -117,7 +136,7 @@ func (w *handoffWrite) run(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("read %s: %w", w.memoryPath, err)
 	}
-	res, err := mem.StoreThreadAs(string(current), w.memoryPath, thread, w.agent, body)
+	res, archive, err := w.store(string(current), thread, body)
 	if err != nil {
 		return err
 	}
@@ -131,7 +150,28 @@ func (w *handoffWrite) run(cmd *cobra.Command) error {
 	if err := mem.CheckMemoryBudget(string(current), res.Content); err != nil {
 		return err
 	}
-	return w.publish(cmd, thread, string(current), string(prev), res)
+	return w.publish(cmd, thread, string(current), string(prev), res, archive)
+}
+
+// store computes the write: the thread placed in MEMORY.md, or with --finished
+// archived out of it, with the dated archive text it then needs.
+func (w *handoffWrite) store(current, thread, body string) (mem.StoredThread, *archiveWrite, error) {
+	if !w.finished {
+		res, err := mem.StoreThreadAs(current, w.memoryPath, thread, w.agent, body)
+		return res, nil, err
+	}
+	res, err := mem.ArchiveThreadAs(current, w.memoryPath, thread, w.agent, body)
+	if err != nil {
+		return mem.StoredThread{}, nil, err
+	}
+	date := now().Format("2006-01-02")
+	path := mem.ArchivePath(w.memoryPath, date)
+	existing, err := os.ReadFile(path) // #nosec G304 -- beside the operator-supplied MEMORY.md
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return mem.StoredThread{}, nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	text, changed := mem.AppendArchive(string(existing), date, res.Block)
+	return res.StoredThread, &archiveWrite{path: path, text: text, changed: changed}, nil
 }
 
 // readHandoffBody reads the thread body from stdin and refuses an empty one.
@@ -151,7 +191,7 @@ func readHandoffBody(cmd *cobra.Command) (string, error) {
 
 // publish reports what the write did and, unless this is a dry run, writes the
 // thread file and then MEMORY.md.
-func (w *handoffWrite) publish(cmd *cobra.Command, thread, current, prev string, res mem.StoredThread) error {
+func (w *handoffWrite) publish(cmd *cobra.Command, thread, current, prev string, res mem.StoredThread, archive *archiveWrite) error {
 	// The one outcome where the handoff is not where its writer asked,
 	// so it is said every time, written or unchanged (#1690).
 	if res.Kept != "" {
@@ -162,7 +202,7 @@ func (w *handoffWrite) publish(cmd *cobra.Command, thread, current, prev string,
 				mem.JournalName(now().Format("2006-01-02"), project, w.agent, res.Key))
 		}
 	}
-	if !res.Changed && prev == res.FileBody {
+	if !res.Changed && prev == res.FileBody && (archive == nil || !archive.changed) {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "unchanged  thread %q already says this\n", res.Key)
 		return nil
 	}
@@ -173,24 +213,38 @@ func (w *handoffWrite) publish(cmd *cobra.Command, thread, current, prev string,
 	}
 	if w.dryRun {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "thread     %s would hold %d bytes\n", res.File, len(res.FileBody))
+		if archive != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "archive    %s would hold thread %q\n", archive.path, res.Key)
+		}
 		_, _ = fmt.Fprint(cmd.OutOrStdout(), res.Content)
 		return nil
 	}
-	if err := w.write(res); err != nil {
+	if err := w.write(res, archive); err != nil {
 		return err
+	}
+	if archive != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "archived   thread %q to %s\n", res.Key,
+			filepath.ToSlash(filepath.Join(filepath.Base(filepath.Dir(archive.path)), filepath.Base(archive.path))))
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "wrote      thread %q in %s\n", res.Key, res.File)
 	return nil
 }
 
-// write replaces the thread file and then MEMORY.md. The file goes first: an
+// write appends the archive, then replaces the thread file and then MEMORY.md.
+// The archive goes first, so a write stopped part-way leaves the entry in
+// MEMORY.md and at worst in the archive too, never in neither. The file goes first: an
 // entry pointing at a file not yet written is the one order that reads as lost,
 // while a file ahead of its entry is the thread a reader follows anyway. A new
 // thread file takes MEMORY.md's mode, which the store is a part of.
-func (w *handoffWrite) write(res mem.StoredThread) error {
+func (w *handoffWrite) write(res mem.StoredThread, archive *archiveWrite) error {
 	mode := os.FileMode(0o644)
 	if fi, err := os.Stat(w.memoryPath); err == nil {
 		mode = fi.Mode().Perm()
+	}
+	if archive != nil && archive.changed {
+		if err := mem.ReplaceFile(archive.path, archive.text, mode); err != nil {
+			return err
+		}
 	}
 	if err := mem.ReplaceFile(res.File, res.FileBody, mode); err != nil {
 		return err

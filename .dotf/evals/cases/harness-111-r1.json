@@ -1,0 +1,44 @@
+{
+  "id": "harness-111-r1",
+  "repo": "mlorentedev/dotfiles",
+  "kind": "replay",
+  "role": "spec-reviewer",
+  "spec": "HARNESS-111",
+  "source_review": "specs/archive/HARNESS-111/review-round-1.md",
+  "key_author": "agy/gemini-3.1-pro-high",
+  "reviewed_sha": "0a584d4ebf173fec0e02d77d70134b7712a3bb3b",
+  "base_sha": "a76ea184ea20f8f54903df15c7d558074f22e241",
+  "base_derivation": "the review's Sources line (git diff a76ea184...HEAD); reviewed_sha is reachable from main, so no fetch_ref is needed",
+  "expected_verdict": "FAIL",
+  "expected": [
+    {
+      "id": "fold-contradicts-ac3",
+      "severity_floor": "Major",
+      "anchors_all": [
+        "AC3"
+      ],
+      "anchors_any": [
+        "fold",
+        "ascii"
+      ],
+      "confirmed_by": "verification.md, Review round 1 dispositions: resolved by amending proposal.md AC3 and features.json f3, whose old command always exited 0"
+    },
+    {
+      "id": "cap-warning-one-unit",
+      "severity_floor": "Minor",
+      "anchors_all": [
+        "warn",
+        "characters"
+      ],
+      "anchors_any": [
+        "bytes",
+        "one unit",
+        "AC6"
+      ],
+      "confirmed_by": "verification.md, Review round 1 dispositions: 'the cap warning printed one unit: applied', with two tests red before the fix"
+    }
+  ],
+  "optional": [],
+  "decoys": [],
+  "noise": []
+}

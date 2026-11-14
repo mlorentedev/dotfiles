@@ -168,6 +168,14 @@ func normalizeVerdict(raw string) Verdict {
 	return Verdict(strings.ToUpper(verdictSeparators.ReplaceAllString(s, "-")))
 }
 
+// FrontmatterVerdict reads only the frontmatter's verdict, normalized as the
+// gate normalizes it, or "" when there is none. It checks nothing else: a
+// grader scoring an eval answer needs the verdict of a review that has no
+// commit to name, and must not treat that as the gate would (ADR-063).
+func FrontmatterVerdict(content string) Verdict {
+	return normalizeVerdict(frontmatterFields(content)["verdict"])
+}
+
 func ParseReview(content string) (Review, error) {
 	return parseReviewAs(content, ReviewFile)
 }
@@ -419,6 +427,9 @@ func checkSignature(repoRoot, specID, specDir string, slot ReviewSlot, checker S
 		return Review{}, fmt.Errorf("%s declares spec %q but lives in %q — the review describes a different change\n"+
 			"re-run /adversarial-review for this spec",
 			slot.Review, review.Spec, specID)
+	}
+	if err := refuseEvalRecord(specDir, slot, review); err != nil {
+		return Review{}, err
 	}
 	// Provenance before verdict, deliberately. Both later checks read the file's
 	// CLAIMS; this one asks whether the file is the answer to the question this

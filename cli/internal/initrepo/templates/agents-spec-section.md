@@ -30,13 +30,15 @@ Pass `--force` to overwrite an existing SDD section in place.
 
 ## Spec-Driven Development
 
-**The Lane Decisor Rule:** The agent MUST declare the chosen lane on the VERY FIRST LINE of its response before taking any action (e.g., `Lane: Fast-Track Development`).
+**The Tier Rule:** The agent MUST declare the chosen tier on the VERY FIRST LINE of its response before taking any action (e.g., `Tier: Fast-Track Development`).
 
-**Implementation Lanes:**
+**Implementation Tiers:**
 - **0. Answer:** Read-only questions, codebase exploration, debugging without writing code.
 - **1. Inline Direct:** <30 LOC diff, understood change, single component.
 - **2. Fast-Track Development (FTD):** 30–150 LOC, ordinary changes, low ambiguity. 1 document `spec.md`, simple branch, no worktree overhead, observable evidence required.
 - **3. Full SDD:** >150 LOC, public contracts, architecture, or high ambiguity. Triad of docs (`proposal.md`, `tasks.md`, `verification.md`).
+
+**Where work starts.** In a repository that runs persistent named lanes (the session-start line says `lane <name> ACTIVE` or `this repository runs lanes`), work starts in a lane, and there is one way in: `dotf lane switch <branch>` puts a branch in a free lane, and `dotf lane next` starts the next queued issue. Do not run `dotf worktree add` there, and do not commit to main in the main checkout: the lane guard blocks it. Lanes are persistent worktrees; they are unrelated to the three implementation tiers above.
 
 This repo follows the **Spec-Driven Development per feature** pattern: non-trivial changes are specified before they are implemented.
 

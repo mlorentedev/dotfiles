@@ -425,6 +425,16 @@ The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows
   - `tests/packages-json.bats` test 3, which does not know `winget_arch` on a `system` entry (shared with the `vcredist` entry's own change)
 - Open: copilot has its own `copilot update`; no environment switch for it is known yet, so it is not in `ownUpdaterOff`. The catalog's npm install had the same exposure
 
+### AC4 blocker #3489: the measurement guest installs Docker Desktop (owner approved the exclusion, 2026-11-14)
+
+- Measured 2026-11-13 on a clean Windows 11 Arm64 guest (`dotf vm windows --ref main --dotf <main build>`, main 9349bbcf): the first converge installed vcredist (ahead of mise), mise, tea, PowerShell, git, eza and Docker Desktop through winget, then the next winget call failed with `0x80071130 Fast Cache data not found` and the step produced nothing until the harness gave up at 2h. The tools step never ran, so the run proves nothing about the pins
+- Why the guest should not install Docker Desktop: it needs WSL2, which needs virtualization exposed to the guest. [ ] Check it in the guest (`systeminfo`, Hyper-V Requirements) and write the answer here before the exclusion ships; an exclusion with no reason would read as a convenience
+- [x] Guard half: every winget call is bounded (30 min, 10 s pipe grace) so a hang ends as a failed step with a message (#3495, option B of #3489)
+- [ ] Catalog: a negative role gate. A new known role `vm-guest` (`envpkg.KnownRoles`) and an `except_roles` field on a catalog entry, read by `AppliesToRoles` beside `roles`; `docker` carries `except_roles: ["vm-guest"]`. The positive-only `roles` gate cannot say "everything but Docker", and making `docker` workstation-only would drop it from every machine that has not set the role. Tests: the loader accepts `except_roles`, rejects an unknown or duplicate role, a tool excluded for a declared role is not applied, and a machine without the role still gets Docker
+- [ ] Guest: `machine.json` declares `vm-guest`, written by the guest's own first-logon or run script, never by hand in a guest
+- [ ] Evidence: one clean Arm64 pass with `--keep` (a kept guest is a session since #3462), run under `caffeinate -ims`, never overlapping a converge. It must state "guest role vm-guest, Docker Desktop excluded (<the reason above>)", so it is not read as a full workstation converge. It ticks the Windows row of #2438 when the four CLIs run from the mise shims and the second converge reports `changed=0`, and it carries the real-guest check of `--keep` that #3462's triage owes
+- Not done here: the winget source error itself (option A of #3489) waits for its cause; another session's clean run on `origin/main` says whether it is deterministic
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

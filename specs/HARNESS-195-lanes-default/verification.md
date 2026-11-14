@@ -23,7 +23,10 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - `TestSessionLineCarriersInjectTheBriefAndSurviveAMissingDotf` runs both sources under node. It skips on Windows and where node cannot strip types, so it is not CI evidence; the two observations above are the manual proof.
 - [ ] AC4 -> <commit> / <test or observation>
 - [ ] AC5 -> <commit> / <test or observation>
-- [ ] AC6 -> <commit> / <test or observation>
+- [x] AC6 -> slice E, feat/lane-launchers:
+  - `dotf secrets run` refuses an npm `.cmd`/`.bat` child where Windows runs it through cmd.exe, before decrypting: `TestSecretsRun_RefusesABatchShimChildWhereWindowsRunsItThroughCmdExe`, `TestSecretsRun_AllowsWhatCmdExeNeverSees`; the one function is `lane.RefuseBatchShim` (`TestRefuseBatchShim_*`, `TestExec_RefusesABatchShimAndNeverStartsIt` on Windows).
+  - #3430: observed 2026-11-14 that a pane started by `lane exec` through the wrapper has `agent: null` (opencode, below). Fixed with `lane.LaunchEnv`; `TestExec_StartsTheWrapperWithTheAgentNamedForHerdr` fails without it, and the same launch afterwards shows `agent: opencode`.
+  - launchers: `TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument` pins every entry; each has an observed launch in the table below.
 - [x] AC7 -> slice F, feat/lane-doctor-warnings:
   - leaseless detached worktree: `TestAuditLanes_WarnsOfLeaselessDetachedWorktrees`, `TestLaneDoctor_WarnsOfALeaselessDetachedWorktreeWithoutFailing`
   - expired lease (parked lanes and unleased worktrees stay silent): `TestAuditLanes_WarnsOfAnExpiredLease`
@@ -38,6 +41,11 @@ One row per agent, per machine: the date, the argv, and the `LANE-READY` answer,
 
 | Agent | Machine | Date | Argv | Result |
 |---|---|---|---|---|
+| copilot 1.0.81 | macOS, herdr 0.9.3 | 2026-11-14 | `copilot -i "Reply with exactly the word LANE-READY and do nothing else."` via `dotf lane exec --agent copilot --prompt-file p.md` typed into a fresh split pane by `herdr pane run` | started interactive, answered `LANE-READY`, pane `agent: copilot` (the agent is the foreground process, no `HERDR_AGENT` needed) |
+| opencode 1.16.2 | macOS, herdr 0.9.3 | 2026-11-14 | `dotf secrets run --only NAN_API_KEY -- opencode --prompt "<same prompt>"` via `dotf lane exec --agent opencode ...`, same way | `--prompt` submits the prompt: answered `LANE-READY` (Build, GLM 5.3 Flash). Pane `agent: null` before the #3430 fix, `agent: opencode` after it |
+| pi | macOS, herdr 0.9.3 | 2026-11-14 | `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "<same prompt>"` via `dotf lane exec --agent pi ...` (entry from CLI-119) | started; pane `agent: pi` with the #3430 fix |
+| codex | macOS | 2026-11-14 | not installed (`command -v codex` empty) | no entry |
+| gemini | macOS | 2026-11-14 | not installed (`command -v gemini` empty) | no entry |
 
 ## Test status
 

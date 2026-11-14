@@ -21,7 +21,7 @@ func TestRefuseBatchShim_RefusesABatchFileNamingTheAgentAndTheRemedy(t *testing.
 		`C:\npm\pi.cmd  `,
 		`/tmp/pi.cmd`,
 	} {
-		err := refuseBatchShim("pi", bin)
+		err := RefuseBatchShim("pi", bin)
 		if err == nil {
 			t.Errorf("bin %q: want a refusal", bin)
 			continue
@@ -48,7 +48,7 @@ func TestRefuseBatchShim_AllowsNativeExecutables(t *testing.T) {
 		`C:\bat\pi`,
 		``,
 	} {
-		if err := refuseBatchShim("claude", bin); err != nil {
+		if err := RefuseBatchShim("claude", bin); err != nil {
 			t.Errorf("bin %q: want it allowed, got %v", bin, err)
 		}
 	}

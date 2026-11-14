@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: e3519c8d1b8e7532
+generated_sha: 58553debada92546
 id: handoff-skill
 type: skill
 status: active
@@ -238,6 +238,7 @@ The board (2b) is not the only place a promise can hide, and it is not the one t
    # For ephemeral worktrees associated with merged PRs:
    dotf worktree done <branch>  # parks named lanes in-place or removes ephemeral worktrees
    ```
+   **Entrance for the next session:** where lanes are active (the session-start line says so), the next session starts work with `dotf lane switch <branch>` or `dotf lane next`, never `dotf worktree add`; write that command, with the branch, into **Next action** when the thread continues in a lane.
    **Note:** Persistent named lanes (`meta.Lane != ""`) are parked in-place (`PARKED`, detached at `origin/main`, directory preserved, memory thread archived to `memory/archive/`), so `dotf lane park` never deletes the launch directory. For ephemeral worktrees, **never remove the worktree this session was launched from**, nor one holding the shell's working directory (dotfiles #1653). List it under **Open threads** for removal after the session ends instead.
 3. **Prune Remote Refs:** Run `git fetch --prune` on all touched repos.
 4. **Delete Merged Local Branches:**

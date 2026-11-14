@@ -11,6 +11,16 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
+// activateRecord writes the activation record `dotf converge` leaves in the git
+// common dir: with it the repository is lane-managed on this machine, whatever
+// the working tree carries.
+func activateRecord(t *testing.T, repoDir string) {
+	t.Helper()
+	if err := os.WriteFile(recordPath(t, repoDir), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // initialisedLaneRepo is a repository with the three lanes provisioned and the
 // marker in place, the starting state of every audit case that breaks one thing.
 // Init no longer writes the marker, so the fixture does.
@@ -23,6 +33,7 @@ func initialisedLaneRepo(t *testing.T) (repoDir, wtRoot string) {
 	if _, err := writeLanesMarker(repoDir); err != nil {
 		t.Fatal(err)
 	}
+	activateRecord(t, repoDir)
 	return repoDir, wtRoot
 }
 
@@ -71,32 +82,45 @@ func TestAuditLanes_IsSilentOnACoherentRepository(t *testing.T) {
 	wantFindings(t, a, 0)
 }
 
-// A detached worktree with no lease is not drift, but the guard refuses its
-// commits the day the marker lands; the audit warns, naming the recovery, so
-// the owner sees it before then (#3436). Lanes, leased and branch worktrees
-// are not that state and stay out of it.
-func TestAuditLanes_WarnsOfLeaselessDetachedWorktrees(t *testing.T) {
+// A worktree with no lease is not drift, and the audit warns of both shapes. A
+// detached one the guard refuses to let commit while the lanes are active
+// (#3436); a branch one it lets through (AC2), but nothing tracks it, so sweep
+// can never reap it (#3438). Each warning names its own recovery. Lanes and
+// leased worktrees stay out of it.
+func TestAuditLanes_WarnsOfLeaselessWorktrees(t *testing.T) {
 	repoDir, wtRoot := initialisedLaneRepo(t)
 	base := filepath.Join(wtRoot, "dotfiles")
 	bare := filepath.Join(base, "feat-scratch")
 	leased := filepath.Join(base, "feat-leased")
+	onBranch := filepath.Join(base, "feat-branch")
 	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", bare, "HEAD")
 	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", leased, "HEAD")
-	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/on-a-branch", filepath.Join(base, "feat-branch"), "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/on-a-branch", onBranch, "HEAD")
 	if err := worktree.SaveMetadata(leased, worktree.Metadata{State: string(worktree.StateActive)}); err != nil {
 		t.Fatal(err)
 	}
 
 	a := audit(t, repoDir, wtRoot)
 	wantFindings(t, a, 0)
-	if len(a.Warnings) != 1 {
-		t.Fatalf("want one warning, for %s only, got %d: %+v", bare, len(a.Warnings), a.Warnings)
+	if len(a.Warnings) != 2 {
+		t.Fatalf("want two warnings, for %s and %s only, got %d: %+v", bare, onBranch, len(a.Warnings), a.Warnings)
 	}
-	w := a.Warnings[0].Warning()
-	for _, want := range []string{"WARN:", "feat-scratch", "no lease", "dotf worktree adopt", "git switch -c"} {
-		if !strings.Contains(w, want) {
-			t.Errorf("warning does not mention %q:\n%s", want, w)
+	byPath := map[string]string{}
+	for _, w := range a.Warnings {
+		byPath[filepath.Base(w.Subject)] = w.Warning()
+	}
+	for name, wants := range map[string][]string{
+		"feat-scratch": {"WARN:", "no lease", "detached", "dotf worktree adopt", "git switch -c"},
+		"feat-branch":  {"WARN:", "no lease", "feat/on-a-branch", "dotf worktree adopt"},
+	} {
+		for _, want := range wants {
+			if !strings.Contains(byPath[name], want) {
+				t.Errorf("warning for %s does not mention %q:\n%s", name, want, byPath[name])
+			}
 		}
+	}
+	if strings.Contains(byPath["feat-branch"], "git switch -c") {
+		t.Errorf("a branch worktree is not asked to leave its detached state:\n%s", byPath["feat-branch"])
 	}
 }
 
@@ -284,6 +308,7 @@ func TestAuditLanes_ErrorsCarryNoCallerPrefix(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile)), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, repoDir)
 		_, err := AuditLanes(repoDir, wtRoot)
 		wantUnprefixed(t, err)
 	})
@@ -331,6 +356,7 @@ func TestAuditLanes_SeparatesNotInitialisedFromDrift(t *testing.T) {
 		if _, err := writeLanesMarker(repoDir); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, repoDir)
 		a := audit(t, repoDir, wtRoot)
 		if !a.Managed || a.Initialised {
 			t.Fatalf("want managed and not initialised, got %+v", a)
@@ -425,6 +451,7 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 		if _, err := writeLanesMarker(repoDir); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, repoDir)
 		gitDir, _, err := worktreeGitDirs(filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary))
 		if err != nil {
 			t.Fatal(err)
@@ -634,6 +661,7 @@ func TestAuditLanes_LeavesAnotherRepositorysWorktreeAlone(t *testing.T) {
 		if _, err := writeLanesMarker(clone); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, clone)
 		a := audit(t, clone, wtRoot)
 		if !a.Initialised {
 			t.Fatal("Initialised = false: the occupied lane paths read as a clone with nothing to audit, so dotf lane init would be the advice and it refuses")
@@ -661,5 +689,46 @@ func TestAuditLanes_LeavesAnotherRepositorysWorktreeAlone(t *testing.T) {
 		runGitLaneTest(t, other, "worktree", "add", "--detach", lanePath, "HEAD")
 		a := audit(t, owner, wtRoot)
 		wantForeign(t, a, 1, LaneFeatPrimary, "stale registration", filepath.Join("worktrees", LaneFeatPrimary), "by hand")
+	})
+}
+
+// The audit gates on what the guard gates on: the activation record, never the
+// marker. A marker in the working tree, however it reads, is not a repository the
+// guard enforces, so the audit has nothing to compare (#3437).
+func TestAuditLanes_IsManagedByTheActivationRecordNotTheMarker(t *testing.T) {
+	t.Run("a marker with no record is not managed, and a broken one is not read", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		path := filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(`{"version": 1,`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		a := audit(t, repoDir, wtRoot)
+		if a.Managed || len(a.Findings) != 0 || len(a.Warnings) != 0 {
+			t.Fatalf("want unmanaged and silent, got %+v", a)
+		}
+	})
+	t.Run("a record with the marker is managed", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		if _, err := writeLanesMarker(repoDir); err != nil {
+			t.Fatal(err)
+		}
+		activateRecord(t, repoDir)
+		if a := audit(t, repoDir, wtRoot); !a.Managed {
+			t.Fatalf("want managed, got %+v", a)
+		}
+	})
+	t.Run("a record with no marker in the main checkout is managed, and says it compared nothing", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		activateRecord(t, repoDir)
+		a := audit(t, repoDir, wtRoot)
+		if !a.Managed || len(a.Findings) != 0 {
+			t.Fatalf("want managed with no finding, got %+v", a)
+		}
+		if len(a.Warnings) != 1 || !strings.Contains(a.Warnings[0].Warning(), LanesMarkerFile) {
+			t.Fatalf("want one warning naming %s, got %+v", LanesMarkerFile, a.Warnings)
+		}
 	})
 }

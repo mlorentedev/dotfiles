@@ -177,7 +177,7 @@ func TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused(t *testing.T) {
 	for _, agent := range []string{"codex", ""} {
 		bb := newFake(t, agent)
 		_, err = Handoff(opts(t), bb, queue)
-		if err == nil || !strings.Contains(err.Error(), "agy, claude, pi") {
+		if err == nil || !strings.Contains(err.Error(), "agy, claude, copilot, opencode, pi") {
 			t.Errorf("pane agent %q: want a refusal naming the known agents, got %v", agent, err)
 		}
 		if len(bb.calls) != 0 {
@@ -215,11 +215,11 @@ func TestNext_NoBackendAndNoAgentPrintsAPlaceholder(t *testing.T) {
 	if err != nil || out.Started {
 		t.Fatalf("Handoff = %+v, %v", out, err)
 	}
-	want := "dotf lane exec --agent <agy|claude|pi> --prompt-file "
+	want := "dotf lane exec --agent <agy|claude|copilot|opencode|pi> --prompt-file "
 	if len(out.Commands) != 4 || !strings.HasPrefix(out.Commands[3], want) {
 		t.Errorf("commands = %q, want the last to start %q", out.Commands, want)
 	}
-	if !strings.Contains(out.Note, "replace <agy|claude|pi> with the agent to start") {
+	if !strings.Contains(out.Note, "replace <agy|claude|copilot|opencode|pi> with the agent to start") {
 		t.Errorf("note = %q", out.Note)
 	}
 }

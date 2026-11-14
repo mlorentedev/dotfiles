@@ -23,6 +23,41 @@ var launchers = map[string]func(prompt string) []string{
 		return []string{"dotf", "secrets", "run", "--only", "NAN_API_KEY,OPENROUTER_API_KEY", "--", "pi", p}
 	},
 	"agy": func(p string) []string { return []string{"agy", "-i", p} },
+	// copilot's -i starts interactive mode on the prompt; -p would run it once and exit.
+	"copilot": func(p string) []string { return []string{"copilot", "-i", p} },
+	// opencode's key comes from a shell function too, so it goes through secrets run
+	// as pi does. --prompt pre-fills the input; the observed launch decides whether
+	// it also submits (verification.md).
+	"opencode": func(p string) []string {
+		return []string{"dotf", "secrets", "run", "--only", "NAN_API_KEY", "--", "opencode", "--prompt", p}
+	},
+}
+
+// LaunchEnv is the environment a launch must start with, beyond the caller's own:
+// the agent's name for herdr, when the launch goes through `dotf secrets run`.
+// herdr names a pane's agent from the foreground process, and the wrapper makes
+// that process dotf, so the pane reads agent: null (#2813; observed for
+// opencode, #3430). The value is read from the environment the process was
+// started with, so it has to be there when the wrapper starts: set later it is
+// invisible to herdr (lesson 493). A launch that starts the agent itself needs
+// nothing, and gets nothing.
+func LaunchEnv(argv []string) []string {
+	if len(argv) < 4 || argv[0] != "dotf" || argv[1] != "secrets" || argv[2] != "run" {
+		return nil
+	}
+	dash := slices.Index(argv, "--")
+	if dash < 0 || dash+1 >= len(argv) {
+		return nil
+	}
+	name := argv[dash+1]
+	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
+		name = name[i+1:]
+	}
+	name = strings.TrimSuffix(strings.TrimSuffix(name, ".exe"), ".EXE")
+	if name == "" {
+		return nil
+	}
+	return []string{"HERDR_AGENT=" + name}
 }
 
 // Agents lists the agents LaunchArgv knows, sorted.

@@ -1,6 +1,8 @@
 package mem
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -13,6 +15,10 @@ import (
 // agyHookDir is where the first-invocation markers live, under the OS temp
 // directory: a marker is only worth keeping for the length of a conversation.
 const agyHookDir = "dotf-agy-session-start"
+
+// markerPrefixMax is how much of a sanitised id a marker name keeps: with the
+// dash and twelve digest characters, 93 in all.
+const markerPrefixMax = 80
 
 // agyMarkerTTL is how long a marker outlives its conversation before the next
 // first invocation removes it.
@@ -56,16 +62,26 @@ func FirstInvocation(stateDir, conversationID string) (bool, error) {
 	return true, f.Close()
 }
 
-// markerName keeps the characters a conversation id is made of and replaces the
-// rest, so an id can never name a path outside the state directory.
+// markerName is the marker's file name. A clean id of up to 80 characters is
+// its own name; anything else, one the sanitiser changed or the cap cuts, keeps
+// a sanitised prefix and gains a digest of the whole raw id, so two ids that
+// collapse to the same text stay two markers. Either way the name holds only
+// characters a conversation id is made of, so an id can never name a path
+// outside the state directory.
 func markerName(id string) string {
+	changed := false
 	name := strings.Map(func(r rune) rune {
 		if r == '-' || r == '_' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' {
 			return r
 		}
+		changed = true
 		return '_'
 	}, id)
-	return name[:min(len(name), 96)]
+	if !changed && len(name) <= markerPrefixMax {
+		return name
+	}
+	sum := sha256.Sum256([]byte(id))
+	return name[:min(len(name), markerPrefixMax)] + "-" + hex.EncodeToString(sum[:6])
 }
 
 // pruneMarkers removes the markers of conversations that ended long ago. A
