@@ -76,7 +76,8 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	if errors.Is(err, fs.ErrNotExist) {
 		// Active, but the main checkout sits on a commit that predates the
 		// marker: the lanes were activated from the default branch and there is
-		// no declared list here to compare them with.
+		// no declared list here to compare them with. Initialised is set only so
+		// the caller does not add its "not initialised" line to this warning.
 		return Audit{Managed: true, Initialised: true, Warnings: []Finding{{LanesMarkerFile,
 			"is absent from the main checkout, so the lanes were not compared with it",
 			"switch the main checkout to the default branch (git switch main && git pull), then run dotf lane doctor again"}}}, nil
