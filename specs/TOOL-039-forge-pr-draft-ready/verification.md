@@ -22,7 +22,7 @@ owner: manu
 - `golangci-lint run` and `GOOS=windows golangci-lint run` on `internal/forgewrite` and `internal/cmd`: 0 issues.
 - Mutations: dropping the `draft: true` check after a Gitea create turns `TestGiteaCreatePRDraftFailsWhenTheInstanceIgnoresThePrefix` red; dropping the ready short-circuit on GitHub turns `TestGitHubReadyPRSkipsTheMutationForAReadyPullRequest` red.
 - The instance in use answers `draft` on every pull request: Gitea 1.27.3, `personal/resume#808` read on 2026-11-14 had `"draft": false`.
-- Manual smoke test on gitea.kubelab.live (a scratch draft opened, marked ready, closed): not run yet. It writes to the owner's forge and leaves a pull request only the owner closes, so it waits for the owner; the spec does not archive before it.
+- Manual smoke test on gitea.kubelab.live, run 2026-11-14 with a binary built from `f0aea7a6`, as the agents' account on `personal/resume` (owner's choice): `dotf forge pr create --draft` opened `personal/resume#811`, which the API answered as `"title": "WIP: chore: check dotf forge drafts", "draft": true`. `dotf forge pr ready 811` then answered `"title": "chore: check dotf forge drafts", "draft": false`. A second `pr ready 811` exited 0 and wrote nothing. `dotf forge` has no close verb, so the owner closes #811 and deletes its branch `chore/forge-draft-check` by hand.
 - No regressions in the existing suite: yes. The one removed test, `TestGiteaCreatePRRefusesDraftBeforeAnyRequest`, asserted the refusal this spec replaces.
 
 ## Decisions made during implementation
