@@ -115,13 +115,17 @@ func TestGiteaReadyPRWritesNothingForAReadyPullRequest(t *testing.T) {
 // ghFake answers `gh api repos/.../pulls/N` with the pull request and records
 // every call, the GraphQL one included.
 func ghFake(draft bool, calls *[][]string) GHRunner {
+	return ghFakeAnswering(draft, `{"data":{"markPullRequestReadyForReview":{"pullRequest":{"isDraft":false}}}}`, calls)
+}
+
+func ghFakeAnswering(draft bool, mutation string, calls *[][]string) GHRunner {
 	return func(_ context.Context, _ []byte, a ...string) ([]byte, error) {
 		*calls = append(*calls, a)
 		switch {
 		case len(a) >= 2 && a[1] == "repos/o/n/pulls/9":
 			return []byte(fmt.Sprintf(`{"node_id":"PR_kw9","draft":%t,"html_url":"https://github.com/o/n/pull/9"}`, draft)), nil
 		case len(a) >= 2 && a[1] == "graphql":
-			return []byte(`{"data":{"markPullRequestReadyForReview":{"pullRequest":{"isDraft":false}}}}`), nil
+			return []byte(mutation), nil
 		}
 		return nil, errors.New("unexpected gh call: " + strings.Join(a, " "))
 	}
@@ -152,6 +156,21 @@ func TestGitHubReadyPRSkipsTheMutationForAReadyPullRequest(t *testing.T) {
 	for _, c := range calls {
 		if len(c) > 1 && c[1] == "graphql" {
 			t.Errorf("a ready pull request got the mutation: %v", calls)
+		}
+	}
+}
+
+// Verified, never assumed: an answer that does not say isDraft: false fails.
+func TestGitHubReadyPRFailsWhenTheAnswerIsNotReady(t *testing.T) {
+	for _, answer := range []string{
+		`{"data":{"markPullRequestReadyForReview":{"pullRequest":{"isDraft":true}}}}`,
+		`{"data":null}`,
+		`not json`,
+	} {
+		var calls [][]string
+		g := GitHub{Run: ghFakeAnswering(true, answer, &calls)}
+		if _, err := g.ReadyPR(context.Background(), Repo{"github.com", "o", "n"}, 9); err == nil || !strings.Contains(err.Error(), "FIX:") {
+			t.Errorf("answer %s: want ERROR/WHY/FIX, got %v", answer, err)
 		}
 	}
 }

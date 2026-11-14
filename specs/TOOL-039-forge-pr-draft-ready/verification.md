@@ -13,7 +13,7 @@ owner: manu
 
 - [x] AC1 -> commit `d90ed3c4` / `TestGiteaCreatePRDraftSendsAPrefixedTitle`, `TestGiteaCreatePRDraftFailsWhenTheInstanceIgnoresThePrefix`, `TestGiteaCreatePRWithoutDraftKeepsTheTitle` (cli/internal/forgewrite/draft_test.go)
 - [x] AC2 -> commit `d90ed3c4` / `TestGiteaReadyPRStripsThePrefix` (four spellings), `TestGiteaReadyPRFailsWhenTheTitleStillReadsAsDraft`, `TestGiteaReadyPRWritesNothingForAReadyPullRequest`
-- [x] AC3 -> commit `d90ed3c4` / `TestGitHubReadyPRSendsTheMutationWithTheNodeID`, `TestGitHubReadyPRSkipsTheMutationForAReadyPullRequest`
+- [x] AC3 -> commits `d90ed3c4`, and the `isDraft` read-back after it / `TestGitHubReadyPRSendsTheMutationWithTheNodeID`, `TestGitHubReadyPRSkipsTheMutationForAReadyPullRequest`, `TestGitHubReadyPRFailsWhenTheAnswerIsNotReady`
 - [x] AC4 -> commit `d90ed3c4` / `TestForgePRReadyMarksTheNumberedPullRequest`, `TestForgePRReadyTakesExactlyOnePositiveNumber`, `TestForgePRHelpNamesDraftAndReadyOnBothForges` (cli/internal/cmd/forge_write_test.go)
 
 ## Test status

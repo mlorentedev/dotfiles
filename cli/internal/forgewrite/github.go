@@ -87,8 +87,21 @@ func (g GitHub) ReadyPR(ctx context.Context, r Repo, number int) (string, error)
 	if !pr.Draft {
 		return pr.HTMLURL, nil
 	}
-	if _, err := g.Run(ctx, nil, "api", "graphql", "-f", "query="+readyMutation, "-f", "id="+pr.NodeID); err != nil {
+	out, err = g.Run(ctx, nil, "api", "graphql", "-f", "query="+readyMutation, "-f", "id="+pr.NodeID)
+	if err != nil {
 		return "", fmt.Errorf("gh api graphql markPullRequestReadyForReview: %w", err)
+	}
+	var resp struct {
+		Data struct {
+			Mark struct {
+				PullRequest struct {
+					IsDraft *bool `json:"isDraft"`
+				} `json:"pullRequest"`
+			} `json:"markPullRequestReadyForReview"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil || resp.Data.Mark.PullRequest.IsDraft == nil || *resp.Data.Mark.PullRequest.IsDraft {
+		return "", fmt.Errorf("ERROR: %s may still be a draft. WHY: the answer to markPullRequestReadyForReview did not say isDraft: false. FIX: check the pull request and rerun dotf forge pr ready", pr.HTMLURL)
 	}
 	return pr.HTMLURL, nil
 }
