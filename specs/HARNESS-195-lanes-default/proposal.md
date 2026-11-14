@@ -29,13 +29,19 @@ The ADR-060 amendment of 2026-11-12 (#3435) settled the policy. This spec builds
 
 After this spec, in a repository that carries the committed `.dotf/lanes.json`:
 
-1. **Each machine activates through converge.** A `lanes` converge step reads the committed marker on the default branch, creates the three lanes (`feat-lane-primary`, `feat-lane-secondary`, `fast-track-lane`), and writes an activation record. A re-run reports `changed=0`. Nothing else activates a machine: `dotf lane init` run by hand, a marker left uncommitted in the main checkout, or the deploy clone.
-2. **The guard arms from the activation record** (#3437), not from a marker file in a working tree. The deploy clone (`DOTFILES_DIR`) is never armed. An expired lease and a branch worktree with no lease are reported, not ignored (#3438).
-3. **Every session is told where it stands.** `dotf mem resume` and `dotf mem session-start` print one line:
+1. **Each machine activates through converge.** A `lanes` converge step reads the committed marker on the default branch, creates the three lanes (`feat-lane-primary`, `feat-lane-secondary`, `fast-track-lane`), and writes an activation record. A re-run reports `changed=0`.
+   - **Decision: where the record lives.** The record is a file named `dotf-lanes-active` in the repository's git common dir. Only converge writes it. It is not committed and not in any working tree, so `git clean -fdx` cannot remove it (lesson 597).
+   - **Decision: which repositories converge activates.** Only the repositories it manages, and the deploy clone (`DOTFILES_DIR`) is never one of them. The exemption therefore needs no match on the clone's name or path.
+   - Nothing else activates a machine: not `dotf lane init` run by hand, not a marker in any working tree, not the deploy clone.
+2. **The guard arms from the activation record and from nothing else** (#3437). The guard drops both marker lookups, `$top/.dotf/lanes.json` and `$main_root/.dotf/lanes.json`. Otherwise any checkout of main that carries the committed marker would arm itself. The deploy clone (`DOTFILES_DIR`) is never armed. An expired lease and a branch worktree with no lease are reported, not ignored (#3438).
+3. **Every session is told where it stands.** `dotf mem resume` and `dotf mem session-start` print one line, and the line reaches each harness through the surface it has:
    - "lane `<name>` ACTIVE on `<branch>`", when the session is in a lane;
    - "this repository runs lanes: start with `dotf lane switch <branch>`", when it is outside them.
 
-   Every harness already calls one of these two commands, so the line reaches all six agents with no new hook.
+   - **claude:** through the bound `mem session-start` hook.
+   - **agy:** through a `mem session-start` entry added to its `bind_named` hooks document.
+   - **pi and opencode:** through their gate extensions' session-start presence (`session_start` and `chat.system.transform`), which run the same command.
+   - **copilot and codex:** they have no hook surface yet (#803). They get the line from `dotf mem resume`, which AGENTS.md tells every session to run first. This is stated as the one non-mechanical path, and it closes when they gain hooks.
 4. **`dotf worktree add` coexists with lanes.** In a repository with active lanes it still creates the worktree, and prints the lane command to use instead. Detached worktrees, and those `spec review` creates, print nothing.
 5. **`dotf lane next` works without herdr.** With no backend, the printed commands enter the lane before they start the agent. The same commands run under zsh, bash and PowerShell.
 6. **More agents can be launched.** copilot and opencode gain launchers after an observed launch (the CLI-119 rule). codex and gemini gain theirs when they are installed and observed. An npm `.cmd` shim stays refused on Windows (#3442), and `dotf secrets run` stops reaching one (#3440).
@@ -55,22 +61,22 @@ After this spec, in a repository that carries the committed `.dotf/lanes.json`:
 
 ## Risks / open questions
 
-- **Activation record location and format.** The proposal is a file under the repository's git common dir (`dotf-lanes-active`), written by converge. It is not committed and not in the working tree, so `git clean -fdx` cannot remove it, which is the lesson 597 class. Settle this in the first task's test, before the guard reads it.
-- **The deploy clone exemption.** The guard must recognise `DOTFILES_DIR` without trusting the clone's name. Proposal: converge records which repositories it activated; the deploy clone is never one of them, so it is never armed. No name match is involved.
-- **Unverified behaviour on Windows:** the guard under Git for Windows `sh`, and lane init, switch and park. Acceptance runs on the Windows guest (`dotf vm windows`). It is batched with #3363 and #3367 when the guest is free.
-- **opencode `--prompt` may pre-fill the input box without submitting it.** The observed launch decides. If it does not submit, the launcher is refused for opencode and that is recorded, not guessed around.
-- **Activating dotfiles turns the 41 existing worktrees into the sweep's queue.** The sweep runs only on merged branches. Unmerged worktrees stay until their PRs land; the guard does not block them, because a branch worktree passes.
+These are true unknowns. The design decisions are recorded in **What**.
+
+- **Unverified on Windows:** the guard under Git for Windows `sh`, and lane init, switch and park. Acceptance runs on the Windows guest (`dotf vm windows`).
+- **opencode `--prompt` may pre-fill the input box without submitting it.** The observed launch decides. If it does not submit, opencode gets no launcher and that is recorded, not guessed around.
+- **The sweep queue.** Activating dotfiles turns the existing worktrees, 41 on the Mac on 2026-11-12, into the sweep's queue. The sweep acts only on merged branches. Unmerged worktrees stay until their PRs land, and the guard lets them through because a branch worktree passes.
 
 ## Acceptance criteria
 
 - [ ] AC1. On a machine whose default branch carries `.dotf/lanes.json`, `dotf converge --only lanes` creates the three lanes and the activation record, and a second run reports `changed=0`. A marker that exists only in a working tree activates nothing.
 - [ ] AC2. With an activation record, the guard blocks a commit on `main` in the main checkout and lets a commit through on a branch worktree. Without one, it blocks nothing. In the deploy clone it never blocks. These are tested on Linux, macOS and Windows CI legs.
-- [ ] AC3. `dotf mem resume` and `dotf mem session-start` print the lane line, both from a lane and from a non-lane worktree of an active repository, and print nothing for a repository without lanes.
+- [ ] AC3. `dotf mem resume` and `dotf mem session-start` print the lane line from a lane and from a non-lane worktree of an active repository, and print nothing for a repository without lanes. The manifest binds the line for claude, agy, pi and opencode. A test fails if a harness with a session-start surface is left unbound.
 - [ ] AC4. `dotf worktree add` in an active repository prints the `dotf lane switch` hint and still creates the worktree. `AddDetached` prints no hint.
 - [ ] AC5. `dotf lane next --dry-run` with no backend prints commands that end inside the lane directory before the agent command. A golden test covers the zsh, bash and PowerShell forms.
 - [ ] AC6. `launchers` holds an entry for each agent with a recorded observed launch (`LANE-READY`) in `verification.md`. `dotf secrets run` refuses an npm `.cmd` shim on Windows the same way `lane exec` does.
 - [ ] AC7. `dotf lane doctor` reports a detached worktree with no lease, an expired lease, and a drifted deployed guard, each with its fix. Exit status is unchanged for warnings.
-- [ ] AC8. AGENTS.md and the three skills name the lane entrances, AGENTS.md no longer calls its implementation tiers "lanes", and a test fails if it does again.
+- [ ] AC8. AGENTS.md, the `dotf init` template that seeds other repositories' AGENTS.md (`cli/internal/initrepo/templates/agents-spec-section.md`) and the three skills name the lane entrances. Neither AGENTS.md nor the template calls the implementation tiers "lanes", and a test fails if either does again.
 - [ ] AC9. dotfiles is active on the Mac, the Linux guest and the Windows guest. A real session of each launched agent starts in a lane and reports it through AC3's line. The evidence is recorded in `verification.md`.
 
 ## References

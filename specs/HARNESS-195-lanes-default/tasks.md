@@ -37,12 +37,13 @@ owner: manu
   - a record on main in the main checkout → block;
   - a branch worktree → pass;
   - the deploy clone → pass.
-- [ ] [AC2] Implement in `git-hooks/lib/lane-guard.sh`: read the record from the git common dir and drop the `$main_root/.dotf/lanes.json` lookup.
+- [ ] [AC2] Implement in `git-hooks/lib/lane-guard.sh`: read the record from the git common dir, and drop both marker lookups (`$top/.dotf/lanes.json` and `$main_root/.dotf/lanes.json`).
 - [ ] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
 
 ### Slice C: tell the session where it stands (AC3)
 - [ ] [P] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
 - [ ] [AC3] Print the line from `dotf mem resume` and `dotf mem session-start`. Golden tests for all three states.
+- [ ] [AC3] Bind `mem session-start` in `harness/manifest.json` for agy (`bind_named`) and the pi and opencode gate extensions. Add a test that every harness with a session-start surface is bound.
 
 ### Slice D: the `worktree add` hint and `lane next` without herdr (AC4, AC5)
 - [ ] [P] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where`. No hint from `AddDetached`.
@@ -60,7 +61,7 @@ owner: manu
 
 ### Slice G: doctrine and activation (AC8, AC9)
 - [ ] Prerequisite: #3456 (harness re-rendered from the vault) merged, so the doctrine PR renders only its own change.
-- [ ] [AC8] Rename the tiers in AGENTS.md (the Lane Decisor rule becomes a tier rule). Update `using-git-worktrees`, `handoff` and `autopilot` in the vault source, then re-render. Add a test that fails if AGENTS.md calls a tier a "lane".
+- [ ] [AC8] Rename the tiers in AGENTS.md and in `cli/internal/initrepo/templates/agents-spec-section.md` (the Lane Decisor rule becomes a tier rule). First check whether AGENTS.md is rendered from a vault source; if it is, edit the source. Update `using-git-worktrees`, `handoff` and `autopilot` in the vault source, then re-render. Add a test that fails if AGENTS.md calls a tier a "lane".
 - [ ] [AC8] Runbook `docs/runbooks/guide-persistent-named-lanes.md`: activation through converge, what the guard blocks, and recovery.
 - [ ] [AC9] PR adding `.dotf/lanes.json` to dotfiles (the switch). Then `dotf converge` on the Mac and each guest, and sweep the merged worktrees.
 - [ ] [AC9] Run a real session of each launchable agent per machine, and record the AC3 line in `verification.md`.
