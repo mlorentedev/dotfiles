@@ -109,6 +109,8 @@ in the same PR), C15 (fail loudly). C8 is amended: NaN has billed from one credi
 | C39 | Scores are per role, and per (model, case) over N runs. One run is an anecdote | #1399 refresh |
 | C40 | A replay is rebuilt from git alone: pinned SHAs, fetchable refs, no hand-cut files | #3476 |
 
+#1399's original body lists three graders (schema, diff/AST, regex/policy) and a dispatcher. The 2026-11-13 refresh on that issue replaced them with the two task kinds measured in #3476, and this ADR follows the refresh. A schema check survives as format validity. Policy checks (attribution, English) belong to the implementer role's grader, not the reviewer's.
+
 ## Options considered
 
 | Option | Door | C35 | C36 | C37 | C38 | C39 | C40 | ADR-020 |
@@ -151,6 +153,8 @@ without touching dotfiles.
 - `case.schema.json` and `result.schema.json`;
 - `candidates.json`;
 - the planted cases.
+
+The two schemas are also embedded in the `dotf` binary, and a test asserts the embedded copies are byte-identical to `harness/evals/`. This is the same arrangement as `cli/internal/prreview/reviewer-pool.json`, and it is how `dotf eval check` validates cases in any repository at the released version without vendoring a copy. Only the schemas are embedded: `candidates.json` and the planted cases are read by `dotf eval run`, which runs from dotfiles. A missing or unreadable file fails loudly (C15).
 
 `dotf eval run` runs from dotfiles and reads them there. `--repo <path>`, repeatable, adds another
 repository's cases. The vault never holds cases, because repositories do not depend on the store. A
@@ -215,7 +219,7 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
      provider, model, secret id. The pool is not read.
    - The base is the case's `base_sha`, passed explicitly instead of resolved.
    - The reviewer writes its verdict to the run directory, never to `specs/`.
-4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run, and in a lane-managed repository the lane guard would also refuse it, because the worktree holds no lease. No exemption is needed.
+4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run. The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
 5. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
    still leaves (today's tools against old code) is listed once in the case's `noise`.
 
@@ -235,7 +239,7 @@ Curation is human, once per case. Grading is mechanical, every run. Graded per r
 | Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer` |
 | Format | The findings table parses. An unparseable answer is a format failure, scored as such, never as zero findings |
 | Verdict match | `PASS` / `PASS-WITH-GAPS` / `FAIL` against `expected_verdict` |
-| Recall | Matched `expected` over `expected`, weighted by severity floor |
+| Recall | Matched `expected` over `expected`, weighted by severity floor. An `expected` entry the reviewer described without its anchors is a miss in that grading, even though the row itself is unadjudicated |
 | False positives | Rows that match a `decoy` |
 | Unadjudicated | Rows that match nothing. Reported as a count with the rows; **neither a miss nor a false positive** |
 | Cost | Duration, and tokens (input, output, thinking) from the transcript |
@@ -246,6 +250,8 @@ quality. An unadjudicated row goes to the owner. Each disposition becomes an `ex
 or `decoy` entry, so the key grows from runs, the way SWE-bench Verified was curated. The
 false-positive rate can only be measured against decoys and adjudicated rows, and the report says so.
 
+**Grading is repeatable after the fact.** Each run keeps the reviewer's raw output. When an adjudication adds anchors to the key, `dotf eval grade <run-id>` re-grades the stored outputs at no model cost. A miss caused only by vocabulary is then corrected for every candidate at once, instead of lingering in their scores.
+
 **Key circularity.** When a candidate is the case's `key_author`, the result is flagged and left
 out of that model's reduced score. `nan/deepseek-v4-flash` authored 62 of the archived reviews.
 
@@ -255,9 +261,9 @@ out of that model's reduced score. `nan/deepseek-v4-flash` authored 62 of the ar
   mean and minimum recall, decoy-hit rate, and median duration and tokens.
 - **Plan before spending.** `dotf eval run --plan` prints the matrix (cases × candidates × epochs) and
   an estimate per runner:
-  - **NaN:** credits, from the token envelope a case recorded on earlier runs, times the rates in
-    `ai/nan/README.md`.
-  - **Anthropic:** money, from the price rows `dotf pr route` already holds (ADR-046 §5).
+  - **NaN:** credits, from a token envelope times the rates in `ai/nan/README.md`. The envelope is the median of earlier runs of that case. A case that has never run uses its kind's default, declared in `candidates.json` and seeded from #3273's measured adversarial review (200K in, 20K out). The plan labels each estimate `measured` or `default`, and never prints zero or unknown, because the cap is the only thing that authorises spend.
+  - **Anthropic:** money, from the price rows `dotf pr route` already holds (ADR-046 §5), applied to the same envelope.
+  - **Copilot:** premium requests on the seat.
   - **agy:** a run count, because its quota cannot be read.
 - **A run refuses above its cap.** The default cap is 30 runs per invocation, and `--max-runs` raises
   it explicitly.
@@ -267,7 +273,7 @@ out of that model's reduced score. `nan/deepseek-v4-flash` authored 62 of the ar
 ### 5. Roles
 
 `role` is a field on each case, and a score is only ever reported per role. The first slice is
-`spec-reviewer`. Each later role plugs in as a new case kind with its own launch path and grader;
+`spec-reviewer`, over the runners the review launcher has today: pi for NaN and Anthropic, and agy for Gemini. Copilot models become candidates once the launcher gains a `copilot` runner (`copilot --model <id> -p`, ids measured in `model-map.json`). That is a launcher change, not a runner change. Each later role plugs in as a new case kind with its own launch path and grader;
 the runner, result format and proposal stay the same:
 
 | Role | Case kind | Launch path | Grader |

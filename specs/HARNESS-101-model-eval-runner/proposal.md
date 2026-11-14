@@ -46,9 +46,10 @@ After this spec:
 ## Risks / open questions
 
 - **Gate integrity (C37).** The eval slot must not become a way around the pool's allow-list. Mitigation: output is written outside `specs/`, the reviewer is recorded as `eval:<id>`, and a test asserts that `checkReviewGate` refuses an eval record copied into a spec folder.
-- **Anchor brittleness.** A reviewer that describes a defect without naming its symbol scores as unadjudicated. Mitigation: unadjudicated rows are reported, never counted as misses, and adjudication extends the key.
+- **Anchor brittleness.** A reviewer that describes a defect without naming its symbol leaves the matching `expected` entry unmatched, which is a miss in that grading, and its row is reported as unadjudicated. Mitigation: raw outputs are kept, adjudication extends the key, and `dotf eval grade <run-id>` re-grades stored runs at no model cost.
 - **SHA durability.** A squash-merged `reviewed_sha` survives only through GitHub's `refs/pull/<n>/head`. Mitigation: each case records `fetch_ref`, and an unresolvable case fails loudly as infrastructure.
 - **Key circularity.** `nan/deepseek-v4-flash` authored 62 archived reviews. Mitigation: `key_author` on each case, and a candidate's results on its own keys are flagged and left out of its reduced score.
+- **Cost estimate for a case that has never run.** `--plan` falls back to a per-kind default envelope declared in `candidates.json`, labelled `default`, never zero.
 - **Token accounting per runner.** pi, agy and the Anthropic path report tokens differently in their transcripts. Open until the first runner adapter is written; a runner that cannot report tokens says so in the result rather than reporting 0.
 - **Owner decisions** pending in ADR-063: recall policy, budget defaults, retirements, scheduling. This spec stays in `draft` until they are answered.
 
