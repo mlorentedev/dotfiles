@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: c60e3288c73ab06b
+generated_sha: b4871586891dda3e
 id: handoff-skill
 type: skill
 status: active
@@ -141,7 +141,9 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
 
   The entry moves byte-identical to `archive/superseded-handoffs-<date>.md` and
   the thread file to `archive/threads/`, so the index a session start loads holds
-  only live work. The flag is explicit: `Next action: None` is never read as
+  only live work. dotf 0.81.0 moves only the entry: the file stays in `threads/`,
+  `dotf doctor` reports it, and moving it to `archive/threads/` by hand clears it;
+  later releases move both. The flag is explicit: `Next action: None` is never read as
   finished. A thread that still has `Awaiting Manu` items is refused; answer or
   move them first. Parking a named lane archives its branch's thread the same way.
 

@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/dispose-proposals/SKILL.md
-generated_sha: 7a6204dc203eee8c
+generated_sha: 1f00ca4898a70a6c
 id: dispose-proposals-skill
 type: skill
 status: active
@@ -82,8 +82,8 @@ For **wontfix**, record the one-line reason in [[00_meta/agents/rejected-mechani
 (the WONTFIX ledger, HARNESS-005). Grep that ledger *before* dispositioning: the analyzer's
 dedup key is the candidate's evidence set, so a rejected cluster returns under a new
 `candidate_id` as soon as one more source joins it, and the ledger is the only thing that
-travels with the cluster rather than the file.
-so the same false cluster is not re-litigated next week.
+travels with the cluster rather than the file, so the same false cluster is not re-litigated
+next week.
 
 ### Step 5 — Close out
 The drafts live in the vault → obsidian-git auto-commits the disposition edits (do not manual-commit).

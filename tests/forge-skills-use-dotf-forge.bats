@@ -39,10 +39,10 @@ setup() {
     if grep -qE 'gh (issue comment|pr create)' "$SKILLS/autopilot/SKILL.md"; then false; fi
 }
 
-@test "agents mark a draft ready with dotf forge, which works on Gitea too" {
+@test "agents open and mark drafts ready with dotf forge, which works on Gitea too" {
     for f in "$SKILLS/autopilot/SKILL.md" "$REPO/harness/enforced/pr-stewardship.md"; do
         grep -q 'dotf forge pr ready' "$f" || { printf '%s does not name dotf forge pr ready\n' "$f" >&2; false; }
-        if grep -q 'gh pr ready' "$f"; then printf '%s still names gh pr ready\n' "$f" >&2; false; fi
+        if grep -qE 'gh pr (create|ready)' "$f"; then printf '%s still names gh pr create or ready\n' "$f" >&2; false; fi
     done
 }
 
