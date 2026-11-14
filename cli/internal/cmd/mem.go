@@ -122,22 +122,27 @@ func newMemSessionStartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "session-start",
 		Short: "Session-start brief: --format for file-based agents, or the Claude hook envelope",
-		Long: "session-start has two modes. With --format=stdout|markdown it renders the\n" +
+		Long: "session-start has three modes. With --format=stdout|markdown it renders the\n" +
 			"agent-agnostic session-brief core (vault detection, health, specs, lessons,\n" +
 			"baseline) that file-based agents (opencode/agy/copilot) inject out-of-band.\n" +
 			"With no --format it is the Claude SessionStart hook: it reads the hook JSON on\n" +
 			"stdin and emits the additionalContext envelope — the same core plus the\n" +
-			"Claude-only injectors. Ported from session-brief.sh + claude-session-start.sh.",
+			"Claude-only injectors. With --format=agy-hook it is agy's PreInvocation hook: the\n" +
+			"brief as an injectSteps systemMessage on a conversation's first invocation, `{}`\n" +
+			"after. Ported from session-brief.sh + claude-session-start.sh.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if format != "" {
-				return runSessionBrief(cmd, format)
+			switch format {
+			case "":
+				return runClaudeHook(cmd)
+			case agyHookFormat:
+				return runAgyHook(cmd)
 			}
-			return runClaudeHook(cmd)
+			return runSessionBrief(cmd, format)
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "", "stdout|markdown for the agnostic brief; omit for the Claude hook envelope")
+	cmd.Flags().StringVar(&format, "format", "", "stdout|markdown for the agnostic brief, agy-hook for agy's PreInvocation hook; omit for the Claude hook envelope")
 	return cmd
 }
 
@@ -147,7 +152,18 @@ func runSessionBrief(cmd *cobra.Command, format string) error {
 	if cwd == "" {
 		cwd, _ = os.Getwd()
 	}
-	brief := mem.Brief(mem.BriefOptions{
+	out, err := mem.RenderBrief(agnosticBrief(cmd, cwd), format)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(cmd.OutOrStdout(), out)
+	return err
+}
+
+// agnosticBrief is the agnostic brief for cwd, the one every file-based agent
+// reads however it is carried to them.
+func agnosticBrief(cmd *cobra.Command, cwd string) string {
+	return mem.Brief(mem.BriefOptions{
 		Cwd: cwd, VaultHealth: memVaultHealth, StaleDays: 14, Now: time.Now(),
 		LaneLine: laneLine(cwd, cmd.ErrOrStderr()),
 		// The file-based agents get the same probe as the Claude hook. Wiring it
@@ -156,12 +172,6 @@ func runSessionBrief(cmd *cobra.Command, format string) error {
 		// closes in one harness is not closed.
 		TriageQueue: memTriageQueue(cwd),
 	})
-	out, err := mem.RenderBrief(brief, format)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprint(cmd.OutOrStdout(), out)
-	return err
 }
 
 // runClaudeHook reads the SessionStart hook JSON on stdin and emits the

@@ -15,7 +15,12 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 - [ ] AC1 -> <commit> / <test or observation>
 - [ ] AC2 -> <commit> / <test or observation>
-- [ ] AC3 -> <commit> / <test or observation>
+- [ ] AC3 -> slice C, in progress (C1 #3491, C2 #3496; agy follows in feat/lane-line-agy-carrier):
+  - `lane.Where` and the line: `TestWhere`, `TestPositionLine`, `TestMemLaneLine_GoldenForEveryState`; every harness with a presence event has a carrier or a named gap: `TestEveryPresenceTargetHasADeployedCarrier`.
+  - pi, observed 2026-11-14 with a stand-in `dotf` on PATH that printed `LANE-LINE-TOKEN-7731: lane x ACTIVE on b`: `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi -e ai/pi/extensions/dotfiles-gate.ts -p --no-session "Copy exactly any line you were given that starts with LANE-LINE-TOKEN. If none was given, answer NONE."` printed `LANE-LINE-TOKEN-7731: lane x ACTIVE on b`.
+  - opencode, same stand-in, plugin copied into a temporary `OPENCODE_CONFIG_DIR/plugins`: `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode run -m nan/qwen3.6 "Search your whole system prompt for the string LANE-LINE-TOKEN. Quote the full line containing it verbatim, or say ABSENT."` printed `LANE-LINE-TOKEN-7731: lane x ACTIVE on b`. (A first, vaguer prompt answered `NONE`; the dotf stub had been called, so the model, not the plugin, missed it.)
+  - deploy: `dotf deploy opencode-gate` and `pi-gate` twice into a temporary home reported `deployed`, then `in sync`.
+  - `TestSessionLineCarriersInjectTheBriefAndSurviveAMissingDotf` runs both sources under node. It skips on Windows and where node cannot strip types, so it is not CI evidence; the two observations above are the manual proof.
 - [ ] AC4 -> <commit> / <test or observation>
 - [ ] AC5 -> <commit> / <test or observation>
 - [ ] AC6 -> <commit> / <test or observation>

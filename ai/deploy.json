@@ -130,6 +130,22 @@
       "requires": "pi"
     },
     {
+      "name": "pi-gate",
+      "src": "ai/pi/extensions/dotfiles-gate.ts",
+      "dst": "{HOME}/.pi/agent/extensions/dotfiles-gate.ts",
+      "render": false,
+      "mode": "0644",
+      "requires": "pi"
+    },
+    {
+      "name": "opencode-gate",
+      "src": "ai/opencode/plugins/dotfiles-gate.ts",
+      "dst": "{OPENCODE_HOME}/plugins/dotfiles-gate.ts",
+      "render": false,
+      "mode": "0644",
+      "requires": "opencode"
+    },
+    {
       "name": "pi-mcp",
       "src": "ai/pi/mcp.json",
       "dst": "{HOME}/.pi/agent/mcp.json",
