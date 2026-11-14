@@ -17,6 +17,7 @@ import (
 	"syscall"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 	"github.com/mlorentedev/dotfiles/cli/internal/redact"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/spf13/cobra"
@@ -792,6 +793,29 @@ func assertSafeChildCommand(argv []string) error {
 				return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout", word)
 			}
 		}
+	}
+	return refuseBatchShimChild(argv)
+}
+
+// batchShimsRunViaCmdExe is true where Windows starts a .cmd or .bat file
+// through cmd.exe. A package variable so a Linux or macOS run can test the
+// refusal; nothing else sets it.
+var batchShimsRunViaCmdExe = runtime.GOOS == "windows"
+
+// refuseBatchShimChild refuses a child that Windows would run through cmd.exe,
+// the refusal `dotf lane exec` makes for the same reason: npm installs an
+// agent as a .cmd shim, and cmd.exe re-parses the arguments it is handed
+// (#3440). A command that is not on PATH is left to the launch to report.
+func refuseBatchShimChild(argv []string) error {
+	if !batchShimsRunViaCmdExe {
+		return nil
+	}
+	bin, err := exec.LookPath(argv[0])
+	if err != nil {
+		return nil //nolint:nilerr // not found is the launch's error to report
+	}
+	if err := lane.RefuseBatchShim(argv[0], bin); err != nil {
+		return fmt.Errorf("secrets run: %w", err)
 	}
 	return nil
 }
