@@ -71,6 +71,12 @@ func TestLaunchArgv_InsertsTheModelAfterTheAgentExecutable(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(got, []string{"claude", "go"}) {
 		t.Errorf("no model: LaunchArgv = %q, %v; want the bare launch", got, err)
 	}
+	// The id is inserted as validated: trimmed, so the agent never sees the
+	// blank a shell left around it.
+	got, err = LaunchArgv("claude", "go", " sonnet ")
+	if err != nil || !reflect.DeepEqual(got, []string{"claude", "--model", "sonnet", "go"}) {
+		t.Errorf("padded model: LaunchArgv = %q, %v; want it trimmed", got, err)
+	}
 }
 
 // A model that is blank or starts like a flag would be read as something else

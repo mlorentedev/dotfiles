@@ -89,11 +89,12 @@ func LaunchArgv(agent, prompt, model string) ([]string, error) {
 	if model == "" {
 		return argv, nil
 	}
-	if m := strings.TrimSpace(model); m == "" || m[0] == '-' {
+	m := strings.TrimSpace(model)
+	if m == "" || m[0] == '-' {
 		return nil, fmt.Errorf("lane: the model must be an id, not %q", model)
 	}
 	at := agentExecutable(argv) + 1
-	return slices.Concat(argv[:at], []string{"--model", model}, argv[at:]), nil
+	return slices.Concat(argv[:at], []string{"--model", m}, argv[at:]), nil
 }
 
 // agentExecutable is the index of the agent's own executable in a launch argv:

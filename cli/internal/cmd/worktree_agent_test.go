@@ -115,7 +115,7 @@ func TestWorktreeAddRefusesAPromptWithoutAnAgent(t *testing.T) {
 func TestWorktreeAddForwardsTheModelToHerdr(t *testing.T) {
 	repo := worktreeTestRepo(t)
 	calls := fakeHerdrRunner(t, herdrAnswers(true), map[string]bool{"agent get": true})
-	if out, err := executeWorktree(t, "add", "demo", "--repo", repo, "--agent", "pi", "--model", "nan/qwen3.8-max"); err != nil {
+	if out, err := executeWorktree(t, "add", "demo", "--repo", repo, "--agent", "pi", "--model", " nan/qwen3.8-max "); err != nil {
 		t.Fatalf("add --agent --model: %v\n%s", err, out)
 	}
 	want := "agent start feat-demo --kind pi --pane w3:p1 -- --model nan/qwen3.8-max"

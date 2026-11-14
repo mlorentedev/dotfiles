@@ -336,10 +336,11 @@ before creating anything.`,
 				if launch == nil {
 					return errors.New("--model needs --agent")
 				}
-				if m := strings.TrimSpace(model); m == "" || m[0] == '-' {
+				m := strings.TrimSpace(model)
+				if m == "" || m[0] == '-' {
 					return fmt.Errorf("--model must be a model id, not %q", model)
 				}
-				launch.Model = model
+				launch.Model = m
 			}
 
 			info, err := worktree.Add(opts)
