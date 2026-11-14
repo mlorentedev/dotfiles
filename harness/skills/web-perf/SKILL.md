@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/web-perf/SKILL.md
-generated_sha: 5ec2f2d6b7b5ff66
+generated_sha: 0cca326c02fce669
 id: web-perf-skill
 type: skill
 status: active
@@ -19,7 +19,7 @@ paths: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/pag
 
 Audit, diagnose, and optimize web applications for loading speed, interactivity, and visual stability against Core Web Vitals targets.
 
-> **Origin:** adapted from [cloudflare/skills](https://github.com/cloudflare/skills) (`skills/web-perf`, MIT). Adapted for the cross-agent skill pipeline with autonomous frontend activation rules and pattern-web-performance thresholds.
+> **Origin:** adapted from [cloudflare/skills](https://github.com/cloudflare/skills) (`skills/web-perf`, Apache-2.0). Adapted for the cross-agent skill pipeline with autonomous frontend activation rules and pattern-web-performance thresholds.
 
 ## Core Web Vitals Thresholds (75th Percentile)
 

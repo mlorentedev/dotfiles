@@ -22,7 +22,7 @@ repository; this file is the NOTICE-equivalent that preserves attribution as the
 | `security-audit` | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) | security-audit-skill | MIT | © 2025-2026 Cloudflare, Inc. |
 | `web-perf` | [cloudflare/skills](https://github.com/cloudflare/skills) | web-perf | Apache-2.0 | © Cloudflare, Inc. |
 
-All sources verified by reading the repository `LICENSE` file at vendor time (2026-06-03).
+All sources verified by reading the repository `LICENSE` file at vendor time (2026-06-03; 2026-11-13 for the `security-audit` and `web-perf` rows).
 Apache-2.0 and MIT both permit redistribution with attribution; this file plus the per-skill
 footer satisfy the notice requirement. If a skill is updated upstream, re-vendor the `SKILL.md`
 into the vault source and run `dotf harness refresh`.

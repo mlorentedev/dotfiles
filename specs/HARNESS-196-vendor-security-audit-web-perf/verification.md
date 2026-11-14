@@ -48,6 +48,14 @@ Not vendored, on purpose: upstream's `*.test.cjs` and the reference documents.
 - `ATTRIBUTION.md` says it vendors only `SKILL.md`; a sentence now names `security-audit` as the exception, because its `scripts/` are vendored too.
 - `dotf harness refresh` skips a vault checkout without an upstream ("not confirmed current"), which a detached worktree is. The refresh was run from a scratch worktree on a branch tracking `origin/master`, removed afterwards.
 
+## Post-review dispositions
+
+The independent review (`review.md`, PASS, `nan/glm5.3-flash`, reviewed `08652a12`) raised three Minors. The contract files stay as reviewed.
+
+- **Minor 1, web-perf body names MIT: applied.** The vault source's Origin line now says Apache-2.0 (vault commit `f95f7ee4`) and the record is re-rendered from it.
+- **Minor 2, the ATTRIBUTION vendor date: applied.** The sentence now says the two new rows were read on 2026-11-13.
+- **Minor 3, "13 reference documents" against 14: declined.** The count sits in `proposal.md`, which a PASS closes; editing it would stale the review's digests. Nothing is vendored from those documents either way, so no acceptance criterion reads on the number.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
