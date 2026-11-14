@@ -215,11 +215,13 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 
   A row below an entry's `severity_floor` does not satisfy it.
 - **Decoys and the self-check** (amended 2026-11-14). A decoy is usually mined from the source
-  review's own false claim, so a replay source may match its decoys. A planted reference is the
-  ideal answer and may not. A decoy broad enough to swallow a true row still fails the check,
-  because decoys are classed first and that row's `expected` entry goes unmatched. A source never
-  exercises a decoy that is not its own, so every decoy and noise entry carries a recorded `sample`
-  it must match.
+  review's own false claim, so a replay source may match its decoys, but only on the row a
+  decoy's `sample` records (the row begins with the sample). A planted reference is the ideal
+  answer and may match none. A decoy or noise entry that takes any other row of its source fails
+  the check: it would swallow a finding nobody refuted, and for an unadjudicated row no `expected`
+  entry goes unmatched to say so (owner chose this over keeping decoys out of their own source,
+  #1399). A source never exercises a decoy that is not its own, so every decoy and noise entry
+  carries a recorded `sample` it must match.
 - **What the tree already records is not expected.** A finding that the replayed tree already dispositions (in `verification.md` or `tasks.md`) goes in `optional`, never in `expected`. A reviewer gets credit for repeating it, and no penalty for skipping it.
 - **Archived specs are never edited.** Reviewer artifacts are untouchable, so the key lives beside
   the archive, never inside it.

@@ -113,7 +113,7 @@ func TestCheckFindsNothingInARepositoryWithoutCases(t *testing.T) {
 // broad to be safe still fails the check: decoys are graded before expected
 // entries, so one that swallows a true row leaves that entry unmatched.
 func TestCheckLetsAReplaySourceCarryItsOwnDecoy(t *testing.T) {
-	review := sourceReview("FAIL", "nan/x", append([]string{"| Minor | REAL | sh | fails on bash 3.2 | e | t | f |"}, goodRows...)...)
+	review := sourceReview("FAIL", "nan/x", append([]string{ownDecoyRow}, goodRows...)...)
 	if p := problemsOf(t, writeTree(t, goodCase, "x-r1.json", review)); len(p) != 0 {
 		t.Fatalf("a replay source carrying its own decoy was refused: %v", p)
 	}
@@ -122,6 +122,25 @@ func TestCheckLetsAReplaySourceCarryItsOwnDecoy(t *testing.T) {
 	p := problemsOf(t, writeTree(t, tooBroad, "x-r1.json", sourceReview("FAIL", "nan/x", goodRows...)))
 	if !strings.Contains(strings.Join(p, "\n"), "deleted-test") {
 		t.Fatalf("a decoy swallowing an expected row passed: %v", p)
+	}
+}
+
+// ownDecoyRow is the source row goodCase's decoy was mined from: it begins with
+// the decoy's sample.
+const ownDecoyRow = "| Major | REAL | sh | breaks on bash 3.2 | e | t | f |"
+
+// A replay source may carry its own decoy, but only on the row the decoy was
+// mined from. A decoy that also takes another row of its source swallows a
+// finding nobody refuted, and no expected entry goes unmatched to say so.
+func TestCheckRefusesAReplayDecoyThatTakesAnotherRowOfItsSource(t *testing.T) {
+	unrefuted := "| Minor | THEORETICAL | sh | a helper assumes bash 3.2 arrays | e | t | f |"
+	review := sourceReview("FAIL", "nan/x", append([]string{ownDecoyRow, unrefuted}, goodRows...)...)
+	p := strings.Join(problemsOf(t, writeTree(t, goodCase, "x-r1.json", review)), "\n")
+	if !strings.Contains(p, "bash32") || !strings.Contains(p, "line ") {
+		t.Fatalf("a decoy taking a row it was not mined from passed: %q", p)
+	}
+	if strings.Count(p, "bash32") != 1 {
+		t.Fatalf("want one problem, for the unrefuted row only: %q", p)
 	}
 }
 
