@@ -1,7 +1,7 @@
 ---
 id: "HARNESS-101-model-eval-runner"
 type: spec
-status: draft # draft | implementing | verifying | archived
+status: implementing # draft | implementing | verifying | archived
 created: "2026-11-13"
 issue: "mlorentedev/dotfiles#1399"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, harness, evals, reviewer-pool]
@@ -51,11 +51,11 @@ After this spec:
 - **Key circularity.** `nan/deepseek-v4-flash` authored 62 archived reviews. Mitigation: `key_author` on each case, and a candidate's results on its own keys are flagged and left out of its reduced score.
 - **Cost estimate for a case that has never run.** `--plan` falls back to a per-kind default envelope declared in `candidates.json`, labelled `default`, never zero.
 - **Token accounting per runner.** pi, agy and the Anthropic path report tokens differently in their transcripts. Open until the first runner adapter is written; a runner that cannot report tokens says so in the result rather than reporting 0.
-- **Owner decisions** pending in ADR-063: recall policy, budget defaults, retirements, scheduling. This spec stays in `draft` until they are answered.
+- **Owner decisions.** Delegated by the owner and settled 2026-11-13 (ADR-063 *Decisions*): build in Go, confirmed-only recall, N=3 with a cap of 30, the retirements, deferred scheduling, dotfiles-only corpus. Any of them can be reversed on #1399.
 
 ## Acceptance criteria
 
-- [ ] AC1. `harness/evals/case.schema.json` exists and every case under `.dotf/evals/cases/` validates against it, including a `repo` field. At least 5 `replay` and 2 `planted` cases exist for `role: spec-reviewer`.
+- [ ] AC1. `harness/evals/case.schema.json` exists and every case under `.dotf/evals/cases/` validates against it, including a `repo` field. A replay case with no confirmed finding in `expected` is rejected. At least 5 `replay` and 2 `planted` cases exist for `role: spec-reviewer`.
 - [ ] AC2. `dotf eval check` (exercised by a Go test and run in CI) grades every case against its own `source_review` (replay) or recorded reference answer (planted) and asserts full recall over `expected` with zero decoy hits. A key whose anchors no longer match fails the test.
 - [ ] AC3. A replay of a case resolves its `reviewed_sha`, fetching `fetch_ref` when absent, and checks it out detached outside the repository. A case whose SHA cannot be resolved exits non-zero naming the case, and is not scored.
 - [ ] AC4. The eval slot launches a candidate from `harness/evals/candidates.json` with an explicit base. It never reads the pool, and it writes only to the run directory. A test asserts that `checkReviewGate` refuses an eval record placed in a spec folder.
