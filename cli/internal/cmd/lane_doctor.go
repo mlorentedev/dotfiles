@@ -42,7 +42,7 @@ func runLaneDoctor(c *cobra.Command) error {
 		return withExitCode(2, err)
 	}
 	if a.Managed {
-		a.Warnings = append(a.Warnings, lane.GuardDrift(repoRoot, env.DotfilesDir(env.Home()))...)
+		a.Warnings = append(a.Warnings, lane.GuardDrift(repoRoot)...)
 	}
 	out := c.OutOrStdout()
 	// Warnings never change the exit code: they are not drift, only what the

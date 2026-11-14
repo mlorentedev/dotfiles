@@ -112,7 +112,10 @@ func TestLaneDoctor_WarnsOfALeaselessDetachedWorktreeWithoutFailing(t *testing.T
 func TestLaneDoctor_WarnsOfADriftedDeployedGuardWithoutFailing(t *testing.T) {
 	repo := laneDoctorRepo(t, true, coherentMarker)
 	deploy := t.TempDir()
-	t.Setenv("DOTFILES_DIR", deploy)
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	if out, err := exec.Command("git", "-C", repo, "config", "core.hooksPath", filepath.Join(deploy, "git-hooks")).CombinedOutput(); err != nil {
+		t.Fatalf("git config: %v\n%s", err, out)
+	}
 	for root, content := range map[string]string{repo: "new\n", deploy: "old\n"} {
 		p := filepath.Join(root, "git-hooks", "lib", "lane-guard.sh")
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {

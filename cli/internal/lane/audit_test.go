@@ -151,11 +151,13 @@ func TestAuditLanes_WarnsOfAnExpiredLease(t *testing.T) {
 	}
 }
 
-// The guard that runs is the copy deployed under DOTFILES_DIR, not the one in
-// the repository; a deploy that lags it keeps the old rules in force. The
-// warning names the command that redeploys. A repository without its own copy
-// has nothing to lag.
+// The guard that runs is the copy under core.hooksPath, not the one in the
+// repository; a deploy that lags it keeps the old rules in force. The warning
+// names the command that redeploys. A repository without its own copy has
+// nothing to lag, and a hooksPath that is the checkout's own git-hooks is no
+// drift by construction.
 func TestGuardDrift(t *testing.T) {
+	const current, stale = "#!/bin/sh\nexit 0\n", "#!/bin/sh\nexit 1\n"
 	write := func(root, content string) {
 		t.Helper()
 		p := filepath.Join(root, "git-hooks", "lib", "lane-guard.sh")
@@ -169,24 +171,40 @@ func TestGuardDrift(t *testing.T) {
 	cases := []struct {
 		name         string
 		repo, deploy *string
+		hooksPath    func(repo, deploy string) string // empty leaves core.hooksPath unset
 		want         string
 	}{
-		{"identical copies", ptr("#!/bin/sh\nexit 0\n"), ptr("#!/bin/sh\nexit 0\n"), ""},
-		{"line endings alone are not drift", ptr("#!/bin/sh\nexit 0\n"), ptr("#!/bin/sh\r\nexit 0\r\n"), ""},
-		{"deployed copy lags", ptr("#!/bin/sh\nexit 1\n"), ptr("#!/bin/sh\nexit 0\n"), "differs"},
-		{"guard never deployed", ptr("#!/bin/sh\nexit 1\n"), nil, "not deployed"},
-		{"repository has no copy of its own", nil, ptr("#!/bin/sh\nexit 0\n"), ""},
+		{"identical copies", ptr(current), ptr(current), deployed, ""},
+		{"line endings alone are not drift", ptr(current), ptr("#!/bin/sh\r\nexit 0\r\n"), deployed, ""},
+		{"deployed copy lags", ptr(current), ptr(stale), deployed, "differs"},
+		{"guard missing under the hooks path", ptr(current), nil, deployed, "not deployed"},
+		{"core.hooksPath unset", ptr(current), ptr(current), func(string, string) string { return "" }, "unset"},
+		{"relative hooks path resolves from the repository", ptr(current), ptr(stale),
+			func(repo, deploy string) string {
+				rel, _ := filepath.Rel(repo, filepath.Join(deploy, "git-hooks"))
+				return rel
+			}, "differs"},
+		{"hooks path is the checkout's own git-hooks", ptr(current), nil,
+			func(repo, _ string) string { return filepath.Join(repo, "git-hooks") }, ""},
+		{"repository has no copy of its own", nil, ptr(current), deployed, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// The machine's own git config must not answer for the test.
+			t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+			t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 			repo, deploy := t.TempDir(), t.TempDir()
+			runGitLaneTest(t, repo, "init", "-b", "main")
 			if tc.repo != nil {
 				write(repo, *tc.repo)
 			}
 			if tc.deploy != nil {
 				write(deploy, *tc.deploy)
 			}
-			got := GuardDrift(repo, deploy)
+			if hp := tc.hooksPath(repo, deploy); hp != "" {
+				runGitLaneTest(t, repo, "config", "core.hooksPath", hp)
+			}
+			got := GuardDrift(repo)
 			if tc.want == "" {
 				if len(got) != 0 {
 					t.Fatalf("want no warning, got %+v", got)
@@ -204,6 +222,8 @@ func TestGuardDrift(t *testing.T) {
 		})
 	}
 }
+
+func deployed(_, deploy string) string { return filepath.Join(deploy, "git-hooks") }
 
 func ptr(s string) *string { return &s }
 
