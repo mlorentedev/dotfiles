@@ -1,7 +1,7 @@
 ---
 id: "CI-017-gate-required-check"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-12"
 issue: "mlorentedev/dotfiles#3306"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal, ci, gate]
@@ -38,10 +38,10 @@ PR 2 (owner, after `ci-gate` has reported on `main`): `forge/branch-protection.j
 
 ## Acceptance criteria
 
-- [ ] AC1: `ci.yml` has a `ci-gate` job under `always()` that needs every other job in the workflow and runs the ci-workflows `gate` composite pinned by full SHA; the CI-004 checker passes.
-- [ ] AC2: On a pull request, `ci-gate` reports, and fails when any job it needs failed or was cancelled.
-- [ ] AC3 (owner, PR 2): branch protection requires `ci-gate` in place of the five `ci.yml` checks, keeping the other workflows' aggregates and `review-attestation`.
-- [ ] AC4 (PR 2): `test-windows` skips at job level on a documentation-only pull request, and the CI-004 checker passes.
+- [x] AC1: `ci.yml` has a `ci-gate` job under `always()` that needs every other job in the workflow and runs the ci-workflows `gate` composite pinned by full SHA; the CI-004 checker passes.
+- [x] AC2: On a pull request, `ci-gate` reports, and fails when any job it needs failed or was cancelled.
+- [x] AC3 (owner, PR 2): branch protection requires `ci-gate` in place of the five `ci.yml` checks, keeping the other workflows' aggregates and `review-attestation`.
+- [x] AC4 (PR 2): `test-windows` skips at job level on a documentation-only pull request, and the CI-004 checker passes.
 
 ## References
 

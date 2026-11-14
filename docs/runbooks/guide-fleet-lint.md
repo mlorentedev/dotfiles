@@ -18,7 +18,7 @@ created: "2026-11-11"
 | Rule | What it asks | Why |
 |---|---|---|
 | `fleet/timeout` | Every job that runs steps sets `timeout-minutes`. A job that calls a reusable workflow is exempt: it cannot set one. | A hung job holds a runner for six hours, the platform default. |
-| `fleet/sha-pin` | Every remote `uses:` is pinned by a full 40-character commit SHA. Local (`./`) and `docker://` references are exempt. | A tag can be moved to other code; a SHA cannot. |
+| `fleet/sha-pin` | Every remote `uses:` is pinned by a full 40-character commit SHA. Local (`./`) and `docker://` references are exempt. It also reads the steps of each local composite action. | A tag can be moved to other code; a SHA cannot. |
 | `fleet/persist-credentials` | Every `actions/checkout` sets `persist-credentials: false`. | Otherwise the job token stays in `.git/config` for every later step to read. |
 | `fleet/no-secrets-inherit` | No job passes `secrets: inherit`. | The called workflow gets every secret, not the ones it needs. |
 | `fleet/cancel-in-progress` | A workflow that a push to a pull request starts again sets workflow-level `concurrency` with `cancel-in-progress` (an expression counts; `false` does not). A pull-request trigger whose `types:` leave out `synchronize` is exempt: a push does not rerun it. | A new push makes the previous run stale; finishing it only spends runner time. |
@@ -26,7 +26,10 @@ created: "2026-11-11"
 | `fleet/skip-cache` | No `*/setup-*` step sets `cache: false`, and golangci-lint-action does not set `skip-cache: true`. A cache left unset is not read. | A switched-off cache pays the download on every run. |
 | `fleet/branch-filter` | A `push` or `pull_request` `branches:` filter includes the default branch, read as GitHub reads it: in order, the last pattern that matches decides, `!` excludes, `*` stays within a path segment and `**` crosses a slash, `?` and `+` make the preceding character optional or repeated, `[...]` is a character class and `\` escapes. `branches-ignore` is not read. | A filter that leaves the default branch out means the workflow never checks it. |
 
-Workflows are read under `.github/workflows` and `.gitea/workflows`. The default branch is `--default-branch`,
+Workflows are read under `.github/workflows` and `.gitea/workflows`. `fleet/sha-pin` also reads
+`runs.steps` in `.github/actions/<name>/action.yml` or `action.yaml` (and under `.gitea/actions`), one level deep: a
+composite action calls third-party actions as a workflow does, and an exception names its manifest by path. The
+other step rules stay with workflows. The default branch is `--default-branch`,
 else what `origin/HEAD` names. A branch filter with neither is an error (exit 2), never a pass.
 
 A clone made by `actions/checkout` has no `origin/HEAD`, so a workflow passes the branch from the event:
@@ -38,7 +41,15 @@ A clone made by `actions/checkout` has no `origin/HEAD`, so a workflow passes th
 dotf lint fleet --dir .                       # one repository
 dotf lint fleet --dir . --summary "$GITHUB_STEP_SUMMARY"
 dotf lint fleet --fleet ~/Projects            # every git checkout directly under a directory
+dotf lint fleet --dir . --rule fleet/sha-pin  # one rule only; repeat --rule for more
 ```
+
+`--rule` reports only the named rules: findings of the others neither print, enter the summary table, nor count
+toward the exit code, so a check that owns one rule (the ci-workflows `hygiene` composite runs `fleet/sha-pin`) is
+not turned red by another. Exceptions are applied first: a stale one shows only under `--rule fleet/exception`. A
+selection without `fleet/branch-filter` or `fleet/exception` does not run the branch rule and needs no default
+branch, so `--rule fleet/sha-pin` works in an `actions/checkout` clone without `--default-branch`. An
+id that names no rule is exit 2 and lists the rules.
 
 `--fleet` checks each checkout against the branch its own `origin/HEAD` names and prefixes each finding with the
 checkout's directory name. A checkout that cannot be read is reported as `[ERROR] <name>: …` and the others are
@@ -49,7 +60,7 @@ one of those errors: run `git remote set-head origin --auto` in it, or lint it a
 |---|---|
 | 0 | No findings. |
 | 1 | Findings, one per line: `path:line: rule: message`. |
-| 2 | A workflow or the exceptions file does not parse, the default branch is unknown where a filter needs it, a checkout could not be read, or the flags are wrong. |
+| 2 | A workflow or the exceptions file does not parse, the default branch is unknown where a filter needs it, a checkout could not be read, or the flags are wrong (an unknown `--rule` included). |
 
 ## Declaring an exception
 

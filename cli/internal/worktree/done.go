@@ -98,7 +98,7 @@ func Done(opts DoneOptions) (DoneResult, error) {
 // deleting the directory from disk: verifies clean status and branchLanding tip
 // SHA containment (M3), detaches HEAD at the remote default branch, deletes the
 // merged local branch while recording its 40-char SHA, removes any residual
-// .dotf-lane-prompt.md (M4), and updates .dotf-worktree.json to State="PARKED".
+// .dotf-lane-prompt.md (M4), and updates the lease to State="PARKED".
 func Park(opts DoneOptions) (DoneResult, error) {
 	absRepo, absWT, unlock, err := parkPreflight(opts)
 	if err != nil {

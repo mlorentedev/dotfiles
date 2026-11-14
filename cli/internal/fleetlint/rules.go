@@ -19,8 +19,9 @@ const (
 
 var shaRef = regexp.MustCompile(`@[0-9a-f]{40}$`)
 
-// lintWorkflow applies every rule to one workflow file.
-func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, error) {
+// lintWorkflow applies every rule to one workflow file; the branch rule only
+// when branches is set.
+func lintWorkflow(path string, data []byte, defaultBranch string, branches bool) ([]Finding, error) {
 	docs, err := decodeDocs(data)
 	if err != nil {
 		return nil, err
@@ -36,11 +37,13 @@ func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, er
 		if rerunsOnPush(on) {
 			out = append(out, cancelFinding(path, root, onKey)...)
 		}
-		bf, err := branchFindings(path, on, defaultBranch)
-		if err != nil {
-			return nil, err
+		if branches {
+			bf, err := branchFindings(path, on, defaultBranch)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, bf...)
 		}
-		out = append(out, bf...)
 		jobs := mapValue(root, "jobs")
 		if jobs == nil || jobs.Kind != yaml.MappingNode {
 			continue
@@ -49,6 +52,28 @@ func lintWorkflow(path string, data []byte, defaultBranch string) ([]Finding, er
 			out = append(out, lintJob(path, jobs.Content[i], jobs.Content[i+1])...)
 			if pr {
 				out = append(out, osFinding(path, jobs.Content[i], jobs.Content[i+1])...)
+			}
+		}
+	}
+	return out, nil
+}
+
+// lintAction applies the pin rule to a local composite action's steps: they
+// run third-party actions as a workflow's do. The other step rules stay with
+// workflows.
+func lintAction(path string, data []byte) ([]Finding, error) {
+	docs, err := decodeDocs(data)
+	if err != nil {
+		return nil, err
+	}
+	var out []Finding
+	for _, d := range docs {
+		if len(d.Content) == 0 {
+			continue
+		}
+		for _, st := range seq(mapValue(mapValue(d.Content[0], "runs"), "steps")) {
+			if su := mapValue(st, "uses"); su != nil && !pinned(su.Value) {
+				out = append(out, Finding{Rule: RuleSHAPin, Path: path, Line: su.Line, Message: su.Value + " is not pinned by a full commit SHA"})
 			}
 		}
 	}

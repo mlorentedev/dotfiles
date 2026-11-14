@@ -26,13 +26,13 @@ owner: manu
 ## PR 2: protection and the Windows skip (owner, after `ci-gate` reports on main)
 
 - [x] [AC3] `forge/branch-protection.json`: `ci-gate` replaces `changes`, `lint`, `lint-powershell`, `test`, `test-windows`
-- [ ] [AC3] Owner, after merge: `dotf forge protection apply`, then `dotf forge protection check` clean
+- [x] [AC3] Owner, after merge: `dotf forge protection apply`, then `dotf forge protection check` clean
 - [x] [AC4] `test-windows` takes `if: github.event_name == 'push' || needs.changes.outputs.code == 'true'`; the CI-004 checker passes
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff
-- [ ] `verification.md` filled in
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] Lint passes
+- [x] No unrelated changes in the diff
+- [x] `verification.md` filled in

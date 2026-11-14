@@ -39,9 +39,9 @@ func TestAddUnderWorktreeRoot(t *testing.T) {
 	}
 	root := filepath.Join(tmp, "worktrees")
 	var gotTarget, gotBranch string
-	runner := &MockAddRunner{OnWorktreeAdd: func(_, target, branch, _ string) error {
+	runner := &MockAddRunner{OnWorktreeAdd: func(repo, target, branch, _ string) error {
 		gotTarget, gotBranch = target, branch
-		return os.MkdirAll(target, 0o755)
+		return fakeAdd(repo, target)
 	}}
 
 	info, err := AddWithRunner(AddOptions{RepoRoot: mainRepo, Slug: "one-root", WorktreeRoot: root}, runner, time.Now())
@@ -63,7 +63,7 @@ func TestAddUnderWorktreeRootFollowsBranch(t *testing.T) {
 	mainRepo := filepath.Join(tmp, "myrepo")
 	_ = os.MkdirAll(filepath.Join(mainRepo, ".git", "info"), 0o755)
 	root := filepath.Join(tmp, "worktrees")
-	runner := &MockAddRunner{OnWorktreeAdd: func(_, target, _, _ string) error { return os.MkdirAll(target, 0o755) }}
+	runner := &MockAddRunner{OnWorktreeAdd: func(repo, target, _, _ string) error { return fakeAdd(repo, target) }}
 
 	info, err := AddWithRunner(AddOptions{RepoRoot: mainRepo, Slug: "x", Branch: "fix/some-bug", WorktreeRoot: root}, runner, time.Now())
 	if err != nil {

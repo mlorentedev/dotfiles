@@ -109,7 +109,7 @@ cannot be read or is not open.`,
 					_, _ = fmt.Fprintf(c.OutOrStdout(), "         %s\n", line)
 				}
 				for _, u := range st.Unreproduced {
-					_, _ = fmt.Fprintf(c.OutOrStdout(), "         REAL %s:%d: %s\n", u.Finding.Path, u.Finding.Line, u.Problem)
+					_, _ = fmt.Fprintf(c.OutOrStdout(), "         REAL %s: %s\n", u.Finding.Where(), u.Problem)
 				}
 			}
 			if len(reg.Classification.Reviewers) == 0 {
@@ -144,11 +144,7 @@ func findingsLine(st prtriage.Status) string {
 			where = append(where, fmt.Sprintf("and %d more", len(st.Unclassified)-shown))
 			break
 		}
-		if f.Line > 0 {
-			where = append(where, fmt.Sprintf("%s:%d", f.Path, f.Line))
-		} else {
-			where = append(where, f.Path)
-		}
+		where = append(where, f.Where())
 	}
 	return fmt.Sprintf("%d finding(s) without a declared class: %s", len(st.Unclassified), strings.Join(where, ", "))
 }

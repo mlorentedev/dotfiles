@@ -196,7 +196,7 @@ func TestRunUpgradesSystemPackagesOnAQuietDay(t *testing.T) {
 		{name: "current, upgrade fails", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, upgradeErr: errors.New("winget: 1 id failed"), wantStatus: StatusUpgradeFailed, wantErr: true, wantUpgrade: true},
 		{name: "current, the step skipped", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, upgradeSkip: "needs root: run `dotf converge --only system-upgrade` from a terminal", wantStatus: StatusUpgradeSkipped, wantUpgrade: true},
 		{name: "fast-forward converges in full instead", mutate: func(fakeGit) {}, wantStatus: "updated"},
-		{name: "current, behind the pin: the installer converges", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, running: "0.69.0", wantStatus: "reinstalled"},
+		{name: "current, behind the pin: the new binary converges", mutate: func(g fakeGit) { g.out["rev-parse @{u}"] = "aaaa" }, running: "0.69.0", wantStatus: "reinstalled"},
 		{name: "dirty skips", mutate: func(g fakeGit) { g.out["status --porcelain"] = " M x" }, wantStatus: "dirty"},
 		{name: "offline skips", mutate: func(g fakeGit) { g.fail["fetch --quiet"] = true }, wantStatus: "offline"},
 		{name: "ahead skips", mutate: func(g fakeGit) { g.out["merge-base HEAD @{u}"] = "bbbb" }, wantStatus: StatusAhead},
@@ -207,11 +207,12 @@ func TestRunUpgradesSystemPackagesOnAQuietDay(t *testing.T) {
 			tt.mutate(g)
 			upgrades := 0
 			out, err := Run(Config{Repo: "/repo", Version: tt.running}, Deps{
-				Git:      g.run,
-				Converge: func() error { return nil },
-				Pin:      func() (string, error) { return "0.70.0", nil },
-				Install:  func(string) error { return nil },
-				Upgrade:  func() (string, error) { upgrades++; return tt.upgradeSkip, tt.upgradeErr },
+				Git:          g.run,
+				Converge:     func() error { return nil },
+				Pin:          func(string) (string, error) { return "0.70.0", nil },
+				Install:      func(string) (string, error) { return testExe, nil },
+				ConvergeWith: func(string) error { return nil },
+				Upgrade:      func() (string, error) { upgrades++; return tt.upgradeSkip, tt.upgradeErr },
 			})
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)

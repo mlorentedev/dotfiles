@@ -168,3 +168,67 @@ func TestLintFleetUnknownDefaultBranchHint(t *testing.T) {
 		t.Errorf("exit %d, %q", code, out.String())
 	}
 }
+
+const taggedWorkflow = "on: push\njobs:\n  a:\n    runs-on: x\n    steps:\n      - uses: owner/setup@v4\n"
+
+// --rule reports only the named rules: the exit code, the lines and the
+// summary table all ignore the others.
+func TestLintFleetRuleSelector(t *testing.T) {
+	timeoutOnly := t.TempDir()
+	writeWorkflow(t, timeoutOnly, dirtyWorkflow)
+	if out, code := runLintFleetCmd(t, "--dir", timeoutOnly, "--rule", "fleet/sha-pin"); code != 0 || !strings.Contains(out, "[OK]") || strings.Contains(out, "fleet/timeout") {
+		t.Errorf("other rule only: exit %d, %q", code, out)
+	}
+
+	both := t.TempDir()
+	writeWorkflow(t, both, taggedWorkflow)
+	summary := filepath.Join(t.TempDir(), "summary.md")
+	out, code := runLintFleetCmd(t, "--dir", both, "--rule", "fleet/sha-pin", "--summary", summary)
+	if code != 1 || !strings.Contains(out, "ci.yml:6: fleet/sha-pin") || strings.Contains(out, "fleet/timeout") {
+		t.Errorf("selected rule: exit %d, %q", code, out)
+	}
+	if table, err := os.ReadFile(summary); err != nil || strings.Contains(string(table), "fleet/timeout") || !strings.Contains(string(table), "fleet/sha-pin") {
+		t.Errorf("summary: %v, %q", err, table)
+	}
+
+	out, code = runLintFleetCmd(t, "--dir", both, "--rule", "fleet/sha-pin", "--rule", "fleet/timeout")
+	if code != 1 || !strings.Contains(out, "fleet/sha-pin") || !strings.Contains(out, "fleet/timeout") {
+		t.Errorf("two rules: exit %d, %q", code, out)
+	}
+}
+
+func TestLintFleetRuleSelectorOverCheckouts(t *testing.T) {
+	fleet := fleetDir(t, map[string]string{"a": dirtyWorkflow, "b": taggedWorkflow})
+	out, code := runLintFleetCmd(t, "--fleet", fleet, "--rule", "fleet/sha-pin")
+	if code != 1 || !strings.Contains(out, "b/.github/workflows/ci.yml:6: fleet/sha-pin") || strings.Contains(out, "fleet/timeout") {
+		t.Errorf("fleet: exit %d, %q", code, out)
+	}
+}
+
+// An id that names no rule is a usage error, never a selection of nothing
+// that passes.
+func TestLintFleetUnknownRule(t *testing.T) {
+	dir := t.TempDir()
+	writeWorkflow(t, dir, taggedWorkflow)
+	out, code := runLintFleetCmd(t, "--dir", dir, "--rule", "fleet/sha_pin")
+	if code != 2 || !strings.Contains(out, "fleet/sha_pin") || !strings.Contains(out, "fleet/sha-pin") {
+		t.Errorf("unknown rule: exit %d, %q", code, out)
+	}
+}
+
+// A selection that leaves out the branch rule needs no default branch: an
+// actions/checkout clone has no origin/HEAD, and a pin check there must not
+// fail on a rule it did not ask for. The branch rule, and the exception
+// check that judges its exceptions, still need one.
+func TestLintFleetRuleSelectorNeedsNoBranchForOtherRules(t *testing.T) {
+	dir := t.TempDir()
+	writeWorkflow(t, dir, "on:\n  push:\n    branches: [master]\njobs:\n  a:\n    runs-on: x\n    timeout-minutes: 5\n    steps:\n      - uses: owner/setup@v4\n")
+	if out, code := runLintFleetCmd(t, "--dir", dir, "--rule", "fleet/sha-pin"); code != 1 || !strings.Contains(out, "ci.yml:9: fleet/sha-pin") {
+		t.Errorf("pin rule, no default branch: exit %d, %q", code, out)
+	}
+	for _, rule := range []string{"fleet/branch-filter", "fleet/exception"} {
+		if out, code := runLintFleetCmd(t, "--dir", dir, "--rule", rule); code != 2 || !strings.Contains(out, "--default-branch") {
+			t.Errorf("%s, no default branch: exit %d, %q", rule, code, out)
+		}
+	}
+}

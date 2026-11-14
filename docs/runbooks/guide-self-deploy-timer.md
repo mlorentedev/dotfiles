@@ -17,33 +17,43 @@ created: "2026-06-09"
 Once a day the timer runs `dotf update` (the Go port of the former
 `dotfiles-selfupdate` twins, CLI-027), which:
 
-1. Skips if the repo worktree is **dirty** (uncommitted changes).
-2. `git fetch`es; skips on a network failure.
-3. Fast-forwards `main` **only** if it can; skips on diverged/non-ff history.
-4. Runs `dotf converge` **only if `HEAD` actually moved**. Its last step re-runs the setup script.
-5. On a day `HEAD` did not move, runs two steps instead: `dotf converge --only system-upgrade,cache-gc`.
+1. `git fetch`es (a dirty worktree is fetched too: a fetch moves remote-tracking refs only). Offline, it skips
+   everything.
+2. Reads the `DOTF_VERSION` pin from the **upstream's** `versions.conf` (`git show @{u}:versions.conf`; the checkout's
+   own copy when there is no upstream). When the running `dotf` is not that release, it installs it in Go: it
+   downloads `dotf_<pin>_<os>_<arch>.tar.gz` (`.zip` on Windows), verifies it against the release `checksums.txt`,
+   runs the staged binary's `--version`, and replaces the file it is running from, renaming the old one aside first
+   (the only replacement Windows allows for a running `.exe`). This happens on **any** checkout it could fetch, a dirty,
+   ahead or diverged one included (CLI-133); `install.sh` and `install.ps1` are not involved.
+3. Fast-forwards `main` **only** if it can, and only on a clean worktree; otherwise it skips the converge with the
+   reason (dirty, ahead, diverged).
+4. On a deployable checkout: converges. After a new `dotf` was installed, the **new binary** converges as a child
+   process; otherwise `dotf converge` runs if `HEAD` moved. Its last step re-runs the setup script.
+5. On a day `HEAD` did not move and `dotf` is at its pin, runs two steps instead: `dotf converge --only system-upgrade,cache-gc`.
    `system-upgrade` refreshes brew, apt or winget and upgrades the catalog's outdated unpinned system packages
    (TOOL-036). `cache-gc` keeps its own weekly cadence (below), so on most days it reports `not due`. A full
    converge already includes both steps, so neither runs twice.
 
-Every skip exits 0 (benign). Only a converge that runs and fails exits non-zero, and so does a failed
-`system-upgrade` or `cache-gc` step on a quiet day (record status `upgrade-failed`). A refresh that fails offline, or apt
-without `sudo -n`, is a skip inside the step: it exits 0 and is recorded as `upgrade-skipped` with the reason, so
-`dotf doctor` can show that a machine is not upgrading.
+Every skip exits 0 (benign). A pinned `dotf` that cannot be installed (`install-failed`), a converge that runs and
+fails (`converge-failed`), and a failed `system-upgrade` or `cache-gc` step on a quiet day (`upgrade-failed`) exit
+non-zero. A refresh that fails offline, or apt without `sudo -n`, is a skip inside the step: it exits 0 and is
+recorded as `upgrade-skipped` with the reason, so `dotf doctor` can show that a machine is not upgrading.
 
 ```mermaid
 flowchart TB
-    T([timer fires]) --> D{worktree dirty?}
-    D -- yes --> S1["skip (exit 0)"]
-    D -- no --> F{git fetch ok?}
+    T([timer fires]) --> F{git fetch ok?}
     F -- no --> S2["skip — network (exit 0)"]
-    F -- yes --> FF{fast-forward possible?}
-    FF -- no --> S3["skip — diverged (exit 0)"]
-    FF -- yes --> M{HEAD moved?}
+    F -- yes --> P{"running dotf = upstream's pin?"}
+    P -- no --> I["install the pin in Go"]
+    I -- fails --> IF(["install-failed (exit ≠0)"])
+    I -- ok --> D
+    P -- yes --> D{"clean and fast-forwardable?"}
+    D -- "no: dirty / ahead / diverged" --> S3["skip the converge, keep the status (exit 0)"]
+    D -- yes --> M{"new dotf installed, or HEAD moved?"}
     M -- no --> UP["dotf converge --only system-upgrade,cache-gc"]
     UP --> OK2(["current, or upgrade-skipped with the reason (exit 0)"]) & UF(["upgrade-failed (exit ≠0)"])
-    M -- yes --> SETUP["dotf converge (setup script last)"]
-    SETUP --> OK([exit 0]) & ERR(["exit ≠0 — only real failure"])
+    M -- yes --> SETUP["dotf converge, by the new binary when one was installed"]
+    SETUP --> OK([exit 0]) & ERR(["converge-failed (exit ≠0)"])
 ```
 
 ### Weekly cache maintenance (`cache-gc`)
@@ -159,8 +169,20 @@ the `DOTF_VERSION` pin, it still runs the system-upgrade step (step 5 above), wh
 outdated catalog package on the real machine. On macOS and Windows, preview that first with
 `dotf converge --plan --only system-upgrade`. On Linux without passwordless `sudo` the step skips whole, refresh and
 listing included, so the preview prints only the `needs root` reason; `apt list --upgradable` shows what is
-outdated. When the installed `dotf` is not the pin, it runs the
-installer instead, which installs the pin and converges.
+outdated. When the installed `dotf` is not the upstream's pin, it installs the pin first and the new binary converges.
+
+`install-failed` means the pinned binary did not land: the download, the checksum or the staged binary's
+`--version` failed, and the running `dotf` is untouched. `converge-failed` after "installed; its converge failed"
+means the pin is in place and a converge step failed: look at that step in the converge report
+(`<state dir>/converge/last.json`). The two are separate steps, so the status says which one failed (#3395,
+CLI-133). On Windows a `dotf.exe.old` beside `dotf.exe` is the previous binary, still held by a process that was
+running it; the next update removes it.
+
+**The first update after CLI-133 needs the installer once.** Only a `dotf` that carries CLI-133 (newer than 0.80.0)
+installs itself from a dirty, ahead or diverged checkout. A machine still running 0.80.0 or older keeps answering
+`diverged ... skipping` from such a checkout, because the binary doing the update is the old one. Run the installer once
+(`./install.sh`, or `pwsh -File install.ps1` on Windows) or reconcile the checkout so it can fast-forward; from then on
+`dotf update` replaces itself.
 
 ## Diagnose
 
@@ -176,7 +198,7 @@ reason that recurs every night (`dirty`, `diverged`, `no-upstream`, `not-a-repo`
 | doctor: `has not run since` (older than three days) | the machine was off, or the scheduler lost the trigger | `dotf converge --only self-deploy`, then the per-OS commands above |
 | `[skip] Dirty worktree` in the journal | uncommitted changes in the repo | commit or stash; the timer resumes next slot |
 | `ahead of origin/main ... nothing to deploy` | local commits not pushed yet; `origin/main` has nothing new | none: push when ready; the timer deploys what the upstream holds |
-| `[skip] ... diverged ... (non fast-forward)` | local and `origin/main` both have commits the other lacks | reconcile your branch (rebase or merge); non-ff is never auto-resolved |
+| `[skip] ... diverged ... (non fast-forward)` | local and `origin/main` both have commits the other lacks | reconcile your branch (rebase or merge); non-ff is never auto-resolved. `dotf` itself is still updated to the pin (from a release newer than 0.80.0; an older one needs the installer once, above); only the converge waits |
 | `[skip] git fetch failed (network?)` | offline / remote unreachable | transient; next slot retries |
 | `[skip] No upstream configured` | current branch has no `@{u}` | `git branch --set-upstream-to=origin/main` |
 | service shows **failed** | a converge step errored, the setup script included (not a skip) | read `journalctl --user -u dotfiles-selfupdate.service` (macOS: `~/Library/Logs/dotf-self-deploy.log`); the report names the failing step, `~/.local/state/dotfiles/converge/last.json` keeps it, and `converge/runs/<UTC>.log` holds the run's full transcript, subprocess output included |

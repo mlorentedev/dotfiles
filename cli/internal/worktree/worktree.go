@@ -2,9 +2,7 @@ package worktree
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -28,7 +26,9 @@ const (
 
 const MetadataFileName = ".dotf-worktree.json"
 
-// Metadata is stored in <worktree-root>/.dotf-worktree.json.
+// Metadata is the lease, stored in the worktree's git admin dir as
+// LeaseFileName, with an in-tree mirror under MetadataFileName for one
+// release (ADR-062).
 type Metadata struct {
 	Creator        string    `json:"creator,omitempty"`
 	Issue          int       `json:"issue,omitempty"`
@@ -86,8 +86,11 @@ type Info struct {
 	PRMerged       bool     `json:"pr_merged"`
 	// PRMergedUnknown is why the forge could not say whether the branch
 	// landed. PRMerged is then false: the safe verdict, never "merged".
-	PRMergedUnknown string         `json:"pr_merged_unknown,omitempty"`
-	Metadata        *Metadata      `json:"metadata,omitempty"`
+	PRMergedUnknown string    `json:"pr_merged_unknown,omitempty"`
+	Metadata        *Metadata `json:"metadata,omitempty"`
+	// LeaseLegacyOnly says the lease was read from the in-tree file because the
+	// worktree's git admin dir holds none (ADR-062): written before the move.
+	LeaseLegacyOnly bool           `json:"lease_legacy_only,omitempty"`
 	State           LifecycleState `json:"state"`
 	StateReason     string         `json:"state_reason,omitempty"`
 }
@@ -158,24 +161,6 @@ func parsePorcelainLine(line string, current *RawWorktree) {
 	}
 }
 
-// LoadMetadata reads .dotf-worktree.json from the worktree root if present.
-func LoadMetadata(worktreePath string) (*Metadata, error) {
-	metaPath := filepath.Join(worktreePath, MetadataFileName)
-	data, err := os.ReadFile(metaPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("reading worktree metadata: %w", err)
-	}
-
-	var meta Metadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return nil, fmt.Errorf("parsing worktree metadata: %w", err)
-	}
-	return &meta, nil
-}
-
 // Classify evaluates all fail-closed criteria to decide the lifecycle state.
 func Classify(info Info, now time.Time) (LifecycleState, string) {
 	if info.IsMain {
@@ -210,7 +195,7 @@ func Classify(info Info, now time.Time) (LifecycleState, string) {
 		return StateDirty, "uncommitted changes"
 	}
 
-	// Gate (a): explicit metadata exists in .dotf-worktree.json with reap_ok: true
+	// Gate (a): an explicit lease exists with reap_ok: true
 	if info.Metadata == nil {
 		return StateUnadopted, "no dotf lease; sweep will not reap it until `dotf worktree adopt <path>`"
 	}

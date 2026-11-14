@@ -211,7 +211,12 @@ func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool
 
 	meta, merr := worktree.LoadMetadata(lanePath)
 	if merr == nil && meta != nil && meta.Lane == name && meta.State != "" && !meta.ReapOK {
-		return writeIdentity(lanePath, name)
+		migrated, err := migrateLegacyLease(lanePath, *meta)
+		if err != nil {
+			return migrated, err
+		}
+		recorded, err := writeIdentity(lanePath, name)
+		return migrated || recorded, err
 	}
 
 	state := string(worktree.StateParked)
@@ -234,6 +239,20 @@ func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool
 	}
 	_, err := writeIdentity(lanePath, name)
 	return true, err
+}
+
+// migrateLegacyLease copies a lease a binary before ADR-062 left in the tree
+// into the lane's git admin dir, as it is, and reports whether it did. Once the
+// admin dir holds the lease the in-tree mirror's presence changes nothing, so
+// a re-run after the mirror is cleaned stays changed=0.
+func migrateLegacyLease(lanePath string, meta worktree.Metadata) (bool, error) {
+	if !worktree.LeaseLegacyOnly(lanePath) {
+		return false, nil
+	}
+	if err := saveLaneMetadata(lanePath, meta); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // errNotAWorktree marks the one refusal of assertWorktreeOf whose repair is to
@@ -393,7 +412,7 @@ func RouteBranchToLane(repoRoot, worktreeRoot, branch string) (string, string, e
 }
 
 // SwitchLane claims a PARKED persistent lane (or explicitLane), checks out branch
-// inside it, and transitions its .dotf-worktree.json to State="ACTIVE".
+// inside it, and transitions its lease to State="ACTIVE".
 func SwitchLane(repoRoot, worktreeRoot, branch, explicitLane string) (string, string, error) {
 	if strings.TrimSpace(branch) == "" {
 		return "", "", fmt.Errorf("lane switch: branch cannot be empty")

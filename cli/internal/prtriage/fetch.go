@@ -466,12 +466,15 @@ func fetchReviews(ctx context.Context, run ghRunner, base string, number int) ([
 }
 
 // restInline is one item of `GET /repos/{owner}/{repo}/pulls/{n}/comments`.
-// Line is null on a comment whose line left the diff; it reads as 0.
+// Line is null on a comment whose line left the diff after a later push, and
+// it shifts when lines are added above it; OriginalLine is the line the
+// reviewer anchored to and does neither (#3455).
 type restInline struct {
 	restComment
-	Path        string `json:"path"`
-	Line        int    `json:"line"`
-	InReplyToID int64  `json:"in_reply_to_id"`
+	Path         string `json:"path"`
+	Line         int    `json:"line"`
+	OriginalLine int    `json:"original_line"`
+	InReplyToID  int64  `json:"in_reply_to_id"`
 }
 
 // fetchInline reads one pull request's inline review comments, the findings a
@@ -496,7 +499,7 @@ func fetchInline(ctx context.Context, run ghRunner, base string, number int) ([]
 			continue
 		}
 		inline = append(inline, Comment{Author: w.User.Login, Body: w.Body,
-			CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt, Path: w.Path, Line: w.Line})
+			CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt, Path: w.Path, Line: w.Line, OriginalLine: w.OriginalLine})
 	}
 	return inline, nil
 }

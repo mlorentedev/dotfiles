@@ -256,7 +256,41 @@ func TestPreCommitLaneGuard(t *testing.T) {
 	if root == nil || root[1] == "" || filepath.Base(root[1]) != "lane-repo" || strings.Contains(root[1], "scratch-wt") {
 		t.Fatalf("expected the message to name the main repository root in parentheses, got:\n%s", out)
 	}
-	// 6c. The main checkout on a detached HEAD keeps its own wording.
+
+	// 6c. The admin-dir lease (ADR-062): the file `git clean` never reaches is
+	// the one both rules read, with no in-tree copy at all, and it outranks a
+	// stale in-tree copy when both exist, as worktree.LoadMetadata reads them.
+	adminWT := filepath.Join(t.TempDir(), "admin", "lane-repo", "feat-lane-secondary")
+	if err := os.MkdirAll(filepath.Dir(adminWT), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "-C", laneRepo, "worktree", "add", "--detach", adminWT, "HEAD").CombinedOutput(); err != nil {
+		t.Fatalf("worktree add admin: %v\n%s", err, string(out))
+	}
+	adminGitDirOut, err := exec.Command("git", "-C", adminWT, "rev-parse", "--absolute-git-dir").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminLease := filepath.Join(strings.TrimSpace(string(adminGitDirOut)), "dotf-worktree.json")
+	if err := os.WriteFile(adminLease, []byte(`{"lane":"feat-lane-secondary","state":"PARKED","reap_ok":false}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runLaneGuardInDir(t, script, adminWT); err == nil || !strings.Contains(out, "PARKED") {
+		t.Fatalf("expected a PARKED admin-dir lease with no in-tree copy to block the commit, got err=%v out=%s", err, out)
+	}
+	if err := os.WriteFile(adminLease, []byte(`{"lane":"feat-lane-secondary","state":"ACTIVE","reap_ok":false}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runLaneGuardInDir(t, script, adminWT); err != nil {
+		t.Fatalf("expected a detached worktree with an ACTIVE admin-dir lease and no in-tree copy to pass rule 6, got err=%v out=%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(adminWT, ".dotf-worktree.json"), []byte(`{"lane":"feat-lane-secondary","state":"PARKED","reap_ok":false}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runLaneGuardInDir(t, script, adminWT); err != nil {
+		t.Fatalf("expected the ACTIVE admin-dir lease to outrank a stale PARKED in-tree copy, got err=%v out=%s", err, out)
+	}
+	// 6d. The main checkout on a detached HEAD keeps its own wording.
 	detachedMain := filepath.Join(t.TempDir(), "detached-main")
 	initGitRepoForLaneGuard(t, detachedMain, "main")
 	writeLanesMarkerFixture(t, detachedMain)

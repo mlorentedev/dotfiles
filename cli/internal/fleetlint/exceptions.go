@@ -3,8 +3,10 @@ package fleetlint
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -28,6 +30,14 @@ type exceptions map[exception]int
 var rules = map[string]bool{
 	RuleTimeout: true, RuleSHAPin: true, RulePersistCredentials: true, RuleNoSecretsInherit: true,
 	RuleCancelInProgress: true, RuleOSOnPullRequest: true, RuleSkipCache: true, RuleBranchFilter: true,
+}
+
+// Rules are the ids a finding can carry, sorted: every rule, and the
+// exceptions file's own.
+func Rules() []string {
+	out := append(slices.Collect(maps.Keys(rules)), RuleException)
+	slices.Sort(out)
+	return out
 }
 
 // filter drops the findings an exception covers: its rule on its path, and

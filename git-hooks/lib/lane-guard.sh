@@ -18,9 +18,9 @@
 # In a repository carrying .dotf/lanes.json, it blocks:
 #   1. Direct commits on main/master, at the main checkout or in a linked worktree
 #      that holds it (each message names which; both direct to a branch or lane)
-#   2. Commits inside a PARKED persistent lane (.dotf-worktree.json state == "PARKED")
-#   3. Commits inside a registered lane that carries no lease (.dotf-worktree.json
-#      absent). A lane is recognised by the `dotf-lane` record `dotf lane init`
+#   2. Commits inside a PARKED persistent lane (lease state == "PARKED")
+#   3. Commits inside a registered lane that carries no lease
+#      ($git_dir/dotf-worktree.json absent, and no legacy in-tree copy). A lane is recognised by the `dotf-lane` record `dotf lane init`
 #      leaves in the worktree's own git admin dir ($git_dir), never by its
 #      directory name: git moves and prunes that record with the worktree, so a
 #      renamed lane stays a lane and a stranger named after one is not.
@@ -103,9 +103,20 @@ for root in $third_party_roots; do
   esac
 done
 
+# The lease lives in the worktree's own git admin dir, $git_dir/dotf-worktree.json
+# (ADR-062), which `git clean` never reaches; a lease a binary before the move
+# left in the tree still counts, for one release. Rules 5 and 6 read this one
+# resolved path, in the order the Go side reads it.
+lease=""
+if [ -f "$git_dir/dotf-worktree.json" ]; then
+  lease="$git_dir/dotf-worktree.json"
+elif [ -f "$top/.dotf-worktree.json" ]; then
+  lease="$top/.dotf-worktree.json"
+fi
+
 # 5. Block commits inside a PARKED lane or a registered lane without a lease.
-if [ -f "$top/.dotf-worktree.json" ]; then
-  if grep -Eq '"state"[[:space:]]*:[[:space:]]*"PARKED"' "$top/.dotf-worktree.json" 2>/dev/null; then
+if [ -n "$lease" ]; then
+  if grep -Eq '"state"[[:space:]]*:[[:space:]]*"PARKED"' "$lease" 2>/dev/null; then
     echo "ERROR: lane at $top is PARKED (detached idle state)." >&2
     echo "FIX: activate the lane on a feature branch first: dotf lane switch <type>/<issue>-<slug>" >&2
     exit 1
@@ -121,7 +132,7 @@ elif [ -f "$git_dir/dotf-lane" ]; then
   # read the first line only.
   lane_name="$(sed -n '1s/^[[:space:]]*//;1s/[[:space:]]*$//;1p' "$git_dir/dotf-lane" 2>/dev/null)"
   if [ -n "$lane_name" ]; then
-    echo "ERROR: lane '$lane_name' at $top is missing .dotf-worktree.json lease metadata." >&2
+    echo "ERROR: lane '$lane_name' at $top is missing its lease metadata ($git_dir/dotf-worktree.json)." >&2
     echo "FIX: restore the lease and switch the lane with: dotf lane init && dotf lane switch <type>/<issue>-<slug>" >&2
     exit 1
   fi
@@ -143,7 +154,7 @@ if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
   fi
   exit 1
 fi
-if [ -z "$branch" ] && [ ! -f "$top/.dotf-worktree.json" ]; then
+if [ -z "$branch" ] && [ -z "$lease" ]; then
   # Same verdict at the main checkout and in a leaseless linked worktree; the
   # message names which one was detected, since the old one sent a user in a
   # scratch worktree to "the main checkout" (#3324).
