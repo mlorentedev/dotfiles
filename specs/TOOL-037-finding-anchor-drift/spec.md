@@ -41,9 +41,14 @@ the same command built from main on the same PR                             -> e
 (the pinned release, 0.80.0, predates the stricter row match and does not hold it)
 ```
 
-## Next
+## Review dispositions
 
-Independent review, then `dotf spec archive TOOL-037-finding-anchor-drift` on main after #3457 merges.
+Independent review (`review.md`, `nan/mimo-v2.6-flash`, reviewed_sha `250c2f58`): PASS-WITH-GAPS, no Blocker, no REAL Major. This section was written after the review; the reviewed `spec.md` is the one `review-request.json` digests.
+
+- Major, THEORETICAL, the print sites have no test asserting the reviewer's line: **applied**. `TestPrTriageQueue_PrintsTheReviewersLineOfAFindingThatLeftTheDiff` (`cli/internal/cmd/pr_triage_scoped_test.go`) feeds a `Line: 0, OriginalLine: 39` finding and asserts `verification.md:39` is printed and `:0` never is, the incident's headline symptom.
+- Minor, REAL, a file-level REAL finding stays unmatchable: **deferred by declaration**, out of scope above; the trigger (a reviewer posting REAL findings file-level) is recorded on #3455.
+- Minor, THEORETICAL, rows keyed by a shifted current line stop matching once this lands: **applied in #3457**, whose `## Migration` section records the repo-wide measurement (the fixed queue held the same open PRs main held, none newly held).
+- Minor, REAL, the checklist says "trying each anchor" and the commit message names `restInline.anchor()`: **declined as a text edit**, the final `Anchors()` returns one anchor and the commit message is history; the Scope bullet is the accurate statement.
 
 ## Promotion candidates
 - [x] Lesson? `yes: docs/lessons/lesson-598-a-review-anchor-moves-when-you-push.md`
