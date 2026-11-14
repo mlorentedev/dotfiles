@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/web-perf/SKILL.md
-generated_sha: 5a60e293757f2b9b
+generated_sha: 5ec2f2d6b7b5ff66
 id: web-perf-skill
 type: skill
 status: active
@@ -10,7 +10,7 @@ owner: manu
 name: web-perf
 description: Audit, diagnose, or optimize website loading and interaction performance, Core Web Vitals (LCP, CLS, INP, TTFB), and bundle size. Auto-triggers proactively on web frontend changes before completion.
 source: https://github.com/cloudflare/skills
-license: MIT
+license: Apache-2.0
 keywords: [web performance, core web vitals, lcp, cls, inp, lighthouse, render blocking, bundle size, optimize web, layout shift]
 paths: ['**/*.tsx', '**/*.jsx', '**/*.vue', '**/*.svelte', '**/*.astro', '**/pages/**', '**/components/**', '**/routes/**', '**/styles/**']
 ---
