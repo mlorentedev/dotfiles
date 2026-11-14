@@ -40,10 +40,11 @@ owner: manu
 - [x] [AC4] Failing test: an eval launch with an explicit base and candidate reads no pool file and writes nothing under `specs/`
 - [x] [AC4] Implement the eval slot (`internal/spec`): candidate from `harness/evals/candidates.json`, base passed explicitly, output directory supplied by the caller
 - [x] [AC3] Failing test: a case whose `reviewed_sha` is absent locally is fetched from `fetch_ref`; an unresolvable one exits non-zero naming the case
-- [x] [AC3] Implement replay checkout: a detached worktree under `$XDG_STATE_HOME/dotf/evals/<run-id>/`, removed afterwards
+- [x] [AC3] Implement replay checkout: a detached worktree at `<run dir>/<case>-<epoch>/`, removed afterwards; the run dir is the caller's
 
 ### Slice 3: `dotf eval run`
 
+- [ ] [AC3] `dotf eval run` places each run under dotf's state directory (`env.StateDir()`, `$XDG_STATE_HOME/dotfiles/evals/<run-id>/`) and exits non-zero naming a case whose commit cannot be resolved
 - [ ] [AC6] Failing test: `--plan` prints the matrix and per-runner estimate; a matrix above `--max-runs` is refused
 - [ ] [AC6] Implement the plan and the cap; concurrency bounded per pool by `model-map.json`
 - [ ] [AC5] Failing test: per-run grading record, with completion class mapped from the launcher's exit, and format failure distinct from zero findings

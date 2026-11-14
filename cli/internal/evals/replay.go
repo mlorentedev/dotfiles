@@ -6,10 +6,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
+
+// caseIDPattern is the schema's id pattern. A case id names a directory of the
+// run, so the checkout holds it to the pattern even for a case nobody validated.
+var caseIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 // Replay is one case's checkout: a detached worktree at its reviewed commit,
 // owned by the run and removed when it ends.
@@ -24,6 +29,9 @@ type Replay struct {
 // ref. A case whose commit cannot be resolved fails naming the case: it is a
 // failure of the run, never a score.
 func CheckoutReplay(repo string, c Case, runDir string, epoch int) (Replay, error) {
+	if !caseIDPattern.MatchString(c.ID) {
+		return Replay{}, fmt.Errorf("case id %q is not a case name (%s), and it names the replay directory", c.ID, caseIDPattern)
+	}
 	if !isSHA(c.ReviewedSHA) {
 		return Replay{}, fmt.Errorf("case %s: reviewed_sha %q is not a full sha", c.ID, c.ReviewedSHA)
 	}

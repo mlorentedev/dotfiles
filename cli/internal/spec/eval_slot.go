@@ -103,7 +103,8 @@ func PlanEvalLaunch(l EvalLaunch) (EvalPlan, error) {
 	}
 	plan.Prompt = reviewPrompt(EvalSlot, l.SpecID, l.Tree, plan.Reviewer, l.Candidate.Runner, l.SkillPath,
 		ReviewScope{BaseSHA: l.BaseSHA}, promptTarget{verdict: plan.Answer, eval: true}) +
-		"\n" + FreshWorktreeNote(l.ReviewedSHA)
+		"\n" + FreshWorktreeNote(l.ReviewedSHA) +
+		"\n" + TimeBudget(time.Now(), timeout)
 	argv, err := ReviewerCommand(l.Candidate, plan.Prompt, timeout, l.Tree)
 	if err != nil {
 		return EvalPlan{}, err

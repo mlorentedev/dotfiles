@@ -412,6 +412,13 @@ type promptTarget struct {
 }
 
 func reviewPrompt(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPath string, scope ReviewScope, target promptTarget) string {
+	// Who reads the verdict, and which folder it is kept in: the archive gate
+	// and the spec folder for a review, the grader and the answer's folder for an
+	// evaluation run.
+	reader, folder := "`dotf spec archive`", "the spec folder"
+	if target.eval {
+		reader, folder = "the grader", "the folder of your verdict"
+	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "Perform an adversarial review of the spec `%s`.\n\n", specID)
 	fmt.Fprintf(&b, "Repo: %s\n\n", repoRoot)
@@ -445,7 +452,7 @@ func reviewPrompt(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPa
 		"  frontmatter with `verdict: PENDING` and `reviewer: %s`, then the findings so far.\n"+
 		"  Keep refining it as you verify, and replace it with your real verdict at the end.\n"+
 		"  A run that is stopped (the time cap, or a tool call that never returns) writes no verdict, so\n"+
-		"  that provisional file is all it leaves behind; `dotf spec archive` refuses it by name.\n", target.verdict, reviewerID)
+		"  that provisional file is all it leaves behind; %s refuses it by name.\n", target.verdict, reviewerID, reader)
 	if slot.Name == SecondSigner.Name {
 		fmt.Fprintf(&b, "- You are the SECOND signer, of a different vendor than the first. Do NOT read\n"+
 			"  `specs/%s/%s` or its transcript: your verdict must be independent of it, and the\n"+
@@ -477,12 +484,12 @@ func reviewPrompt(slot ReviewSlot, specID, repoRoot, reviewerID, runner, skillPa
 		"  ~/Projects): a walk that size stalls a tool call and the run's cap then discards the\n"+
 		"  whole round. Run `dotf` commands to observe the gate; what you cannot reach, mark\n"+
 		"  UNVERIFIED.\n", repoRoot)
-	b.WriteString("- Verify claims by running things — the build, the linters, the test suite, and\n" +
-		"  mutation edits that you revert afterwards — not by reading assertions about them.\n" +
-		"  Leave the working tree clean apart from your review: put probes and scratch\n" +
-		"  files under a `mktemp -d` directory, never in the repository. When the run\n" +
-		"  ends, every file left changed outside the spec folder is listed and the run\n" +
-		"  fails.\n")
+	fmt.Fprintf(&b, "- Verify claims by running things — the build, the linters, the test suite, and\n"+
+		"  mutation edits that you revert afterwards — not by reading assertions about them.\n"+
+		"  Leave the working tree clean apart from your review: put probes and scratch\n"+
+		"  files under a `mktemp -d` directory, never in the repository. When the run\n"+
+		"  ends, every file left changed outside %s is listed and the run\n"+
+		"  fails.\n", folder)
 	// A slow test piped through `tail` prints nothing until it ends, and the
 	// stall detector cannot tell that silence from a wedge (#2979).
 	b.WriteString("- Let long commands print as they run: never pipe a test or build through `| tail`\n" +

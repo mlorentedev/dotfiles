@@ -228,7 +228,7 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 
 1. Resolve `reviewed_sha`. If the clone lacks it, fetch the SHA itself, then `fetch_ref`, then verify. A branch rebased after its review would not carry the SHA on its PR ref.
    If it cannot be resolved, the case fails loudly as infrastructure; it is never scored zero.
-2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotf/evals/<run-id>/<case>-<epoch>/`,
+2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotfiles/evals/<run-id>/<case>-<epoch>/`,
    outside every repository tree, and remove it when the run ends.
 3. Launch through `internal/spec`'s review launcher in a new **eval slot**:
    - The candidate comes from `harness/evals/candidates.json`, using a pool entry's shape: runner,
@@ -246,7 +246,8 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 The review gate cannot be satisfied by an eval run (C37), for three reasons:
 
 - the output never lands in a spec folder;
-- the recorded reviewer is prefixed `eval:`, which no pool id matches;
+- the recorded reviewer is prefixed `eval:`, and the gate refuses a signature or launch request
+  carrying that prefix before it consults the pool, which has no opinion in a repository without one;
 - a test in the same PR asserts that `checkReviewGate` refuses an eval record copied into a spec
   folder.
 
@@ -305,7 +306,7 @@ the runner, result format and proposal stay the same:
 
 ### 6. Output
 
-Each run writes to `$XDG_STATE_HOME/dotf/evals/<run-id>/`:
+Each run writes to `$XDG_STATE_HOME/dotfiles/evals/<run-id>/`:
 
 - `results.json`, valid against `harness/evals/result.schema.json`. Every record carries its
   provenance: dotf version, corpus commit, skill digest, runner version, model id and date.

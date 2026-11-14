@@ -121,12 +121,12 @@ func TestEvalSlotReadsNoPoolAndWritesNothingUnderSpecs(t *testing.T) {
 		t.Errorf("request = %+v, want the eval reviewer and both explicit commits", req)
 	}
 
-	for _, want := range []string{plan.Answer, plan.Reviewer, evalBaseSHA, "harness/evals/candidates.json"} {
+	for _, want := range []string{plan.Answer, plan.Reviewer, evalBaseSHA, "harness/evals/candidates.json", "Time budget:"} {
 		if !strings.Contains(plan.Prompt, want) {
 			t.Errorf("the prompt does not name %q", want)
 		}
 	}
-	for _, banned := range []string{"`specs/X/review.md`", "reviewer-pool.json", "reviewer pool"} {
+	for _, banned := range []string{"`specs/X/review.md`", "reviewer-pool.json", "reviewer pool", "dotf spec archive", "spec folder"} {
 		if strings.Contains(plan.Prompt, banned) {
 			t.Errorf("the prompt still says %q, which is the review slot's, not the eval slot's", banned)
 		}
@@ -140,7 +140,7 @@ func TestEvalSlotRefusesALaunchItCannotKeepApart(t *testing.T) {
 	tree := evalTree(t)
 	link := filepath.Join(t.TempDir(), "tree-link")
 	if err := os.Symlink(tree, link); err != nil {
-		t.Fatal(err)
+		link = "" // no symlinks here; the case that needs one is skipped
 	}
 	for _, tc := range []struct {
 		name string
@@ -158,6 +158,9 @@ func TestEvalSlotRefusesALaunchItCannotKeepApart(t *testing.T) {
 		{"a run directory under specs/", func(l *EvalLaunch) { l.OutDir = filepath.Join(t.TempDir(), "specs", "X") }, "specs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if link == "" && strings.Contains(tc.name, "symlink") {
+				t.Skip("no symlinks here")
+			}
 			l := evalLaunch(t, tree)
 			tc.edit(&l)
 			_, err := PlanEvalLaunch(l)

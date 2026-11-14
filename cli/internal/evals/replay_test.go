@@ -145,3 +145,15 @@ func TestReplayCheckoutFallsBackToTheFetchRef(t *testing.T) {
 		t.Errorf("replay HEAD = %s, want %s", head, reviewed)
 	}
 }
+
+// The case id names a directory, so one that could leave the run directory is
+// refused before anything is checked out.
+func TestReplayCheckoutRefusesACaseIdThatIsNotAName(t *testing.T) {
+	clone, onMain, _ := replayRemote(t)
+	for _, id := range []string{"", "../escape", "a/b", "Upper"} {
+		_, err := CheckoutReplay(clone, Case{ID: id, ReviewedSHA: onMain}, filepath.Join(t.TempDir(), "run"), 1)
+		if err == nil || !strings.Contains(err.Error(), "case id") {
+			t.Errorf("id %q: want a refusal naming the case id, got %v", id, err)
+		}
+	}
+}
