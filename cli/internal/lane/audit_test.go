@@ -267,6 +267,46 @@ func TestGuardDrift_ReportsAHooksPathGitCannotRead(t *testing.T) {
 
 func ptr(s string) *string { return &s }
 
+// The caller prints a failure to audit under its own "lane doctor:" prefix, so
+// none of the errors AuditLanes returns carries one.
+func TestAuditLanes_ErrorsCarryNoCallerPrefix(t *testing.T) {
+	t.Run("empty worktree root", func(t *testing.T) {
+		repoDir, _ := initialisedLaneRepo(t)
+		_, err := AuditLanes(repoDir, " ")
+		wantUnprefixed(t, err)
+	})
+	t.Run("marker unreadable", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		if err := os.MkdirAll(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		_, err := AuditLanes(repoDir, wtRoot)
+		wantUnprefixed(t, err)
+	})
+	t.Run("worktree registry unreadable", func(t *testing.T) {
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		registry := filepath.Join(repoDir, ".git", "worktrees")
+		if err := os.RemoveAll(registry); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(registry, []byte("not a directory"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := AuditLanes(repoDir, wtRoot)
+		wantUnprefixed(t, err)
+	})
+}
+
+func wantUnprefixed(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if strings.Contains(err.Error(), "lane doctor:") {
+		t.Errorf("error carries the caller's prefix: %v", err)
+	}
+}
+
 func TestAuditLanes_SeparatesNotInitialisedFromDrift(t *testing.T) {
 	t.Run("no marker is not lane-managed", func(t *testing.T) {
 		repoDir, wtRoot := setupLaneTestRepo(t)

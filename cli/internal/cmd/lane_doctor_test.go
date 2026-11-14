@@ -136,3 +136,22 @@ func TestLaneDoctor_WarnsOfADriftedDeployedGuardWithoutFailing(t *testing.T) {
 		}
 	}
 }
+
+// A failure to audit is printed by runLaneDoctor with its own "lane doctor:"
+// prefix, so the errors beneath it must not carry one: the line read
+// "lane doctor: lane doctor: reading ...".
+func TestLaneDoctor_AFailureToAuditCarriesItsPrefixOnce(t *testing.T) {
+	repo := laneDoctorRepo(t, false, "")
+	// A directory where the marker should be: present, and not readable as one.
+	if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(lane.LanesMarkerFile)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	_, stderr, err := execute(t, "lane", "doctor")
+	if got := ExitCode(err); got != 2 {
+		t.Fatalf("exit code = %d, want 2 (the audit could not run): %v", got, err)
+	}
+	if n := strings.Count(stderr, "lane doctor:"); n != 1 {
+		t.Errorf("stderr carries the prefix %d times, want once:\n%s", n, stderr)
+	}
+}

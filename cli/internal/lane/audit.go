@@ -63,7 +63,7 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 		return Audit{}, nil
 	}
 	if err != nil {
-		return Audit{}, fmt.Errorf("lane doctor: reading %s: %w", LanesMarkerFile, err)
+		return Audit{}, fmt.Errorf("reading %s: %w", LanesMarkerFile, err)
 	}
 	a := Audit{Managed: true}
 	marker, findings := parseMarker(raw)
@@ -157,7 +157,7 @@ func expiredLease(path string, meta *worktree.Metadata) Finding {
 // to the cwd and every FIX line would then point at the wrong path.
 func auditRoots(repoRoot, worktreeRoot string) (absRepo, absWTRoot string, err error) {
 	if strings.TrimSpace(worktreeRoot) == "" {
-		return "", "", fmt.Errorf("lane doctor: WORKTREE_ROOT cannot be empty")
+		return "", "", fmt.Errorf("WORKTREE_ROOT cannot be empty")
 	}
 	if absRepo, err = filepath.Abs(repoRoot); err == nil {
 		absWTRoot, err = filepath.Abs(worktreeRoot)
@@ -290,7 +290,7 @@ func laneRecords(commonDir string) (map[string][]laneRecord, []Finding, error) {
 		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("lane doctor: reading the worktree registry of %s: %w", commonDir, err)
+		return nil, nil, fmt.Errorf("reading the worktree registry of %s: %w", commonDir, err)
 	}
 	out := map[string][]laneRecord{}
 	var unreadable []Finding
