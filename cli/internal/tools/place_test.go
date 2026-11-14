@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestHelperBlockUntilStdinCloses is not a test: placeBinary's tests run a copy
@@ -114,6 +115,7 @@ func asideCopies(t *testing.T, dst string) []string {
 // When the new file cannot be renamed in, the old one goes back: a failed
 // update must never leave the machine without a dotf.
 func TestPlaceBinaryRestoresTheOldFileWhenTheFinalRenameFails(t *testing.T) {
+	noRenameWait(t)
 	dir := t.TempDir()
 	dst := filepath.Join(dir, "dotf")
 	if err := os.WriteFile(dst, []byte("old release"), 0o600); err != nil {
@@ -198,5 +200,71 @@ func TestRemoveAsideLeavesUnrelatedSiblings(t *testing.T) {
 	want := []string{"foo.old-backup", "foo.old.x1", "foo.older"}
 	if strings.Join(left, ",") != strings.Join(want, ",") {
 		t.Errorf("after the sweep: %v, want %v", left, want)
+	}
+}
+
+// noRenameWait drops the backoff between rename attempts for one test.
+func noRenameWait(t *testing.T) {
+	t.Helper()
+	real := renameBackoff
+	t.Cleanup(func() { renameBackoff = real })
+	renameBackoff = make([]time.Duration, len(real))
+}
+
+// #3465: Windows holds a just-written or just-started executable for a few
+// milliseconds. A rename refused that way succeeds on a later attempt.
+func TestPlaceBinaryRetriesARenameRefusedForAMoment(t *testing.T) {
+	noRenameWait(t)
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "dotf")
+	if err := os.WriteFile(dst, []byte("old release"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(t.TempDir(), "new")
+	if err := os.WriteFile(src, []byte("new release"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	real := renameFile
+	t.Cleanup(func() { renameFile = real })
+	refusals := 2
+	renameFile = func(from, to string) error {
+		if from == dst && refusals > 0 {
+			refusals--
+			return errors.New("injected: the file is being used by another process")
+		}
+		return real(from, to)
+	}
+
+	if err := placeBinary(src, dst); err != nil {
+		t.Fatalf("placeBinary gave up on a lock that clears: %v", err)
+	}
+	if got, _ := os.ReadFile(dst); !bytes.Equal(got, []byte("new release")) { //nolint:gosec // test path
+		t.Fatalf("dst holds %q, want the new release", got)
+	}
+}
+
+// A lock that never clears still fails, after a bounded number of attempts,
+// and a missing source is answered by the first one.
+func TestRenameSettledIsBounded(t *testing.T) {
+	noRenameWait(t)
+	real := renameFile
+	t.Cleanup(func() { renameFile = real })
+	calls := 0
+	held := errors.New("injected: held")
+	renameFile = func(string, string) error { calls++; return held }
+	if err := renameSettled("a", "b"); !errors.Is(err, held) {
+		t.Fatalf("renameSettled = %v, want the lock error", err)
+	}
+	if want := len(renameBackoff) + 1; calls != want {
+		t.Errorf("held rename tried %d times, want %d", calls, want)
+	}
+
+	calls = 0
+	renameFile = func(string, string) error { calls++; return os.ErrNotExist }
+	if err := renameSettled("a", "b"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("renameSettled = %v, want ErrNotExist", err)
+	}
+	if calls != 1 {
+		t.Errorf("a missing source was tried %d times, want 1", calls)
 	}
 }

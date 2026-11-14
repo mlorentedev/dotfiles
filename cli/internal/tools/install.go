@@ -781,6 +781,30 @@ var (
 	removeFile = os.Remove
 )
 
+// renameBackoff is the wait before each retry of a rename in replaceFile, about
+// 0.6s in all. Windows can refuse to rename an executable for a few
+// milliseconds after it is written or started, while the image loader or an
+// antivirus scan holds it without sharing delete (ERROR_SHARING_VIOLATION,
+// #3465). Tests set it to zero waits.
+var renameBackoff = []time.Duration{
+	10 * time.Millisecond, 20 * time.Millisecond, 40 * time.Millisecond,
+	80 * time.Millisecond, 160 * time.Millisecond, 320 * time.Millisecond,
+}
+
+// renameSettled is renameFile retried through renameBackoff. A missing source
+// is an answer, not a lock, and returns at once.
+func renameSettled(from, to string) error {
+	err := renameFile(from, to)
+	for _, wait := range renameBackoff {
+		if err == nil || errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		time.Sleep(wait)
+		err = renameFile(from, to)
+	}
+	return err
+}
+
 // replaceFile moves staged onto dst so that dst can be a running executable.
 // Windows refuses to rename over, or delete, a running .exe but lets it be
 // renamed aside, so dst is set aside first and staged takes its name; the same
@@ -796,14 +820,14 @@ func replaceFile(staged, dst string) error {
 	if err := removeFile(aside); err != nil && !errors.Is(err, os.ErrNotExist) {
 		aside = fmt.Sprintf("%s.old.%d", dst, time.Now().UnixNano())
 	}
-	if err := renameFile(dst, aside); err != nil {
+	if err := renameSettled(dst, aside); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		return renameFile(staged, dst) // nothing to set aside
+		return renameSettled(staged, dst) // nothing to set aside
 	}
-	if err := renameFile(staged, dst); err != nil {
-		if rerr := renameFile(aside, dst); rerr != nil {
+	if err := renameSettled(staged, dst); err != nil {
+		if rerr := renameSettled(aside, dst); rerr != nil {
 			return fmt.Errorf("%w; restoring the previous %s also failed: %v", err, filepath.Base(dst), rerr)
 		}
 		return err
