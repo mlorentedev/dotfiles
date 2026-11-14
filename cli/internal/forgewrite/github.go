@@ -81,8 +81,11 @@ func (g GitHub) ReadyPR(ctx context.Context, r Repo, number int) (string, error)
 		Draft   bool   `json:"draft"`
 		HTMLURL string `json:"html_url"`
 	}
-	if err := json.Unmarshal(out, &pr); err != nil || pr.NodeID == "" {
-		return "", fmt.Errorf("gh api %s: the answer is not a pull request", endpoint)
+	if err := json.Unmarshal(out, &pr); err != nil {
+		return "", fmt.Errorf("ERROR: gh api %s answered something that is not JSON. WHY: %w. FIX: run the same gh api call by hand and read its answer", endpoint, err)
+	}
+	if pr.NodeID == "" {
+		return "", fmt.Errorf("ERROR: gh api %s answered without a node_id. WHY: the answer is not a pull request. FIX: check the number names a pull request, not an issue", endpoint)
 	}
 	if !pr.Draft {
 		return pr.HTMLURL, nil
