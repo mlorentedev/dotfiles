@@ -33,7 +33,7 @@ owner: manu
 - Review (PASS-WITH-GAPS, four minors) dispositioned:
   - The post-PATCH still-draft path on Gitea: applied, `TestGiteaReadyPRFailsWhenThePatchedTitleIsStillADraft`.
   - GitHub `ReadyPR`'s REST read failure: applied. The decode error is wrapped with `%w` in the ERROR/WHY/FIX shape and a missing `node_id` has its own message, `TestGitHubReadyPRFailsWhenTheReadIsNotAPullRequest`.
-  - The two unticked closing boxes in `tasks.md` (verification filled in, PR opened): acknowledged. Both are done (this file, #3479); the contract files are not edited after the review.
+  - The two unticked closing boxes in `tasks.md` (verification filled in, PR opened): acknowledged. Both are done (this file, #3479); `tasks.md` is left as the review read it, and the archive's only change to a reviewed file is `proposal.md`'s `status: archived`.
   - The ticked manual-check task says the scratch PR was closed: acknowledged. The check itself ran as recorded above; closing `personal/resume#811` is the owner's, by hand.
 
 ## Promotion candidates
