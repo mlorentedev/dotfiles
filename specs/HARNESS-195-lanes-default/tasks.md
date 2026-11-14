@@ -36,13 +36,21 @@ owner: manu
 > - Plan and apply agree, including for a lane that lacks a lease or its identity record; a lane path another repository occupies is a converge skip carrying the repair, not a failure.
 
 ### Slice B: the guard arms from the activation record (AC2, #3437, #3438)
-- [ ] [AC2] Failing `TestPreCommitLaneGuard` cases:
+- [x] [AC2] Failing `TestPreCommitLaneGuard` cases:
   - no record → no block;
   - a record on main in the main checkout → block;
   - a branch worktree → pass;
   - the deploy clone → pass.
-- [ ] [AC2] Implement in `git-hooks/lib/lane-guard.sh`: read the record from the git common dir, and drop both marker lookups (`$top/.dotf/lanes.json` and `$main_root/.dotf/lanes.json`).
-- [ ] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
+- [x] [AC2] Implement in `git-hooks/lib/lane-guard.sh`: read the record from the git common dir, and drop both marker lookups (`$top/.dotf/lanes.json` and `$main_root/.dotf/lanes.json`).
+- [x] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
+- [x] [AC2] `lane doctor` gates on the activation record, not the marker, so doctor and guard agree. Test first.
+- [x] [AC2] `lane doctor` warns about a branch worktree with no lease, with its FIX (the guard still lets it pass). Test first (#3438).
+
+> Slice B as built (for the slices that follow):
+> - The record's content is now the committed marker, copied by `Activate` as the default branch carries it; its existence still means active. The guard reads `third_party_roots` from it, so no marker lookup remains. A marker edited on the default branch refreshes the record on the next converge (one change, then `changed=0`).
+> - An expired lease warns on stderr for any worktree that carries one, detached or on a branch, and never blocks. A branch worktree with no lease still passes, as AC2 says.
+> - `lane doctor` is silent about a marker it is not armed by: no record means "not lane-managed on this machine", with no audit. An active repository whose main checkout lacks the marker warns that nothing was compared.
+> - `lane doctor` also warns about a branch worktree with no lease (`dotf worktree adopt`); the guard still lets it pass.
 
 ### Slice C: tell the session where it stands (AC3)
 - [x] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
@@ -60,7 +68,8 @@ owner: manu
 - [x] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
 
 ### Slice D2: the `worktree add` hint (AC4)
-- [ ] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
+- [x] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
+> Slice D2 as built: the hint lives in the command layer, not in `cli/internal/worktree/add.go`: `lane` imports `worktree`, so `worktree` cannot call `lane.Where`. `laneHint` (`cli/internal/cmd/worktree_lane_hint.go`) runs after `worktree.Add` succeeds and prints one line to stderr for every active standing (in-lane, parked, out-of-lane). `AddDetached` is not on that path, so `spec review` prints nothing; a test pins it.
 
 ### Slice E: launchers (AC6, #3440, #3430)
 - [ ] [AC6] Fix #3440: `dotf secrets run` refuses an npm `.cmd` or `.bat` child on Windows, using the same function as `lane exec` (`refuseBatchShim`). Test first.
@@ -76,6 +85,7 @@ owner: manu
 - [ ] Prerequisite: #3456 (harness re-rendered from the vault) merged, so the doctrine PR renders only its own change.
 - [ ] [AC8] Rename the tiers in AGENTS.md and in `cli/internal/initrepo/templates/agents-spec-section.md` (the Lane Decisor rule becomes a tier rule). First check whether AGENTS.md is rendered from a vault source; if it is, edit the source. Update `using-git-worktrees`, `handoff` and `autopilot` in the vault source, then re-render. Add a test that fails if AGENTS.md calls a tier a "lane".
 - [ ] [AC8] Runbook `docs/runbooks/guide-persistent-named-lanes.md`: activation through converge, what the guard blocks, and recovery.
+- [ ] [AC8] The autopilot skill (`harness/skills/autopilot/SKILL.md`, vault-rendered) and `tests/guard-autopilot-lane-marker.bats` still decide by the marker (`if [ -f .dotf/lanes.json ]`); switch both to the activation record.
 - [ ] [AC9] PR adding `.dotf/lanes.json` to dotfiles (the switch). Then `dotf converge` on the Mac and each guest, and sweep the merged worktrees.
 - [ ] [AC9] Run a real session of each launchable agent per machine, and record the AC3 line in `verification.md`.
 

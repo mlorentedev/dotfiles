@@ -4,9 +4,10 @@
 #
 # `.dotf/lane.json` is the CLI-129 queue contract: a repository can carry it and
 # run no lanes, so testing it sent runs down the lane branch on repositories
-# that never opted in. `dotf lane init` writes the marker into the main
-# checkout, which arms the lane guard for every worktree on the machine, so an
-# unattended run must not run it.
+# that never opted in. Activating a repository belongs to `dotf converge --only
+# lanes`, which writes the record the guard arms from (#3437), so an unattended
+# run must not run `dotf lane init` to do it. The skill still decides by the
+# marker, not the record: HARNESS-195 Slice G switches it.
 
 setup() {
     REPO="$BATS_TEST_DIRNAME/.."
