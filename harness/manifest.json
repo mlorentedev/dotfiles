@@ -339,12 +339,6 @@
             "event": "PreToolUse",
             "command": "harness gate --harness agy",
             "timeout": 5
-          },
-          {
-            "id": "session-line",
-            "event": "PreInvocation",
-            "command": "mem session-start --format agy-hook",
-            "timeout": 30
           }
         ],
         "retire": [
