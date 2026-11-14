@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -58,31 +59,51 @@ func newChecks(declared *Protection, live Protection) []Check {
 	return added
 }
 
-// mergedHeads returns the head SHAs of the branch's most recently MERGED pull
-// requests, newest merge first. The API cannot sort by merge time, so the
-// newest-updated page is read and ordered by merged_at here: sorting by update
-// alone would let an old pull request that was merely commented on stand in
-// for a recent merge. Every merge updates its pull request, so the newest
-// merges are on that page unless 100 pull requests were closed or touched
-// since the fifth-newest one. A closed pull request that never merged is
-// skipped: what reported on an abandoned change says nothing about what
-// reports now.
+// mergedPullsQuery asks for the branch's merged pull requests, newest update
+// first, and only the two fields the window reads. The REST list it replaces
+// returned every closed pull request with its full repository payload, 1.9 MB
+// on dotfiles, and a slow moment of the API ran it past the call's deadline
+// (#3434). Only merged ones are asked for, so an abandoned change never takes a
+// slot. It costs one point of the GraphQL quota.
+const mergedPullsQuery = `query($owner: String!, $name: String!, $base: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(baseRefName: $base, states: MERGED, first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes { mergedAt headRefOid }
+    }
+  }
+}`
+
+// mergedHeads returns the head SHAs of the branch's most recently merged pull
+// requests, newest merge first. GitHub cannot order by merge time, so the 30
+// most recently updated merged pull requests are read and ordered by mergedAt
+// here: ordering by update alone would let an old pull request that was merely
+// commented on stand in for a recent merge. Every merge updates its pull
+// request, so the newest merges are among those 30 unless 25 older merged pull
+// requests were touched since the fifth-newest merge.
 func mergedHeads(repo, branch string, run Runner) ([]string, error) {
-	out, errOut, err := run("api", fmt.Sprintf("repos/%s/pulls?state=closed&base=%s&sort=updated&direction=desc&per_page=100", repo, branch))
+	owner, name, _ := strings.Cut(repo, "/")
+	out, errOut, err := run("api", "graphql", "-f", "query="+mergedPullsQuery,
+		"-f", "owner="+owner, "-f", "name="+name, "-f", "base="+branch)
 	if err != nil {
 		return nil, fmt.Errorf("list merged pull requests: %s", unanswerable(errOut, err))
 	}
-	var pulls []struct {
-		MergedAt *time.Time `json:"merged_at"`
-		Head     struct {
-			SHA string `json:"sha"`
-		} `json:"head"`
+	var answer struct {
+		Data struct {
+			Repository struct {
+				PullRequests struct {
+					Nodes []struct {
+						MergedAt   *time.Time `json:"mergedAt"`
+						HeadRefOid string     `json:"headRefOid"`
+					} `json:"nodes"`
+				} `json:"pullRequests"`
+			} `json:"repository"`
+		} `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(out), &pulls); err != nil {
+	if err := json.Unmarshal([]byte(out), &answer); err != nil {
 		return nil, fmt.Errorf("unexpected pull request list: %w", err)
 	}
-	merged := pulls[:0]
-	for _, p := range pulls {
+	merged := answer.Data.Repository.PullRequests.Nodes[:0]
+	for _, p := range answer.Data.Repository.PullRequests.Nodes {
 		if p.MergedAt != nil {
 			merged = append(merged, p)
 		}
@@ -93,7 +114,7 @@ func mergedHeads(repo, branch string, run Runner) ([]string, error) {
 		if len(heads) == reportWindow {
 			break
 		}
-		heads = append(heads, p.Head.SHA)
+		heads = append(heads, p.HeadRefOid)
 	}
 	return heads, nil
 }
