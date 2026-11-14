@@ -136,21 +136,28 @@ sys.exit(0 if shared[0] == "**" and excl and not overlap else 1)'
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
 
-@test "CI-013: the integration container builds with a gha layer cache and the pinned build args" {
+# The build is the shared docker-build composite (ci-workflows CI-010), pinned by
+# SHA with its tag. The composite owns buildx and the gha cache; this repository
+# owns the scope, which stays `integration` so the cache main already wrote is
+# reused, and the policy that only a push to main writes it.
+@test "CI-013: the integration container builds through the pinned docker-build composite, which owns the gha cache backend, with the integration scope and the pinned build args" {
     run _py '
+import re
 steps = load("ci.yml")["jobs"]["integration"]["steps"]
-build = [s for s in steps if str(s.get("uses", "")).startswith("docker/build-push-action@")]
+build = [s for s in steps if str(s.get("uses", "")).startswith("mlorentedev/ci-workflows/.github/actions/docker-build@")]
 print([s.get("uses") or s.get("name") for s in steps])
 if len(build) != 1:
     sys.exit(1)
 w = build[0]["with"]
 args = str(w.get("build-args", ""))
 checks = [
-    any(str(s.get("uses", "")).startswith("docker/setup-buildx-action@") for s in steps),
-    "type=gha" in str(w.get("cache-from", "")),
-    "type=gha" in str(w.get("cache-to", "")) and "github.event_name == " in str(w.get("cache-to", "")),
+    re.fullmatch(r"mlorentedev/ci-workflows/\.github/actions/docker-build@[0-9a-f]{40}", build[0]["uses"]) is not None,
+    not any(str(s.get("uses", "")).startswith(("docker/setup-buildx-action@", "docker/build-push-action@")) for s in steps),
+    w.get("cache-scope") == "integration",
+    "cache-from" not in w and "cache-to" not in w,
+    str(w.get("cache-write")).replace(" ", "") == "${{github.event_name==\x27push\x27}}",
     str(w.get("load")).lower() == "true",
-    w.get("tags") == "dotfiles-integration-test",
+    w.get("image") == "dotfiles-integration-test",
     w.get("file") == "tests/Dockerfile.integration",
     all(f"{v}=${{{{ steps.versions.outputs.{v} }}}}" in args
         for v in ("BATS_VERSION", "AGE_VERSION", "GO_VERSION")),
