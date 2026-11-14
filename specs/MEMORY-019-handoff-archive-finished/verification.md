@@ -29,6 +29,8 @@ owner: manu
 - The dated archive file, not `archive/<key>.md`: every archive in the vault has the dated shape, and the lane-park path's shape has no instance. Converging the two is #3487.
 - The prune is the lane-park's `pruneThreadFromMemory` with an exact-key mode, not a new loop.
 
+- Review (PASS, two minors) dispositioned, both applied: `AppendArchive` trims a CRLF ending (`TestAppendArchiveTrimsACRLFEnding`), and an end-to-end test removes a thread already on disk (`TestHandoffWriteFinishedRemovesAnExistingThreadOnDisk`).
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.

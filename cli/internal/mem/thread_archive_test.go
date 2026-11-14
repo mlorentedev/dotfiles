@@ -160,3 +160,12 @@ func TestArchiveThreadByItsWriterKeepsAnotherAgentsFork(t *testing.T) {
 		t.Errorf("archiving feat-a gave key %q and\n%s", res.Key, res.Content)
 	}
 }
+
+// An archive a Windows editor saved with CRLF gets no dangling carriage return
+// before the appended block.
+func TestAppendArchiveTrimsACRLFEnding(t *testing.T) {
+	got, _ := AppendArchive("# Superseded handoffs 2026-11-14\r\n\r\n### thread: a\r\n", "2026-11-14", "### thread: b")
+	if want := "# Superseded handoffs 2026-11-14\r\n\r\n### thread: a\n\n### thread: b\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

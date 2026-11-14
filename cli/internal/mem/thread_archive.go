@@ -62,5 +62,5 @@ func AppendArchive(existing, date, block string) (string, bool) {
 	if strings.Contains(existing, block) {
 		return existing, false
 	}
-	return strings.TrimRight(existing, "\n") + "\n\n" + block + "\n", true
+	return strings.TrimRight(existing, "\r\n") + "\n\n" + block + "\n", true
 }

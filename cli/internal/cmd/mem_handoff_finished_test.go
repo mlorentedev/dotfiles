@@ -110,3 +110,24 @@ func TestHandoffWriteFinishedIsIdempotentAndDryRuns(t *testing.T) {
 		t.Errorf("a repeated finished write changed the archive:\n%s", again)
 	}
 }
+
+// MEMORY-019 AC1 end to end: a thread already in MEMORY.md leaves the file on
+// disk, and the thread beside it stays.
+func TestHandoffWriteFinishedRemovesAnExistingThreadOnDisk(t *testing.T) {
+	memory, archive := finishedSetup(t)
+	if _, _, err := runHandoffWrite(t, memory, "**Next action:** Working.\n"); err != nil {
+		t.Fatal(err)
+	}
+	if index, _ := os.ReadFile(memory); !strings.Contains(string(index), "### thread: feat-x") {
+		t.Fatalf("setup: feat-x was not written:\n%s", index)
+	}
+	if _, _, err := runHandoffWrite(t, memory, "**Next action:** None for this thread.\n", "--finished"); err != nil {
+		t.Fatal(err)
+	}
+	if index, _ := os.ReadFile(memory); string(index) != finishedMemory {
+		t.Errorf("MEMORY.md is\n%s\nwant only feat-a left:\n%s", index, finishedMemory)
+	}
+	if got, _ := os.ReadFile(archive); !strings.Contains(string(got), "### thread: feat-x") {
+		t.Errorf("the archive lacks the thread:\n%s", got)
+	}
+}
