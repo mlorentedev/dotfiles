@@ -2,9 +2,13 @@ package lane
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // commitMarker writes the marker through its writer (lesson 569) and commits
@@ -153,4 +157,99 @@ func TestInitLanes_NeverWritesTheRecordOrTheMarker(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The plan predicts the apply for a lane that exists but is half provisioned:
+// a plan that said 0 where the apply writes 1 would break converge's contract.
+func TestActivate_PlanPredictsApplyForAHalfProvisionedLane(t *testing.T) {
+	damage := map[string]func(t *testing.T, lanePath string){
+		"identity record missing": func(t *testing.T, lanePath string) {
+			gitDir, _, err := worktreeGitDirs(lanePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(filepath.Join(gitDir, LaneIdentityFile)); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"lease only in the tree (legacy)": func(t *testing.T, lanePath string) {
+			gitDir, _, err := worktreeGitDirs(lanePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(filepath.Join(gitDir, worktree.LeaseFileName)); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(lanePath, worktree.MetadataFileName), mustJSON(t, worktree.Metadata{Lane: LaneFastTrack, State: "PARKED"}), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"no lease anywhere": func(t *testing.T, lanePath string) {
+			gitDir, _, err := worktreeGitDirs(lanePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, p := range []string{filepath.Join(gitDir, worktree.LeaseFileName), filepath.Join(lanePath, worktree.MetadataFileName)} {
+				if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+					t.Fatal(err)
+				}
+			}
+		},
+	}
+	for name, hurt := range damage {
+		t.Run(name, func(t *testing.T) {
+			repo, wt := setupLaneTestRepo(t)
+			commitMarker(t, repo, true)
+			if _, err := Activate(repo, wt, false); err != nil {
+				t.Fatal(err)
+			}
+			hurt(t, filepath.Join(wt, filepath.Base(repo), LaneFastTrack))
+
+			plan, err := Activate(repo, wt, true)
+			if err != nil || plan.Changes != 1 {
+				t.Fatalf("plan = %+v, %v; want 1 change", plan, err)
+			}
+			applied, err := Activate(repo, wt, false)
+			if err != nil || applied.Changes != plan.Changes {
+				t.Fatalf("apply = %+v, %v; want what the plan said (%d)", applied, err, plan.Changes)
+			}
+			if again, err := Activate(repo, wt, true); err != nil || again.Changes != 0 {
+				t.Fatalf("re-plan = %+v, %v; want 0", again, err)
+			}
+		})
+	}
+}
+
+// A lane path another repository (or nothing git knows) occupies is refused,
+// as a RefusedError, in the plan and in the apply alike, before any lane or
+// record is written.
+func TestActivate_RefusesAnOccupiedLanePathBeforeWritingAnything(t *testing.T) {
+	repo, wt := setupLaneTestRepo(t)
+	commitMarker(t, repo, true)
+	laneDir := filepath.Join(wt, filepath.Base(repo))
+	if err := os.MkdirAll(filepath.Join(laneDir, LaneFastTrack), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, dry := range []bool{true, false} {
+		_, err := Activate(repo, wt, dry)
+		var refused *RefusedError
+		if !errors.As(err, &refused) {
+			t.Fatalf("dryRun=%v: err = %v; want a RefusedError", dry, err)
+		}
+	}
+	if _, err := os.Stat(recordPath(t, repo)); !os.IsNotExist(err) {
+		t.Errorf("a record was written despite the refusal (err=%v)", err)
+	}
+	if _, err := os.Stat(filepath.Join(laneDir, LaneFeatPrimary)); !os.IsNotExist(err) {
+		t.Errorf("another lane was created despite the refusal (err=%v)", err)
+	}
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

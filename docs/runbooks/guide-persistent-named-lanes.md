@@ -40,7 +40,7 @@ Three properties follow from that split:
   guard. `.dotf/lane.json` (singular) belongs to the issue-queue subsystem and is
   ignored here on purpose.
 - **Policy is code, host data is data.** `canonical_lanes` is rewritten from
-  `lane.CanonicalLanes` on every `dotf lane init`. `third_party_roots` is unioned
+  `lane.CanonicalLanes` on every `dotf lane init --write-marker`. `third_party_roots` is unioned
   with whatever the file already declares, so adding a session host is a data
   change that survives re-initialization.
 - **The guard parses, it does not decide.** It reads the marker's roots, the
@@ -80,7 +80,7 @@ read from a worktree).
 | Field | Type | Owner | Semantics |
 |---|---|---|---|
 | `version` | integer | code | Marker schema version. Currently `1`. |
-| `canonical_lanes` | array of string | code | The lanes `dotf lane init` provisions. Rewritten on every init; policy for the CLI, not read by the guard. |
+| `canonical_lanes` | array of string | code | The lanes `dotf lane init` provisions. Rewritten on every `--write-marker`; policy for the CLI, not read by the guard. |
 | `third_party_roots` | array of string | operator | Directory names, under the projects boundary, that belong to an external session host. Unioned, never truncated. |
 
 Constraints enforced by tests (`cli/internal/lane`, `cli/internal/hooks`):
@@ -160,7 +160,7 @@ else routes to `fast-track-lane` then `feat-lane-secondary`. If every candidate 
 
 | Use case | Command | Marker state | Guard verdict in that worktree |
 |---|---|---|---|
-| Opt a repository in | `dotf lane init` | created | arms the guard everywhere in the repo |
+| Declare a repository | `dotf lane init --write-marker`, then commit | created, uncommitted until you commit it | arms nothing: a machine activates through `dotf converge --only lanes`, from the committed marker |
 | Start feature work | `dotf lane switch feat/3259-slug` | unchanged | allowed (ACTIVE lane) |
 | Start a fix | `dotf lane switch fix/3300-slug` | unchanged | allowed (`fast-track-lane`) |
 | Lane's branch landed | `dotf lane park` | unchanged | **blocked** until a new branch is claimed |
@@ -178,9 +178,10 @@ code. Shipping the guard and arming it are separate decisions: arming it in the
 same merge would block every existing session container on every seat at once.
 
 1. Install the released `dotf` (see `release-dotf.md`).
-2. In the main checkout, run `dotf lane init`.
+2. In the main checkout, run `dotf lane init --write-marker`.
    Expected: `changed=3`, the worktree root printed, and a line naming
-   `.dotf/lanes.json`.
+   `.dotf/lanes.json`. Without the flag init provisions the lanes and writes no
+   marker.
 3. Review the marker, then commit it:
    `git add .dotf/lanes.json && git commit -m "chore: arm the persistent named lane guard"`.
    The commit itself is allowed: it lands from a lane or before the guard sees a

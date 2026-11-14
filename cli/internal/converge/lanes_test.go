@@ -191,3 +191,23 @@ func TestRegistry_HasTheLanesStep(t *testing.T) {
 	}
 	t.Errorf("no lanes step in the registry")
 }
+
+// A lane path something else occupies is one machine's collision: the step
+// reports it, with the repair, as a skip, and the steps after it still run.
+func TestLanes_SkipsWithTheRepairWhenALanePathIsOccupied(t *testing.T) {
+	repo, wt := laneRepo(t, "dotfiles", true), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(wt, "dotfiles", lane.LaneFastTrack), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env, step := Env{RepoRoot: repo, DeployDir: t.TempDir(), GOOS: runtime.GOOS}, lanesStep(wt)
+
+	for _, dry := range []bool{true, false} {
+		res, err := step.Reconcile(env, dry)
+		if err != nil || res.Skip == "" || !strings.Contains(res.Skip, "move it aside") {
+			t.Fatalf("dryRun=%v: Reconcile = %+v, %v; want a skip that carries the repair", dry, res, err)
+		}
+	}
+	if hasRecord(t, repo) {
+		t.Errorf("the repository was activated despite the occupied lane path")
+	}
+}

@@ -47,16 +47,28 @@ func Activate(repoRoot, worktreeRoot string, dryRun bool) (Activation, error) {
 	if err != nil {
 		return Activation{}, err
 	}
-	record := filepath.Join(commonDir, ActivationFile)
+	absWT, err := filepath.Abs(worktreeRoot)
+	if err != nil || strings.TrimSpace(worktreeRoot) == "" {
+		return Activation{}, fmt.Errorf("lane activate: WORKTREE_ROOT cannot be empty")
+	}
 	act := Activation{Active: true, Ref: ref}
+	// Refuse before counting or writing anything, in a plan as in an apply:
+	// the same refusal InitLanes would make, reported before it makes a lane.
+	laneDir := filepath.Join(absWT, filepath.Base(filepath.Clean(mainRoot)))
+	for _, name := range CanonicalLanes {
+		if err := refuseStranger(mainRoot, commonDir, filepath.Join(laneDir, name)); err != nil {
+			return act, &RefusedError{Err: err}
+		}
+	}
+	record := filepath.Join(commonDir, ActivationFile)
 	if _, err := os.Stat(record); err != nil {
 		act.Changes++
 	}
 	if dryRun {
-		act.Changes += missingLanes(mainRoot, worktreeRoot)
+		act.Changes += pendingLanes(laneDir)
 		return act, nil
 	}
-	created, err := InitLanes(mainRoot, worktreeRoot)
+	created, err := InitLanes(mainRoot, absWT)
 	if err != nil {
 		return act, err
 	}
@@ -86,17 +98,16 @@ func committedMarkerRef(mainRoot string) string {
 	return ""
 }
 
-// missingLanes counts the canonical lanes InitLanes would have to create: no
-// worktree at the lane path, or one that carries no lease.
-func missingLanes(mainRoot, worktreeRoot string) int {
-	laneDir := filepath.Join(worktreeRoot, filepath.Base(filepath.Clean(mainRoot)))
-	missing := 0
+// pendingLanes counts the canonical lanes InitLanes would write to, by the
+// same conditions provisionLane writes on, so a plan predicts its apply.
+func pendingLanes(laneDir string) int {
+	pending := 0
 	for _, name := range CanonicalLanes {
-		if meta, err := worktree.LoadMetadata(filepath.Join(laneDir, name)); err != nil || meta == nil {
-			missing++
+		if laneNeedsWork(filepath.Join(laneDir, name), name) {
+			pending++
 		}
 	}
-	return missing
+	return pending
 }
 
 // WriteLanesMarker writes .dotf/lanes.json into repo, for the one commit that
@@ -109,3 +120,11 @@ func WriteLanesMarker(repo string) (bool, error) {
 	}
 	return writeLanesMarker(abs)
 }
+
+// RefusedError says the lanes cannot be provisioned here because something
+// else occupies a lane path (#3318). It is one machine's collision, not a
+// failure of Activate, so a caller can report it and carry on.
+type RefusedError struct{ Err error }
+
+func (e *RefusedError) Error() string { return e.Err.Error() }
+func (e *RefusedError) Unwrap() error { return e.Err }

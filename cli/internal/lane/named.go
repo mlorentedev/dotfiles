@@ -231,6 +231,29 @@ func provisionLane(absRepo, repoCommonDir, lanePath, name, baseRef string) (bool
 	return true, err
 }
 
+// laneNeedsWork reports whether provisionLane would write anything for the
+// lane at lanePath. It follows provisionLane's branches one for one: a path
+// with no worktree, a worktree with no usable lease, a lease that exists only
+// in the tree, and an identity record that is absent or differs.
+func laneNeedsWork(lanePath, name string) bool {
+	if _, err := os.Lstat(lanePath); err != nil {
+		return true
+	}
+	meta, err := worktree.LoadMetadata(lanePath)
+	if err != nil || meta == nil || meta.Lane != name || meta.State == "" || meta.ReapOK {
+		return true
+	}
+	if worktree.LeaseLegacyOnly(lanePath) {
+		return true
+	}
+	gitDir, commonDir, err := worktreeGitDirs(lanePath)
+	if err != nil || gitDir == "" || gitDir == commonDir {
+		return true
+	}
+	have, err := os.ReadFile(filepath.Join(gitDir, LaneIdentityFile))
+	return err != nil || !bytes.Equal(have, []byte(name+"\n"))
+}
+
 // migrateLegacyLease copies a lease a binary before ADR-062 left in the tree
 // into the lane's git admin dir, as it is, and reports whether it did. Once the
 // admin dir holds the lease the in-tree mirror's presence changes nothing, so

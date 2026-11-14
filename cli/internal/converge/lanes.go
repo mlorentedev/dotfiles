@@ -1,6 +1,7 @@
 package converge
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -57,6 +58,11 @@ func (r lanes) Reconcile(env Env, dryRun bool) (Result, error) {
 		return Result{Skip: skip}, nil
 	}
 	act, err := lane.Activate(env.RepoRoot, root, dryRun)
+	var refused *lane.RefusedError
+	if errors.As(err, &refused) {
+		// One machine's collision names its repair and stops nothing else.
+		return Result{Skip: refused.Error()}, nil
+	}
 	if err != nil {
 		return Result{}, err
 	}
@@ -79,6 +85,10 @@ func (r lanes) Probe(env Env) error {
 		return nil
 	}
 	act, err := lane.Activate(env.RepoRoot, root, true)
+	var refused *lane.RefusedError
+	if errors.As(err, &refused) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
