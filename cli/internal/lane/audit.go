@@ -38,11 +38,13 @@ func (f Finding) Warning() string {
 	return "WARN: " + f.Subject + ": " + f.Problem + ".\nFIX: " + f.Fix
 }
 
-// Audit is what AuditLanes answers. Managed is false when the repository has
-// no marker. Initialised is false when the marker is present but no declared
+// Audit is what AuditLanes answers. Managed is false when this machine never
+// activated the repository's lanes (no activation record): the guard enforces
+// nothing there, whatever marker a working tree carries, so there is nothing to
+// compare. Initialised is false when the marker is present but no declared
 // lane exists on this machine: the marker is committed and travels to every
 // clone, the lanes are per machine, so that state is not drift. Warnings are
-// what is not drift yet: states the guard will refuse once the marker arms it.
+// what is not drift yet: states the guard will refuse, or sweep act on.
 type Audit struct {
 	Managed     bool
 	Initialised bool
@@ -58,9 +60,27 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	if err != nil {
 		return Audit{}, err
 	}
+	commonDir, err := resolveGitCommonDir(absRepo)
+	if err != nil {
+		return Audit{}, err
+	}
+	// The guard arms from the activation record and from nothing else (#3437),
+	// so this is what makes a repository managed for the audit too.
+	if _, err := os.Stat(filepath.Join(commonDir, ActivationFile)); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return Audit{}, nil
+		}
+		return Audit{}, fmt.Errorf("reading %s: %w", ActivationFile, err)
+	}
 	raw, err := os.ReadFile(filepath.Join(absRepo, filepath.FromSlash(LanesMarkerFile)))
 	if errors.Is(err, fs.ErrNotExist) {
-		return Audit{}, nil
+		// Active, but the main checkout sits on a commit that predates the
+		// marker: the lanes were activated from the default branch and there is
+		// no declared list here to compare them with. Initialised is set only so
+		// the caller does not add its "not initialised" line to this warning.
+		return Audit{Managed: true, Initialised: true, Warnings: []Finding{{LanesMarkerFile,
+			"is absent from the main checkout, so the lanes were not compared with it",
+			"switch the main checkout to the default branch (git switch main && git pull), then run dotf lane doctor again"}}}, nil
 	}
 	if err != nil {
 		return Audit{}, fmt.Errorf("reading %s: %w", LanesMarkerFile, err)
@@ -70,10 +90,6 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	if len(findings) > 0 {
 		a.Findings = findings
 		return a, nil
-	}
-	commonDir, err := resolveGitCommonDir(absRepo)
-	if err != nil {
-		return a, err
 	}
 	records, unreadable, err := laneRecords(commonDir)
 	if err != nil {
@@ -92,13 +108,12 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	return a, err
 }
 
-// leaseWarnings walks the linked worktrees once and warns of the two states
-// the guard or sweep will act on before anyone looks: a detached worktree with
-// no lease, which guard rule 6 refuses and nothing in its path would have
-// adopted (#3436), and a lease that has run out. Lanes are audited on their own
-// for the leaseless case, so a worktree recorded as one is left out of it; a
-// worktree whose lease cannot be read is a different defect and is left out of
-// both.
+// leaseWarnings walks the linked worktrees once and warns of the states the
+// guard or sweep will act on before anyone looks: a worktree with no lease,
+// detached or on a branch (#3436, #3438), and a lease that has run out. Lanes
+// are audited on their own for the leaseless case, so a worktree recorded as one
+// is left out of it; a worktree whose lease cannot be read is a different
+// defect and is left out of both.
 func leaseWarnings(absRepo string, records map[string][]laneRecord, now time.Time) ([]Finding, error) {
 	out, err := exec.Command("git", "-C", absRepo, "worktree", "list", "--porcelain").Output()
 	if err != nil {
@@ -123,15 +138,28 @@ func leaseWarnings(absRepo string, records map[string][]laneRecord, now time.Tim
 		switch {
 		case lerr != nil:
 		case meta == nil:
-			if w.Detached && !slices.ContainsFunc(lanes, func(p string) bool { return samePath(p, w.Path) }) {
-				warns = append(warns, Finding{w.Path, "is detached and has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there once " + LanesMarkerFile + " is committed",
-					"dotf worktree adopt " + w.Path + ", or run git switch -c <type>/<issue>-<slug> inside it"})
+			if !slices.ContainsFunc(lanes, func(p string) bool { return samePath(p, w.Path) }) {
+				warns = append(warns, leaselessWarning(w))
 			}
 		case leaseExpired(meta, now):
 			warns = append(warns, expiredLease(w.Path, meta))
 		}
 	}
 	return warns, nil
+}
+
+// leaselessWarning names what a worktree with no lease costs. A detached one is
+// refused by guard rule 6 and nothing in its path would have adopted it (#3436).
+// A branch one commits freely (AC2), but no lease means `dotf worktree list` and
+// sweep cannot track it, so nobody learns when its work is over (#3438).
+func leaselessWarning(w worktree.RawWorktree) Finding {
+	adopt := "dotf worktree adopt " + w.Path
+	if w.Detached {
+		return Finding{w.Path, "is detached and has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there while the lanes are active",
+			adopt + ", or run git switch -c <type>/<issue>-<slug> inside it"}
+	}
+	return Finding{w.Path, "is on branch " + strings.TrimPrefix(w.Branch, "refs/heads/") + " and has no lease (" + worktree.MetadataFileName + "), so the guard lets it commit but sweep cannot track or reap it",
+		adopt}
 }
 
 // leaseExpired is true for a lease that carries an expiry and whose expiry has
