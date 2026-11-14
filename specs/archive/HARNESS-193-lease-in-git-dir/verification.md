@@ -38,6 +38,10 @@ Brief log of non-obvious trade-offs or course corrections taken during the work.
 - Independent review (PASS, `review.md`): the session-end reader prefers the admin-dir copy, so a lane parked by a binary older than this change (in-tree PARKED, admin-dir still ACTIVE) gets a detached journal once. That is the same mixed-version window the runbook names, it costs one stray journal and no data, and it ends when the old binary is gone; accepted as noise, no code change. The review's other findings were applied: Save refusals for the main checkout and a submodule, a source pin for the two spellings outside the worktree package (`TestLeaseFileNameSpellingsAgree`), and the duplicate test label.
 - `features.json` entries stay `pending` with the exit-0 evidence line: no harness runs those commands, and the archived specs that carry `features.json` (SEC-002 among them) close the same way; the independent review, not a runner, is the archive gate. The Definition of Done item this touches is §5 Evidence, and it is met by the recorded command output (the `evidence` field, and the test runs in `## Test status`), not skipped: what no tool produces is the state flip, which §5 does not ask for.
 
+## Post-review dispositions
+
+- `tasks.md` docs line: the reviewed text names the lesson as `lesson-595-<slug>.md`. Before merge it was renumbered to 597, because 594, 595 and 596 were taken on main while the branch was open. The shipped lesson is `docs/lessons/lesson-597-excluded-from-git-is-not-safe-from-git-clean.md`, as the promotion line below states. `tasks.md` is restored to the reviewed text so the review stays bound to what it read. Nothing else in the contract changed after the review.
+
 ## Promotion candidates
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
@@ -48,7 +52,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/HARNESS-193-lease-in-git-dir/` -> `specs/archive/HARNESS-193-lease-in-git-dir/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/HARNESS-193-lease-in-git-dir/` -> `specs/archive/HARNESS-193-lease-in-git-dir/`
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3307 closes with #3460
+- [x] Promotions above executed (if any)
