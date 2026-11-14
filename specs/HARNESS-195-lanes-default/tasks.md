@@ -53,7 +53,7 @@ owner: manu
 - [ ] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
 
 ### Slice D1: `lane next` without herdr (AC5)
-- [ ] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
+- [x] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
 
 ### Slice D2: the `worktree add` hint (AC4)
 - [ ] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
@@ -65,8 +65,8 @@ owner: manu
 - [ ] [AC6] #3430: check whether a lane-launched pane carries `HERDR_AGENT`. Set it in `Exec`'s environment if it does not.
 
 ### Slice F: doctor (AC7, #3327)
-- [ ] [P] [AC7] Apply the patch preserved on #3327 (detached worktree with no lease) with its tests.
-- [ ] [AC7] Expired lease and deployed-guard drift: failing tests, then implementation.
+- [x] [P] [AC7] Apply the patch preserved on #3327 (detached worktree with no lease) with its tests.
+- [x] [AC7] Expired lease and deployed-guard drift: failing tests, then implementation.
 
 ### Slice G: doctrine and activation (AC8, AC9)
 - [ ] Prerequisite: #3456 (harness re-rendered from the vault) merged, so the doctrine PR renders only its own change.

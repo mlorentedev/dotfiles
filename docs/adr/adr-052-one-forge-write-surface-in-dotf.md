@@ -75,3 +75,10 @@ The amendment above keeps one write token per host. That token is a PAT on the o
 - `gitea.kubelab.live` (and its `forge` alias) maps `personal` to `GITEA_KUBELAB_AGENT_TOKEN`, the agents' account kubelab mints (ADR-062, 2026-11-03 amendment). That account is a collaborator only where a repository lists it under `writers:`, which today is every `personal/` repository. A new `personal/` repository needs that entry before agents can write to it; the forge answers 404, never a fallback to the operator's token.
 - The client organization has no entry: the agents' account has no access there, so agent writes on it stay on the operator's token. Moving them is a kubelab grant decision, not a routing one.
 - The previous amendment's point stands: no route ever selects the organization-scoped token. The map is still keyed by host first; the owner only refines it inside one host.
+
+## Amendment (2026-11-14, #3406): drafts on both forges, and one GraphQL call
+
+`pr create --draft` was GitHub-only, and nothing in `dotf forge` marked a draft ready, so agents fell back to `gh pr ready` on GitHub and dropped `--draft` on Gitea. The owner chose one verb for both forges (option A on #3406), specified in TOOL-039.
+
+- **Gitea drafts are a title prefix, verified on the answer.** Gitea has no draft field on create or edit and no API that reads an instance's `WORK_IN_PROGRESS_PREFIXES`. `--draft` opens the pull request with `WIP: ` and requires `draft: true` in the answer; `pr ready` removes `WIP:` or `[WIP]` and requires `draft: false`. When the instance does not agree, the command fails and names the pull request rather than reporting success.
+- **GitHub's ready call is GraphQL.** REST can create a draft but cannot clear the flag; `markPullRequestReadyForReview` is the only call that does, and the one `gh pr ready` sends. It goes through `gh api graphql`, the transport the backend already uses, so the "REST endpoint" in clause 1 now has this one exception. It is one call per pull request, the load `gh pr ready` already put on the GraphQL quota.

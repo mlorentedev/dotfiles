@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,5 +76,86 @@ func TestLaneDoctor_AFindingExitsOneWithoutCobrasErrorLine(t *testing.T) {
 	}
 	if strings.Contains(stderr, "Error:") {
 		t.Errorf("cobra's Error: line repeats the findings: %q", stderr)
+	}
+}
+
+// A leaseless detached worktree is a warning, not a finding: it names the
+// recovery and does not change the exit code, and it is reported whether or not
+// the lanes are initialised here (#3436).
+func TestLaneDoctor_WarnsOfALeaselessDetachedWorktreeWithoutFailing(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		init   bool
+		marker string
+	}{
+		{"lanes initialised", true, ""},
+		{"lanes not initialised", false, coherentMarker},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := laneDoctorRepo(t, tc.init, tc.marker)
+			wt := filepath.Join(t.TempDir(), "scratch")
+			if out, err := exec.Command("git", "-C", repo, "worktree", "add", "-q", "--detach", wt, "HEAD").CombinedOutput(); err != nil {
+				t.Fatalf("git worktree add: %v\n%s", err, out)
+			}
+			t.Chdir(repo)
+			stdout, stderr, err := execute(t, "lane", "doctor")
+			if err != nil || stderr != "" {
+				t.Fatalf("a warning must not fail the command: err=%v stderr=%q", err, stderr)
+			}
+			for _, want := range []string{"WARN: ", "scratch", "dotf worktree adopt"} {
+				if !strings.Contains(stdout, want) {
+					t.Errorf("stdout lacks %q:\n%s", want, stdout)
+				}
+			}
+		})
+	}
+}
+
+// A deployed guard that lags the repository's copy is a warning with its fix,
+// and the exit status stays what it was (AC7 of HARNESS-195).
+func TestLaneDoctor_WarnsOfADriftedDeployedGuardWithoutFailing(t *testing.T) {
+	repo := laneDoctorRepo(t, true, coherentMarker)
+	deploy := t.TempDir()
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	if out, err := exec.Command("git", "-C", repo, "config", "core.hooksPath", filepath.Join(deploy, "git-hooks")).CombinedOutput(); err != nil {
+		t.Fatalf("git config: %v\n%s", err, out)
+	}
+	for root, content := range map[string]string{repo: "new\n", deploy: "old\n"} {
+		p := filepath.Join(root, "git-hooks", filepath.FromSlash(lane.GuardRelPath))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(repo)
+	stdout, stderr, err := execute(t, "lane", "doctor")
+	if err != nil || stderr != "" {
+		t.Fatalf("a warning must not fail the command: err=%v stderr=%q", err, stderr)
+	}
+	for _, want := range []string{"WARN: ", "lane-guard.sh", "dotf hooks install"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout lacks %q:\n%s", want, stdout)
+		}
+	}
+}
+
+// A failure to audit is printed by runLaneDoctor with its own "lane doctor:"
+// prefix, so the errors beneath it must not carry one: the line read
+// "lane doctor: lane doctor: reading ...".
+func TestLaneDoctor_AFailureToAuditCarriesItsPrefixOnce(t *testing.T) {
+	repo := laneDoctorRepo(t, false, "")
+	// A directory where the marker should be: present, and not readable as one.
+	if err := os.MkdirAll(filepath.Join(repo, filepath.FromSlash(lane.LanesMarkerFile)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	_, stderr, err := execute(t, "lane", "doctor")
+	if got := ExitCode(err); got != 2 {
+		t.Fatalf("exit code = %d, want 2 (the audit could not run): %v", got, err)
+	}
+	if n := strings.Count(stderr, "lane doctor:"); n != 1 {
+		t.Errorf("stderr carries the prefix %d times, want once:\n%s", n, stderr)
 	}
 }

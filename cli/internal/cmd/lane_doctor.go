@@ -28,7 +28,8 @@ func newLaneDoctorCmd() *cobra.Command {
 }
 
 // runLaneDoctor resolves the main checkout, audits it and prints the findings;
-// exit 2 when the audit could not run, 1 when it found something.
+// exit 2 when the audit could not run, 1 when it found something. Warnings
+// are printed first and do not count as findings.
 func runLaneDoctor(c *cobra.Command) error {
 	repoRoot, err := worktree.ResolveMainRepoRoot(".")
 	if err != nil {
@@ -40,7 +41,20 @@ func runLaneDoctor(c *cobra.Command) error {
 		_, _ = fmt.Fprintf(c.ErrOrStderr(), "lane doctor: %v\n", err)
 		return withExitCode(2, err)
 	}
+	if a.Managed {
+		drift, derr := lane.GuardDrift(repoRoot)
+		if derr != nil {
+			_, _ = fmt.Fprintf(c.ErrOrStderr(), "lane doctor: %v\n", derr)
+			return withExitCode(2, derr)
+		}
+		a.Warnings = append(a.Warnings, drift...)
+	}
 	out := c.OutOrStdout()
+	// Warnings never change the exit code: they are not drift, only what the
+	// guard will refuse once the marker arms it.
+	for _, w := range a.Warnings {
+		_, _ = fmt.Fprintln(out, w.Warning())
+	}
 	switch {
 	case !a.Managed:
 		_, _ = fmt.Fprintf(out, "lane doctor: %s is not lane-managed (no %s)\n", repoRoot, lane.LanesMarkerFile)

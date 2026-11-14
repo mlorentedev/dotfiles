@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
@@ -68,6 +69,253 @@ func TestAuditLanes_IsSilentOnACoherentRepository(t *testing.T) {
 		t.Fatalf("want managed and initialised, got %+v", a)
 	}
 	wantFindings(t, a, 0)
+}
+
+// A detached worktree with no lease is not drift, but the guard refuses its
+// commits the day the marker lands; the audit warns, naming the recovery, so
+// the owner sees it before then (#3436). Lanes, leased and branch worktrees
+// are not that state and stay out of it.
+func TestAuditLanes_WarnsOfLeaselessDetachedWorktrees(t *testing.T) {
+	repoDir, wtRoot := initialisedLaneRepo(t)
+	base := filepath.Join(wtRoot, "dotfiles")
+	bare := filepath.Join(base, "feat-scratch")
+	leased := filepath.Join(base, "feat-leased")
+	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", bare, "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", leased, "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/on-a-branch", filepath.Join(base, "feat-branch"), "HEAD")
+	if err := worktree.SaveMetadata(leased, worktree.Metadata{State: string(worktree.StateActive)}); err != nil {
+		t.Fatal(err)
+	}
+
+	a := audit(t, repoDir, wtRoot)
+	wantFindings(t, a, 0)
+	if len(a.Warnings) != 1 {
+		t.Fatalf("want one warning, for %s only, got %d: %+v", bare, len(a.Warnings), a.Warnings)
+	}
+	w := a.Warnings[0].Warning()
+	for _, want := range []string{"WARN:", "feat-scratch", "no lease", "dotf worktree adopt", "git switch -c"} {
+		if !strings.Contains(w, want) {
+			t.Errorf("warning does not mention %q:\n%s", want, w)
+		}
+	}
+}
+
+// An expired lease is not drift either: sweep may reap the worktree or park
+// the lane under its owner once the lease is past. The audit warns, naming the
+// command that ends the work, and leaves alone the leases that cannot expire
+// into trouble: a live one, a parked lane's (it carries no expiry) and a
+// worktree that has no lease at all.
+func TestAuditLanes_WarnsOfAnExpiredLease(t *testing.T) {
+	repoDir, wtRoot := initialisedLaneRepo(t)
+	base := filepath.Join(wtRoot, "dotfiles")
+	stale := filepath.Join(base, "feat-stale")
+	live := filepath.Join(base, "feat-live")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/stale", stale, "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/live", live, "HEAD")
+	past, future := time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
+	for path, expires := range map[string]time.Time{stale: past, live: future} {
+		if err := worktree.SaveMetadata(path, worktree.Metadata{Issue: 1, LeaseExpiresAt: expires, ReapOK: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A lane in use whose lease ran out: the fix is to park it, not to remove it.
+	laneName := CanonicalLanes[0]
+	lanePath := filepath.Join(base, laneName)
+	if err := worktree.SaveMetadata(lanePath, worktree.Metadata{Lane: laneName, State: string(worktree.StateActive), Issue: 2, LeaseExpiresAt: past}); err != nil {
+		t.Fatal(err)
+	}
+
+	a := audit(t, repoDir, wtRoot)
+	wantFindings(t, a, 0)
+	var staleWarning, laneWarning Finding
+	for _, w := range a.Warnings {
+		switch {
+		case strings.Contains(w.Subject, "feat-stale"):
+			staleWarning = w
+		case strings.Contains(w.Subject, laneName):
+			laneWarning = w
+		default:
+			t.Errorf("unexpected warning (live, parked or unleased worktrees stay silent):\n%s", w.Warning())
+		}
+	}
+	// The path git reports can differ in form from the one the test built
+	// (slashes, 8.3 names, /var against /private/var): the warning must name
+	// this worktree, and its FIX must repeat the path it reports.
+	if !samePath(staleWarning.Subject, stale) {
+		t.Errorf("warning is about %q, not %q", staleWarning.Subject, stale)
+	}
+	stalePath, lanePathWarning := staleWarning.Warning(), laneWarning.Warning()
+	for _, want := range []string{"WARN:", "lease expired", "FIX: dotf worktree done " + staleWarning.Subject + " "} {
+		if !strings.Contains(stalePath, want) {
+			t.Errorf("warning for a worktree lacks %q:\n%s", want, stalePath)
+		}
+	}
+	for _, want := range []string{"WARN:", "lease expired", "dotf lane park " + laneName} {
+		if !strings.Contains(lanePathWarning, want) {
+			t.Errorf("warning for a lane lacks %q:\n%s", want, lanePathWarning)
+		}
+	}
+}
+
+// The guard that runs is the one under the hooks directory git answers with:
+// core.hooksPath when set, $GIT_DIR/hooks otherwise. A deploy that lags the
+// repository's copy keeps the old rules in force; the warning names the command
+// that redeploys. A repository without its own copy has nothing to lag, and a
+// hooks directory that is the checkout's own git-hooks is no drift by
+// construction.
+func TestGuardDrift(t *testing.T) {
+	const current, stale = "#!/bin/sh\nexit 0\n", "#!/bin/sh\nexit 1\n"
+	writeGuard := func(hooksDir, content string) {
+		t.Helper()
+		p := filepath.Join(hooksDir, filepath.FromSlash(GuardRelPath))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// where says which directory the deployed copy is written to and which
+	// core.hooksPath git is given for it ("" leaves it unset).
+	type place struct{ dir, hooksPath string }
+	inDeploy := func(repo, deploy string) place { d := filepath.Join(deploy, "git-hooks"); return place{d, d} }
+	cases := []struct {
+		name     string
+		repo     *string
+		deployed *string
+		where    func(repo, deploy string) place
+		want     string
+	}{
+		{"identical copies", ptr(current), ptr(current), inDeploy, ""},
+		{"line endings alone are not drift", ptr(current), ptr("#!/bin/sh\r\nexit 0\r\n"), inDeploy, ""},
+		{"deployed copy lags", ptr(current), ptr(stale), inDeploy, "differs"},
+		{"guard missing under the hooks path", ptr(current), nil, inDeploy, "not deployed"},
+		{"relative hooks path resolves from the repository", ptr(current), ptr(stale), func(repo, deploy string) place {
+			d := filepath.Join(deploy, "git-hooks")
+			rel, _ := filepath.Rel(repo, d)
+			return place{d, rel}
+		}, "differs"},
+		{"hooks path is the checkout's own git-hooks", ptr(current), nil, func(repo, _ string) place {
+			d := filepath.Join(repo, "git-hooks")
+			return place{d, d}
+		}, ""},
+		{"hooks path unset, guard in .git/hooks is current", ptr(current), ptr(current), func(repo, _ string) place {
+			return place{filepath.Join(repo, ".git", "hooks"), ""}
+		}, ""},
+		{"hooks path unset, guard in .git/hooks lags", ptr(current), ptr(stale), func(repo, _ string) place {
+			return place{filepath.Join(repo, ".git", "hooks"), ""}
+		}, "differs"},
+		{"hooks path unset, nothing deployed", ptr(current), nil, func(repo, _ string) place {
+			return place{filepath.Join(repo, ".git", "hooks"), ""}
+		}, "not deployed"},
+		{"repository has no copy of its own", nil, ptr(current), inDeploy, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// The machine's own git config must not answer for the test.
+			t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+			t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+			repo, deploy := t.TempDir(), t.TempDir()
+			runGitLaneTest(t, repo, "init", "-b", "main")
+			if tc.repo != nil {
+				writeGuard(filepath.Join(repo, "git-hooks"), *tc.repo)
+			}
+			w := tc.where(repo, deploy)
+			if tc.deployed != nil {
+				writeGuard(w.dir, *tc.deployed)
+			}
+			if w.hooksPath != "" {
+				runGitLaneTest(t, repo, "config", "core.hooksPath", w.hooksPath)
+			}
+			got, err := GuardDrift(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if len(got) != 0 {
+					t.Fatalf("want no warning, got %+v", got)
+				}
+				return
+			}
+			if len(got) != 1 {
+				t.Fatalf("want one warning, got %+v", got)
+			}
+			for _, want := range []string{"WARN:", tc.want, "dotf hooks install"} {
+				if !strings.Contains(got[0].Warning(), want) {
+					t.Errorf("warning lacks %q:\n%s", want, got[0].Warning())
+				}
+			}
+		})
+	}
+}
+
+// When git cannot say where hooks run from, the answer is an error that names
+// the read, not "no guard deployed": a wrong guess would tell the owner to
+// redeploy what is already there.
+func TestGuardDrift_ReportsAHooksPathGitCannotRead(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	notARepo := t.TempDir()
+	p := filepath.Join(notARepo, "git-hooks", filepath.FromSlash(GuardRelPath))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := GuardDrift(notARepo)
+	if err == nil || !strings.Contains(err.Error(), "cannot read the hooks path") {
+		t.Fatalf("want a hooks path read error, got warnings=%+v err=%v", got, err)
+	}
+}
+
+func ptr(s string) *string { return &s }
+
+// The caller prints a failure to audit under its own "lane doctor:" prefix, so
+// none of the errors AuditLanes returns carries one.
+func TestAuditLanes_ErrorsCarryNoCallerPrefix(t *testing.T) {
+	t.Run("empty worktree root", func(t *testing.T) {
+		repoDir, _ := initialisedLaneRepo(t)
+		_, err := AuditLanes(repoDir, " ")
+		wantUnprefixed(t, err)
+	})
+	t.Run("marker unreadable", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		if err := os.MkdirAll(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		_, err := AuditLanes(repoDir, wtRoot)
+		wantUnprefixed(t, err)
+	})
+	t.Run("worktree registry unreadable", func(t *testing.T) {
+		// A file where the registry directory belongs: ReadDir fails with
+		// ENOTDIR here, but Windows reports ERROR_PATH_NOT_FOUND, which Go
+		// maps to fs.ErrNotExist, and an absent registry is not an error. No
+		// other failure of that read is portable (chmod denies nothing there).
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows reports a file in place of the registry directory as not-exist, which is not an error")
+		}
+		repoDir, wtRoot := initialisedLaneRepo(t)
+		registry := filepath.Join(repoDir, ".git", "worktrees")
+		if err := os.RemoveAll(registry); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(registry, []byte("not a directory"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := AuditLanes(repoDir, wtRoot)
+		wantUnprefixed(t, err)
+	})
+}
+
+func wantUnprefixed(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	if strings.Contains(err.Error(), "lane doctor:") {
+		t.Errorf("error carries the caller's prefix: %v", err)
+	}
 }
 
 func TestAuditLanes_SeparatesNotInitialisedFromDrift(t *testing.T) {

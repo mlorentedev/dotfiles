@@ -125,7 +125,7 @@ func newForgePRCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	pr.AddCommand(newForgeCommentCmd("a pull request"), newForgePRCreateCmd(), newForgePREditCmd())
+	pr.AddCommand(newForgeCommentCmd("a pull request"), newForgePRCreateCmd(), newForgePREditCmd(), newForgePRReadyCmd())
 	return pr
 }
 
@@ -271,7 +271,8 @@ func newForgePRCreateCmd() *cobra.Command {
 		Long: "create opens a pull request in the repository the cwd's origin names. The body is\n" +
 			"read only from --body-file (or stdin with -). --head defaults to the current\n" +
 			"branch; --base is required, because the default branch is not something to guess.\n" +
-			"--draft works on GitHub only. It never merges.",
+			"--draft opens a draft on GitHub and Gitea; on Gitea it is a \"WIP: \" title the\n" +
+			"instance must recognise, checked on the answer. It never merges.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -323,8 +324,39 @@ func newForgePRCreateCmd() *cobra.Command {
 	c.Flags().StringVar(&bodyFile, "body-file", "", "file holding the pull request body, or - for stdin (required)")
 	c.Flags().StringVar(&head, "head", "", "branch to merge from (default: the current branch)")
 	c.Flags().StringVar(&base, "base", "", "branch to merge into (required)")
-	c.Flags().BoolVar(&draft, "draft", false, "open as a draft (GitHub only)")
+	c.Flags().BoolVar(&draft, "draft", false, "open as a draft; mark it ready with dotf forge pr ready")
 	return c
+}
+
+func newForgePRReadyCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "ready <number>",
+		Short: "Mark a draft pull request ready for review",
+		Long: "ready marks draft pull request <number> ready for review and prints its URL.\n" +
+			"GitHub: the markPullRequestReadyForReview mutation, the call gh pr ready makes.\n" +
+			"Gitea: the WIP: or [WIP] title prefix is removed, and the answer must no longer\n" +
+			"read as a draft. A pull request that is already ready is left alone.",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			n, err := parseForgeNumber(args[0])
+			if err != nil {
+				return err
+			}
+			repo, backend, err := forgeTarget()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(c.Context(), forgeWriteTimeout)
+			defer cancel()
+			url, err := backend.ReadyPR(ctx, repo, n)
+			if err != nil {
+				return err
+			}
+			printForgeURL(c, url)
+			return nil
+		},
+	}
 }
 
 // newForgePREditCmd is issue edit under the pr name: a pull request is an

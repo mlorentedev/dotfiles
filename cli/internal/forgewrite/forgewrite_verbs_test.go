@@ -179,19 +179,6 @@ func TestGiteaCreatePRSendsHeadAndBase(t *testing.T) {
 	}
 }
 
-// Gitea has no draft field; guessing a title prefix would be silent behaviour.
-func TestGiteaCreatePRRefusesDraftBeforeAnyRequest(t *testing.T) {
-	srv, log := giteaServer(t, 201, `{}`)
-	g := Gitea{BaseURL: srv.URL, Token: tokenFn}
-	_, err := g.CreatePR(context.Background(), Repo{"gitea.example", "o", "n"}, NewPR{Title: "t", Head: "h", Base: "b", Draft: true})
-	if err == nil || !strings.Contains(err.Error(), "FIX:") {
-		t.Fatalf("want ERROR/WHY/FIX, got %v", err)
-	}
-	if len(*log) != 0 {
-		t.Errorf("a refused draft reached the forge: %v", *log)
-	}
-}
-
 func TestGitHubCreatePRUsesThePullsEndpointWithDraft(t *testing.T) {
 	var args []string
 	var stdin string

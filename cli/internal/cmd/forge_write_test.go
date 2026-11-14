@@ -45,6 +45,12 @@ func (r *commentRecorder) CreatePR(_ context.Context, repo forgewrite.Repo, in f
 	return "https://forge.example/p/3", nil
 }
 
+func (r *commentRecorder) ReadyPR(_ context.Context, repo forgewrite.Repo, n int) (string, error) {
+	r.repo, r.number = repo, n
+	r.calls = append(r.calls, "ready")
+	return "https://forge.example/p/3", nil
+}
+
 func (r *commentRecorder) EditIssue(_ context.Context, repo forgewrite.Repo, n int, in forgewrite.IssueEdit) (string, error) {
 	r.repo, r.number, r.edit = repo, n, in
 	r.calls = append(r.calls, "edit")
@@ -501,4 +507,42 @@ func TestForgeHasNoMergeOrCloseCommand(t *testing.T) {
 		}
 	}
 	walk(newForgeCmd())
+}
+
+func TestForgePRReadyMarksTheNumberedPullRequest(t *testing.T) {
+	rec := stubForgeWrite(t, "https://gitea.example/o/n.git")
+	out, err := runForge(t, "pr", "ready", "12")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.number != 12 || len(rec.calls) != 1 || rec.calls[0] != "ready" {
+		t.Errorf("backend got number %d, calls %v", rec.number, rec.calls)
+	}
+	if !strings.Contains(out, "https://forge.example/p/3") {
+		t.Errorf("the pull request URL was not printed: %q", out)
+	}
+}
+
+func TestForgePRReadyTakesExactlyOnePositiveNumber(t *testing.T) {
+	rec := stubForgeWrite(t, "https://github.com/o/n.git")
+	for _, args := range [][]string{{}, {"0"}, {"x"}, {"1", "2"}} {
+		if _, err := runForge(t, append([]string{"pr", "ready"}, args...)...); err == nil {
+			t.Errorf("pr ready %v succeeded", args)
+		}
+	}
+	if len(rec.calls) != 0 {
+		t.Errorf("a refused call reached the forge: %v", rec.calls)
+	}
+}
+
+func TestForgePRHelpNamesDraftAndReadyOnBothForges(t *testing.T) {
+	stubForgeWrite(t, "https://github.com/o/n.git")
+	create, _ := runForge(t, "pr", "create", "--help")
+	if strings.Contains(create, "GitHub only") {
+		t.Errorf("pr create --help still says --draft is GitHub only:\n%s", create)
+	}
+	ready, _ := runForge(t, "pr", "ready", "--help")
+	if !strings.Contains(ready, "GitHub") || !strings.Contains(ready, "Gitea") {
+		t.Errorf("pr ready --help does not name both forges:\n%s", ready)
+	}
 }
