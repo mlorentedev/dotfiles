@@ -19,7 +19,11 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - [ ] AC4 -> <commit> / <test or observation>
 - [ ] AC5 -> <commit> / <test or observation>
 - [ ] AC6 -> <commit> / <test or observation>
-- [ ] AC7 -> <commit> / <test or observation>
+- [x] AC7 -> slice F, feat/lane-doctor-warnings:
+  - leaseless detached worktree: `TestAuditLanes_WarnsOfLeaselessDetachedWorktrees`, `TestLaneDoctor_WarnsOfALeaselessDetachedWorktreeWithoutFailing`
+  - expired lease (parked lanes and unleased worktrees stay silent): `TestAuditLanes_WarnsOfAnExpiredLease`
+  - drifted deployed guard (also a guard never deployed; line endings are not drift): `TestGuardDrift`, `TestLaneDoctor_WarnsOfADriftedDeployedGuardWithoutFailing`
+  - each warning prints a `FIX:` line naming its command, and `lane doctor` exits 0 with warnings alone (the cmd tests assert both)
 - [ ] AC8 -> <commit> / <test or observation>
 - [ ] AC9 -> <commit> / <test or observation>
 
