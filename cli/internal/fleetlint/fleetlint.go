@@ -32,10 +32,29 @@ func (f Finding) String() string {
 // workflowDirs are read on every forge the fleet runs on.
 var workflowDirs = []string{".github/workflows", ".gitea/workflows"}
 
+// actionDirs hold local composite actions, one directory each, on every forge.
+var actionDirs = []string{".github/actions", ".gitea/actions"}
+
 // Lint returns the findings in dir's workflows that no exception covers, and
 // the exceptions file's own, sorted by file, line and rule. An unreadable file
 // is an error, never an empty result.
 func Lint(dir, defaultBranch string) ([]Finding, error) {
+	return LintRules(dir, defaultBranch, nil)
+}
+
+// LintRules is Lint keeping only the findings of the rules in only, every rule
+// when only is empty. The branch rule runs only when it, or the exception
+// check that judges its exceptions, is selected: no other rule needs the
+// default branch, so a selection without them passes where none is known.
+func LintRules(dir, defaultBranch string, only []string) ([]Finding, error) {
+	all, err := lint(dir, defaultBranch, len(only) == 0 || slices.Contains(only, RuleBranchFilter) || slices.Contains(only, RuleException))
+	if err != nil || len(only) == 0 {
+		return all, err
+	}
+	return slices.DeleteFunc(all, func(f Finding) bool { return !slices.Contains(only, f.Rule) }), nil
+}
+
+func lint(dir, defaultBranch string, branches bool) ([]Finding, error) {
 	var all []Finding
 	for _, wd := range workflowDirs {
 		files, err := workflowFiles(filepath.Join(dir, wd))
@@ -43,14 +62,24 @@ func Lint(dir, defaultBranch string) ([]Finding, error) {
 			return nil, err
 		}
 		for _, f := range files {
-			data, err := os.ReadFile(f)
+			found, err := lintFile(dir, f, func(rel string, data []byte) ([]Finding, error) {
+				return lintWorkflow(rel, data, defaultBranch, branches)
+			})
 			if err != nil {
 				return nil, err
 			}
-			rel, _ := filepath.Rel(dir, f)
-			found, err := lintWorkflow(filepath.ToSlash(rel), data, defaultBranch)
+			all = append(all, found...)
+		}
+	}
+	for _, ad := range actionDirs {
+		files, err := actionFiles(filepath.Join(dir, ad))
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range files {
+			found, err := lintFile(dir, f, func(rel string, data []byte) ([]Finding, error) { return lintAction(rel, data) })
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", filepath.ToSlash(rel), err)
+				return nil, err
 			}
 			all = append(all, found...)
 		}
@@ -63,6 +92,58 @@ func Lint(dir, defaultBranch string) ([]Finding, error) {
 	slices.SortStableFunc(out, func(a, b Finding) int {
 		return cmp.Or(strings.Compare(a.Path, b.Path), cmp.Compare(a.Line, b.Line), strings.Compare(a.Rule, b.Rule))
 	})
+	return out, nil
+}
+
+// lintFile reads f and lints it under its path relative to dir, with forward
+// slashes; an error names the file.
+func lintFile(dir, f string, lint func(rel string, data []byte) ([]Finding, error)) ([]Finding, error) {
+	data, err := os.ReadFile(f)
+	if err != nil {
+		return nil, err
+	}
+	rel, _ := filepath.Rel(dir, f)
+	rel = filepath.ToSlash(rel)
+	found, err := lint(rel, data)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", rel, err)
+	}
+	return found, nil
+}
+
+// actionFiles are the manifests of the actions directly under dir: each
+// subdirectory's action.yml or action.yaml, a symlinked one included. Only a
+// manifest that does not exist is skipped: any other failure to stat one is
+// an error, since skipping it would read as a clean check.
+func actionFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range entries {
+		// Stat follows a symlink, as Repos does: e.IsDir() would not.
+		fi, err := os.Stat(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		if !fi.IsDir() {
+			continue
+		}
+		for _, name := range []string{"action.yml", "action.yaml"} {
+			f := filepath.Join(dir, e.Name(), name)
+			_, err := os.Stat(f)
+			switch {
+			case err == nil:
+				out = append(out, f)
+			case !errors.Is(err, os.ErrNotExist):
+				return nil, err
+			}
+		}
+	}
 	return out, nil
 }
 

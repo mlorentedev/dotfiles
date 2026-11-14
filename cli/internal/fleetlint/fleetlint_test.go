@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -393,5 +394,92 @@ func TestReposFollowSymlinks(t *testing.T) {
 	}
 	if got, err := Repos(dir); err != nil || strings.Join(got, ",") != "linked" {
 		t.Errorf("got %v, %v, want linked", got, err)
+	}
+}
+
+// A local composite action can call third-party actions itself, so its
+// manifest is pin-checked like a workflow, on both forges. Only the pin rule
+// reads it, and only one level under actions/.
+func TestActionManifestsArePinChecked(t *testing.T) {
+	const tagged = "runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@" + strings40 + "\n    - uses: owner/setup@v4\n"
+	const pinned = "runs:\n  using: composite\n  steps:\n    - uses: owner/setup@" + strings40 + "\n    - uses: ./.github/actions/other\n    - run: true\n      shell: bash\n"
+	got, err := lintFiles(t, map[string]string{
+		".github/actions/setup/action.yml":    tagged,
+		".gitea/actions/setup/action.yaml":    tagged,
+		".github/actions/ok/action.yml":       pinned,
+		".github/actions/a/nested/action.yml": tagged,
+		".github/actions/docker/action.yml":   "runs:\n  using: docker\n  image: docker://alpine:3\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Finding{
+		{RuleSHAPin, ".gitea/actions/setup/action.yaml", 5, "owner/setup@v4 is not pinned by a full commit SHA"},
+		{RuleSHAPin, ".github/actions/setup/action.yml", 5, "owner/setup@v4 is not pinned by a full commit SHA"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestActionManifestFindingMayBeExcepted(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{
+		".github/actions/setup/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: owner/setup@v4\n",
+		ExceptionsPath:                     "exceptions:\n  - rule: fleet/sha-pin\n    path: .github/actions/setup/action.yml\n    reason: r\n    issue: i\n",
+	})
+	if err != nil || len(got) != 0 {
+		t.Errorf("got %v, %v; want no finding", got, err)
+	}
+}
+
+func TestUnreadableActionManifestIsAnError(t *testing.T) {
+	if _, err := lintFiles(t, map[string]string{".github/actions/setup/action.yml": "runs: [unclosed"}); err == nil {
+		t.Error("a manifest that does not parse read as clean")
+	}
+}
+
+// Rules lists every id a finding can carry, the exceptions file's own
+// included: a selector checks names against it.
+func TestRulesListsEveryFindingRule(t *testing.T) {
+	got := Rules()
+	want := append(slices.Sorted(maps.Keys(rules)), RuleException)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("Rules() = %v, want %v", got, want)
+	}
+}
+
+const strings40 = "0123456789abcdef0123456789abcdef01234567"
+
+// A symlinked action directory is read like any other, and a manifest that
+// cannot be stat'ed for a reason other than its absence is an error: either
+// way, skipping it would read as a clean pin check.
+func TestActionManifestsFailClosed(t *testing.T) {
+	shared := repo(t, map[string]string{"setup/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: owner/setup@v4\n"})
+	dir := repo(t, map[string]string{".github/workflows/ci.yml": "on: push\njobs: {}\n"})
+	if err := os.MkdirAll(filepath.Join(dir, ".github", "actions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(shared, "setup"), filepath.Join(dir, ".github", "actions", "setup")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	got, err := Lint(dir, "main")
+	if err != nil || len(got) != 1 || got[0].Path != ".github/actions/setup/action.yml" {
+		t.Errorf("symlinked action: got %v, %v; want one finding on its manifest", got, err)
+	}
+
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("permission bits do not deny access here")
+	}
+	locked := filepath.Join(dir, ".github", "actions", "locked")
+	if err := os.Mkdir(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	if _, err := Lint(dir, "main"); err == nil {
+		t.Error("an action directory that cannot be searched read as clean")
 	}
 }
