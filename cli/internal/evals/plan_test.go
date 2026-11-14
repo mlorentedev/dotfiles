@@ -102,6 +102,7 @@ func TestPlanRefusesWhatItCannotPrice(t *testing.T) {
 		{"a NaN candidate without rates", unpriced, "nan/glm5.3-flash", "credits_per_mtok"},
 		{"a kind without an envelope", noPlanted, "nan/glm5.3-flash", "planted"},
 		{"a provider with no estimator", other, "or/x", "openrouter"},
+		{"all-zero rates", strings.Replace(pricedCandidates, `{"input":5.25,"cached":1.05,"output":17.5}`, `{"input":0,"cached":0,"output":0}`, 1), "nan/glm5.3-flash", "zero"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := BuildPlan(planCases(), loadPriced(t, tc.body), []string{tc.id}, 3, 30)
@@ -269,5 +270,18 @@ func TestSelectCasesNarrowsToTheNamedOnes(t *testing.T) {
 	}
 	if _, err := SelectCases(planCases(), []string{"p1", "p1"}); err == nil {
 		t.Error("a case named twice must be refused")
+	}
+}
+
+// The rate a token is priced at is the highest of the three, so a cached rate
+// above both others still bounds it.
+func TestPlanPricesAtTheHighestOfTheThreeRates(t *testing.T) {
+	body := strings.Replace(pricedCandidates, `{"input":5.25,"cached":1.05,"output":17.5}`, `{"input":1,"cached":30,"output":2}`, 1)
+	p, err := BuildPlan([]Case{{ID: "a-r1", Kind: "replay"}}, loadPriced(t, body), []string{"nan/glm5.3-flash"}, 1, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := 200000 * 30 / 1e6; p.Estimates[0].Amount != want {
+		t.Errorf("estimate %v, want %v at the cached rate", p.Estimates[0].Amount, want)
 	}
 }

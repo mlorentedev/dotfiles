@@ -123,9 +123,13 @@ func estimate(e spec.ReviewerEntry, cs Candidates, cases []Case, epochs int) (Es
 		if !ok {
 			return Estimate{}, fmt.Errorf("candidate %s declares no credits_per_mtok in %s, so its runs cannot be priced", e.ID, CandidatesFile)
 		}
-		// The envelopes are measured totals with no input/output split, so each
-		// token is priced at the higher rate rather than at an invented split.
-		rate := max(rates.Input, rates.Output)
+		// The envelopes are measured totals with no split by token type, so each
+		// token is priced at the highest of the three rates rather than at an
+		// invented split.
+		rate := max(rates.Input, rates.Cached, rates.Output)
+		if rate == 0 {
+			return Estimate{}, fmt.Errorf("candidate %s has zero credits_per_mtok, and an estimate is never zero; a model that draws no credits needs no evaluation budget, so it is not a candidate here", e.ID)
+		}
 		var tokens int
 		for _, c := range cases {
 			n, ok := cs.Envelopes[c.Kind]
@@ -222,7 +226,7 @@ func (p Plan) Render() string {
 		}
 		fmt.Fprintf(&b, "\nNaN envelopes (%s): %s.\n"+
 			"Measured on another model and case, so a run may spend more. Each token is\n"+
-			"priced at the higher of the model's input and output rates.\n", CandidatesFile, strings.Join(parts, ", "))
+			"priced at the highest of the model's input, cached and output rates.\n", CandidatesFile, strings.Join(parts, ", "))
 	}
 	return b.String()
 }

@@ -114,7 +114,9 @@ func newEvalRunCmd() *cobra.Command {
 				return fmt.Errorf("eval run: %w", err)
 			}
 			plan, err := evals.BuildPlan(cases, cs, candidates, epochs, maxRuns)
-			if plan.Runs > 0 {
+			// Only a plan refused for its size is printed with the error: any
+			// other refusal has no plan worth showing.
+			if err == nil || errors.Is(err, evals.ErrOverCap) {
 				if _, werr := io.WriteString(c.OutOrStdout(), plan.Render()); werr != nil {
 					return werr
 				}
