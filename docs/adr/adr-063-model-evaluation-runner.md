@@ -228,13 +228,17 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 
 1. Resolve `reviewed_sha`. If the clone lacks it, fetch the SHA itself, then `fetch_ref`, then verify. A branch rebased after its review would not carry the SHA on its PR ref.
    If it cannot be resolved, the case fails loudly as infrastructure; it is never scored zero.
-2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotf/evals/<run-id>/<case>-<epoch>/`,
+2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotfiles/evals/<run-id>/<case>-<epoch>/`,
    outside every repository tree, and remove it when the run ends.
 3. Launch through `internal/spec`'s review launcher in a new **eval slot**:
    - The candidate comes from `harness/evals/candidates.json`, using a pool entry's shape: runner,
      provider, model, secret id. The pool is not read.
    - The base is the case's `base_sha`, passed explicitly instead of resolved.
-   - The reviewer writes its verdict to the run directory, never to `specs/`.
+   - The reviewer writes its verdict inside the replay tree, to `.dotf-eval/review.md`, never to
+     `specs/`. The answer is then kept in the run directory, beside the launch request and the
+     transcript. Amended 2026-11-14: a verdict path outside the tree is out of reach of agy's
+     `--add-dir` scope and of the launcher's stray-write snapshot, which runs `git status` in
+     the verdict's folder.
 4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run. The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
 5. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
    still leaves (today's tools against old code) is listed once in the case's `noise`.
@@ -242,7 +246,8 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 The review gate cannot be satisfied by an eval run (C37), for three reasons:
 
 - the output never lands in a spec folder;
-- the recorded reviewer is prefixed `eval:`, which no pool id matches;
+- the recorded reviewer is prefixed `eval:`, and the gate refuses a signature or launch request
+  carrying that prefix before it consults the pool, which has no opinion in a repository without one;
 - a test in the same PR asserts that `checkReviewGate` refuses an eval record copied into a spec
   folder.
 
@@ -301,7 +306,7 @@ the runner, result format and proposal stay the same:
 
 ### 6. Output
 
-Each run writes to `$XDG_STATE_HOME/dotf/evals/<run-id>/`:
+Each run writes to `$XDG_STATE_HOME/dotfiles/evals/<run-id>/`:
 
 - `results.json`, valid against `harness/evals/result.schema.json`. Every record carries its
   provenance: dotf version, corpus commit, skill digest, runner version, model id and date.
