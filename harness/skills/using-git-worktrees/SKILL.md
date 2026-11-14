@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: 1ae2d00e2343129c
+generated_sha: 7a729775ee1c02a0
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -117,7 +117,22 @@ to remove the gitlink. Do not proceed.
 
 ## Creation Steps
 
-### 1. Create the worktree (new branch)
+### 1. Create or switch the workspace (Persistent Named Lanes first, Ephemeral fallback)
+
+If the repository uses persistent named lanes (`.dotf/lane.json` present or `dotf lane status` shows `feat-lane-primary` / `feat-lane-secondary` / `fast-track-lane`), **never create a 4th ephemeral worktree**. Provision and switch the persistent lane in-place (ADR-060):
+
+```bash
+if [ -f "$repo_root/.dotf/lane.json" ]; then
+  cd "$repo_root" &&
+  dotf lane init &&
+  dotf lane switch "<type>/$SLUG" &&
+  wt_path="$(git -C "$repo_root" worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')" &&
+  [ -n "$wt_path" ] &&
+  cd "$wt_path"
+fi
+```
+
+Otherwise, create an external worktree via `dotf worktree add`:
 
 ```bash
 dotf worktree add "$SLUG" -b "<type>/$SLUG" &&
@@ -167,13 +182,17 @@ Ready to work in parallel.
 
 ## Teardown (deterministic)
 
-Run it from a shell **outside** the worktree being removed, after the session that worked
-in it has ended. A session cannot resume once its launch directory is gone, which is why
-`done` refuses the caller's own worktree and one with a recent session.
+In repositories using persistent named lanes (`feat-lane-primary`, `feat-lane-secondary`, `fast-track-lane`), **never delete the lane directory**. Instead, park the lane in-place once its PR has merged (`dotf lane park` or `dotf worktree done "<type>/$SLUG"`, which automatically detects `meta.Lane != ""` and parks in-place, detaching `HEAD` at `origin/main`, deleting the merged local branch, releasing the issue claim, and archiving the memory thread):
+
+```bash
+dotf lane park --repo "$repo_root"
+```
+
+For ordinary ephemeral worktrees, run teardown from a shell **outside** the worktree being removed, after the session that worked in it has ended. A session cannot resume once its launch directory is gone, which is why `done` refuses the caller's own worktree and one with a recent session.
 
 ```bash
 cd "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"  # the main checkout, never the target
-dotf worktree done "<type>/$SLUG"      # by branch; refuses while a session lives in it; deletes a landed branch
+dotf worktree done "<type>/$SLUG"      # by branch; parks persistent lanes in-place or removes ephemeral worktrees
 # fallback: git worktree remove "$wt_path" (add --force only if intentionally discarding work)
 # If a nested fallback was ever used: remove its line from .git/info/exclude
 git -C "$repo_root" ls-files --stage | awk '$1==160000'   # must be empty
