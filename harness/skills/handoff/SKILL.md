@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 0fefcf90069ae2f7
+generated_sha: e3519c8d1b8e7532
 id: handoff-skill
 type: skill
 status: active
@@ -230,13 +230,15 @@ The board (2b) is not the only place a promise can hide, and it is not the one t
 ### 3. Repo / worktree / branch state & housekeeping
 
 1. **Verify Git clean state:** No dangling uncommitted work unless explicitly listed in **Open threads**.
-2. **Audit Worktrees:**
+2. **Audit Worktrees & Persistent Named Lanes (ADR-060):**
    ```bash
    dotf worktree list
-   # For worktrees associated with merged PRs:
-   dotf worktree done <branch>  # refuses while a session lives in it; deletes the landed branch
+   # For persistent named lanes (feat-lane-primary, feat-lane-secondary, fast-track-lane) whose PR merged:
+   dotf lane park
+   # For ephemeral worktrees associated with merged PRs:
+   dotf worktree done <branch>  # parks named lanes in-place or removes ephemeral worktrees
    ```
-   **Never the worktree this session was launched from**, nor one holding the shell's working directory. Removing it strands the session, and the harness cannot resume a conversation whose launch directory is gone (dotfiles #1653; `dotf worktree done` refuses it, `--force` included). List it under **Open threads** for removal after the session ends instead.
+   **Note:** Persistent named lanes (`meta.Lane != ""`) are parked in-place (`PARKED`, detached at `origin/main`, directory preserved, memory thread archived to `memory/archive/`), so `dotf lane park` never deletes the launch directory. For ephemeral worktrees, **never remove the worktree this session was launched from**, nor one holding the shell's working directory (dotfiles #1653). List it under **Open threads** for removal after the session ends instead.
 3. **Prune Remote Refs:** Run `git fetch --prune` on all touched repos.
 4. **Delete Merged Local Branches:**
    ```bash

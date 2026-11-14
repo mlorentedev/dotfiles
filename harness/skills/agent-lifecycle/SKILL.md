@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/agent-lifecycle/SKILL.md
-generated_sha: d432cf76b1f0e8d0
+generated_sha: a60cff06ec36d893
 id: agent-lifecycle-skill
 type: skill
 status: active
@@ -255,9 +255,9 @@ Scripts should:
 | Task type | Model | Why |
 |-----------|-------|-----|
 | Agent-driven complex tasks | `deepseek-v4-flash` | Strong reasoning, 1M context |
-| Creating cron jobs | `qwen3.6` | No token limit, always available |
+| Creating cron jobs | `qwen3.6` | Spends no NaN credits; rate-limited only |
 | Simple extraction/classification | `gemma4` | Ultra-lite, high volume |
-| Async cron runs | `qwen3.6` | Default for cron, no quota |
+| Async cron runs | `qwen3.6` | Default for cron, spends no credits |
 
 ### Common Patterns
 

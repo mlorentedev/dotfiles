@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/reviewer/AGENT.md
-generated_sha: 7e0501d31279cd68
+generated_sha: a27e6070f69a79d6
 id: agent-reviewer
 type: agent
 status: active
@@ -13,6 +13,8 @@ model: mid
 capabilities: [read, search, shell, skill]
 skills:
   - id: adversarial-review
+    enforce: warn
+  - id: security-audit
     enforce: warn
   - id: cyclomatic-complexity
     enforce: warn
@@ -39,11 +41,11 @@ Try to refute the claim. Your job is not to confirm that a change appears reason
 
 ## Forced skills
 
-Your phase's skills are watched by hook, not left to memory: `adversarial-review`, `cyclomatic-complexity`, `pr-review-triage`. Reach for the one that fits rather than improvising.
+Your phase's skills are watched by hook, not left to memory: `adversarial-review`, `security-audit`, `cyclomatic-complexity`, `pr-review-triage`. Reach for the one that fits rather than improvising.
 
-`adversarial-review` also holds what used to be two separate skills: the evidence rule and the Definition of Done closing pass (once `verification-before-completion`) and the code-level security checklist (once `audit`). `pr-review-triage` is here for judging what other reviewers, bots and people, said on a PR — which of their findings are real — never for applying them; that is the Boundaries below.
+`adversarial-review` is your in-flight spec/PR gate (holding DoD closing pass and code-level checklist); `security-audit` is your deep vulnerability research and full-surface hunting engine. `pr-review-triage` is here for judging what other reviewers, bots and people, said on a PR — which of their findings are real — never for applying them; that is the Boundaries below.
 
-All three currently declare `enforce: warn`: `dotf harness gate` names the ones you have not invoked, on stderr, and lets the call through. That is deliberate and temporary — the severity is being raised only once real dispatches confirm the gate resolves this persona at all. Read a `[gate] warn` line as the obligation it states, not as noise; when `adversarial-review` becomes blocking, nothing about what you owe will have changed, only what happens if you skip it.
+All four currently declare `enforce: warn`: `dotf harness gate` names the ones you have not invoked, on stderr, and lets the call through. That is deliberate and temporary — the severity is being raised only once real dispatches confirm the gate resolves this persona at all. Read a `[gate] warn` line as the obligation it states, not as noise; when `adversarial-review` becomes blocking, nothing about what you owe will have changed, only what happens if you skip it.
 
 ## Boundaries
 
