@@ -49,9 +49,11 @@ owner: manu
 - [x] [AC6] Implement the plan and the cap, for NaN (credits) and agy (run count); rates in `candidates.json`, held to `ai/nan/README.md` by a test
 - [ ] [AC6] Anthropic estimate in money from `dotf pr route`'s price rows, once a candidate runs on Anthropic (none does today)
 - [ ] [AC6] `measured` envelopes: the median of a case's earlier runs, read from stored `results.json` (needs AC7)
-- [ ] [AC5] Launch path for a planted case: it has no commit or tree, only `prompt.md`; decide how the eval slot sends it (ADR-063 §1)
+- [x] [AC5] Launch path for a planted case: it has no commit or tree, only `prompt.md`; decide how the eval slot sends it (ADR-063 §1). `spec.PlanPlantedLaunch`, answer at `.dotf-eval/review.md` in an empty tree
 - [ ] [AC5] Concurrency bounded per pool by `model-map.json`, the bound `dotf agent run` holds
-- [ ] [AC5] Failing test: per-run grading record, with completion class mapped from the launcher's exit, and format failure distinct from zero findings
+- [x] [AC5] Failing test: per-run grading record, with completion class mapped from the launcher's exit, and format failure distinct from zero findings. `evals.Run` with an injected launcher: one attempt at a time, `record.json` before the next, `infra-error` never charged to the model, own-key flag, interrupt passed to the runner in flight
+- [ ] [AC5] The real launcher: create and remove the tree (replay checkout or empty dir, removed on interrupt), exec under `deadlineWrap`, copy the answer out, tokens from the transcript; preflight resolves every commit and runner binary before the first launch, and refuses a replay whose source review is present at `reviewed_sha`
+- [ ] [AC5] Tell `rate-limit`, `quota` and `content-filter` apart from `provider-error` by the transcript
 - [ ] [AC5] Implement run, grade and epoch reduction; flag results on a candidate's own keys
 - [ ] [AC7] Failing test: `results.json` validates against `result.schema.json` with the provenance fields; no code path opens the pool, map or pins for writing
 - [ ] [AC7] Implement `results.json`, `report.md`, `proposal.md`, and `dotf eval report --comment <issue>`

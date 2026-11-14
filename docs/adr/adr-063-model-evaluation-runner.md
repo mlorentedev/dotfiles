@@ -207,6 +207,11 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
   `reference.md`, the ideal answer the key is checked against. They use the same
   `expected`/`decoys` fields and name `human` as `key_author`. #3476's prompt is case one, and its
   false bash 3.2 claim is its first decoy.
+  A planted run (amended 2026-11-14, HARNESS-101 slice 3) sends `prompt.md` as written, followed by
+  where to write the answer and the time budget, and runs in an empty directory. The answer is a file
+  at `.dotf-eval/review.md` inside that directory, the place a replay writes to, so one grading path
+  reads both. #3476 took the answer from stdout (`--print`); a file is kept apart from the runner's
+  own chatter and survives a runner that streams.
 - **How a row is classed, in order** (amended 2026-11-14, HARNESS-101 slice 1):
   - noise is discarded first;
   - then a decoy match is a false positive, even when the row also names a real symbol;
