@@ -184,13 +184,15 @@ for wf_file in sorted(glob.glob(os.path.join(sys.argv[1], "*.yml"))):
     outputs = (jobs.get("changes") or {}).get("outputs") or {}
     for job_id, job in jobs.items():
         cond = str(job.get("if", ""))
-        m = re.search(r"needs\.changes\.outputs\.(\w+)", cond)
-        if not m:
+        refs = re.findall(r"needs\.changes\.outputs\.(\w+)", cond)
+        if not refs:
             continue
         host = str(job.get("runs-on", "")) + str((job.get("strategy") or {}).get("matrix", {}).get("os", ""))
         if job_id not in aggregated and not any(k in host for k in ("windows", "macos")):
             continue
-        if cond.strip().startswith(push_if) or push_out in str(outputs.get(m.group(1), "")):
+        # Every output the guard reads must be push-true: one that is not can
+        # still skip the job on a push, whatever the others say.
+        if cond.strip().startswith(push_if) or all(push_out in str(outputs.get(r, "")) for r in refs):
             continue
         bad.append(f"{name}:{job_id} ({cond})")
 print("guarded jobs a push can skip:", bad)
