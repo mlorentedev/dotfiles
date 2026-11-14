@@ -387,14 +387,18 @@ func ArchiveAndPruneThread(projectDir, branch string) error {
 		}
 		return err
 	}
-	pruned, changed := pruneThreadFromMemory(string(raw), key)
+	pruned, changed := pruneThreadFromMemory(string(raw), key, true)
 	if !changed {
 		return nil
 	}
 	return ReplaceFile(memoryPath, pruned, 0o644)
 }
 
-func pruneThreadFromMemory(content, key string) (string, bool) {
+// pruneThreadFromMemory removes key's block from the handoff section, and with
+// forks also every <key>+<agent> fork of it. A lane park takes the forks with
+// the lane (#3487 questions that); a writer archiving its own thread never
+// touches another agent's fork (MEMORY-019).
+func pruneThreadFromMemory(content, key string, forks bool) (string, bool) {
 	lines := strings.Split(content, "\n")
 	changed := false
 	for {
@@ -408,7 +412,7 @@ func pruneThreadFromMemory(content, key string) (string, bool) {
 			if !ok {
 				continue
 			}
-			if hk == key || strings.HasPrefix(hk, key+"+") {
+			if hk == key || forks && strings.HasPrefix(hk, key+"+") {
 				foundStart, foundEnd = threadSpan(lines, start, end, hk)
 				break
 			}
