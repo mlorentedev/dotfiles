@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: dfa92e8b08af7d40
+generated_sha: 11b06ae5079a8436
 id: autopilot-skill
 type: skill
 status: active
@@ -173,10 +173,20 @@ resolve_wt() {
 }
 WT_DIR="$(resolve_wt)"
 if [ -z "$WT_DIR" ]; then
-  if [ -f .dotf/lane.json ]; then
+  # `.dotf/lanes.json` is the committed ADR-060 marker (`LanesMarkerFile`); `.dotf/lane.json` is the
+  # CLI-129 queue contract and says nothing about lanes. A run never calls `dotf lane init`: that
+  # writes the marker into the main checkout and arms the lane guard for every worktree on the
+  # machine, which is the owner's or converge's step (#3426).
+  if [ -f .dotf/lanes.json ]; then
     # `lane switch` takes the branch as an argument; `lane claim` takes the lease `worktree add --issue` would
-    dotf lane init && dotf lane switch "$BRANCH" &&
-      lane_dir="$(resolve_wt)" && [ -n "$lane_dir" ] &&
+    # A run takes a free lane; when none is free it ENDS (ADR-060). A failed switch (`WIP cap reached`
+    # names the candidate lanes) is `parked(wip-cap)`: never fall through to `dotf worktree add`, and
+    # never reach the generic lease-lost path below.
+    if ! lane_err="$(dotf lane switch "$BRANCH" 2>&1)"; then
+      echo "parked(wip-cap): no lane is free for ${BRANCH}: ${lane_err}"
+      exit 1
+    fi
+    lane_dir="$(resolve_wt)" && [ -n "$lane_dir" ] &&
       ( cd "$lane_dir" && dotf lane claim "$ISSUE_NUM" )
   else
     dotf worktree add "$SLUG" -b "$BRANCH" --issue "$ISSUE_NUM"
@@ -413,7 +423,7 @@ real check would go in, and spends the attention that would have written one.
 
 **Run-level stops** (nothing else is picked; the disarm report is written): `expired` · `budget-iterations` ·
 `budget-items` · `stalled` (two iterations changing neither the ledger nor the envelope) · `queue-empty` ·
-`goal-blocked` · `lease-lost` · `envelope-invalid` · `preflight-failed` · `advisor-unavailable`.
+`goal-blocked` · `wip-cap` · `lease-lost` · `envelope-invalid` · `preflight-failed` · `advisor-unavailable`.
 
 **A check that cannot run is `pending`, never `pass`.** If `dotf pr land` is absent, unauthenticated,
 rate-limited, or returns something you cannot interpret: post the triage comment with a
