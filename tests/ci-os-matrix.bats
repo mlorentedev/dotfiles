@@ -140,7 +140,7 @@ sys.exit(0 if shared[0] == "**" and excl and not overlap else 1)'
 # SHA with its tag. The composite owns buildx and the gha cache; this repository
 # owns the scope, which stays `integration` so the cache main already wrote is
 # reused, and the policy that only a push to main writes it.
-@test "CI-013: the integration container builds with a gha layer cache and the pinned build args" {
+@test "CI-013: the integration container builds through the pinned docker-build composite, which owns the gha cache backend, with the integration scope and the pinned build args" {
     run _py '
 import re
 steps = load("ci.yml")["jobs"]["integration"]["steps"]
