@@ -234,7 +234,11 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
    - The candidate comes from `harness/evals/candidates.json`, using a pool entry's shape: runner,
      provider, model, secret id. The pool is not read.
    - The base is the case's `base_sha`, passed explicitly instead of resolved.
-   - The reviewer writes its verdict to the run directory, never to `specs/`.
+   - The reviewer writes its verdict inside the replay tree, to `.dotf-eval/review.md`, never to
+     `specs/`. The answer is then kept in the run directory, beside the launch request and the
+     transcript. Amended 2026-11-14: a verdict path outside the tree is out of reach of agy's
+     `--add-dir` scope and of the launcher's stray-write snapshot, which runs `git status` in
+     the verdict's folder.
 4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run. The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
 5. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
    still leaves (today's tools against old code) is listed once in the case's `noise`.

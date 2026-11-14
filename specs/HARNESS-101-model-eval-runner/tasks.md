@@ -36,11 +36,11 @@ owner: manu
 
 ### Slice 2: eval slot in the review launcher
 
-- [ ] [AC4] Failing test: `checkReviewGate` refuses a review recorded as `eval:<id>` inside a spec folder
-- [ ] [AC4] Failing test: an eval launch with an explicit base and candidate reads no pool file and writes nothing under `specs/`
-- [ ] [AC4] Implement the eval slot (`internal/spec`): candidate from `harness/evals/candidates.json`, base passed explicitly, output directory supplied by the caller
-- [ ] [AC3] Failing test: a case whose `reviewed_sha` is absent locally is fetched from `fetch_ref`; an unresolvable one exits non-zero naming the case
-- [ ] [AC3] Implement replay checkout: a detached worktree under `$XDG_STATE_HOME/dotf/evals/<run-id>/`, removed afterwards
+- [x] [AC4] Failing test: `checkReviewGate` refuses a review recorded as `eval:<id>` inside a spec folder
+- [x] [AC4] Failing test: an eval launch with an explicit base and candidate reads no pool file and writes nothing under `specs/`
+- [x] [AC4] Implement the eval slot (`internal/spec`): candidate from `harness/evals/candidates.json`, base passed explicitly, output directory supplied by the caller
+- [x] [AC3] Failing test: a case whose `reviewed_sha` is absent locally is fetched from `fetch_ref`; an unresolvable one exits non-zero naming the case
+- [x] [AC3] Implement replay checkout: a detached worktree under `$XDG_STATE_HOME/dotf/evals/<run-id>/`, removed afterwards
 
 ### Slice 3: `dotf eval run`
 
