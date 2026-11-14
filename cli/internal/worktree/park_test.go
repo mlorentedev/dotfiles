@@ -199,7 +199,7 @@ func TestLaneParkInPlaceAndTipVerification(t *testing.T) {
 		t.Errorf("unexpected metadata after Park: %+v", afterMeta)
 	}
 
-	// 3. SessionEnd must be a clean no-op on a PARKED lane (B3), and ArchiveAndPruneThread moves thread to archive.
+	// 3. SessionEnd must be a clean no-op on a PARKED lane (B3), and ArchiveParkedThread moves its entry to the dated archive.
 	vaultDir := filepath.Join(root, "vault")
 	memDir := filepath.Join(vaultDir, "10_projects", "dotfiles", "memory")
 	if err := os.MkdirAll(filepath.Join(memDir, "threads"), 0o755); err != nil {
@@ -227,15 +227,18 @@ func TestLaneParkInPlaceAndTipVerification(t *testing.T) {
 		t.Errorf("SessionEnd on PARKED lane wrote journal %q, want no-op empty string (B3)", journalOut)
 	}
 
-	if err := mem.ArchiveAndPruneThread(filepath.Join(vaultDir, "10_projects", "dotfiles"), "feat/3255-lanes"); err != nil {
-		t.Fatalf("ArchiveAndPruneThread failed: %v", err)
+	archived, err := mem.ArchiveParkedThread(filepath.Join(vaultDir, "10_projects", "dotfiles"), "feat/3255-lanes", now)
+	if err != nil {
+		t.Fatalf("ArchiveParkedThread failed: %v", err)
 	}
 	if _, err := os.Stat(threadFile); !os.IsNotExist(err) {
 		t.Errorf("expected active thread file %s to be moved out of threads/", threadFile)
 	}
-	archivedThread := filepath.Join(memDir, "archive", "feat-3255-lanes.md")
-	if _, err := os.Stat(archivedThread); err != nil {
-		t.Errorf("expected archived thread file at %s, stat err: %v", archivedThread, err)
+	if _, err := os.Stat(filepath.Join(memDir, "archive", "threads", "feat-3255-lanes.md")); err != nil {
+		t.Errorf("archived thread file is not under archive/threads/: %v", err)
+	}
+	if body, err := os.ReadFile(archived.Path); err != nil || !strings.Contains(string(body), "[full thread](threads/feat-3255-lanes.md)") {
+		t.Errorf("dated archive %s holds %q (%v)", archived.Path, body, err)
 	}
 	updatedMem, err := os.ReadFile(memPath)
 	if err != nil {

@@ -151,7 +151,7 @@ func newLaneParkCmd() *cobra.Command {
 				return err
 			}
 			_, _ = fmt.Fprintf(c.OutOrStdout(), "lane park: %s parked (deleted_branch=%s sha=%s)\n", lanePath, res.DeletedBranch, res.DeletedSHA)
-			return nil
+			return reportParkThreads(c.ErrOrStderr(), lanePath, res.Threads, res.ThreadsErr)
 		},
 	}
 	c.Flags().BoolVar(&force, "force", false, "force park even if uncommitted or unpushed")

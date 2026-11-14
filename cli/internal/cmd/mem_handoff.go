@@ -101,6 +101,7 @@ type archiveWrite struct {
 	path    string // the archive file
 	text    string // what it holds after the write
 	changed bool   // false when it already held the block
+	live    string // the thread file in threads/ the archived one replaces
 }
 
 func (w *handoffWrite) run(cmd *cobra.Command) error {
@@ -171,7 +172,7 @@ func (w *handoffWrite) store(current, thread, body string) (mem.StoredThread, *a
 		return mem.StoredThread{}, nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	text, changed := mem.AppendArchive(string(existing), date, res.Block)
-	return res.StoredThread, &archiveWrite{path: path, text: text, changed: changed}, nil
+	return res.StoredThread, &archiveWrite{path: path, text: text, changed: changed, live: res.Live}, nil
 }
 
 // readHandoffBody reads the thread body from stdin and refuses an empty one.
@@ -230,8 +231,9 @@ func (w *handoffWrite) publish(cmd *cobra.Command, thread, current, prev string,
 	return nil
 }
 
-// write appends the archive, then replaces the thread file and then MEMORY.md.
-// The archive goes first, so a write stopped part-way leaves the entry in
+// write appends the archive, then replaces the thread file and then MEMORY.md,
+// and with --finished removes the live thread file last, once nothing points
+// at it. The archive goes first, so a write stopped part-way leaves the entry in
 // MEMORY.md and at worst in the archive too, never in neither. The file goes first: an
 // entry pointing at a file not yet written is the one order that reads as lost,
 // while a file ahead of its entry is the thread a reader follows anyway. A new
@@ -249,10 +251,18 @@ func (w *handoffWrite) write(res mem.StoredThread, archive *archiveWrite) error 
 	if err := mem.ReplaceFile(res.File, res.FileBody, mode); err != nil {
 		return err
 	}
-	if !res.Changed {
+	if res.Changed {
+		if err := mem.ReplaceFile(w.memoryPath, res.Content, mode); err != nil {
+			return err
+		}
+	}
+	if archive == nil || archive.live == "" {
 		return nil
 	}
-	return mem.ReplaceFile(w.memoryPath, res.Content, mode)
+	if err := os.Remove(archive.live); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("the thread is archived, but its live file %s was not removed, and doctor will report it as a lost handoff: %w", archive.live, err)
+	}
+	return nil
 }
 
 // newMemThreadCmd prints this session's thread key and journal filename, so a

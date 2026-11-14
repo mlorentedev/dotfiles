@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
@@ -64,11 +65,11 @@ func realLaneVerbs(c *cobra.Command, src lane.Sources) lane.Verbs {
 				return 0, err
 			}
 			runner := lane.ForgeSweep{RealSweepRunner: &worktree.RealSweepRunner{}, Forge: src.Forge}
-			report, err := worktree.SweepWithRunner(worktree.SweepOptions{RepoRoot: root, Sessions: sessionStores()}, runner, src.Now)
+			report, err := worktree.SweepWithRunner(worktree.SweepOptions{RepoRoot: root, Sessions: sessionStores(), VaultPath: vault.ResolveVault()}, runner, src.Now)
 			if err != nil {
 				return 0, err
 			}
-			return len(report.Reaped), nil
+			return len(report.Reaped), reportSweepThreads(c.ErrOrStderr(), report)
 		},
 		Next: func() (bool, error) {
 			out, err := doLaneNext(c, "", false)

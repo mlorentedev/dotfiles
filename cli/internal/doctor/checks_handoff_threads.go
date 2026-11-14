@@ -28,7 +28,8 @@ var threadHeading = regexp.MustCompile(`(?m)^### thread: (\S+)`)
 // split back into a key. The key and the file name come from mem.ThreadKey and
 // mem.ThreadFileName, the writer's own functions, so the check cannot disagree
 // with the writer about what a thread is. The sanctioned archive step moves the
-// file to archive/ as it deletes the entry, so an archived thread never trips it.
+// file to archive/threads/ as it deletes the entry (MEMORY-020), so an archived
+// thread never trips it.
 //
 // Read-only and WARN-only by contract: restoring an entry needs a human to say
 // whether the thread is live, so there is no --fix and no path to rep.Fail.
@@ -125,7 +126,7 @@ func lostHandoffs(trees []worktree.RawWorktree, threadsPath string, entries map[
 			continue
 		}
 		warnings = append(warnings, fmt.Sprintf("thread %q (worktree %s) has a handoff file but no `### thread: %s` entry in MEMORY.md — %s still holds its body. "+
-			"Re-run `dotf mem handoff-write --thread %s` with that body, or, if the thread is finished, move the file to archive/ (the archive step).",
+			"Re-run `dotf mem handoff-write --thread %s` with that body, adding --finished if the thread is finished, which archives it.",
 			key, t.Path, key, file, key))
 	}
 	return checked, warnings

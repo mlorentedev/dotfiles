@@ -45,8 +45,37 @@ func TestHandoffWriteFinishedArchivesTheThread(t *testing.T) {
 	if string(got) != want {
 		t.Errorf("archive holds\n%q\nwant\n%q", got, want)
 	}
-	if _, err := os.Stat(filepath.Join(filepath.Dir(memory), "threads", "feat-x.md")); err != nil {
-		t.Errorf("the thread file was not written: %v", err)
+	if _, err := os.Stat(filepath.Join(filepath.Dir(memory), "archive", "threads", "feat-x.md")); err != nil {
+		t.Errorf("the thread file was not written under archive/threads/, where the entry's pointer resolves from the archive: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(memory), "threads", "feat-x.md")); !os.IsNotExist(err) {
+		t.Errorf("a finished thread left a file in threads/, which doctor reports as a lost handoff: %v", err)
+	}
+}
+
+// MEMORY-020 AC1: finishing a thread that was live moves its file out of
+// threads/: the entry is gone from MEMORY.md, so nothing points there.
+func TestHandoffWriteFinishedMovesALiveThreadFile(t *testing.T) {
+	memory, _ := finishedSetup(t)
+	if _, _, err := runHandoffWrite(t, memory, "**Next action:** Keep going.\n"); err != nil {
+		t.Fatal(err)
+	}
+	live := filepath.Join(filepath.Dir(memory), "threads", "feat-x.md")
+	if _, err := os.Stat(live); err != nil {
+		t.Fatalf("setup: no live thread file: %v", err)
+	}
+	if _, _, err := runHandoffWrite(t, memory, "**Next action:** None for this thread.\n", "--finished"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(live); !os.IsNotExist(err) {
+		t.Errorf("the live thread file is still in threads/: %v", err)
+	}
+	archived, err := os.ReadFile(filepath.Join(filepath.Dir(memory), "archive", "threads", "feat-x.md"))
+	if err != nil || !strings.Contains(string(archived), "None for this thread") {
+		t.Errorf("archived thread file holds %q (%v), want the finished body", archived, err)
+	}
+	if index, _ := os.ReadFile(memory); strings.Contains(string(index), "feat-x") {
+		t.Errorf("MEMORY.md still holds the thread:\n%s", index)
 	}
 }
 
