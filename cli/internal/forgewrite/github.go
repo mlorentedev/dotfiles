@@ -63,6 +63,36 @@ func (g GitHub) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) 
 		map[string]any{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base, "draft": in.Draft})
 }
 
+// readyMutation marks a draft ready. REST can open a pull request as a draft
+// but cannot clear the flag; this GraphQL mutation is the only call that does,
+// and the one `gh pr ready` sends.
+const readyMutation = `mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }`
+
+// ReadyPR implements Backend. The pull request is read over REST for its node
+// id; a ready one gets no mutation.
+func (g GitHub) ReadyPR(ctx context.Context, r Repo, number int) (string, error) {
+	endpoint := fmt.Sprintf("repos/%s/%s/pulls/%d", r.Owner, r.Name, number)
+	out, err := g.Run(ctx, nil, "api", endpoint)
+	if err != nil {
+		return "", fmt.Errorf("gh api %s: %w", endpoint, err)
+	}
+	var pr struct {
+		NodeID  string `json:"node_id"`
+		Draft   bool   `json:"draft"`
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.Unmarshal(out, &pr); err != nil || pr.NodeID == "" {
+		return "", fmt.Errorf("gh api %s: the answer is not a pull request", endpoint)
+	}
+	if !pr.Draft {
+		return pr.HTMLURL, nil
+	}
+	if _, err := g.Run(ctx, nil, "api", "graphql", "-f", "query="+readyMutation, "-f", "id="+pr.NodeID); err != nil {
+		return "", fmt.Errorf("gh api graphql markPullRequestReadyForReview: %w", err)
+	}
+	return pr.HTMLURL, nil
+}
+
 // LandedHeads implements Backend. It reads the REST endpoint, as lane.REST
 // does, not `gh pr list`: that is GraphQL, whose quota a fleet of worktrees
 // drains. head=owner:branch names an account, not a repository, so a fork the
