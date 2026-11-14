@@ -185,3 +185,22 @@ func TestClaudeContextAssembly(t *testing.T) {
 		}
 	})
 }
+
+// The Claude hook carries the lane line right behind the reminder, once, and
+// carries nothing for a session with no line (HARNESS-195 AC3).
+func TestClaudeContextCarriesTheLaneLine(t *testing.T) {
+	const line = "lane `feat-lane-primary` ACTIVE on `feat/x`"
+	in := ClaudeContextInput{Cwd: t.TempDir(), Home: t.TempDir(), Now: time.Date(2026, 6, 23, 12, 0, 0, 0, time.UTC)}
+	if got := ClaudeContext(in); strings.Contains(got, "lane `") {
+		t.Errorf("a session with no line got one: %q", got)
+	}
+	in.LaneLine = line
+	ctx := ClaudeContext(in)
+	if !strings.HasPrefix(ctx, sddReminder+"\n"+line) || strings.Count(ctx, line) != 1 {
+		t.Errorf("want the line once behind the reminder, got: %q", ctx)
+	}
+	brief := Brief(BriefOptions{Cwd: t.TempDir(), LaneLine: line, Now: in.Now})
+	if brief != line {
+		t.Errorf("Brief = %q, want just the line", brief)
+	}
+}

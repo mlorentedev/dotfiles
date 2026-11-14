@@ -149,6 +149,7 @@ func runSessionBrief(cmd *cobra.Command, format string) error {
 	}
 	brief := mem.Brief(mem.BriefOptions{
 		Cwd: cwd, VaultHealth: memVaultHealth, StaleDays: 14, Now: time.Now(),
+		LaneLine: laneLine(cwd, cmd.ErrOrStderr()),
 		// The file-based agents get the same probe as the Claude hook. Wiring it
 		// on one path only would rebuild the asymmetry this CLI exists to remove:
 		// opencode, agy and copilot read this brief, and a triage loop that only
@@ -189,6 +190,7 @@ func runClaudeHook(cmd *cobra.Command) error {
 			return buf.String()
 		},
 		TriageQueue: memTriageQueue(cwd),
+		LaneLine:    laneLine(cwd, cmd.ErrOrStderr()),
 	})
 	out, err := mem.ClaudeEnvelope(ctx)
 	if err != nil {
