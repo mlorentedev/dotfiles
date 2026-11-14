@@ -582,8 +582,10 @@ func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
 
 	const bats = `C:\m\bats.cmd`
 	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
-		"git --exec-path":                        execPath + "\n",
-		"mise which bats":                        bats + "\n",
+		"git --exec-path": execPath + "\n",
+		"mise which bats": bats + "\n",
+		// A Windows host asks for the launcher by name; any other host, for bats.
+		"mise which bats.cmd":                    bats + "\n",
 		"mise bin-paths --bin-names bats@1.13.0": "bats\n",
 		"mise install":                           "",
 		"mise ls --prunable --json":              "{}",
