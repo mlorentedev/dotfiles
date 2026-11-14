@@ -22,7 +22,7 @@ func newEvalCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newEvalCheckCmd())
+	c.AddCommand(newEvalCheckCmd(), newEvalRunCmd())
 	return c
 }
 
@@ -66,6 +66,68 @@ func newEvalCheckCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&root, "repo-root", "", "repository to check (default: the current one)")
+	return c
+}
+
+// errEvalRunNotYet is returned by a run without --plan until the run path lands
+// (HARNESS-101 slice 3).
+var errEvalRunNotYet = errors.New("eval run: only --plan exists so far; launching candidates is not implemented yet")
+
+func newEvalRunCmd() *cobra.Command {
+	var (
+		root       string
+		candidates []string
+		epochs     int
+		maxRuns    int
+		planOnly   bool
+	)
+	c := &cobra.Command{
+		Use:   "run",
+		Short: "Replay the eval cases for named candidates and grade each run",
+		Long: "run builds the matrix of every eval case × each --candidate × --epochs, and\n" +
+			"refuses it above --max-runs: the cap is what authorises spend. --plan prints the\n" +
+			"matrix and each candidate's estimate (NaN credits, agy runs) and launches nothing.\n" +
+			"A corpus whose keys fail `dotf eval check` is not run. Candidates come from\n" +
+			evals.CandidatesFile + ", never from the reviewer pool.",
+		Example:       "  dotf eval run --plan --candidate nan/glm5.3-flash\n  dotf eval run --plan --candidate agy/gemini-4-hydrogen-high --epochs 1",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(c *cobra.Command, _ []string) error {
+			if root == "" {
+				root = env.RepoDir()
+			}
+			if root == "" {
+				return fmt.Errorf("eval run: not inside a repository — pass --repo-root")
+			}
+			cases, err := evals.LoadCases(root)
+			if err != nil {
+				return fmt.Errorf("eval run: %w", err)
+			}
+			cs, err := evals.LoadCandidates(root)
+			if err != nil {
+				return fmt.Errorf("eval run: %w", err)
+			}
+			plan, err := evals.BuildPlan(cases, cs, candidates, epochs, maxRuns)
+			if plan.Runs > 0 {
+				if _, werr := io.WriteString(c.OutOrStdout(), plan.Render()); werr != nil {
+					return werr
+				}
+			}
+			if err != nil {
+				return fmt.Errorf("eval run: %w", err)
+			}
+			if planOnly {
+				return nil
+			}
+			return errEvalRunNotYet
+		},
+	}
+	c.Flags().StringVar(&root, "repo-root", "", "repository holding the cases and candidates (default: the current one)")
+	c.Flags().StringArrayVar(&candidates, "candidate", nil, "candidate id from "+evals.CandidatesFile+" (repeatable)")
+	c.Flags().IntVar(&epochs, "epochs", evals.DefaultEpochs, "runs per (candidate, case)")
+	c.Flags().IntVar(&maxRuns, "max-runs", evals.DefaultMaxRuns, "the most runs this invocation may launch")
+	c.Flags().BoolVar(&planOnly, "plan", false, "print the matrix and the estimate, and launch nothing")
 	return c
 }
 

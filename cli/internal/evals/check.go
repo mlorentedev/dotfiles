@@ -288,3 +288,31 @@ func sampleProblems(c Case) []string {
 	}
 	return out
 }
+
+// LoadCases returns every case under root, refusing a corpus where any case
+// fails its self-check: a run grades against the keys, and a key that does not
+// hold against its own source would score every candidate wrongly.
+func LoadCases(root string) ([]Case, error) {
+	results, err := Check(root)
+	if err != nil {
+		return nil, err
+	}
+	var broken []string
+	for _, r := range results {
+		if len(r.Problems) > 0 {
+			broken = append(broken, r.Path)
+		}
+	}
+	if len(broken) > 0 {
+		return nil, fmt.Errorf("%d cases fail their self-check (%s); run `dotf eval check`", len(broken), strings.Join(broken, ", "))
+	}
+	cases := make([]Case, 0, len(results))
+	for _, r := range results {
+		c, err := LoadCase(filepath.Join(root, filepath.FromSlash(r.Path)))
+		if err != nil {
+			return nil, err
+		}
+		cases = append(cases, c)
+	}
+	return cases, nil
+}
