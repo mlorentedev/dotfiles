@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -48,8 +49,8 @@ func TestArchiveThreadDropsTheEntryAndReturnsTheBlockItWouldHavePlaced(t *testin
 	if res.Block != want {
 		t.Errorf("archived block is\n%s\nwant the block the write would have placed:\n%s", res.Block, want)
 	}
-	if res.FileBody != stored.FileBody || res.File != stored.File {
-		t.Errorf("thread file is %q holding %q, want what a plain write stores", res.File, res.FileBody)
+	if res.FileBody != stored.FileBody || res.Live != stored.File || res.File != filepath.Join("archive", "threads", "feat-b.md") {
+		t.Errorf("thread file is %q (live %q) holding %q, want what a plain write stores, under archive/threads/", res.File, res.Live, res.FileBody)
 	}
 	if res.Key != "feat-b" {
 		t.Errorf("key is %q, want feat-b", res.Key)
@@ -115,14 +116,14 @@ func TestArchiveThreadByAnotherAgentArchivesOnlyItsFork(t *testing.T) {
 	}
 }
 
-// The forked prune is exact: removing feat-a never takes feat-a+pi with it.
+// The exact take: removing feat-a never takes feat-a+pi with it.
 func TestPruneExactKeepsForks(t *testing.T) {
 	withFork, err := StoreThreadAs(archiveMemory, "MEMORY.md", "feat-a", "pi", "**Next action:** Fork work.")
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, changed := pruneThreadFromMemory(withFork.Content, "feat-a", false)
-	if !changed || !strings.Contains(out, "### thread: feat-a+pi") || strings.Contains(out, "### thread: feat-a (writer") {
+	out, taken, _ := takeThreads(withFork.Content, "feat-a", false, nil)
+	if len(taken) != 1 || !strings.Contains(out, "### thread: feat-a+pi") || strings.Contains(out, "### thread: feat-a (writer") {
 		t.Errorf("exact prune of feat-a gave\n%s", out)
 	}
 }

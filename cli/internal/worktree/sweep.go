@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 )
 
 type SweepRunner interface {
@@ -105,6 +107,9 @@ type SweepOptions struct {
 	// LandedHeads answers which merged pull requests had a branch as their
 	// head (#2818). Nil asks GitHub through gh.
 	LandedHeads LandedHeads
+	// VaultPath is the knowledge vault a park archives the lane's handoff
+	// threads in. Empty archives nothing.
+	VaultPath string
 }
 
 // SessionSkip is a worktree sweep left alone for a harness session, with
@@ -128,7 +133,13 @@ type SweepReport struct {
 	// not park, with the reason: a dirty tree, a landing it could not confirm,
 	// or a detach git refused (#3263).
 	LaneSkips []SessionSkip `json:"lane_skips,omitempty"`
-	DryRun    bool          `json:"dry_run"`
+	// ArchivedThreads are the handoff threads the parks archived, KeptThreads
+	// the ones they left because they still await Manu, and ArchiveFailures
+	// the parked lanes whose threads could not be archived (MEMORY-020).
+	ArchivedThreads []string      `json:"archived_threads,omitempty"`
+	KeptThreads     []string      `json:"kept_threads,omitempty"`
+	ArchiveFailures []SessionSkip `json:"archive_failures,omitempty"`
+	DryRun          bool          `json:"dry_run"`
 	// ProcessDiscovery is false when Gate f has no implementation on this
 	// platform and is therefore refusing everything. Reported because an inert
 	// sweep prints "reaped 0" exactly like a machine with nothing to clean up,
@@ -370,12 +381,19 @@ type sweepOutcome struct {
 	lane          string // a named lane sweep did not park, or held by dirt
 	mergeUnknown  string // the forge could not say whether its branch landed
 	uninspectable int
+	threads       mem.ParkArchive // what a park did to the lane's handoff threads
+	threadsErr    error           // why it could not
 }
 
 // record folds one worktree's outcome into the report.
 func (r *SweepReport) record(info Info, out sweepOutcome) {
 	if out.uninspectable > r.UninspectableProcesses {
 		r.UninspectableProcesses = out.uninspectable
+	}
+	r.ArchivedThreads = append(r.ArchivedThreads, out.threads.Archived...)
+	r.KeptThreads = append(r.KeptThreads, out.threads.Kept...)
+	if out.threadsErr != nil {
+		r.ArchiveFailures = append(r.ArchiveFailures, SessionSkip{Path: info.Path, Reason: out.threadsErr.Error()})
 	}
 	if out.reaped {
 		r.Reaped = append(r.Reaped, info)
@@ -432,6 +450,9 @@ func sweepLane(opts SweepOptions, info Info, runner SweepRunner, now time.Time) 
 	}
 	parked, why := parkSingleNamedLane(opts.RepoRoot, info, runner, opts.LandedHeads)
 	out.reaped, out.lane = parked, why
+	if parked {
+		out.threads, out.threadsErr = archiveBranchThreads(opts.VaultPath, opts.RepoRoot, info.Branch)
+	}
 	return out
 }
 
@@ -452,7 +473,7 @@ func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedH
 	if _, out, err := detachAtBase(repoRoot, info.Path, false, info.Metadata); err != nil {
 		return false, "git refused to detach it: " + gitFailure(out, err)
 	}
-	releaseParkedLane(repoRoot, info.Path, info.Branch, issueNum)
+	releaseParkedLane(info.Path, repoRoot, issueNum)
 	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
 	return true, ""
 }

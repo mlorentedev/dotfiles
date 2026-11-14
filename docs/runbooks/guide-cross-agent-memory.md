@@ -95,6 +95,6 @@ Per ADR-020 (Go CLI Convergence), the legacy `session-handoff.sh` and `session-h
 
 Two remedies, depending on whether the thread is live:
 - **Live:** re-run `dotf mem handoff-write --thread <key>` with the body the file still holds.
-- **Finished:** move the file to `archive/` (the documented archive step, which also drops the entry). A file left behind after a hand-deleted entry looks identical to a loss, so this is the usual case.
+- **Finished:** run `dotf mem handoff-write --thread <key> --finished` with the final body. It archives the thread: the entry is appended to `archive/superseded-handoffs-<date>.md` and the file moves to `archive/threads/<key>.md`, where the entry's `[full thread](threads/<key>.md)` pointer still resolves. A parked lane archives its branch's threads the same way. By hand, do both moves; a file moved anywhere else leaves the archived pointer broken. A file left behind after a hand-deleted entry looks identical to a loss, so this is the usual case.
 
 Only the per-thread layout is covered. A project that keeps its handoffs inline has no `threads/` directory, and the check says so instead of passing. Spec: `HARNESS-185-handoff-loss-check`.

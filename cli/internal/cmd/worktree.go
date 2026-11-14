@@ -15,6 +15,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/herdr"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 	"github.com/spf13/cobra"
 )
@@ -434,6 +435,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 				DryRun:      dryRun,
 				Sessions:    sessionStores(),
 				LandedHeads: forgeLandedHeads,
+				VaultPath:   vault.ResolveVault(),
 			}
 
 			report, err := worktree.Sweep(opts)
@@ -483,7 +485,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 			for _, r := range report.Reaped {
 				c.Printf("  - reaped: %s (%s)\n", r.Path, r.Branch)
 			}
-			return nil
+			return reportSweepThreads(c.OutOrStdout(), report)
 		},
 	}
 
@@ -741,6 +743,7 @@ is kept and the reason printed; after --force it may hold the only copy.`,
 				Sessions:            sessionStores(),
 				IgnoreRecentSession: ignoreRecentSession,
 				LandedHeads:         forgeLandedHeads,
+				VaultPath:           vault.ResolveVault(),
 			}
 
 			res, err := worktree.Done(opts)
@@ -755,7 +758,7 @@ is kept and the reason printed; after --force it may hold the only copy.`,
 			case res.KeptBranch != "":
 				c.Printf("Kept branch %s: %s\n", res.KeptBranch, res.KeptReason)
 			}
-			return nil
+			return reportParkThreads(c.ErrOrStderr(), target, res.Threads, res.ThreadsErr)
 		},
 	}
 

@@ -125,11 +125,12 @@ func TestHandoffThreads_EntryOrForkPasses(t *testing.T) {
 	}
 }
 
-// AC3: file moved to archive/ → no warning
+// AC3: file moved to archive/threads/ (MEMORY-020) → no warning
 func TestHandoffThreads_ArchivedThreadIsQuiet(t *testing.T) {
 	f := newHandoffFixture(t, "feat/a")
 	mkdirAll(t, f.threads)
-	f.writeThread(t, filepath.Join(f.memDir, "archive"), "feat-a")
+	mkdirAll(t, filepath.Join(f.memDir, "archive", "threads"))
+	f.writeThread(t, filepath.Join(f.memDir, "archive", "threads"), "feat-a")
 	f.writeMemory(t, "# proj\n")
 	out, _ := f.run(t)
 	if strings.Contains(out, "no `### thread") {

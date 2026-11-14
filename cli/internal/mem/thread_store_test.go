@@ -278,8 +278,8 @@ func TestTheBudgetRefusalSuggestsOnlyDatedThreadsAndHowToArchiveEach(t *testing.
 	}
 	msg := err.Error()
 	for _, want := range []string{
-		"\n  by-journal (2026-08-02): move its block from MEMORY.md to archive/",
-		"\n  stored (2026-09-01): move threads/stored.md to archive/ and delete its entry from MEMORY.md",
+		"\n  by-journal (2026-08-02): move its block from MEMORY.md to archive/superseded-handoffs-<date>.md",
+		"\n  stored (2026-09-01): its writer runs `dotf mem handoff-write --finished`; by hand, move its entry to archive/superseded-handoffs-<date>.md and threads/stored.md to archive/threads/",
 		"\nUndated, so not suggested: legacy-undated",
 	} {
 		if !strings.Contains(msg, want) {
@@ -318,7 +318,7 @@ func TestCheckMemoryBudgetRefusesAWritePastTheLineCap(t *testing.T) {
 	for _, want := range []string{
 		fmt.Sprintf("%d lines", MemoryLineBudget+1),
 		fmt.Sprintf("the %d a session start loads", MemoryLineBudget),
-		"  old (2026-09-01): move its block from MEMORY.md to archive/",
+		"  old (2026-09-01): move its block from MEMORY.md to archive/superseded-handoffs-<date>.md",
 	} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("the refusal lacks %q:\n%s", want, msg)

@@ -101,6 +101,7 @@ type archiveWrite struct {
 	path    string // the archive file
 	text    string // what it holds after the write
 	changed bool   // false when it already held the block
+	live    string // the thread file in threads/ the archived one replaces
 }
 
 func (w *handoffWrite) run(cmd *cobra.Command) error {
@@ -140,17 +141,36 @@ func (w *handoffWrite) run(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	prev, err := mem.ReadThreadFile(res.File)
+	prev, err := checkThreadFiles(res, archive)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", res.File, err)
-	}
-	if err := mem.CheckThreadFile(prev, res.Key); err != nil {
 		return err
 	}
 	if err := mem.CheckMemoryBudget(string(current), res.Content); err != nil {
 		return err
 	}
 	return w.publish(cmd, thread, string(current), string(prev), res, archive)
+}
+
+// checkThreadFiles reads the thread file the write replaces and refuses one
+// another key holds. With --finished the live file it removes last is checked
+// too: it must be this thread's, not another key's that sanitizes to the same
+// name (fix/x and fix-x).
+func checkThreadFiles(res mem.StoredThread, archive *archiveWrite) ([]byte, error) {
+	prev, err := mem.ReadThreadFile(res.File)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", res.File, err)
+	}
+	if err := mem.CheckThreadFile(prev, res.Key); err != nil {
+		return nil, err
+	}
+	if archive == nil || archive.live == "" {
+		return prev, nil
+	}
+	live, err := mem.ReadThreadFile(archive.live)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", archive.live, err)
+	}
+	return prev, mem.CheckThreadFile(live, res.Key)
 }
 
 // store computes the write: the thread placed in MEMORY.md, or with --finished
@@ -171,7 +191,7 @@ func (w *handoffWrite) store(current, thread, body string) (mem.StoredThread, *a
 		return mem.StoredThread{}, nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	text, changed := mem.AppendArchive(string(existing), date, res.Block)
-	return res.StoredThread, &archiveWrite{path: path, text: text, changed: changed}, nil
+	return res.StoredThread, &archiveWrite{path: path, text: text, changed: changed, live: res.Live}, nil
 }
 
 // readHandoffBody reads the thread body from stdin and refuses an empty one.
@@ -230,8 +250,9 @@ func (w *handoffWrite) publish(cmd *cobra.Command, thread, current, prev string,
 	return nil
 }
 
-// write appends the archive, then replaces the thread file and then MEMORY.md.
-// The archive goes first, so a write stopped part-way leaves the entry in
+// write appends the archive, then replaces the thread file and then MEMORY.md,
+// and with --finished removes the live thread file last, once nothing points
+// at it. The archive goes first, so a write stopped part-way leaves the entry in
 // MEMORY.md and at worst in the archive too, never in neither. The file goes first: an
 // entry pointing at a file not yet written is the one order that reads as lost,
 // while a file ahead of its entry is the thread a reader follows anyway. A new
@@ -249,10 +270,18 @@ func (w *handoffWrite) write(res mem.StoredThread, archive *archiveWrite) error 
 	if err := mem.ReplaceFile(res.File, res.FileBody, mode); err != nil {
 		return err
 	}
-	if !res.Changed {
+	if res.Changed {
+		if err := mem.ReplaceFile(w.memoryPath, res.Content, mode); err != nil {
+			return err
+		}
+	}
+	if archive == nil || archive.live == "" {
 		return nil
 	}
-	return mem.ReplaceFile(w.memoryPath, res.Content, mode)
+	if err := os.Remove(archive.live); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("the thread is archived, but its live file %s was not removed, and doctor will report it as a lost handoff: %w", archive.live, err)
+	}
+	return nil
 }
 
 // newMemThreadCmd prints this session's thread key and journal filename, so a

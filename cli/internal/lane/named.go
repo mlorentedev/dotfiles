@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
-	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
@@ -591,21 +590,12 @@ func ParkLane(repoRoot, lanePath, vaultPath string, force bool) (worktree.DoneRe
 	} else if err := assertWorktreeOf(repoRoot, repoCommonDir, lanePath); err != nil {
 		return worktree.DoneResult{}, fmt.Errorf("lane park: %w", err)
 	}
-	branchOut, _ := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
-	oldBranch := strings.TrimSpace(string(branchOut))
-
 	res, err := worktree.Park(worktree.DoneOptions{
 		RepoRoot:            repoRoot,
 		WorktreePath:        lanePath,
 		Force:               force,
 		IgnoreRecentSession: true,
+		VaultPath:           vaultPath,
 	})
-	if err != nil {
-		return res, err
-	}
-	if vaultPath != "" && oldBranch != "" {
-		project := filepath.Base(filepath.Clean(repoRoot))
-		_ = mem.ArchiveAndPruneThread(filepath.Join(vaultPath, "10_projects", project), oldBranch)
-	}
-	return res, nil
+	return res, err
 }

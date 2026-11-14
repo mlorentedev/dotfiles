@@ -10,7 +10,6 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/filelock"
 	"github.com/mlorentedev/dotfiles/cli/internal/mem"
-	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 )
 
 type DoneOptions struct {
@@ -29,6 +28,9 @@ type DoneOptions struct {
 	// LandedHeads answers which merged pull requests had a branch as their
 	// head, on the forge the origin names. nil asks GitHub through gh.
 	LandedHeads LandedHeads
+	// VaultPath is the knowledge vault a park archives the branch's handoff
+	// threads in. Empty archives nothing.
+	VaultPath string
 }
 
 // DoneResult reports what happened to the worktree's branch.
@@ -37,6 +39,11 @@ type DoneResult struct {
 	DeletedSHA    string // its tip, to restore it with git branch <name> <sha>
 	KeptBranch    string // the branch left in place, when there is one
 	KeptReason    string // why it was kept
+	// Threads is what a park did to its branch's handoff threads, and
+	// ThreadsErr why it could not: the lane is parked either way, so the
+	// caller reports it rather than failing the park (MEMORY-020).
+	Threads    mem.ParkArchive
+	ThreadsErr error
 }
 
 // Done tears down a completed worktree safely, then deletes its local branch
@@ -121,8 +128,10 @@ func Park(opts DoneOptions) (DoneResult, error) {
 	if baseRef, out, err := detachAtBase(absRepo, absWT, opts.Force, meta); err != nil {
 		return DoneResult{}, fmt.Errorf("git checkout --detach %s failed (%w): %s", baseRef, err, strings.TrimSpace(string(out)))
 	}
-	releaseParkedLane(absRepo, absWT, branch, issueNum)
-	return parkOutcome(absRepo, branch, tip, landed, why), nil
+	releaseParkedLane(absWT, absRepo, issueNum)
+	res := parkOutcome(absRepo, branch, tip, landed, why)
+	res.Threads, res.ThreadsErr = archiveBranchThreads(opts.VaultPath, absRepo, branch)
+	return res, nil
 }
 
 // parkPreflight validates the options, takes the worktree lock, refreshes
@@ -208,11 +217,10 @@ func detachAtBase(absRepo, absWT string, force bool, prev *Metadata) (baseRef st
 }
 
 // releaseParkedLane drops what the active lane left behind: the handoff
-// prompt (M4), the issue's claim refs (M-CODE-1) and the branch's memory thread.
-func releaseParkedLane(absRepo, absWT, branch string, issueNum int) {
+// prompt (M4) and the issue's claim refs (M-CODE-1).
+func releaseParkedLane(absWT, absRepo string, issueNum int) {
 	_ = os.Remove(filepath.Join(absWT, ".dotf-lane-prompt.md"))
 	releaseIssueClaimRefs(absRepo, issueNum)
-	archiveBranchMemoryThread(absRepo, branch)
 }
 
 // parkOutcome deletes a landed branch, recording its 40-char SHA, and reports
@@ -253,17 +261,14 @@ func releaseIssueClaimRefs(absRepo string, issueNum int) {
 	}
 }
 
-// archiveBranchMemoryThread archives memory/threads/<branch>.md and prunes MEMORY.md when VAULT_PATH resolves.
-func archiveBranchMemoryThread(absRepo, branch string) {
-	if strings.TrimSpace(branch) == "" {
-		return
-	}
-	vaultPath := vault.ResolveVault()
-	if strings.TrimSpace(vaultPath) == "" {
-		return
+// archiveBranchThreads archives the parked branch's handoff threads in the
+// vault's project for this repository, when a vault is given.
+func archiveBranchThreads(vaultPath, absRepo, branch string) (mem.ParkArchive, error) {
+	if strings.TrimSpace(vaultPath) == "" || branch == "" {
+		return mem.ParkArchive{}, nil
 	}
 	project := filepath.Base(filepath.Clean(absRepo))
-	_ = mem.ArchiveAndPruneThread(filepath.Join(vaultPath, "10_projects", project), branch)
+	return mem.ArchiveParkedThread(filepath.Join(vaultPath, "10_projects", project), branch, time.Now())
 }
 
 // branchLanding reads the worktree's branch and tip, and whether that tip has
