@@ -428,6 +428,9 @@ func checkSignature(repoRoot, specID, specDir string, slot ReviewSlot, checker S
 			"re-run /adversarial-review for this spec",
 			slot.Review, review.Spec, specID)
 	}
+	if err := refuseEvalRecord(specDir, slot, review); err != nil {
+		return Review{}, err
+	}
 	// Provenance before verdict, deliberately. Both later checks read the file's
 	// CLAIMS; this one asks whether the file is the answer to the question this
 	// repository asked. Put it after, and a stale PASS left behind by a reviewer
