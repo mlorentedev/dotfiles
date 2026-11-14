@@ -284,6 +284,13 @@ func TestAuditLanes_ErrorsCarryNoCallerPrefix(t *testing.T) {
 		wantUnprefixed(t, err)
 	})
 	t.Run("worktree registry unreadable", func(t *testing.T) {
+		// A file where the registry directory belongs: ReadDir fails with
+		// ENOTDIR here, but Windows reports ERROR_PATH_NOT_FOUND, which Go
+		// maps to fs.ErrNotExist, and an absent registry is not an error. No
+		// other failure of that read is portable (chmod denies nothing there).
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows reports a file in place of the registry directory as not-exist, which is not an error")
+		}
 		repoDir, wtRoot := initialisedLaneRepo(t)
 		registry := filepath.Join(repoDir, ".git", "worktrees")
 		if err := os.RemoveAll(registry); err != nil {
