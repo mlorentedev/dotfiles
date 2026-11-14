@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -101,5 +102,29 @@ func TestParseAgyHook(t *testing.T) {
 	}
 	if got := ParseAgyHook([]byte("not json")); got != (AgyHookPayload{}) {
 		t.Errorf("malformed payload gave %+v, want empty fields", got)
+	}
+}
+
+// Two long ids that share a prefix, or two ids the sanitiser maps to the same
+// text, are two conversations: each is first once, and neither silences the other.
+func TestFirstInvocationKeepsDistinctIdsDistinct(t *testing.T) {
+	state := t.TempDir()
+	prefix := strings.Repeat("a", 100)
+	ids := []string{prefix + strings.Repeat("x", 20), prefix + strings.Repeat("y", 20), "a/b", "a_b", "a:b"}
+	for _, id := range ids {
+		if got, err := FirstInvocation(state, id); err != nil || !got {
+			t.Errorf("FirstInvocation(%q) = %v, %v; want first", id, got, err)
+		}
+	}
+	for _, id := range ids {
+		if got, _ := FirstInvocation(state, id); got {
+			t.Errorf("FirstInvocation(%q) was first twice", id)
+		}
+	}
+	if markerName("conv-1") != "conv-1" {
+		t.Errorf("a clean short id must keep its own name, got %q", markerName("conv-1"))
+	}
+	if n := len(markerName(ids[0])); n > 96 {
+		t.Errorf("marker name is %d characters, want at most 96", n)
 	}
 }
