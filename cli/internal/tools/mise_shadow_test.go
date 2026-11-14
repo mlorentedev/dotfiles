@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -12,14 +13,19 @@ import (
 // it: one per installed version, and the one mise runs carries active and the
 // config that requested it in source.path.
 func miseLsEntry(version, requested, source string, active bool) string {
-	entry := `{"version": "` + version + `", "installed": true, "active": ` + map[bool]string{true: "true", false: "false"}[active]
+	entry := map[string]any{"version": version, "installed": true, "active": active}
 	if requested != "" {
-		entry += `, "requested_version": "` + requested + `"`
+		entry["requested_version"] = requested
 	}
 	if source != "" {
-		entry += `, "source": {"type": "mise.toml", "path": "` + source + `"}`
+		// Marshalled, so a Windows path's backslashes are escaped as mise does.
+		entry["source"] = map[string]string{"type": "mise.toml", "path": source}
 	}
-	return entry + "}"
+	out, err := json.Marshal(entry)
+	if err != nil {
+		panic(err)
+	}
+	return string(out)
 }
 
 // shadowMise wraps fakeMise with the one command it does not know,
