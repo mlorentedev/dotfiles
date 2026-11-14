@@ -64,7 +64,9 @@ type Tokens struct {
 }
 
 // Launcher runs one attempt. It returns an error only for a failure on our
-// side; a runner that failed is a LaunchResult with ExitErr set.
+// side; a runner that failed is a LaunchResult with ExitErr set. It copies the
+// answer to OutDir only after the runner exited on its own, and the loop
+// grades nothing from an attempt the deadline or the interrupt cut short.
 type Launcher interface {
 	Launch(ctx context.Context, a Attempt) (LaunchResult, error)
 }
@@ -92,10 +94,16 @@ func Run(ctx context.Context, p Plan, cases []Case, runDir string, l Launcher) (
 	for _, c := range cases {
 		byID[c.ID] = c
 	}
+	slugs := map[string]string{}
 	for _, cell := range p.Cells {
 		if _, ok := byID[cell.Case]; !ok {
 			return nil, fmt.Errorf("eval run: the plan names case %s, which is not loaded", cell.Case)
 		}
+		slug := Slug(cell.Candidate)
+		if other, ok := slugs[slug]; ok && other != cell.Candidate {
+			return nil, fmt.Errorf("eval run: candidates %s and %s would share the directory %s", other, cell.Candidate, slug)
+		}
+		slugs[slug] = cell.Candidate
 	}
 	var recs []Record
 	for _, cell := range p.Cells {
@@ -135,26 +143,30 @@ func grade(ctx context.Context, a Attempt, l Launcher) Record {
 		return rec
 	}
 	rec.DurationSeconds, rec.Tokens = res.Duration.Seconds(), res.Tokens
-	body, readErr := os.ReadFile(filepath.Join(a.OutDir, AnswerFile))
+	if res.ExitErr != nil {
+		rec.Detail = res.ExitErr.Error()
+	}
+	// Only a runner that exited on its own leaves an answer worth grading: one
+	// the deadline or the interrupt killed may have left half a file.
 	switch {
 	case res.TimedOut:
 		rec.Completion = CompletionTimeout
-	case readErr == nil && strings.TrimSpace(string(body)) != "":
-		g := GradeAnswer(a.Case, string(body))
-		rec.Completion, rec.Grade = CompletionAnswered, &g
 		return rec
 	case ctx.Err() != nil:
-		rec.Completion = CompletionInfra
-		res.ExitErr = errors.Join(errors.New("interrupted"), res.ExitErr)
+		rec.Completion, rec.Detail = CompletionInfra, strings.TrimSuffix("interrupted: "+rec.Detail, ": ")
+		return rec
+	}
+	body, err := os.ReadFile(filepath.Join(a.OutDir, AnswerFile))
+	switch {
+	case err != nil && !errors.Is(err, os.ErrNotExist):
+		rec.Completion, rec.Detail = CompletionInfra, err.Error()
+	case err == nil && strings.TrimSpace(string(body)) != "":
+		g := GradeAnswer(a.Case, string(body))
+		rec.Completion, rec.Grade = CompletionAnswered, &g
 	case res.ExitErr != nil:
 		rec.Completion = CompletionProviderError
 	default:
 		rec.Completion = CompletionEmptyAnswer
-	}
-	if res.ExitErr != nil {
-		rec.Detail = res.ExitErr.Error()
-	} else if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
-		rec.Detail = readErr.Error()
 	}
 	return rec
 }

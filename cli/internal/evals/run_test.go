@@ -125,6 +125,13 @@ func TestRunKeepsAFormatFailureApartFromZeroFindings(t *testing.T) {
 		}, CompletionTimeout, ""},
 		{"a failed runner", func(Attempt) (LaunchResult, error) { return LaunchResult{ExitErr: errors.New("exit 1")}, nil }, CompletionProviderError, ""},
 		{"our own failure", func(Attempt) (LaunchResult, error) { return LaunchResult{}, errors.New("checkout failed") }, CompletionInfra, ""},
+		{"a timeout that left a file", func(a Attempt) (LaunchResult, error) {
+			_, _ = answered(answer("FAIL"))(a)
+			return LaunchResult{TimedOut: true, ExitErr: errors.New("killed")}, nil
+		}, CompletionTimeout, ""},
+		{"an answer we cannot read", func(a Attempt) (LaunchResult, error) {
+			return LaunchResult{}, os.MkdirAll(filepath.Join(a.OutDir, AnswerFile), 0o755)
+		}, CompletionInfra, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			l := &fakeLauncher{script: map[string]func(Attempt) (LaunchResult, error){"a-r1/1": tc.launch}}
@@ -184,6 +191,9 @@ func TestRunStopsOnInterrupt(t *testing.T) {
 	if !errors.Is(err, context.Canceled) || len(l.started) != 1 || len(recs) != 1 {
 		t.Fatalf("err %v, started %v, records %d", err, l.started, len(recs))
 	}
+	if recs[0].Completion != CompletionInfra || recs[0].Grade != nil {
+		t.Fatalf("an answer from a runner the interrupt killed is not graded: %+v", recs[0])
+	}
 }
 
 func TestRunRefusesACellWithoutItsCase(t *testing.T) {
@@ -215,3 +225,50 @@ func TestRunPassesTheInterruptToTheRunnerInFlight(t *testing.T) {
 type launcherFunc func(context.Context, Attempt) (LaunchResult, error)
 
 func (f launcherFunc) Launch(ctx context.Context, a Attempt) (LaunchResult, error) { return f(ctx, a) }
+
+// A runner that exited non-zero after writing its answer is graded, and the
+// exit is kept.
+func TestRunGradesAnAnswerFromARunnerThatExitedNonZero(t *testing.T) {
+	l := &fakeLauncher{script: map[string]func(Attempt) (LaunchResult, error){
+		"a-r1/1": func(a Attempt) (LaunchResult, error) {
+			res, err := answered(answer("FAIL"))(a)
+			res.ExitErr = errors.New("exit status 3")
+			return res, err
+		},
+	}}
+	recs, err := Run(context.Background(), runPlan(1, "agy/x"), []Case{runCase()}, t.TempDir(), l)
+	if err != nil || recs[0].Completion != CompletionAnswered || recs[0].Grade == nil || !strings.Contains(recs[0].Detail, "exit status 3") {
+		t.Fatalf("err %v, record %+v", err, recs[0])
+	}
+}
+
+// Two candidates whose ids share a slug would write over each other's records.
+func TestRunRefusesCandidatesThatShareADirectory(t *testing.T) {
+	_, err := Run(context.Background(), runPlan(1, "nan/x", "nan:x"), []Case{runCase()}, t.TempDir(), &fakeLauncher{})
+	if err == nil || !strings.Contains(err.Error(), "nan/x") || !strings.Contains(err.Error(), "nan:x") {
+		t.Fatalf("want a refusal naming both ids, got %v", err)
+	}
+}
+
+// The flag holds on the real corpus: ai-055-r2's key was written by
+// nan/glm5.3-flash, spelled as candidates.json spells it.
+func TestRunFlagsTheRealCorpusOwnKey(t *testing.T) {
+	cases, err := LoadCases(repoFile(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := LoadCandidates(repoFile(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cs.Resolve("nan/glm5.3-flash"); err != nil {
+		t.Fatal(err)
+	}
+	p := Plan{Cells: []Cell{{Case: "ai-055-r2", Kind: "replay", Candidate: "nan/glm5.3-flash", Epochs: 1}}}
+	recs, err := Run(context.Background(), p, cases, t.TempDir(), launcherFunc(func(context.Context, Attempt) (LaunchResult, error) {
+		return LaunchResult{}, nil
+	}))
+	if err != nil || len(recs) != 1 || !recs[0].OwnKey {
+		t.Fatalf("err %v, records %+v", err, recs)
+	}
+}

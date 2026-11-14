@@ -54,6 +54,9 @@ owner: manu
 - [x] [AC5] Failing test: per-run grading record, with completion class mapped from the launcher's exit, and format failure distinct from zero findings. `evals.Run` with an injected launcher: one attempt at a time, `record.json` before the next, `infra-error` never charged to the model, own-key flag, interrupt passed to the runner in flight
 - [ ] [AC5] The real launcher: create and remove the tree (replay checkout or empty dir, removed on interrupt), exec under `deadlineWrap`, copy the answer out, tokens from the transcript; preflight resolves every commit and runner binary before the first launch, and refuses a replay whose source review is present at `reviewed_sha`
 - [ ] [AC5] Tell `rate-limit`, `quota` and `content-filter` apart from `provider-error` by the transcript
+- [ ] [AC5] A request record for a planted run (`WriteEvalRequest` takes only an `EvalLaunch`), with the `prompt.md` digest
+- [ ] [AC5] Remove trees an earlier interrupted run left under `<run>/trees/`
+- [ ] [AC3] A replay checkout under lanes: check what `dotf lane status` and `dotf lane doctor` report for a worktree the run adds
 - [ ] [AC5] Implement run, grade and epoch reduction; flag results on a candidate's own keys
 - [ ] [AC7] Failing test: `results.json` validates against `result.schema.json` with the provenance fields; no code path opens the pool, map or pins for writing
 - [ ] [AC7] Implement `results.json`, `report.md`, `proposal.md`, and `dotf eval report --comment <issue>`
