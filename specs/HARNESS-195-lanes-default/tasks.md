@@ -48,7 +48,7 @@ owner: manu
 - [ ] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
 
 ### Slice D1: `lane next` without herdr (AC5)
-- [ ] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
+- [x] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
 
 ### Slice D2: the `worktree add` hint (AC4)
 - [ ] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
