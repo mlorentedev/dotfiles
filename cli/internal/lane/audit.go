@@ -8,9 +8,11 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
@@ -30,14 +32,22 @@ func (f Finding) String() string {
 	return "ERROR: " + f.Subject + ": " + f.Problem + ".\nFIX: " + f.Fix
 }
 
+// Warning renders the finding as something to act on before it bites: the
+// same shape as String, and no effect on the audit's verdict.
+func (f Finding) Warning() string {
+	return "WARN: " + f.Subject + ": " + f.Problem + ".\nFIX: " + f.Fix
+}
+
 // Audit is what AuditLanes answers. Managed is false when the repository has
 // no marker. Initialised is false when the marker is present but no declared
 // lane exists on this machine: the marker is committed and travels to every
-// clone, the lanes are per machine, so that state is not drift.
+// clone, the lanes are per machine, so that state is not drift. Warnings are
+// what is not drift yet: states the guard will refuse once the marker arms it.
 type Audit struct {
 	Managed     bool
 	Initialised bool
 	Findings    []Finding
+	Warnings    []Finding
 }
 
 // AuditLanes compares the marker of repoRoot with the lanes under
@@ -53,7 +63,7 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 		return Audit{}, nil
 	}
 	if err != nil {
-		return Audit{}, fmt.Errorf("lane doctor: reading %s: %w", LanesMarkerFile, err)
+		return Audit{}, fmt.Errorf("reading %s: %w", LanesMarkerFile, err)
 	}
 	a := Audit{Managed: true}
 	marker, findings := parseMarker(raw)
@@ -78,14 +88,76 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 		}
 	}
 	a.Findings = append(a.Findings, undeclaredRecords(marker.CanonicalLanes, records)...)
-	return a, nil
+	a.Warnings, err = leaseWarnings(absRepo, records, time.Now())
+	return a, err
+}
+
+// leaseWarnings walks the linked worktrees once and warns of the two states
+// the guard or sweep will act on before anyone looks: a detached worktree with
+// no lease, which guard rule 6 refuses and nothing in its path would have
+// adopted (#3436), and a lease that has run out. Lanes are audited on their own
+// for the leaseless case, so a worktree recorded as one is left out of it; a
+// worktree whose lease cannot be read is a different defect and is left out of
+// both.
+func leaseWarnings(absRepo string, records map[string][]laneRecord, now time.Time) ([]Finding, error) {
+	out, err := exec.Command("git", "-C", absRepo, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return nil, fmt.Errorf("listing the worktrees of %s: %w", absRepo, err)
+	}
+	linked, err := worktree.LinkedWorktrees(string(out))
+	if err != nil {
+		return nil, fmt.Errorf("reading the worktree list of %s: %w", absRepo, err)
+	}
+	var lanes []string
+	for _, rs := range records {
+		for _, r := range rs {
+			lanes = append(lanes, r.path)
+		}
+	}
+	var warns []Finding
+	for _, w := range linked {
+		if w.Prunable {
+			continue
+		}
+		meta, lerr := worktree.LoadMetadata(w.Path)
+		switch {
+		case lerr != nil:
+		case meta == nil:
+			if w.Detached && !slices.ContainsFunc(lanes, func(p string) bool { return samePath(p, w.Path) }) {
+				warns = append(warns, Finding{w.Path, "is detached and has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there once " + LanesMarkerFile + " is committed",
+					"dotf worktree adopt " + w.Path + ", or run git switch -c <type>/<issue>-<slug> inside it"})
+			}
+		case leaseExpired(meta, now):
+			warns = append(warns, expiredLease(w.Path, meta))
+		}
+	}
+	return warns, nil
+}
+
+// leaseExpired is true for a lease that carries an expiry and whose expiry has
+// passed. A parked lane's lease carries none (it is not a claim on anything),
+// and a lease without one has not expired.
+func leaseExpired(meta *worktree.Metadata, now time.Time) bool {
+	return !meta.LeaseExpiresAt.IsZero() && !meta.LeaseExpiresAt.After(now) &&
+		!strings.EqualFold(meta.State, string(worktree.StateParked))
+}
+
+// expiredLease names the command that ends the work the lease claimed: park
+// for a lane, which stays where it is, done for any other worktree. There is no
+// command that renews a lease; the work either ended or this is a new claim.
+func expiredLease(path string, meta *worktree.Metadata) Finding {
+	problem := "lease expired " + meta.LeaseExpiresAt.Format(time.RFC3339) + ", so sweep may reap or park it under whoever works there"
+	if meta.Lane != "" {
+		return Finding{path, problem, "dotf lane park " + meta.Lane + " once its branch landed, or dotf lane switch to claim the lane again"}
+	}
+	return Finding{path, problem, "dotf worktree done " + path + " once its branch landed"}
 }
 
 // auditRoots makes both roots absolute. An empty worktree root would resolve
 // to the cwd and every FIX line would then point at the wrong path.
 func auditRoots(repoRoot, worktreeRoot string) (absRepo, absWTRoot string, err error) {
 	if strings.TrimSpace(worktreeRoot) == "" {
-		return "", "", fmt.Errorf("lane doctor: WORKTREE_ROOT cannot be empty")
+		return "", "", fmt.Errorf("WORKTREE_ROOT cannot be empty")
 	}
 	if absRepo, err = filepath.Abs(repoRoot); err == nil {
 		absWTRoot, err = filepath.Abs(worktreeRoot)
@@ -218,7 +290,7 @@ func laneRecords(commonDir string) (map[string][]laneRecord, []Finding, error) {
 		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("lane doctor: reading the worktree registry of %s: %w", commonDir, err)
+		return nil, nil, fmt.Errorf("reading the worktree registry of %s: %w", commonDir, err)
 	}
 	out := map[string][]laneRecord{}
 	var unreadable []Finding

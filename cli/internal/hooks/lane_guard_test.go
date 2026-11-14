@@ -16,7 +16,7 @@ import (
 func findLaneGuardScript(t *testing.T) string {
 	t.Helper()
 	// Walk up from cli/internal/hooks to repository root git-hooks/lib/lane-guard.sh.
-	p, err := filepath.Abs(filepath.Join("..", "..", "..", "git-hooks", "lib", "lane-guard.sh"))
+	p, err := filepath.Abs(filepath.Join("..", "..", "..", "git-hooks", filepath.FromSlash(lane.GuardRelPath)))
 	if err != nil {
 		t.Fatal(err)
 	}
