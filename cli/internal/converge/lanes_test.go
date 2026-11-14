@@ -47,7 +47,7 @@ func laneRepo(t *testing.T, name string, committed bool) string {
 	}
 	if committed {
 		laneGit(t, repo, "add", lane.LanesMarkerFile)
-		laneGit(t, repo, "-c", "core.hooksPath="+os.DevNull, "commit", "-m", "declare lanes")
+		laneGit(t, repo, "-c", "core.hooksPath="+t.TempDir(), "commit", "-m", "declare lanes")
 		laneGit(t, repo, "push", "origin", "main")
 	}
 	return repo

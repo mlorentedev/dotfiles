@@ -16,7 +16,7 @@ func commitMarker(t *testing.T, repo string, push bool) {
 	}
 	runGitLaneTest(t, repo, "add", LanesMarkerFile)
 	// The machine's own guard must not decide whether a fixture can commit.
-	runGitLaneTest(t, repo, "-c", "core.hooksPath="+os.DevNull, "commit", "-m", "declare lanes")
+	runGitLaneTest(t, repo, "-c", "core.hooksPath="+t.TempDir(), "commit", "-m", "declare lanes")
 	if push {
 		runGitLaneTest(t, repo, "push", "origin", "main")
 	}
