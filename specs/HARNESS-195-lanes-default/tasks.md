@@ -70,7 +70,7 @@ owner: manu
 > - The deploy entries are `pi-gate` and `opencode-gate` because `deployNameWidth` (16) caps a manifest name; `deploy` twice into a temporary home reports `deployed`, then `in sync`.
 > - Observed: `pi -e <extension> -p` and `opencode run` (with `OPENCODE_CONFIG_DIR` holding the plugin) each echoed a line a stand-in `dotf` printed. agy was not launched: whether it shows the hook's `systemMessage` to the model is AC9's observation.
 > - Every carrier carries the whole session-start brief, which includes the lane line, not the line alone.
-> - `carrierGaps` keeps one row, agy, until the agy branch lands. `TestSessionLineCarriersInjectTheBriefAndSurviveAMissingDotf` runs both TypeScript sources under node with a stand-in dotf.
+> - `carrierGaps` is empty: this branch deleted the agy row. `TestSessionLineCarriersInjectTheBriefAndSurviveAMissingDotf` runs both TypeScript sources under node with a stand-in dotf.
 
 ### Slice D1: `lane next` without herdr (AC5)
 - [x] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
