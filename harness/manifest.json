@@ -300,7 +300,7 @@
       },
       {
         "agent": "opencode",
-        "file": ".config/opencode/plugin/dotfiles-gate.ts",
+        "file": ".config/opencode/plugins/dotfiles-gate.ts",
         "format": "ts-extension",
         "emit": false,
         "events": {
@@ -339,6 +339,12 @@
             "event": "PreToolUse",
             "command": "harness gate --harness agy",
             "timeout": 5
+          },
+          {
+            "id": "session-line",
+            "event": "PreInvocation",
+            "command": "mem session-start --format agy-hook",
+            "timeout": 30
           }
         ],
         "retire": [

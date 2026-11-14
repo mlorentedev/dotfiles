@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -114,5 +115,39 @@ func assertLaneLine(t *testing.T, who, out, want string) {
 		t.Errorf("%s printed a lane line for a repository without lanes:\n%s", who, out)
 	case want != "" && (first != want || mentions != 1):
 		t.Errorf("%s: first line %q with %d lane mentions, want %q once:\n%s", who, first, mentions, want, out)
+	}
+}
+
+func agyHook(t *testing.T, conversation, cwd string) string {
+	t.Helper()
+	cmd := newMemCmd()
+	cmd.SetArgs([]string{"session-start", "--format", "agy-hook"})
+	cmd.SetIn(strings.NewReader(`{"conversationId":"` + conversation + `","hookEventName":"PreInvocation","cwd":` + strconv.Quote(cwd) + `}`))
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	return out.String()
+}
+
+// agy has only PreInvocation, which fires before every turn: the line must
+// arrive on the first and nothing may follow it (HARNESS-195 AC3).
+func TestAgyHookTellsTheLineOnTheFirstInvocationOnly(t *testing.T) {
+	tmp := t.TempDir()
+	for _, v := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(v, tmp)
+	}
+	f := newLaneFixture(t, true, worktree.StateActive)
+	first := agyHook(t, "conv-a", f.lane)
+	if !strings.HasPrefix(first, `{"injectSteps":[{"systemMessage":{"systemMessage":"`+inLaneLine) {
+		t.Errorf("first invocation = %q, want an injectSteps systemMessage starting with the lane line", first)
+	}
+	if again := agyHook(t, "conv-a", f.lane); again != "{}\n" {
+		t.Errorf("second invocation = %q, want {}", again)
+	}
+	if other := agyHook(t, "conv-b", f.lane); !strings.Contains(other, inLaneLine) {
+		t.Errorf("another conversation = %q, want its own first line", other)
 	}
 }

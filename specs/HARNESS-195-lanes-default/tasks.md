@@ -53,8 +53,13 @@ owner: manu
 > - `mem` cannot import `lane` (lane imports mem), so the command layer resolves the line (`laneLine` in `cli/internal/cmd/mem_lane_line.go`) and hands it to `mem.BriefOptions.LaneLine` and `mem.ClaudeContextInput.LaneLine`. `mem resume` prints it as its first line. An unreadable directory reports on stderr and prints no line; it never fails the command.
 > - `TestEveryPresenceTargetHasADeployedCarrier` reads each manifest target's `events.presence`. A target has a carrier when it emits a hook on that event running `mem session-start` or `mem resume`, or, for an `emit: false` extension, when an `ai/deploy.json` entry writes a file with the same last two path elements. Its `carrierGaps` table lists pi, opencode and agy and is asserted exact, so C2 deletes each row as it adds the carrier, and adapts the agy hook's command to one of the two prefixes.
 
-- [ ] [AC3] pi extension (`session_start`) and opencode plugin (`chat.system.transform`): run `dotf mem session-start` and inject its output into the session context. Keep them small and deploy them through dotf's existing deploy path, not bind (the manifest says `emit: false`).
-- [ ] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
+- [x] [AC3] pi extension (`session_start`) and opencode plugin (`chat.system.transform`): run `dotf mem session-start` and inject its output into the session context. Keep them small and deploy them through dotf's existing deploy path, not bind (the manifest says `emit: false`).
+- [x] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
+
+> Slice C2 as built:
+> - pi and opencode: `ai/pi/extensions/dotfiles-gate.ts` and `ai/opencode/plugins/dotfiles-gate.ts`, deployed by the `pi-gate` and `opencode-gate` entries of `ai/deploy.json`. Each runs `dotf mem session-start --format stdout` and fails silent-but-logged when dotf is missing. pi sends it once per session start (not on a reload) for the next turn; opencode adds it to the system prompt, one brief per session. The manifest's opencode `file` now says `plugins/`, the directory opencode reads (the herdr plugin sits there).
+> - agy: a flat `PreInvocation` hook, `dotf mem session-start --format agy-hook`. It answers agy's `{"injectSteps":[{"systemMessage":{"systemMessage":...}}]}` on the first invocation of a `conversationId` and `{}` after, keyed by an O_EXCL marker under the OS temp dir (pruned after seven days). It never fails the turn.
+> - `carrierGaps` is empty. `TestSessionLineCarriersInjectTheBriefAndSurviveAMissingDotf` runs both TypeScript sources under node with a stand-in dotf.
 
 ### Slice D1: `lane next` without herdr (AC5)
 - [x] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
