@@ -1,0 +1,21 @@
+{
+  "$comment": [
+    "Models an evaluation run (`dotf eval run`) may launch. This is not the reviewer",
+    "pool: a candidate is measured here, and admission to the pool stays an owner",
+    "decision recorded in harness/reviewer-pool.json. Nothing in `dotf eval` reads or",
+    "writes the pool.",
+    "",
+    "Each entry has a pool entry's launch shape: runner, provider (pi only), model,",
+    "and exactly one of secret_id or `auth: login`. Pool roles (`signs`, `role`,",
+    "`pr_agent`) are refused. The first set is the reviewer pool's non-Anthropic",
+    "members plus gemini-4-hydrogen-medium, measured beside high on #3476."
+  ],
+  "candidates": [
+    {"id": "nan/deepseek-v4-flash", "runner": "pi", "provider": "nan", "model": "deepseek-v4-flash", "secret_id": "NAN_API_KEY", "vendor": "deepseek"},
+    {"id": "nan/mimo-v2.6-flash", "runner": "pi", "provider": "nan", "model": "mimo-v2.6-flash", "secret_id": "NAN_API_KEY", "vendor": "xiaomi"},
+    {"id": "nan/glm5.3-flash", "runner": "pi", "provider": "nan", "model": "glm5.3-flash", "secret_id": "NAN_API_KEY", "vendor": "zhipu"},
+    {"id": "nan/qwen3.8-flash", "runner": "pi", "provider": "nan", "model": "qwen3.8-flash", "secret_id": "NAN_API_KEY", "vendor": "alibaba"},
+    {"id": "agy/gemini-4-hydrogen-high", "runner": "agy", "model": "gemini-4-hydrogen-high", "auth": "login", "vendor": "google"},
+    {"id": "agy/gemini-4-hydrogen-medium", "runner": "agy", "model": "gemini-4-hydrogen-medium", "auth": "login", "vendor": "google"}
+  ]
+}
