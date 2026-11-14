@@ -143,16 +143,16 @@
     "top": {
       "claude": "opus",
       "copilot": "claude-opus-5",
-      "gemini": "gemini-3.8-flash-high",
-      "$comment_gemini": "agy serves no Gemini Pro tier since 2026-10 (`agy models`, agy 1.3.5), so top and mid name the same id until Gemini ships a stronger one; the old gemini-3.1-pro-high was rejected at startup (#2385, #902)."
+      "gemini": "gemini-4-argon-high",
+      "$comment_gemini": "Gemini 4 Argon fills the Pro slot: `agy models` (agy 1.5.8, 2026-11-14) serves gemini-4-argon-{low,medium,high}, and Argon at High passed the reviewer pool's admission bar in 50 s (#3471). From 2026-10 to 2026-11-14 agy served no Pro tier, so top named the mid id, gemini-3.8-flash-high; the older gemini-3.1-pro-high was rejected at startup (#2385, #902)."
     },
     "mid": {
       "claude": "sonnet",
       "copilot": "gpt-5.6-sol",
-      "gemini": "gemini-3.8-flash-high",
+      "gemini": "gemini-4-hydrogen-high",
       "nan": "deepseek-v4-flash",
       "opencode": "qwen3.6-plus",
-      "$comment_gemini": "agy's interactive default, routed 2026-10-01 so the pin in ai/agy/settings.json resolves (HARNESS-067 round-1 finding 1, #902). agy writes the picker label `Gemini 3.8 Flash (High)`; `agy models` lists its id as gemini-3.8-flash-high (moved from 3.7 by the owner, 2026-10-09, #902). Compile-time only: no chain carries it, so `dotf agent run` dispatch is unchanged."
+      "$comment_gemini": "agy's interactive default, routed 2026-10-01 so the pin in ai/agy/settings.json resolves (HARNESS-067 round-1 finding 1, #902). Gemini 4 Hydrogen is the Flash successor: `agy models` (agy 1.5.8, 2026-11-14) lists gemini-4-hydrogen-{low,medium,high,xhigh}, agy writes the picker label `Gemini 4 Hydrogen (High)`, and Hydrogen at High passed the reviewer pool's admission bar in 66 s (#3471). Moved from gemini-3.8-flash-high on 2026-11-14 (AI-054, #3471; that id came from 3.7 by the owner on 2026-10-09, #902). Compile-time only: no chain carries it, so `dotf agent run` dispatch is unchanged."
     },
     "low": {
       "claude": "haiku",

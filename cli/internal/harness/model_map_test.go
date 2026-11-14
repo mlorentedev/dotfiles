@@ -239,8 +239,17 @@ func TestModelMapConsumerClasses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ResolveTier(top, gemini): %v", err)
 		}
-		if got != "gemini-3.8-flash-high" {
-			t.Errorf("top/gemini = %q, want gemini-3.8-flash-high", got)
+		if got != "gemini-4-argon-high" {
+			t.Errorf("top/gemini = %q, want gemini-4-argon-high", got)
+		}
+		// Since 2026-11-14 agy serves a Pro slot again (#3471), so top and mid
+		// are distinct ids: a map that collapses them has lost the tier.
+		mid, err := ResolveTier(m, "mid", "gemini")
+		if err != nil {
+			t.Fatalf("ResolveTier(mid, gemini): %v", err)
+		}
+		if mid == got {
+			t.Errorf("mid/gemini = top/gemini = %q, want two tiers", mid)
 		}
 	})
 }
