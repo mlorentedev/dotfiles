@@ -45,8 +45,12 @@ owner: manu
 ### Slice 3: `dotf eval run`
 
 - [ ] [AC3] `dotf eval run` places each run under dotf's state directory (`env.StateDir()`, `$XDG_STATE_HOME/dotfiles/evals/<run-id>/`) and exits non-zero naming a case whose commit cannot be resolved
-- [ ] [AC6] Failing test: `--plan` prints the matrix and per-runner estimate; a matrix above `--max-runs` is refused
-- [ ] [AC6] Implement the plan and the cap; concurrency bounded per pool by `model-map.json`
+- [x] [AC6] Failing test: `--plan` prints the matrix and per-runner estimate; a matrix above `--max-runs` is refused
+- [x] [AC6] Implement the plan and the cap, for NaN (credits) and agy (run count); rates in `candidates.json`, held to `ai/nan/README.md` by a test
+- [ ] [AC6] Anthropic estimate in money from `dotf pr route`'s price rows, once a candidate runs on Anthropic (none does today)
+- [ ] [AC6] `measured` envelopes: the median of a case's earlier runs, read from stored `results.json` (needs AC7)
+- [ ] [AC5] Launch path for a planted case: it has no commit or tree, only `prompt.md`; decide how the eval slot sends it (ADR-063 §1)
+- [ ] [AC5] Concurrency bounded per pool by `model-map.json`, the bound `dotf agent run` holds
 - [ ] [AC5] Failing test: per-run grading record, with completion class mapped from the launcher's exit, and format failure distinct from zero findings
 - [ ] [AC5] Implement run, grade and epoch reduction; flag results on a candidate's own keys
 - [ ] [AC7] Failing test: `results.json` validates against `result.schema.json` with the provenance fields; no code path opens the pool, map or pins for writing
