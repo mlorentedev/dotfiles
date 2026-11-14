@@ -80,10 +80,15 @@ owner: manu
 > Slice D2 as built: the hint lives in the command layer, not in `cli/internal/worktree/add.go`: `lane` imports `worktree`, so `worktree` cannot call `lane.Where`. `laneHint` (`cli/internal/cmd/worktree_lane_hint.go`) runs after `worktree.Add` succeeds and prints one line to stderr for every active standing (in-lane, parked, out-of-lane). `AddDetached` is not on that path, so `spec review` prints nothing; a test pins it.
 
 ### Slice E: launchers (AC6, #3440, #3430)
-- [ ] [AC6] Fix #3440: `dotf secrets run` refuses an npm `.cmd` or `.bat` child on Windows, using the same function as `lane exec` (`refuseBatchShim`). Test first.
-- [ ] [AC6] Observed launch of copilot (`copilot -i <p>`) and opencode (`opencode --prompt <p>` under `dotf secrets run`). Record `LANE-READY` evidence in `verification.md`, then add the entries.
-- [ ] [AC6] codex and gemini: add each when it is installed and observed. Otherwise record "not installed" with the date.
-- [ ] [AC6] #3430: check whether a lane-launched pane carries `HERDR_AGENT`. Set it in `Exec`'s environment if it does not.
+- [x] [AC6] Fix #3440: `dotf secrets run` refuses an npm `.cmd` or `.bat` child on Windows, using the same function as `lane exec` (`refuseBatchShim`). Test first.
+- [x] [AC6] Observed launch of copilot (`copilot -i <p>`) and opencode (`opencode --prompt <p>` under `dotf secrets run`). Record `LANE-READY` evidence in `verification.md`, then add the entries.
+- [x] [AC6] codex and gemini: add each when it is installed and observed. Otherwise record "not installed" with the date.
+- [x] [AC6] #3430: check whether a lane-launched pane carries `HERDR_AGENT`. Set it in `Exec`'s environment if it does not.
+
+> Slice E as built:
+> - `lane.RefuseBatchShim` is exported and returns an error with no command prefix; `lane exec` wraps it as `lane:`, `dotf secrets run` as `secrets run:`. The secrets check runs in `assertSafeChildCommand`, so every entry point (the command, `runChild`, `runChildPTY`) has it, and only where `batchShimsRunViaCmdExe` is true (Windows).
+> - `lane.LaunchEnv(argv)` names the agent in `HERDR_AGENT` for a launch through `dotf secrets run`, read from the command after `--`, so a later wrapped entry needs no second list. `Exec` hands it to the image it starts with (it replaces an inherited value).
+> - Launchers added: `copilot -i <p>`, and `dotf secrets run --only NAN_API_KEY -- opencode --prompt <p>` (it submits the prompt, observed). codex and gemini are not installed here: no entry.
 
 ### Slice F: doctor (AC7, #3327)
 - [x] [P] [AC7] Apply the patch preserved on #3327 (detached worktree with no lease) with its tests.

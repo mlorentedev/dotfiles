@@ -18,6 +18,8 @@ func TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument(t *testing.T) {
 		{"claude", []string{"claude", prompt}},
 		{"pi", []string{"dotf", "secrets", "run", "--only", "NAN_API_KEY,OPENROUTER_API_KEY", "--", "pi", prompt}},
 		{"agy", []string{"agy", "-i", prompt}},
+		{"copilot", []string{"copilot", "-i", prompt}},
+		{"opencode", []string{"dotf", "secrets", "run", "--only", "NAN_API_KEY", "--", "opencode", "--prompt", prompt}},
 	} {
 		got, err := LaunchArgv(tc.agent, prompt)
 		if err != nil || !reflect.DeepEqual(got, tc.want) {
@@ -30,7 +32,7 @@ func TestLaunchArgv_PinsEachAgentAndPassesThePromptAsOneArgument(t *testing.T) {
 // wrong flag would start the successor in the wrong mode without a word.
 func TestLaunchArgv_RefusesAnUnknownAgentNamingTheKnownOnes(t *testing.T) {
 	_, err := LaunchArgv("codex", "go")
-	if err == nil || !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "agy, claude, pi") {
+	if err == nil || !strings.Contains(err.Error(), "codex") || !strings.Contains(err.Error(), "agy, claude, copilot, opencode, pi") {
 		t.Errorf("want an error naming codex and the known agents, got %v", err)
 	}
 }

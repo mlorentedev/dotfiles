@@ -38,7 +38,7 @@ func TestLaneExec_HandsTheAgentTheFilePromptAsOneArgument(t *testing.T) {
 	if want := []string{"agy", "-i", "Bug \"2501\"\nsecond line $HOME"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("exec argv = %q, want %q", got, want)
 	}
-	if err := runLane(t, "exec", "--agent", "codex", "--prompt-file", f); err == nil || !strings.Contains(err.Error(), "agy, claude, pi") {
+	if err := runLane(t, "exec", "--agent", "codex", "--prompt-file", f); err == nil || !strings.Contains(err.Error(), "agy, claude, copilot, opencode, pi") {
 		t.Errorf("an unknown agent is refused naming the known ones, got %v", err)
 	}
 	if err := runLane(t, "exec", "--agent", "claude", "--prompt-file", filepath.Join(t.TempDir(), "missing")); err == nil {
@@ -150,7 +150,7 @@ func TestLane_RefusalsAreShownOnStderr(t *testing.T) {
 		want string
 	}{
 		"unknown agent":       {[]string{"exec", "--agent", "copilot", "--prompt-file", f}, `no launch command for agent "copilot"`},
-		"known agents listed": {[]string{"exec", "--agent", "copilot", "--prompt-file", f}, "agy, claude, pi"},
+		"known agents listed": {[]string{"exec", "--agent", "codex", "--prompt-file", f}, "agy, claude, copilot, opencode, pi"},
 		"missing prompt":      {[]string{"exec", "--agent", "claude", "--prompt-file", f + ".missing"}, "lane exec:"},
 	} {
 		root := New("test", "test")
