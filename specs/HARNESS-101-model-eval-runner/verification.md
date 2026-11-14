@@ -13,7 +13,7 @@ owner: manu
 
 Map every acceptance criterion from `proposal.md` to concrete proof (commit hash, test name, or observed behavior).
 
-- [x] AC1 (slice 1): `harness/evals/case.schema.json`, embedded with an identity test. Tests: `TestValidateCaseRejectsMalformedCases` (20 mutations, each one property), `TestEmbeddedCaseSchemaEqualsTheRepoSchema`, `TestRepositoryCorpusChecksClean` (5 replay, 2 planted). Commits `361321c1`, `86e76cd9`.
+- [x] AC1 (slice 1): `harness/evals/case.schema.json`, embedded with an identity test. Tests: `TestValidateCaseRejectsMalformedCases` (19 mutations, each one property), `TestEmbeddedCaseSchemaEqualsTheRepoSchema`, `TestRepositoryCorpusChecksClean` (5 replay, 2 planted). Commits `361321c1`, `86e76cd9`.
 - [x] AC2 (slice 1): `dotf eval check`. Tests: `TestCheckReportsEachBrokenProperty`, `TestCheckLetsAReplaySourceCarryItsOwnDecoy`, `TestCheckHoldsAPlantedReferenceToTheIdealAnswer`, `TestGradeAssignsRowsOneToOneWhenFindingsShareASymbol`, `TestEvalCheckFailsAndNamesABrokenCase`. CI: `TestRepositoryCorpusChecksClean` runs in `cli.yml`'s test job, which has no path filter. Mutation: renaming the `latch` anchor in `harness-105.json` fails it with "expected wrapped-latch-prefix matches no row of source_review".
 - [ ] AC3-AC8: later slices.
 
