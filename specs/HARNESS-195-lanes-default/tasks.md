@@ -60,7 +60,8 @@ owner: manu
 - [x] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
 
 ### Slice D2: the `worktree add` hint (AC4)
-- [ ] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
+- [x] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
+> Slice D2 as built: the hint lives in the command layer, not in `cli/internal/worktree/add.go`: `lane` imports `worktree`, so `worktree` cannot call `lane.Where`. `laneHint` (`cli/internal/cmd/worktree_lane_hint.go`) runs after `worktree.Add` succeeds and prints one line to stderr for every active standing (in-lane, parked, out-of-lane). `AddDetached` is not on that path, so `spec review` prints nothing; a test pins it.
 
 ### Slice E: launchers (AC6, #3440, #3430)
 - [ ] [AC6] Fix #3440: `dotf secrets run` refuses an npm `.cmd` or `.bat` child on Windows, using the same function as `lane exec` (`refuseBatchShim`). Test first.
