@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // Standing is where a session's working directory stands relative to a
@@ -18,13 +20,16 @@ const (
 	Inactive Standing = iota
 	// InLane: cwd is in a persistent named lane of an active repository.
 	InLane
+	// ParkedLane: cwd is in a persistent lane nobody holds, whose lease says
+	// PARKED or whose HEAD is detached. It is not a place to work from.
+	ParkedLane
 	// OutOfLane: cwd is in an active repository but not in a lane, such as its
 	// main checkout or a worktree made by hand.
 	OutOfLane
 )
 
-// Position is Where's answer. Lane and Branch are set only InLane, and Branch
-// is "" for a lane parked on a detached HEAD.
+// Position is Where's answer. Lane is set InLane and ParkedLane, Branch only
+// InLane.
 type Position struct {
 	Standing Standing
 	Lane     string
@@ -55,24 +60,31 @@ func Where(cwd string) (Position, error) {
 	if !ok {
 		return Position{Standing: OutOfLane}, nil
 	}
-	// `git branch --show-current` prints nothing on a detached HEAD, which is
-	// the state of a parked lane, and exits 0.
+	// `git branch --show-current` prints nothing on a detached HEAD and exits 0.
 	out, err := exec.Command("git", "-C", cwd, "branch", "--show-current").Output()
 	if err != nil {
 		return Position{}, fmt.Errorf("lane where: reading the branch of %s: %w", cwd, err)
 	}
-	return Position{Standing: InLane, Lane: name, Branch: strings.TrimSpace(string(out))}, nil
+	branch := strings.TrimSpace(string(out))
+	meta, err := worktree.LoadMetadata(cwd)
+	if err != nil {
+		return Position{}, fmt.Errorf("lane where: reading the lease of %s: %w", cwd, err)
+	}
+	// A lane is held only while it has a branch and its lease says so: a lease
+	// still PARKED beside a branch is a lane nobody claimed.
+	if branch == "" || (meta != nil && strings.EqualFold(meta.State, string(worktree.StateParked))) {
+		return Position{Standing: ParkedLane, Lane: name}, nil
+	}
+	return Position{Standing: InLane, Lane: name, Branch: branch}, nil
 }
 
 // Line is the one line a session is told, or "" when there is nothing to say.
 func (p Position) Line() string {
 	switch p.Standing {
 	case InLane:
-		branch := p.Branch
-		if branch == "" {
-			branch = "(detached)"
-		}
-		return fmt.Sprintf("lane `%s` ACTIVE on `%s`", p.Lane, branch)
+		return fmt.Sprintf("lane `%s` ACTIVE on `%s`", p.Lane, p.Branch)
+	case ParkedLane:
+		return fmt.Sprintf("lane `%s` is PARKED: start with `dotf lane switch <branch>`", p.Lane)
 	case OutOfLane:
 		return "this repository runs lanes: start with `dotf lane switch <branch>`"
 	}

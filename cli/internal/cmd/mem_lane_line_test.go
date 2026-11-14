@@ -9,14 +9,16 @@ import (
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // laneFixture is a repository whose activation record is written (or not) and
-// which has one lane on feat/x. It writes the two records by hand: the line
-// reads them, and how Activate makes them is lane's own tests' business.
+// which has one lane on feat/x, leased in the given state. It writes the records
+// by hand: the line reads them, and how Activate makes them is lane's own
+// tests' business.
 type laneFixture struct{ main, lane string }
 
-func newLaneFixture(t *testing.T, active bool) laneFixture {
+func newLaneFixture(t *testing.T, active bool, state worktree.LifecycleState) laneFixture {
 	t.Helper()
 	root := t.TempDir()
 	git := func(dir string, args ...string) string {
@@ -41,6 +43,9 @@ func newLaneFixture(t *testing.T, active bool) laneFixture {
 	if err := os.WriteFile(filepath.Join(admin, lane.LaneIdentityFile), []byte("feat-lane-primary\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := worktree.SaveMetadata(f.lane, worktree.Metadata{Lane: "feat-lane-primary", State: string(state)}); err != nil {
+		t.Fatal(err)
+	}
 	if active {
 		if err := os.WriteFile(filepath.Join(common, lane.ActivationFile), []byte("active\n"), 0o644); err != nil {
 			t.Fatal(err)
@@ -51,6 +56,7 @@ func newLaneFixture(t *testing.T, active bool) laneFixture {
 
 const (
 	inLaneLine  = "lane `feat-lane-primary` ACTIVE on `feat/x`"
+	parkedLine  = "lane `feat-lane-primary` is PARKED: start with `dotf lane switch <branch>`"
 	outLaneLine = "this repository runs lanes: start with `dotf lane switch <branch>`"
 )
 
@@ -68,18 +74,20 @@ func sessionBrief(t *testing.T, cwd string) string {
 	return out.String()
 }
 
-// The three states a session can be in, as `mem session-start` and `mem resume`
+// The four states a session can be in, as `mem session-start` and `mem resume`
 // print them (HARNESS-195 AC3). Inactive prints nothing at all, not an empty line.
-func TestMemLaneLine_GoldenForTheThreeStates(t *testing.T) {
+func TestMemLaneLine_GoldenForEveryState(t *testing.T) {
 	memory := filepath.Join(t.TempDir(), "MEMORY.md")
 	if err := os.WriteFile(memory, []byte("# M\n\n## Session Handoff\n\n### thread: feat-x (writer: pi)\n\n**Next action:** n.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	active, inactive := newLaneFixture(t, true), newLaneFixture(t, false)
+	active, inactive := newLaneFixture(t, true, worktree.StateActive), newLaneFixture(t, false, worktree.StateActive)
+	parked := newLaneFixture(t, true, worktree.StateParked)
 	cases := []struct {
 		name, cwd, line string
 	}{
 		{"in a lane", active.lane, inLaneLine},
+		{"a lane nobody holds", parked.lane, parkedLine},
 		{"outside the lanes of an active repository", active.main, outLaneLine},
 		{"a repository that runs no lanes", inactive.lane, ""},
 	}

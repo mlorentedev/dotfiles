@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // activeRepo is a repository whose default branch carries the marker and whose
@@ -18,21 +20,48 @@ func activeRepo(t *testing.T) (repo, laneDir string) {
 	return repo, filepath.Join(wt, filepath.Base(repo))
 }
 
+// holdLane marks the lane's lease ACTIVE, as `dotf lane switch` does.
+func holdLane(t *testing.T, lane string) {
+	t.Helper()
+	meta, err := worktree.LoadMetadata(lane)
+	if err != nil || meta == nil {
+		t.Fatalf("LoadMetadata(%s) = %v, %v", lane, meta, err)
+	}
+	meta.State = string(worktree.StateActive)
+	if err := worktree.SaveMetadata(lane, *meta); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWhere(t *testing.T) {
 	t.Run("a lane of an active repository", func(t *testing.T) {
 		_, laneDir := activeRepo(t)
 		lane := filepath.Join(laneDir, LaneFeatPrimary)
 		runGitLaneTest(t, lane, "switch", "-c", "feat/x")
+		holdLane(t, lane)
 		got, err := Where(lane)
 		if err != nil || got != (Position{Standing: InLane, Lane: LaneFeatPrimary, Branch: "feat/x"}) {
 			t.Fatalf("Where(lane) = %+v, %v", got, err)
 		}
 	})
-	t.Run("a parked lane is on no branch", func(t *testing.T) {
+	t.Run("a lane nobody holds is parked", func(t *testing.T) {
 		_, laneDir := activeRepo(t)
+		// Detached, as init leaves it.
 		got, err := Where(filepath.Join(laneDir, LaneFastTrack))
-		if err != nil || got.Standing != InLane || got.Lane != LaneFastTrack || got.Branch != "" {
-			t.Fatalf("Where(parked lane) = %+v, %v", got, err)
+		if err != nil || got != (Position{Standing: ParkedLane, Lane: LaneFastTrack}) {
+			t.Fatalf("Where(detached lane) = %+v, %v", got, err)
+		}
+		// A branch checked out under a lease still PARKED is not held either.
+		lane := filepath.Join(laneDir, LaneFeatSecondary)
+		runGitLaneTest(t, lane, "switch", "-c", "feat/y")
+		if got, err := Where(lane); err != nil || got.Standing != ParkedLane {
+			t.Fatalf("Where(branch under a PARKED lease) = %+v, %v", got, err)
+		}
+		// And a detached HEAD under an ACTIVE lease is not a place to work.
+		holdLane(t, lane)
+		runGitLaneTest(t, lane, "switch", "--detach")
+		if got, err := Where(lane); err != nil || got.Standing != ParkedLane {
+			t.Fatalf("Where(detached under an ACTIVE lease) = %+v, %v", got, err)
 		}
 	})
 	t.Run("the main checkout and a plain worktree are out of a lane", func(t *testing.T) {
@@ -70,7 +99,7 @@ func TestPositionLine(t *testing.T) {
 		want string
 	}{
 		{Position{Standing: InLane, Lane: "feat-lane-primary", Branch: "feat/x"}, "lane `feat-lane-primary` ACTIVE on `feat/x`"},
-		{Position{Standing: InLane, Lane: "fast-track-lane"}, "lane `fast-track-lane` ACTIVE on `(detached)`"},
+		{Position{Standing: ParkedLane, Lane: "fast-track-lane"}, "lane `fast-track-lane` is PARKED: start with `dotf lane switch <branch>`"},
 		{Position{Standing: OutOfLane}, "this repository runs lanes: start with `dotf lane switch <branch>`"},
 		{Position{Standing: Inactive}, ""},
 	}
