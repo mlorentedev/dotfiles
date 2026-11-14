@@ -236,4 +236,16 @@ func TestLaneExec_HandsTheAgentTheModel(t *testing.T) {
 	if want := []string{"copilot", "--model", "gpt-5.4", "-i", "go"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("exec argv = %q, want %q", got, want)
 	}
+	// --model given empty is not --model omitted: the agent would start on its
+	// default and the launch would report success. Both commands refuse it
+	// before touching the prompt file or the repository.
+	for _, args := range [][]string{
+		{"exec", "--agent", "copilot", "--model", "", "--prompt-file", f},
+		{"exec", "--agent", "copilot", "--model", "  ", "--prompt-file", f},
+		{"next", "--model", "", "--dry-run"},
+	} {
+		if err := runLane(t, args...); err == nil || !strings.Contains(err.Error(), "--model") {
+			t.Errorf("%q: want a refusal naming --model, got %v", args, err)
+		}
+	}
 }

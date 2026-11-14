@@ -315,6 +315,18 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 	if err != nil {
 		return plan{}, err
 	}
+	// The model is checked before the agent resolves, so the placeholder plan
+	// (no backend, no agent named) refuses the same ids a launch would: one that
+	// reads as a flag, and, since the exec line is typed into a shell, one that
+	// is not a word every shell reads alike (the rule the binary's path follows).
+	if o.Model != "" {
+		if strings.HasPrefix(o.Model, "-") {
+			return plan{}, fmt.Errorf("lane: the model must be an id, not %q", o.Model)
+		}
+		if !plainWord.MatchString(o.Model) {
+			return plan{}, fmt.Errorf("lane: model %q has a character the shells do not read alike; name the model by its plain id", o.Model)
+		}
+	}
 	if out.Agent, err = resolveAgent(o.Agent, b); err != nil {
 		return plan{}, err
 	}
@@ -322,11 +334,6 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 		if _, err := LaunchArgv(out.Agent, prompt, o.Model); err != nil {
 			return plan{}, err
 		}
-	}
-	// The exec line is typed into a shell, so the model has to be a word every
-	// shell reads alike (the rule the binary's path already follows).
-	if o.Model != "" && !plainWord.MatchString(o.Model) {
-		return plan{}, fmt.Errorf("lane: model %q has a character the shells do not read alike; name the model by its plain id", o.Model)
 	}
 	dotf, note := o.Dotf, ""
 	if dotf == "" || !plainWord.MatchString(dotf) {

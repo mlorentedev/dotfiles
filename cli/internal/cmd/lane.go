@@ -170,7 +170,10 @@ func newLaneExecCmd() *cobra.Command {
 		Example:      "  dotf lane exec --agent claude --prompt-file prompt.md",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(c *cobra.Command, _ []string) error {
+			if err := checkModelFlag(c, model); err != nil {
+				return fmt.Errorf("lane exec: %w", err)
+			}
 			b, err := readPrompt(promptFile)
 			if err != nil {
 				return fmt.Errorf("lane exec: %w", err)
@@ -188,6 +191,16 @@ func newLaneExecCmd() *cobra.Command {
 	_ = c.MarkFlagRequired("agent")
 	_ = c.MarkFlagRequired("prompt-file")
 	return c
+}
+
+// checkModelFlag refuses a --model given with nothing in it: LaunchArgv reads an
+// empty model as "none", which would start the agent on its default and report
+// success, the opposite of what the flag asked for. An omitted flag is fine.
+func checkModelFlag(c *cobra.Command, model string) error {
+	if c.Flags().Changed("model") && strings.TrimSpace(model) == "" {
+		return fmt.Errorf("--model must be a model id, not %q", model)
+	}
+	return nil
 }
 
 // readPrompt reads the prompt file. The line `lane next` types into a pane
@@ -224,6 +237,9 @@ func newLaneNextCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if err := checkModelFlag(c, model); err != nil {
+				return fmt.Errorf("lane next: %w", err)
+			}
 			return runLaneNext(c, agent, model, dryRun)
 		},
 	}

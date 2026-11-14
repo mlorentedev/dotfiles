@@ -628,4 +628,11 @@ func TestNext_TypesTheModelOnTheExecLineAndRefusesOneTheShellsReadApart(t *testi
 	if _, err := Handoff(o, newFake(t, "claude"), queue); err == nil || !strings.Contains(err.Error(), "model") {
 		t.Errorf("want a refusal naming the model, got %v", err)
 	}
+	// With no backend the agent is a placeholder and no launch argv is built, so
+	// the flag-shaped id has to be caught by the plan itself.
+	o = opts(t)
+	o.Model = "--help"
+	if _, err := Handoff(o, nil, queue); err == nil || !strings.Contains(err.Error(), "model") {
+		t.Errorf("no backend: want a refusal naming the model, got %v", err)
+	}
 }
