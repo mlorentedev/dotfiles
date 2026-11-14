@@ -15,12 +15,7 @@ import (
 // whether it stands in a lane (HARNESS-195 AC3). The test below asserts this
 // table is exact: a gap not listed fails it, and so does a row whose harness
 // now has a carrier, so the slice that adds one has to delete its row.
-var carrierGaps = map[string]string{
-	// Lands in feat/lane-line-agy-carrier, only after a release carries
-	// `mem session-start --format agy-hook`: the manifest is mirrored on merge,
-	// and a pinned binary that lacks the flag would fail the hook on every turn.
-	"agy": "bind_named binds only a PreToolUse gate; no PreInvocation hook runs the session line",
-}
+var carrierGaps = map[string]string{}
 
 // laneLineCommands are the commands that print the line, as the manifest
 // spells them (a dotf subcommand suffix).
