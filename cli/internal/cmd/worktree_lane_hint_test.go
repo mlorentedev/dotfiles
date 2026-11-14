@@ -114,9 +114,23 @@ func TestLaneHintByPosition(t *testing.T) {
 	if got := laneHint(idle.main, io.Discard); got != "" {
 		t.Errorf("a repository without lanes got the hint %q", got)
 	}
+	// A lease Where cannot parse is a question it cannot answer: the lane's own
+	// directory, not a missing one (git answers a missing directory with "no
+	// repository", which is Inactive and silent).
+	broken := newLaneFixture(t, true, worktree.StateActive)
+	admin, err := worktree.AdminDir(broken.lane)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(admin, worktree.LeaseFileName), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	var errOut bytes.Buffer
-	if got := laneHint(filepath.Join(t.TempDir(), "gone"), &errOut); got != "" {
-		t.Errorf("a missing directory got the hint %q", got)
+	if got := laneHint(broken.lane, &errOut); got != "" {
+		t.Errorf("a lane whose lease cannot be read got the hint %q", got)
+	}
+	if !strings.Contains(errOut.String(), "lane hint skipped") {
+		t.Errorf("a directory Where cannot read was not reported on errOut: %q", errOut.String())
 	}
 }
 
