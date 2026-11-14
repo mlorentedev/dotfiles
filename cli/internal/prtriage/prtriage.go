@@ -85,9 +85,39 @@ type Comment struct {
 	CreatedAt         time.Time `json:"createdAt"`
 	UpdatedAt         time.Time `json:"updatedAt"`
 	// Path and Line locate an inline review comment; both are zero for a
-	// conversation comment or a review.
-	Path string `json:"path,omitempty"`
-	Line int    `json:"line,omitempty"`
+	// conversation comment or a review. Line is the line as of the current
+	// head and goes to zero once a later push moves it out of the diff;
+	// OriginalLine is the line the reviewer anchored to and never moves, and
+	// it is the one a triage row names: the row was written at review time
+	// and the diff moved under it (#3455).
+	Path         string `json:"path,omitempty"`
+	Line         int    `json:"line,omitempty"`
+	OriginalLine int    `json:"originalLine,omitempty"`
+}
+
+// Anchors returns the line a row may name for the finding: the one the
+// reviewer anchored, which never moves, so a row written when the reviewer
+// spoke keeps matching and a row cannot name a line another finding was
+// moved onto. The current line serves only when GitHub reports no original
+// (a position-only comment). Empty for a file-level or conversation comment,
+// which no row keyed by a line can name.
+func (c Comment) Anchors() []int {
+	switch {
+	case c.OriginalLine != 0:
+		return []int{c.OriginalLine}
+	case c.Line != 0:
+		return []int{c.Line}
+	}
+	return nil
+}
+
+// Where names the finding as the reviewer printed it, `path:line` on the
+// reviewer's line; a file-level comment is its path alone.
+func (c Comment) Where() string {
+	if lines := c.Anchors(); len(lines) > 0 {
+		return fmt.Sprintf("%s:%d", c.Path, lines[0])
+	}
+	return c.Path
 }
 
 // Spoken is when this comment last said something new.

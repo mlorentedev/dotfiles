@@ -753,6 +753,64 @@ func TestFetchClearsATriagedPRWhoseRealFindingWasReproduced(t *testing.T) {
 	}
 }
 
+// A push after the review moves the finding's line out of the diff, and
+// GitHub then answers line null with original_line still set. The row the
+// author wrote names the original line, and it must keep matching: read as
+// 0, the finding could never be triaged and the PR stayed held (#3455).
+func TestFetchKeepsTheOriginalLineOfAFindingThatLeftTheDiff(t *testing.T) {
+	responses := triagedPR10("| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |")
+	responses["/pulls/10/comments"] = `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":null,"original_line":4,"created_at":"2026-09-02T10:00:01Z"}]`
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("got %+v, want an empty queue: the row names the line the reviewer anchored", got)
+	}
+}
+
+// Lines added above the finding shift its current line while the reviewer's
+// comment still prints the original. The row names the reviewer's line; one
+// keyed by the shifted current line does not match, since that line is the
+// diff's, not the reviewer's, and another finding may move onto it.
+func TestFetchMatchesARowOnTheReviewersLineOfAShiftedFinding(t *testing.T) {
+	for name, tc := range map[string]struct {
+		row  string
+		held int
+	}{
+		"the reviewer's line": {"| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |", 0},
+		"the current line":    {"| `cli/a.go:9` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |", 1},
+	} {
+		responses := triagedPR10(tc.row)
+		responses["/pulls/10/comments"] = `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":9,"original_line":4,"created_at":"2026-09-02T10:00:01Z"}]`
+		got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+		if err != nil {
+			t.Fatalf("%s: fetchWith: %v", name, err)
+		}
+		if len(got) != tc.held {
+			t.Fatalf("%s: got %+v, want %d PR(s) held", name, got, tc.held)
+		}
+	}
+}
+
+// Two findings can come to share a current line: a push removes lines above
+// A (original 9, now 4) and pushes B (original 4) out of the diff. The one
+// row written for B, under the reviewer's line 4, must not clear A: a row
+// names the line the reviewer anchored, never the line the diff moved a
+// finding to (#3457 review).
+func TestFetchDoesNotClearAFindingOnAnotherFindingsRow(t *testing.T) {
+	responses := triagedPR10("| `cli/a.go:4` | apply | Reproduction: reproduced (exit 1) on 0123456789ab: `go test ./cli` |")
+	responses["/pulls/10/comments"] = `[{"id":1,"user":{"login":"github-actions[bot]"},"body":"**A**\n\nClass: REAL\nx","path":"cli/a.go","line":4,"original_line":9,"created_at":"2026-09-02T10:00:01Z"},
+	  {"id":2,"user":{"login":"github-actions[bot]"},"body":"**B**\n\nClass: REAL\ny","path":"cli/a.go","line":null,"original_line":4,"created_at":"2026-09-02T10:00:01Z"}]`
+	got, err := fetchWith(context.Background(), (&fakeGH{responses: responses}).run, "o/r", classifyingRegistry())
+	if err != nil {
+		t.Fatalf("fetchWith: %v", err)
+	}
+	if len(got) != 1 || len(got[0].Unreproduced) != 1 || got[0].Unreproduced[0].Finding.OriginalLine != 9 {
+		t.Fatalf("got %+v, want PR #10 held on finding A (original line 9) only", got)
+	}
+}
+
 // A gate that cannot read what it gates on fails closed: the PR stays listed.
 func TestFetchHoldsATriagedPRWhoseFindingsCannotBeRead(t *testing.T) {
 	fake := &fakeGH{responses: triagedPR10("| `cli/a.go:4` | apply | fixed |"), errs: map[string]error{"/pulls/10/comments": errors.New("boom")}}
