@@ -22,7 +22,7 @@ owner: manu
 - `golangci-lint run` and `GOOS=windows golangci-lint run` on `internal/forgewrite` and `internal/cmd`: 0 issues.
 - Mutations: dropping the `draft: true` check after a Gitea create turns `TestGiteaCreatePRDraftFailsWhenTheInstanceIgnoresThePrefix` red; dropping the ready short-circuit on GitHub turns `TestGitHubReadyPRSkipsTheMutationForAReadyPullRequest` red.
 - The instance in use answers `draft` on every pull request: Gitea 1.27.3, `personal/resume#808` read on 2026-11-14 had `"draft": false`.
-- Manual smoke test on gitea.kubelab.live (a scratch draft opened, marked ready, closed): not run yet. It writes to the owner's forge and leaves a pull request only the owner closes, so it waits for the owner; the spec does not archive before it.
+- Manual smoke test on gitea.kubelab.live, run 2026-11-14 with a binary built from `f0aea7a6`, as the agents' account on `personal/resume` (owner's choice): `dotf forge pr create --draft` opened `personal/resume#811`, which the API answered as `"title": "WIP: chore: check dotf forge drafts", "draft": true`. `dotf forge pr ready 811` then answered `"title": "chore: check dotf forge drafts", "draft": false`. A second `pr ready 811` exited 0 and wrote nothing. `dotf forge` has no close verb, so the owner closes #811 and deletes its branch `chore/forge-draft-check` by hand.
 - No regressions in the existing suite: yes. The one removed test, `TestGiteaCreatePRRefusesDraftBeforeAnyRequest`, asserted the refusal this spec replaces.
 
 ## Decisions made during implementation
@@ -30,6 +30,11 @@ owner: manu
 - One PR rather than the two the decision comment on #3406 planned: the production change is about 150 lines, so splitting it would double the review for no smaller risk.
 - The Gitea prefix dotf writes is `WIP: `, the first of Gitea's defaults. `pr ready` removes either default in any case, because a person may have retitled the pull request by hand.
 - Out-of-scope work ticketed: #3477 (harness text and the `dotf forge pr ready` allow rule, owner-only paths).
+- Review (PASS-WITH-GAPS, four minors) dispositioned:
+  - The post-PATCH still-draft path on Gitea: applied, `TestGiteaReadyPRFailsWhenThePatchedTitleIsStillADraft`.
+  - GitHub `ReadyPR`'s REST read failure: applied. The decode error is wrapped with `%w` in the ERROR/WHY/FIX shape and a missing `node_id` has its own message, `TestGitHubReadyPRFailsWhenTheReadIsNotAPullRequest`.
+  - The two unticked closing boxes in `tasks.md` (verification filled in, PR opened): acknowledged. Both are done (this file, #3479); `tasks.md` is left as the review read it, and the archive's only change to a reviewed file is `proposal.md`'s `status: archived`.
+  - The ticked manual-check task says the scratch PR was closed: acknowledged. The check itself ran as recorded above; closing `personal/resume#811` is the owner's, by hand.
 
 ## Promotion candidates
 
@@ -41,7 +46,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/TOOL-039-forge-pr-draft-ready/` -> `specs/archive/TOOL-039-forge-pr-draft-ready/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/TOOL-039-forge-pr-draft-ready/` -> `specs/archive/TOOL-039-forge-pr-draft-ready/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)

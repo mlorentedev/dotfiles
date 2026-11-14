@@ -98,6 +98,19 @@ func TestGiteaReadyPRFailsWhenTheTitleStillReadsAsDraft(t *testing.T) {
 	}
 }
 
+// A title carrying a known prefix twice is still a draft after one is
+// removed, so the answer to the PATCH is read, not assumed.
+func TestGiteaReadyPRFailsWhenThePatchedTitleIsStillADraft(t *testing.T) {
+	srv, log := prServer(t, "WIP: WIP: t", "WIP:")
+	g := Gitea{BaseURL: srv.URL, Token: tokenFn}
+	if _, err := g.ReadyPR(context.Background(), Repo{"h", "o", "n"}, 7); err == nil || !strings.Contains(err.Error(), "still a draft") {
+		t.Fatalf("want the still-a-draft error after the PATCH, got %v", err)
+	}
+	if n := len(*log); n != 2 || (*log)[1].method != http.MethodPatch {
+		t.Errorf("want a GET then a PATCH, got %+v", *log)
+	}
+}
+
 func TestGiteaReadyPRWritesNothingForAReadyPullRequest(t *testing.T) {
 	srv, log := prServer(t, "feat: x", "WIP:")
 	g := Gitea{BaseURL: srv.URL, Token: tokenFn}
@@ -189,6 +202,25 @@ func TestGiteaCreatePRDraftDoesNotPrefixTwice(t *testing.T) {
 		}
 		if _, err := g.ReadyPR(context.Background(), Repo{"h", "o", "n"}, 7); err != nil {
 			t.Errorf("%q: pr ready after create: %v", title, err)
+		}
+	}
+}
+
+// A REST read that is not a pull request fails with its cause and a remedy,
+// before any GraphQL call.
+func TestGitHubReadyPRFailsWhenTheReadIsNotAPullRequest(t *testing.T) {
+	for _, read := range []string{`not json`, `{"number":9}`} {
+		var calls int
+		run := func(_ context.Context, _ []byte, _ ...string) ([]byte, error) {
+			calls++
+			return []byte(read), nil
+		}
+		g := GitHub{Run: run}
+		if _, err := g.ReadyPR(context.Background(), Repo{"github.com", "o", "n"}, 9); err == nil || !strings.Contains(err.Error(), "FIX:") {
+			t.Errorf("read %s: want ERROR/WHY/FIX, got %v", read, err)
+		}
+		if calls != 1 {
+			t.Errorf("read %s: %d gh calls, want only the read", read, calls)
 		}
 	}
 }
