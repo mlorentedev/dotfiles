@@ -94,7 +94,7 @@ func newVMWindowsCmd() *cobra.Command {
 		},
 	}
 	w.Flags().StringVar(&ref, "ref", "HEAD", "committed branch, tag or commit to converge")
-	w.Flags().BoolVar(&keep, "keep", false, "leave the guest running for inspection")
+	w.Flags().BoolVar(&keep, "keep", false, "leave the guest running as a session: exec/cp --session <name> reach it, down ends it")
 	w.Flags().StringVar(&dotf, "dotf", "", "a dotf.exe source build (windows/arm64) to converge with instead of the pinned release")
 	w.Flags().IntVar(&cpus, "cpus", 4, "virtual CPUs")
 	w.Flags().IntVar(&memory, "memory", 8192, "memory in MiB")

@@ -457,8 +457,39 @@ func TestRun_KeepLeavesTheGuestRunning(t *testing.T) {
 	if _, err := os.Stat(o.Machine.Layout.Disk()); err != nil {
 		t.Errorf("--keep removed the overlay: %v", err)
 	}
-	if !strings.Contains(o.Progress.(*bytes.Buffer).String(), "dotf vm windows stop") {
-		t.Error("--keep does not say how to stop the guest")
+	if !strings.Contains(o.Progress.(*bytes.Buffer).String(), "down --session") {
+		t.Error("--keep does not say how to end the guest")
+	}
+	// The kept guest is a session, so exec and cp can address it and down ends it.
+	holder, err := WindowsSessions{Machine: o.Machine}.holder()
+	if err != nil || !strings.HasPrefix(holder, "windows-") {
+		t.Errorf("--keep registered no session: holder %q, err %v", holder, err)
+	}
+}
+
+func TestRun_KeepRefusesAStaleSession(t *testing.T) {
+	o := sealedBase(t)
+	o.Keep = true
+	if err := os.MkdirAll(filepath.Join(o.Machine.Layout.Sessions(), "old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err == nil || !strings.Contains(err.Error(), "down --session old") {
+		t.Fatalf("want the stale session named, got %v", err)
+	}
+	if len(g.starts)+len(g.imgs) != 0 {
+		t.Error("a kept run started over a stale session")
+	}
+}
+
+func TestRun_WithoutKeepRegistersNoSession(t *testing.T) {
+	o := sealedBase(t)
+	g := newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err != nil {
+		t.Fatal(err)
+	}
+	if holder, _ := (WindowsSessions{Machine: o.Machine}).holder(); holder != "" {
+		t.Errorf("a throwaway run left session %q", holder)
 	}
 }
 
