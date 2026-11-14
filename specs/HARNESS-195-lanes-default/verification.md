@@ -33,7 +33,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
   - drifted deployed guard (also a guard never deployed; line endings are not drift): `TestGuardDrift`, `TestLaneDoctor_WarnsOfADriftedDeployedGuardWithoutFailing`
   - each warning prints a `FIX:` line naming its command, and `lane doctor` exits 0 with warnings alone (the cmd tests assert both)
 - [ ] AC8 -> <commit> / <test or observation>
-- [ ] AC9 -> <commit> / <test or observation>
+- [ ] AC9 -> in progress. macOS done; the Linux and Windows guests remain, and ace2 is blocked by kubelab#3559 (its converge stops at `tools`, before `lanes`):
+  - macOS (macmini), 2026-11-14: `dotf update` installed 0.81.0 and converged. The run reported `[CHANGE] lanes 2.9s applied: lanes created and activated (4 change(s))` and `4 changed, 17 ok, 0 opaque, 4 skipped, 0 failed`. `.git/dotf-lanes-active` holds the committed marker (#3514), and a re-plan reports `0 to change, 20 ok`.
+  - Real sessions, macOS, 2026-11-14, see the table below. In a lane (`dotf lane switch chore/3432-ac9-evidence` -> `feat-lane-secondary`), claude, pi and opencode each quoted `` lane `feat-lane-secondary` ACTIVE on `chore/3432-ac9-evidence` ``. In the main checkout each quoted `this repository runs lanes: start with `dotf lane switch <branch>``. That second line cannot be guessed from the prompt, so the model read it from the carrier rather than making it up. One earlier pi run answered inconsistently (it quoted the line, then retracted it in the same reply); the rerun and the control are both clean.
 
 ## Observed launches (CLI-119 rule)
 
@@ -44,6 +46,9 @@ One row per agent, per machine: the date, the argv, and the `LANE-READY` answer,
 | copilot 1.0.81 | macOS, herdr 0.9.3 | 2026-11-14 | `copilot -i "Reply with exactly the word LANE-READY and do nothing else."` via `dotf lane exec --agent copilot --prompt-file p.md` typed into a fresh split pane by `herdr pane run` | started interactive, answered `LANE-READY`, pane `agent: copilot` (the agent is the foreground process, no `HERDR_AGENT` needed) |
 | opencode 1.16.2 | macOS, herdr 0.9.3 | 2026-11-14 | `dotf secrets run --only NAN_API_KEY -- opencode --prompt "<same prompt>"` via `dotf lane exec --agent opencode ...`, same way | `--prompt` submits the prompt: answered `LANE-READY` (Build, GLM 5.3 Flash). Pane `agent: null` before the #3430 fix, `agent: opencode` after it |
 | pi | macOS, herdr 0.9.3 | 2026-11-14 | `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi "<same prompt>"` via `dotf lane exec --agent pi ...` (entry from CLI-119) | started; pane `agent: pi` with the #3430 fix |
+| claude 2.1.325 | macOS (macmini), dotf 0.81.0 | 2026-11-14 | `claude -p "<quote the line starting with lane>"` in lane `feat-lane-secondary`; control from the main checkout | quoted the ACTIVE line in the lane, and the "this repository runs lanes" line in the main checkout (SessionStart hook) |
+| pi 1.5.2 | macOS (macmini), dotf 0.81.0 | 2026-11-14 | `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY -- pi -p --no-session "<same>"`, same two places | same two lines (deployed `~/.pi/agent/extensions/dotfiles-gate.ts`) |
+| opencode 1.16.2 | macOS (macmini), dotf 0.81.0 | 2026-11-14 | `dotf secrets run --only NAN_API_KEY,OPENROUTER_API_KEY,OPENAI_API_KEY -- opencode run "<same>"`, same two places | same two lines (deployed plugin, build agent on glm5.3-flash) |
 | codex | macOS | 2026-11-14 | not installed (`command -v codex` empty) | no entry |
 | gemini | macOS | 2026-11-14 | not installed (`command -v gemini` empty) | no entry |
 
