@@ -39,6 +39,13 @@ setup() {
     if grep -qE 'gh (issue comment|pr create)' "$SKILLS/autopilot/SKILL.md"; then false; fi
 }
 
+@test "agents open and mark drafts ready with dotf forge, which works on Gitea too" {
+    for f in "$SKILLS/autopilot/SKILL.md" "$REPO/harness/enforced/pr-stewardship.md"; do
+        grep -q 'dotf forge pr ready' "$f" || { printf '%s does not name dotf forge pr ready\n' "$f" >&2; false; }
+        if grep -qE 'gh pr (create|ready)' "$f"; then printf '%s still names gh pr create or ready\n' "$f" >&2; false; fi
+    done
+}
+
 @test "no forge-writing skill passes a body as a command-line argument" {
     for s in new-ticket pr-review-triage autopilot; do
         if grep -qE 'dotf forge [a-z]+ [a-z]+.* --body ' "$SKILLS/$s/SKILL.md"; then
@@ -49,7 +56,7 @@ setup() {
 }
 
 @test "the Claude template allows the dotf forge write verbs" {
-    for rule in 'dotf forge issue:\*' 'dotf forge pr create:\*' 'dotf forge pr comment:\*' 'dotf forge pr edit:\*'; do
+    for rule in 'dotf forge issue:\*' 'dotf forge pr create:\*' 'dotf forge pr comment:\*' 'dotf forge pr edit:\*' 'dotf forge pr ready:\*'; do
         grep -q "\"Bash($rule)\"" "$REPO/ai/claude/settings.json" || { printf 'missing allow: %s\n' "$rule" >&2; false; }
     done
 }
