@@ -202,13 +202,13 @@ repository nobody activated here.
 | `lane <name> ACTIVE on <branch>` | in a lane, lease held | work; commits are allowed |
 | `lane <name> is PARKED: start with dotf lane switch <branch>` | in a lane nobody holds, or detached in one | `dotf lane switch <branch>`; commits here are blocked (rule 5a, 6c) |
 | `this repository runs lanes: start with dotf lane switch <branch>` | outside every lane (the main checkout, a third-party root) | `dotf lane switch <branch>`, then `cd` to the lane it prints; commits on `main` are blocked (rule 6a) |
-| no line | this machine runs no lanes here | nothing lane-related applies |
+| no line | this machine runs no lanes here, or the lane state could not be read | check `<git common dir>/dotf-lanes-active`: absent means nothing lane-related applies; present means run `dotf lane doctor`, which names the read error |
 
 What the guard blocks is the table in section 3. Recovery, by symptom:
 
 | Symptom | Recovery |
 |---|---|
-| `direct commits on 'main' are blocked` | `dotf lane switch <branch>`, move the change with `git stash push -u -m <tag>` (never a bare stash; the stack is shared) or a WIP commit on the new branch |
+| `direct commits on 'main' are blocked` | in the original checkout, `git stash push -u -m <tag>` (never a bare stash; the stack is shared) and note its SHA from `git stash list --format='%H %gs'`; `dotf lane switch <branch>` and `cd` to the lane; `git stash apply <sha>` there, then drop the entry |
 | `lane at <path> is PARKED` | `dotf lane switch <branch>` in that lane, or switch to a free one |
 | `WIP cap reached` from `lane switch` | park a finished lane (`dotf lane park <lane>`, or `dotf worktree done <branch>` once its PR merged); an unattended run ends with `parked(wip-cap)` instead of creating a worktree |
 | detached HEAD in a linked worktree | `dotf worktree adopt`, or `git switch -c <type>/<issue>-<slug>` |
