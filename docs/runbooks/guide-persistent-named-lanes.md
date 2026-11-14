@@ -11,8 +11,9 @@ host, an operating system, an agent or a machine path.
 
 ```mermaid
 flowchart TB
-  subgraph Data["Data (the marker is committed; the lease and the record are local to the machine)"]
+  subgraph Data["Data (the marker is committed; the activation record, the lease and the identity record are local to the machine)"]
     M[".dotf/lanes.json<br/>canonical_lanes[]<br/>third_party_roots[]<br/>committed, travels with every clone"]
+    A["&lt;repo&gt;/.git/dotf-lanes-active<br/>the activation record: a copy of the committed marker<br/>written by dotf converge, local, out of git clean's reach"]
     W["&lt;repo&gt;/.git/worktrees/&lt;id&gt;/dotf-worktree.json<br/>lane, state, issue, lease<br/>local, git-owned, out of git clean's reach"]
     I["&lt;repo&gt;/.git/worktrees/&lt;id&gt;/dotf-lane<br/>the lane's identity, git-owned<br/>local, never committed"]
   end
@@ -26,9 +27,10 @@ flowchart TB
   end
   C1 -->|writes| M
   C2 -->|unions into| M
+  M -->|"converge copies it"| A
   C3 -->|creates + leases| W
   C3 -->|records| I
-  M -->|activation + roots| G
+  A -->|"activation + roots"| G
   W -->|lease state| G
   I -->|identity| G
   G -->|exit 1 blocks commit| Git[["git commit"]]
@@ -36,15 +38,20 @@ flowchart TB
 
 Three properties follow from that split:
 
-- **The marker is the only opt-in.** No other feature's config file can arm the
-  guard. `.dotf/lane.json` (singular) belongs to the issue-queue subsystem and is
-  ignored here on purpose.
+- **The activation record is the only opt-in (#3437).** The guard arms from the
+  file `dotf-lanes-active` in the git common dir and from nothing else: a
+  `.dotf/lanes.json` in a working tree, committed or not, arms no checkout, so
+  the deploy clone (`DOTFILES_DIR`) and any other clone of the default branch
+  stay inert. Only `dotf converge --only lanes` writes the record, from the
+  marker on the default branch; `dotf lane init` never does. No other feature's
+  config file can arm the guard either: `.dotf/lane.json` (singular) belongs to
+  the issue-queue subsystem and is ignored here on purpose.
 - **Policy is code, host data is data.** `canonical_lanes` is rewritten from
   `lane.CanonicalLanes` on every `dotf lane init --write-marker`. `third_party_roots` is unioned
   with whatever the file already declares, so adding a session host is a data
   change that survives re-initialization.
-- **The guard parses, it does not decide.** It reads the marker's roots, the
-  lease and the identity record. A repository that declares nothing gets no
+- **The guard parses, it does not decide.** It reads the record (its existence
+  arms it, its content declares the roots), the lease and the identity record. A repository that declares nothing gets no
   rules.
 - **The lease lives next to the identity record.** `dotf` writes it to
   `dotf-worktree.json` inside the worktree's git admin dir (ADR-062), the
@@ -60,8 +67,12 @@ Three properties follow from that split:
 
 ## 2. The marker contract
 
-Path: `.dotf/lanes.json` at the repository root (or at the main checkout root when
-read from a worktree).
+Path: `.dotf/lanes.json` at the repository root, committed on the default branch.
+The guard does not read it from a working tree: `dotf converge --only lanes`
+copies it, as the default branch carries it, into the activation record
+(`<git common dir>/dotf-lanes-active`), and the guard reads that copy. A marker
+edited on the default branch reaches the guard on the next converge, which
+reports one change and then `changed=0`.
 
 ```json
 {
@@ -81,7 +92,7 @@ read from a worktree).
 |---|---|---|---|
 | `version` | integer | code | Marker schema version. Currently `1`. |
 | `canonical_lanes` | array of string | code | The lanes `dotf lane init` provisions. Rewritten on every `--write-marker`; policy for the CLI, not read by the guard. |
-| `third_party_roots` | array of string | operator | Directory names, under the projects boundary, that belong to an external session host. Unioned, never truncated. |
+| `third_party_roots` | array of string | operator | Directory names, under the projects boundary, that belong to an external session host. Unioned, never truncated. The guard reads them from the activation record. |
 
 Constraints enforced by tests (`cli/internal/lane`, `cli/internal/hooks`):
 
@@ -101,7 +112,7 @@ flowchart TD
   B -->|yes| OK([exit 0: allowed])
   B -->|no| C{'.obsidian/' present<br/>in worktree or main root?}
   C -->|yes| OK
-  C -->|no| D{'.dotf/lanes.json'<br/>in worktree or main root?}
+  C -->|no| D{activation record<br/>'dotf-lanes-active' in the<br/>git common dir?}
   D -->|no| OK
   D -->|yes| E{worktree path matches a<br/>declared third_party_root?}
   E -->|yes| B1([exit 1: claim a lane])
@@ -121,13 +132,15 @@ Rule summary:
 |---|---|---|
 | 1 | Active rebase, cherry-pick, revert, merge or sequencer | allowed |
 | 2 | `.obsidian/` in worktree or main root (vault) | allowed |
-| 3 | No `.dotf/lanes.json` | allowed — the guard is not armed |
+| 3 | No activation record in the git common dir (`dotf-lanes-active`) | allowed — the guard is not armed, whatever marker a working tree carries |
 | 4 | Worktree sits under a declared `third_party_root` | **blocked** |
 | 5a | Lease present and `state == "PARKED"` | **blocked** |
 | 5b | Identity record `$git_dir/dotf-lane` readable with a non-empty first line, or present but unreadable; no lease | **blocked** |
 | 6a | Branch is `main` or `master` | **blocked** |
 | 6b | Detached HEAD at the main checkout, no lease | **blocked** |
 | 6c | Detached HEAD in a linked worktree, no lease | **blocked**; recover with `dotf worktree adopt` (keeps the worktree) or `git switch -c <type>/<issue>-<slug>` |
+
+After rule 5 reads the lease, an expired `lease_expires_at` (compared as an instant, across UTC offsets) prints a `WARN`/`FIX` pair on stderr and never blocks (#3438): the commit goes through, and `dotf lane doctor` reports the same lease.
 
 The lease is one resolved path for both rules: `$git_dir/dotf-worktree.json`
 first, the legacy `$top/.dotf-worktree.json` second, the order `dotf` reads
@@ -161,7 +174,7 @@ else routes to `fast-track-lane` then `feat-lane-secondary`. If every candidate 
 
 | Use case | Command | Marker state | Guard verdict in that worktree |
 |---|---|---|---|
-| Declare a repository | `dotf lane init --write-marker`, then commit | created, uncommitted until you commit it | arms nothing: a machine activates through `dotf converge --only lanes`, from the committed marker |
+| Declare a repository | `dotf lane init --write-marker`, then commit | created, uncommitted until you commit it | arms nothing: a machine activates through `dotf converge --only lanes`, from the committed marker, which writes the record |
 | Start feature work | `dotf lane switch feat/3259-slug` | unchanged | allowed (ACTIVE lane) |
 | Start a fix | `dotf lane switch fix/3300-slug` | unchanged | allowed (`fast-track-lane`) |
 | Lane's branch landed | `dotf lane park` | unchanged | **blocked** until a new branch is claimed |
@@ -169,14 +182,17 @@ else routes to `fast-track-lane` then `feat-lane-secondary`. If every candidate 
 | Work on `main` | — | unchanged | **blocked** (rule 6a) |
 | Rebase / cherry-pick / revert | `git rebase`, `git cherry-pick` | unchanged | allowed (rule 1) |
 | Edit the Obsidian vault | — | n/a | allowed (rule 2) |
-| Add a new session host | edit `third_party_roots`, commit | extended | **blocked** for that host only |
-| Repository without a marker | — | absent | allowed, guard inert |
+| Add a new session host | edit `third_party_roots`, commit, then `dotf converge --only lanes` | extended | **blocked** for that host only, once converge refreshed the record |
+| Repository this machine never activated (no record), the deploy clone included | — | any | allowed, guard inert |
 
 ## 6. Activation checklist (after the feature merges)
 
 The marker is deliberately **not** committed by the pull request that ships the
 code. Shipping the guard and arming it are separate decisions: arming it in the
 same merge would block every existing session container on every seat at once.
+Committing the marker declares the repository; each machine arms its own guard
+when `dotf converge --only lanes` writes the activation record, so a clone that
+never converges (the deploy clone) is never armed.
 
 1. Install the released `dotf` (see `release-dotf.md`).
 2. In the main checkout, run `dotf lane init --write-marker`.
@@ -185,13 +201,17 @@ same merge would block every existing session container on every seat at once.
    marker.
 3. Review the marker, then commit it:
    `git add .dotf/lanes.json && git commit -m "chore: arm the persistent named lane guard"`.
-   The commit itself is allowed: it lands from a lane or before the guard sees a
-   marker in the main checkout's history. If rule 6 blocks it, claim a lane with
-   `dotf lane switch chore/<issue>-arm-lane-guard` and commit there.
-4. Confirm the guard is live (section 7), and that the marker and the lanes
+   Land it through a pull request from a branch worktree; a commit on `main` in an
+   activated main checkout is refused by rule 6.
+4. On each machine, activate: `dotf converge --only lanes` (twice: the second run
+   reports `changed=0`). It writes `dotf-lanes-active` in the git common dir.
+5. Confirm the guard is live (section 7), and that the marker and the lanes
    agree: `dotf lane doctor` prints nothing and exits 0 (section 7.6).
-5. Announce the change: from that merge onward, commits in third-party session
-   roots and on `main` in this repository are refused.
+6. Announce the change: from then on, on each activated machine, commits in
+   third-party session roots and on `main` in this repository are refused.
+
+To disarm a machine, delete `<git common dir>/dotf-lanes-active`; the next
+converge writes it again while the default branch carries the marker.
 
 Lanes leased by a `dotf` older than ADR-062 carry the lease at the worktree
 root only. Re-run `dotf lane init` once after updating: it copies each such
@@ -239,8 +259,12 @@ cd cli
 go test ./internal/hooks/... -count=1 -timeout 30m -run TestPreCommitLaneGuard -v
 ```
 
-Expected: `PASS`. The scenarios cover: no marker (allowed), vault (allowed),
-`main` with marker (blocked), issue-queue `.dotf/lane.json` only (allowed),
+Expected: `PASS`. The scenarios cover: no record (allowed), vault (allowed),
+`main` with a record (blocked), a committed marker with no record (allowed, at the
+main checkout and in a worktree holding `main`), the deploy clone carrying the
+same committed marker as an activated clone (allowed, while the activated one is
+blocked), an expired lease (warns, never blocks, whichever UTC offset it is
+written in), issue-queue `.dotf/lane.json` only (allowed),
 third-party root (blocked), PARKED lane (blocked), ACTIVE lane (allowed),
 declared custom root (blocked), undeclared root with no fallback (allowed),
 identity: an unleased worktree merely named after a lane (allowed), the same
@@ -272,9 +296,9 @@ a plain directory or another repository's worktree at a lane path.
 ### 7.4 Verify by effect on a real repository
 
 ```sh
-# 1. Opt in.
-dotf lane init
-test -f .dotf/lanes.json && echo "marker present"
+# 1. Activate (the marker must be committed on the default branch).
+dotf converge --only lanes
+test -f "$(git rev-parse --git-common-dir)/dotf-lanes-active" && echo "record present"
 
 # 2. A commit on main must now be refused.
 git checkout main
@@ -295,7 +319,8 @@ git commit --allow-empty -m probe
 
 If step 2 succeeds, the guard is not installed in this seat: check that
 `git config --get core.hooksPath` points at a directory containing
-`lib/lane-guard.sh`, and that the marker exists in the checkout being tested.
+`lib/lane-guard.sh`, and that the activation record exists in the repository
+being tested (a clone that never converged has none).
 
 ### 7.5 Verify agnosticism
 
@@ -312,14 +337,18 @@ Expected: no matches. If that changes, policy has leaked back into the script.
 dotf lane doctor; echo "exit=$?"
 ```
 
-Expected on a coherent repository: no output, `exit=0`. A repository without the
-marker, or a marker whose lanes are not provisioned on this machine, prints one
-line and exits 0: the marker is committed and travels with every clone, the lanes
+Expected on a coherent repository: no output, `exit=0`. Doctor audits what the
+guard enforces, so a repository without the activation record prints one line
+(`not lane-managed on this machine`) and exits 0, whatever marker its working
+tree carries and however that marker reads. An activated repository whose main
+checkout sits on a commit that predates the marker warns that nothing was
+compared. A marker whose lanes are not provisioned on this machine also prints
+one line and exits 0: the marker is committed and travels with every clone, the lanes
 are per machine. Any incoherence prints one `ERROR`/`FIX` pair per finding on
 stdout and exits 1; the audit repairs nothing, the FIX line names the command
 that does. A linked worktree detached with no lease prints a `WARN`/`FIX` pair and
 does not change the exit code: it is not drift, but the guard refuses its commits
-once the marker is committed (#3436), so adopt it first (`dotf worktree adopt`).
+while the lanes are active (#3436), so adopt it first (`dotf worktree adopt`).
 The same pair, same exit code, reports a lease that has expired (the FIX is `dotf
 lane park <lane>` or `dotf worktree done <path>`; no command renews a lease) and a
 deployed `lane-guard.sh` that differs from the repository's copy (the FIX is `dotf
@@ -379,17 +408,17 @@ go test ./internal/cmd/... -count=1 -run 'TestLaneDoctor' -v
   lanes, and `dotf lane doctor` run from the second reports each lane path as
   the first's with a FIX that touches nothing of the first's; a layout that lets
   both coexist is the follow-up (#3318).
-- **The parser fails closed on syntax and open on semantics.** A malformed marker
+- **The parser fails closed on syntax and open on semantics.** A malformed record
   still arms the guard (the file exists) but yields empty lists, so rules 4 and 5a
   do not apply; rule 5b reads the record independently of the lists and still
   fires. `dotf lane init` owns the file format; do not hand-edit it beyond
   `third_party_roots`. `dotf lane doctor` (7.6) is the detector: it names the
   field, the guard stays silent.
-- **`dotf lane doctor` reads the main checkout's marker only.** The guard reads
-  `$top/.dotf/lanes.json` first, so a lane checked out on a branch whose copy of
-  the marker differs is guarded by that copy. An older branch legitimately
-  carries an older marker, so the audit does not compare the copies; a corrupt
-  lane-local copy is found by running `dotf lane doctor` from that lane after
-  merging the branch. The audit is also not yet a `dotf doctor` sweep entry (#3327).
+- **`dotf lane doctor` reads the main checkout's marker, the guard the record.**
+  The guard no longer reads any working-tree marker, so an older branch carrying
+  an older marker guards nothing differently. The record follows the default
+  branch at the next converge; a marker edited there and not yet converged is
+  the one window in which the guard's roots lag the file. The audit is also not
+  yet a `dotf doctor` sweep entry (#3327).
 - **Rule 6 blocks `main`/`master` only.** A repository whose default branch is
   named otherwise relies on rules 4 and 5.

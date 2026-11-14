@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
@@ -252,4 +253,45 @@ func mustJSON(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+// The record carries the committed marker, because the guard reads the declared
+// third-party roots from it and from nothing else (#3437). A marker edited on
+// the default branch refreshes the record, as one change that the plan predicts
+// and a second run no longer reports.
+func TestActivate_RecordCarriesTheCommittedMarkerAndFollowsIt(t *testing.T) {
+	repo, wt := setupLaneTestRepo(t)
+	commitMarker(t, repo, true)
+	if _, err := Activate(repo, wt, false); err != nil {
+		t.Fatal(err)
+	}
+	committed := runGitLaneTest(t, repo, "show", "origin/main:"+LanesMarkerFile)
+	got, err := os.ReadFile(recordPath(t, repo))
+	if err != nil || strings.TrimSpace(string(got)) != strings.TrimSpace(committed) {
+		t.Fatalf("record = %q (err=%v), want the committed marker %q", got, err, committed)
+	}
+
+	edited := strings.Replace(committed, "copilot-worktrees", "acme-sessions", 1)
+	if edited == committed {
+		t.Fatalf("fixture marker declares no copilot-worktrees root to edit:\n%s", committed)
+	}
+	if err := os.WriteFile(filepath.Join(repo, filepath.FromSlash(LanesMarkerFile)), []byte(edited+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGitLaneTest(t, repo, "add", LanesMarkerFile)
+	runGitLaneTest(t, repo, "-c", "core.hooksPath="+t.TempDir(), "commit", "-m", "declare another root")
+	runGitLaneTest(t, repo, "push", "origin", "main")
+
+	if plan, err := Activate(repo, wt, true); err != nil || plan.Changes != 1 {
+		t.Fatalf("plan after the marker changed = %+v, %v; want 1 change (the record)", plan, err)
+	}
+	if apply, err := Activate(repo, wt, false); err != nil || apply.Changes != 1 {
+		t.Fatalf("apply after the marker changed = %+v, %v; want 1 change", apply, err)
+	}
+	if got, _ := os.ReadFile(recordPath(t, repo)); !strings.Contains(string(got), "acme-sessions") {
+		t.Errorf("record was not refreshed from the default branch: %q", got)
+	}
+	if again, err := Activate(repo, wt, false); err != nil || again.Changes != 0 {
+		t.Fatalf("second run = %+v, %v; want changes=0", again, err)
+	}
 }

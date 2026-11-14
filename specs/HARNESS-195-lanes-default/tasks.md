@@ -36,13 +36,20 @@ owner: manu
 > - Plan and apply agree, including for a lane that lacks a lease or its identity record; a lane path another repository occupies is a converge skip carrying the repair, not a failure.
 
 ### Slice B: the guard arms from the activation record (AC2, #3437, #3438)
-- [ ] [AC2] Failing `TestPreCommitLaneGuard` cases:
+- [x] [AC2] Failing `TestPreCommitLaneGuard` cases:
   - no record → no block;
   - a record on main in the main checkout → block;
   - a branch worktree → pass;
   - the deploy clone → pass.
-- [ ] [AC2] Implement in `git-hooks/lib/lane-guard.sh`: read the record from the git common dir, and drop both marker lookups (`$top/.dotf/lanes.json` and `$main_root/.dotf/lanes.json`).
-- [ ] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
+- [x] [AC2] Implement in `git-hooks/lib/lane-guard.sh`: read the record from the git common dir, and drop both marker lookups (`$top/.dotf/lanes.json` and `$main_root/.dotf/lanes.json`).
+- [x] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
+- [x] [AC2] `lane doctor` gates on the activation record, not the marker, so doctor and guard agree. Test first.
+
+> Slice B as built (for the slices that follow):
+> - The record's content is now the committed marker, copied by `Activate` as the default branch carries it; the guard reads `third_party_roots` from it, so no marker lookup remains. A marker edited on the default branch refreshes the record on the next converge (one change, then `changed=0`).
+> - An expired lease warns on stderr for any worktree that carries one, detached or on a branch, and never blocks. A branch worktree with no lease still passes, as AC2 says.
+> - `lane doctor` is silent about a marker it is not armed by: no record means "not lane-managed on this machine", with no audit. An active repository whose main checkout lacks the marker warns that nothing was compared.
+> - `harness/skills/autopilot/SKILL.md` still routes on the marker (`if [ -f .dotf/lanes.json ]`); that is a separate decision from arming and is not touched here.
 
 ### Slice C: tell the session where it stands (AC3)
 - [ ] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.

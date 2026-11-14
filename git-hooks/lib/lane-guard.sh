@@ -5,17 +5,20 @@
 # POSIX sh on purpose: this runs under bash, zsh, dash and BusyBox alike, on
 # Linux, macOS and Git-for-Windows. No bash-only expansion is permitted here.
 #
-# Opt-in is the committed marker .dotf/lanes.json, written by `dotf lane init`
-# and located in the current worktree or the main repository root. The marker
-# carries no paths and no host names, so it is identical on every OS, agent host
-# and seat, and no other feature's config file can switch this guard on.
+# Opt-in is the activation record `dotf converge --only lanes` writes into the
+# git common dir (dotf-lanes-active), and nothing else arms this guard (#3437). A
+# marker in a working tree, committed or not, arms nothing: otherwise every
+# checkout of the default branch, the deploy clone included, would arm itself.
+# The record carries the committed marker's content, which declares no paths and
+# no host names, so it is identical on every OS, agent host and seat, and no
+# other feature's config file can switch this guard on.
 #
 # It exempts:
 #   - Obsidian vaults (.obsidian/ present)
 #   - Active git rebase or cherry-pick operations (rebase-merge, rebase-apply,
 #     or CHERRY_PICK_HEAD present in git-dir, fixing B6)
 #
-# In a repository carrying .dotf/lanes.json, it blocks:
+# In a repository holding the activation record, it blocks:
 #   1. Direct commits on main/master, at the main checkout or in a linked worktree
 #      that holds it (each message names which; both direct to a branch or lane)
 #   2. Commits inside a PARKED persistent lane (lease state == "PARKED")
@@ -25,6 +28,8 @@
 #      directory name: git moves and prunes that record with the worktree, so a
 #      renamed lane stays a lane and a stranger named after one is not.
 #   4. Commits inside a declared third-party session root (third_party_roots)
+#
+# It warns, and never blocks, when the worktree's lease has expired (#3438).
 
 set -u
 
@@ -64,30 +69,28 @@ if [ -d "$top/.obsidian" ] || [ -d "$main_root/.obsidian" ]; then
   exit 0
 fi
 
-# 3. Only enforce where the repository declares the named lane system.
-marker=""
-for candidate in "$top/.dotf/lanes.json" "$main_root/.dotf/lanes.json"; do
-  if [ -f "$candidate" ]; then
-    marker="$candidate"
-    break
-  fi
-done
-[ -n "$marker" ] || exit 0
+# 3. Only enforce where this machine activated the lanes: the record exists in
+# the git common dir, which every worktree of the repository shares and which
+# `git clean` never reaches. Only the file's existence arms the guard; its
+# content is data for rule 4. A different clone, such as the deploy clone, has a
+# common dir of its own and so no record.
+record="$common_dir/dotf-lanes-active"
+[ -f "$record" ] || exit 0
 
 # json_list prints the string elements of a named array, one per line. sed is
-# line-based and `dotf lane init` writes indented JSON, where every array element
-# sits on its own line, so the document is flattened before matching. Names are
+# line-based and the marker is indented JSON, where every array element sits on
+# its own line, so the document is flattened before matching. Names are
 # kebab-case identifiers, so the caller may word-split the result safely.
 json_list() {
-  tr -d '\r\n' <"$marker" 2>/dev/null |
+  tr -d '\r\n' <"$record" 2>/dev/null |
     sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p" |
     tr ',' '\n' |
     sed -e 's/[[:space:]"]//g' -e '/^$/d'
 }
 
-# The marker is the single source of truth: a list it does not declare is a rule
+# The record is the single source of truth: a list it does not declare is a rule
 # that does not apply. No session host is hardcoded here, so a repository opts
-# into exactly the roots it declares. The marker's lane list is policy for
+# into exactly the roots its marker declares. The lane list is policy for
 # `dotf lane init`, not an identity: this guard never matches a lane by name.
 third_party_roots="$(json_list third_party_roots)"
 
@@ -102,6 +105,53 @@ for root in $third_party_roots; do
       ;;
   esac
 done
+
+# epoch_of prints the Unix time of an RFC 3339 timestamp, as dotf writes it into
+# the lease (local zone: "Z" or an offset, optional fraction), or nothing when it
+# does not parse. Pure arithmetic: `date -d` is GNU-only and `date -j` BSD-only.
+# The days come from the proleptic Gregorian calendar (Hinnant's days_from_civil).
+epoch_of() {
+  parts="$(printf '%s' "$1" | sed -nE 's/^([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?(Z|z|[+-][0-9]{2}:[0-9]{2})$/\1 \2 \3 \4 \5 \6 \8/p')"
+  [ -n "$parts" ] || return 0
+  IFS=' ' read -r ey em ed eh emi es ez <<PARTS
+$parts
+PARTS
+  # Leading zeros would read as octal.
+  em="${em#0}"; ed="${ed#0}"; eh="${eh#0}"; emi="${emi#0}"; es="${es#0}"
+  [ "$ey" -ge 1970 ] || return 0
+  ey=$((ey - (em <= 2)))
+  eera=$((ey / 400))
+  eyoe=$((ey - eera * 400))
+  edoy=$(((153 * (em > 2 ? em - 3 : em + 9) + 2) / 5 + ed - 1))
+  edays=$((eera * 146097 + eyoe * 365 + eyoe / 4 - eyoe / 100 + edoy - 719468))
+  eoff=0
+  case "$ez" in
+    [+-]*)
+      eoh="${ez#?}"
+      eom="${eoh##*:}"
+      eoh="${eoh%%:*}"
+      eoh="${eoh#0}"; eom="${eom#0}"
+      eoff=$((${eoh:-0} * 3600 + ${eom:-0} * 60))
+      [ "${ez%"${ez#?}"}" = "-" ] && eoff=$((0 - eoff))
+      ;;
+  esac
+  echo $((edays * 86400 + ${eh:-0} * 3600 + ${emi:-0} * 60 + ${es:-0} - eoff))
+}
+
+# warn_if_lease_expired warns, and never blocks, when the lease has run out: the
+# work it claimed may be over, and sweep may reap or park the worktree under
+# whoever is committing in it (#3438). A lease without an expiry, or whose expiry
+# is the zero time, has not expired.
+warn_if_lease_expired() {
+  expires="$(sed -n 's/.*"lease_expires_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$lease" 2>/dev/null | head -n 1)"
+  [ -n "$expires" ] || return 0
+  expires_at="$(epoch_of "$expires")"
+  [ -n "$expires_at" ] || return 0
+  if [ "$expires_at" -le "$(date +%s)" ]; then
+    echo "WARN: $top: lease expired $expires, so sweep may reap or park it under whoever works there." >&2
+    echo "FIX: dotf worktree done $top once its branch landed (a lane: dotf lane park <lane>)" >&2
+  fi
+}
 
 # The lease lives in the worktree's own git admin dir, $git_dir/dotf-worktree.json
 # (ADR-062), which `git clean` never reaches; a lease a binary before the move
@@ -121,6 +171,7 @@ if [ -n "$lease" ]; then
     echo "FIX: activate the lane on a feature branch first: dotf lane switch <type>/<issue>-<slug>" >&2
     exit 1
   fi
+  warn_if_lease_expired
 elif [ -f "$git_dir/dotf-lane" ]; then
   # A record that exists but cannot be read is not "no record": fail closed.
   if [ ! -r "$git_dir/dotf-lane" ]; then

@@ -1,6 +1,7 @@
 package lane
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,7 +14,9 @@ import (
 // ActivationFile is the record that a machine runs this repository's lanes. It
 // lives in the repository's git common dir: not committed and in no working
 // tree, so `git clean -fdx` cannot remove it (lesson 597). Only Activate writes
-// it, and only its existence counts: nothing parses the content.
+// it. Its existence is what arms the guard; its content is the marker as the
+// default branch carries it, because the guard reads the declared third-party
+// roots from the record and from no working tree (#3437).
 const ActivationFile = "dotf-lanes-active"
 
 // defaultBranchRefs is the order the remote's default branch is looked for in.
@@ -60,8 +63,13 @@ func Activate(repoRoot, worktreeRoot string, dryRun bool) (Activation, error) {
 			return act, &RefusedError{Err: err}
 		}
 	}
+	body, err := committedMarker(mainRoot, ref)
+	if err != nil {
+		return act, err
+	}
 	record := filepath.Join(commonDir, ActivationFile)
-	if _, err := os.Stat(record); err != nil {
+	stale := recordStale(record, body)
+	if stale {
 		act.Changes++
 	}
 	if dryRun {
@@ -73,14 +81,30 @@ func Activate(repoRoot, worktreeRoot string, dryRun bool) (Activation, error) {
 		return act, err
 	}
 	act.Changes += created
-	if _, err := os.Stat(record); err == nil {
+	if !stale {
 		return act, nil
 	}
-	body := "dotf lane activation record: written by `dotf converge`, read by the lane guard; existence is the signal\n"
-	if err := os.WriteFile(record, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(record, body, 0o644); err != nil {
 		return act, fmt.Errorf("lane activate: writing %s: %w", record, err)
 	}
 	return act, nil
+}
+
+// committedMarker reads the marker as ref carries it.
+func committedMarker(mainRoot, ref string) ([]byte, error) {
+	body, err := exec.Command("git", "-C", mainRoot, "show", ref+":"+LanesMarkerFile).Output()
+	if err != nil {
+		return nil, fmt.Errorf("lane activate: reading %s from %s: %w", LanesMarkerFile, ref, err)
+	}
+	return body, nil
+}
+
+// recordStale is true when the record is missing, or holds something other than
+// body: a marker edited on the default branch, or a record an earlier build
+// wrote without one.
+func recordStale(record string, body []byte) bool {
+	have, err := os.ReadFile(record)
+	return err != nil || !bytes.Equal(have, body)
 }
 
 // committedMarkerRef names the default-branch ref whose tree carries the

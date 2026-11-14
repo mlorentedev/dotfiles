@@ -38,11 +38,13 @@ func (f Finding) Warning() string {
 	return "WARN: " + f.Subject + ": " + f.Problem + ".\nFIX: " + f.Fix
 }
 
-// Audit is what AuditLanes answers. Managed is false when the repository has
-// no marker. Initialised is false when the marker is present but no declared
+// Audit is what AuditLanes answers. Managed is false when this machine never
+// activated the repository's lanes (no activation record): the guard enforces
+// nothing there, whatever marker a working tree carries, so there is nothing to
+// compare. Initialised is false when the marker is present but no declared
 // lane exists on this machine: the marker is committed and travels to every
 // clone, the lanes are per machine, so that state is not drift. Warnings are
-// what is not drift yet: states the guard will refuse once the marker arms it.
+// what is not drift yet: states the guard will refuse, or sweep act on.
 type Audit struct {
 	Managed     bool
 	Initialised bool
@@ -58,9 +60,26 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	if err != nil {
 		return Audit{}, err
 	}
+	commonDir, err := resolveGitCommonDir(absRepo)
+	if err != nil {
+		return Audit{}, err
+	}
+	// The guard arms from the activation record and from nothing else (#3437),
+	// so this is what makes a repository managed for the audit too.
+	if _, err := os.Stat(filepath.Join(commonDir, ActivationFile)); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return Audit{}, nil
+		}
+		return Audit{}, fmt.Errorf("reading %s: %w", ActivationFile, err)
+	}
 	raw, err := os.ReadFile(filepath.Join(absRepo, filepath.FromSlash(LanesMarkerFile)))
 	if errors.Is(err, fs.ErrNotExist) {
-		return Audit{}, nil
+		// Active, but the main checkout sits on a commit that predates the
+		// marker: the lanes were activated from the default branch and there is
+		// no declared list here to compare them with.
+		return Audit{Managed: true, Initialised: true, Warnings: []Finding{{LanesMarkerFile,
+			"is absent from the main checkout, so the lanes were not compared with it",
+			"switch the main checkout to the default branch (git switch main && git pull), then run dotf lane doctor again"}}}, nil
 	}
 	if err != nil {
 		return Audit{}, fmt.Errorf("reading %s: %w", LanesMarkerFile, err)
@@ -70,10 +89,6 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 	if len(findings) > 0 {
 		a.Findings = findings
 		return a, nil
-	}
-	commonDir, err := resolveGitCommonDir(absRepo)
-	if err != nil {
-		return a, err
 	}
 	records, unreadable, err := laneRecords(commonDir)
 	if err != nil {
@@ -124,7 +139,7 @@ func leaseWarnings(absRepo string, records map[string][]laneRecord, now time.Tim
 		case lerr != nil:
 		case meta == nil:
 			if w.Detached && !slices.ContainsFunc(lanes, func(p string) bool { return samePath(p, w.Path) }) {
-				warns = append(warns, Finding{w.Path, "is detached and has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there once " + LanesMarkerFile + " is committed",
+				warns = append(warns, Finding{w.Path, "is detached and has no lease (" + worktree.MetadataFileName + "), so the guard refuses commits there while the lanes are active",
 					"dotf worktree adopt " + w.Path + ", or run git switch -c <type>/<issue>-<slug> inside it"})
 			}
 		case leaseExpired(meta, now):

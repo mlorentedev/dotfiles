@@ -17,7 +17,7 @@ import (
 func newLaneDoctorCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:          "doctor",
-		Short:        "Report drift between .dotf/lanes.json and the lanes on this machine",
+		Short:        "Report drift between .dotf/lanes.json and the lanes on this machine, where lanes are active",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		// The findings are the diagnostic: cobra's Error: line would only
@@ -29,7 +29,8 @@ func newLaneDoctorCmd() *cobra.Command {
 
 // runLaneDoctor resolves the main checkout, audits it and prints the findings;
 // exit 2 when the audit could not run, 1 when it found something. Warnings
-// are printed first and do not count as findings.
+// are printed first and do not count as findings. A repository is managed when
+// this machine holds its activation record, the one thing the guard arms from.
 func runLaneDoctor(c *cobra.Command) error {
 	repoRoot, err := worktree.ResolveMainRepoRoot(".")
 	if err != nil {
@@ -51,13 +52,13 @@ func runLaneDoctor(c *cobra.Command) error {
 	}
 	out := c.OutOrStdout()
 	// Warnings never change the exit code: they are not drift, only what the
-	// guard will refuse once the marker arms it.
+	// guard will refuse, or sweep act on.
 	for _, w := range a.Warnings {
 		_, _ = fmt.Fprintln(out, w.Warning())
 	}
 	switch {
 	case !a.Managed:
-		_, _ = fmt.Fprintf(out, "lane doctor: %s is not lane-managed (no %s)\n", repoRoot, lane.LanesMarkerFile)
+		_, _ = fmt.Fprintf(out, "lane doctor: %s is not lane-managed on this machine (no activation record; dotf converge --only lanes activates it from the %s the default branch carries)\n", repoRoot, lane.LanesMarkerFile)
 		return nil
 	case !a.Initialised && len(a.Findings) == 0:
 		_, _ = fmt.Fprintf(out, "lane doctor: %s declares lanes that are not initialised on this machine; dotf lane init provisions them\n", repoRoot)

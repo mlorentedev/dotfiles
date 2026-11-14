@@ -11,6 +11,16 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
+// activateRecord writes the activation record `dotf converge` leaves in the git
+// common dir: with it the repository is lane-managed on this machine, whatever
+// the working tree carries.
+func activateRecord(t *testing.T, repoDir string) {
+	t.Helper()
+	if err := os.WriteFile(recordPath(t, repoDir), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // initialisedLaneRepo is a repository with the three lanes provisioned and the
 // marker in place, the starting state of every audit case that breaks one thing.
 // Init no longer writes the marker, so the fixture does.
@@ -23,6 +33,7 @@ func initialisedLaneRepo(t *testing.T) (repoDir, wtRoot string) {
 	if _, err := writeLanesMarker(repoDir); err != nil {
 		t.Fatal(err)
 	}
+	activateRecord(t, repoDir)
 	return repoDir, wtRoot
 }
 
@@ -284,6 +295,7 @@ func TestAuditLanes_ErrorsCarryNoCallerPrefix(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile)), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, repoDir)
 		_, err := AuditLanes(repoDir, wtRoot)
 		wantUnprefixed(t, err)
 	})
@@ -331,6 +343,7 @@ func TestAuditLanes_SeparatesNotInitialisedFromDrift(t *testing.T) {
 		if _, err := writeLanesMarker(repoDir); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, repoDir)
 		a := audit(t, repoDir, wtRoot)
 		if !a.Managed || a.Initialised {
 			t.Fatalf("want managed and not initialised, got %+v", a)
@@ -425,6 +438,7 @@ func TestAuditLanes_ReportsDriftInBothDirections(t *testing.T) {
 		if _, err := writeLanesMarker(repoDir); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, repoDir)
 		gitDir, _, err := worktreeGitDirs(filepath.Join(wtRoot, "dotfiles", LaneFeatPrimary))
 		if err != nil {
 			t.Fatal(err)
@@ -634,6 +648,7 @@ func TestAuditLanes_LeavesAnotherRepositorysWorktreeAlone(t *testing.T) {
 		if _, err := writeLanesMarker(clone); err != nil {
 			t.Fatal(err)
 		}
+		activateRecord(t, clone)
 		a := audit(t, clone, wtRoot)
 		if !a.Initialised {
 			t.Fatal("Initialised = false: the occupied lane paths read as a clone with nothing to audit, so dotf lane init would be the advice and it refuses")
@@ -661,5 +676,46 @@ func TestAuditLanes_LeavesAnotherRepositorysWorktreeAlone(t *testing.T) {
 		runGitLaneTest(t, other, "worktree", "add", "--detach", lanePath, "HEAD")
 		a := audit(t, owner, wtRoot)
 		wantForeign(t, a, 1, LaneFeatPrimary, "stale registration", filepath.Join("worktrees", LaneFeatPrimary), "by hand")
+	})
+}
+
+// The audit gates on what the guard gates on: the activation record, never the
+// marker. A marker in the working tree, however it reads, is not a repository the
+// guard enforces, so the audit has nothing to compare (#3437).
+func TestAuditLanes_IsManagedByTheActivationRecordNotTheMarker(t *testing.T) {
+	t.Run("a marker with no record is not managed, and a broken one is not read", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		path := filepath.Join(repoDir, filepath.FromSlash(LanesMarkerFile))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(`{"version": 1,`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		a := audit(t, repoDir, wtRoot)
+		if a.Managed || len(a.Findings) != 0 || len(a.Warnings) != 0 {
+			t.Fatalf("want unmanaged and silent, got %+v", a)
+		}
+	})
+	t.Run("a record with the marker is managed", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		if _, err := writeLanesMarker(repoDir); err != nil {
+			t.Fatal(err)
+		}
+		activateRecord(t, repoDir)
+		if a := audit(t, repoDir, wtRoot); !a.Managed {
+			t.Fatalf("want managed, got %+v", a)
+		}
+	})
+	t.Run("a record with no marker in the main checkout is managed, and says it compared nothing", func(t *testing.T) {
+		repoDir, wtRoot := setupLaneTestRepo(t)
+		activateRecord(t, repoDir)
+		a := audit(t, repoDir, wtRoot)
+		if !a.Managed || len(a.Findings) != 0 {
+			t.Fatalf("want managed with no finding, got %+v", a)
+		}
+		if len(a.Warnings) != 1 || !strings.Contains(a.Warnings[0].Warning(), LanesMarkerFile) {
+			t.Fatalf("want one warning naming %s, got %+v", LanesMarkerFile, a.Warnings)
+		}
 	})
 }
