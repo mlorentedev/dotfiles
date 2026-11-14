@@ -104,13 +104,22 @@ func ArchiveParkedThread(projectDir, branch string, now time.Time) (ParkArchive,
 	if err := ReplaceFile(memoryPath, pruned, 0o644); err != nil {
 		return res, err
 	}
+	return res, moveThreadFiles(memoryPath, taken, &res)
+}
+
+// moveThreadFiles moves every taken thread's file, continuing past a failure so
+// one bad file does not strand the others in threads/. Archived lists only the
+// threads whose entry and file both moved; the error names each other one.
+func moveThreadFiles(memoryPath string, taken []takenThread, res *ParkArchive) error {
+	var errs []error
 	for _, t := range taken {
-		res.Archived = append(res.Archived, t.key)
 		if err := moveThreadFile(memoryPath, t.key); err != nil {
-			return res, fmt.Errorf("thread %q: its entry is archived, but its file stays in %s/, where dotf doctor reports it as a lost handoff: %w", t.key, threadsDir, err)
+			errs = append(errs, fmt.Errorf("thread %q: its entry is archived, but its file stays in %s/, where dotf doctor reports it as a lost handoff: %w", t.key, threadsDir, err))
+			continue
 		}
+		res.Archived = append(res.Archived, t.key)
 	}
-	return res, nil
+	return errors.Join(errs...)
 }
 
 // appendArchiveFile appends the taken entries to the dated archive at path.

@@ -198,11 +198,12 @@ func TestArchiveParkedThreadLeavesAFileAnotherKeyHolds(t *testing.T) {
 	}
 }
 
-// A move that fails after the entry is archived says which half happened: the
-// entry left MEMORY.md, the file did not leave threads/ (MEMORY-020 review 2).
+// A move that fails after the entries are archived says which half happened
+// for every thread, and does not stop at the first: the entry left MEMORY.md,
+// the file did not leave threads/ (MEMORY-020 review 2, PR review).
 func TestArchiveParkedThreadNamesAFailedMove(t *testing.T) {
 	projectDir, memDir := parkVault(t)
-	// A file where archive/threads/ goes: the move cannot create its directory.
+	// A file where archive/threads/ goes: no move can create its directory.
 	if err := os.WriteFile(filepath.Join(memDir, "archive", "threads"), []byte("in the way\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -210,13 +211,17 @@ func TestArchiveParkedThreadNamesAFailedMove(t *testing.T) {
 	if err == nil {
 		t.Fatal("a failed move was not reported")
 	}
-	if !strings.Contains(err.Error(), `thread "feat-a": its entry is archived, but its file stays in threads/`) {
-		t.Errorf("error %q does not say the file stayed in threads/", err)
+	for _, key := range []string{"feat-a", "feat-a+pi"} {
+		if !strings.Contains(err.Error(), `thread "`+key+`": its entry is archived, but its file stays in threads/`) {
+			t.Errorf("error %q does not name %s's file staying in threads/", err, key)
+		}
 	}
-	if strings.Join(got.Archived, ",") != "feat-a" {
-		t.Errorf("archived %v, want feat-a: its entry did leave MEMORY.md", got.Archived)
+	if len(got.Archived) != 0 {
+		t.Errorf("archived %v, want none: no file left threads/", got.Archived)
 	}
-	if _, err := os.Stat(filepath.Join(memDir, "threads", "feat-a.md")); err != nil {
-		t.Errorf("feat-a's file left threads/: %v", err)
+	for _, name := range []string{"feat-a.md", "feat-a+pi.md"} {
+		if _, err := os.Stat(filepath.Join(memDir, "threads", name)); err != nil {
+			t.Errorf("%s left threads/: %v", name, err)
+		}
 	}
 }
