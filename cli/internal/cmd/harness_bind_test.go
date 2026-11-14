@@ -709,3 +709,28 @@ func TestBindUnderTheUsersOwnHomeFollowsClaudeConfigDir(t *testing.T) {
 		t.Errorf("--home \"$HOME\" bound ~/.claude/settings.json, which Claude does not read here (err %v)", err)
 	}
 }
+
+// agy has no session-start event, so the session line rides PreInvocation. That
+// event's handlers are a flat list (a `matcher` group is for tool events only),
+// and Orca's own PreInvocation hook, in the same file, must keep running beside it.
+func TestBindEmitsTheAgySessionLineAsAFlatPreInvocationHook(t *testing.T) {
+	home, raw := agyBindFixture(t, liveShapedAgyHooks, liveShapedGeminiSettings)
+	dotf := harness.HookBinaryTokenForTarget(raw, runtime.GOOS, harness.NamedHooksFormat)
+	if _, err := bindAgy(t, home, raw); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+	doc := readJSONFile(t, filepath.Join(home, ".gemini", "config", "hooks.json"))
+	ours, _ := doc["dotfiles-harness"].(map[string]any)
+	handlers, _ := ours["PreInvocation"].([]any)
+	if len(handlers) != 1 {
+		t.Fatalf("want one PreInvocation handler under our name, got %v", ours)
+	}
+	handler, _ := handlers[0].(map[string]any)
+	if handler["command"] != dotf+" mem session-start --format agy-hook" || handler["timeout"] != float64(30) || handler["matcher"] != nil || handler["hooks"] != nil {
+		t.Errorf("handler = %v, want a flat command handler for the session line with a 30s bound", handler)
+	}
+	orca, _ := doc["orca-status"].(map[string]any)
+	if pre, _ := orca["PreInvocation"].([]any); len(pre) != 1 {
+		t.Errorf("Orca's PreInvocation hook was altered: %v", orca["PreInvocation"])
+	}
+}
