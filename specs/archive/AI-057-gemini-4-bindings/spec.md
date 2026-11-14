@@ -1,7 +1,7 @@
 ---
 id: spec-AI-057-gemini-4-bindings
 type: spec
-status: implementing
+status: archived
 created: "2026-11-14"
 owner: manu
 issue: "mlorentedev/dotfiles#3471"
@@ -46,3 +46,8 @@ git diff origin/main -- harness/reviewer-pool.json cli/internal/prreview/reviewe
 ## Next
 
 Independent review, then archive (closes #3471). After the PR lands: `dotf deploy agy-settings` on each seat and confirm agy's start log resolves `Gemini 4 Hydrogen (High)`.
+
+## Promotion candidates
+- [x] Lesson? `yes: docs/lessons/lesson-599-a-provisional-binding-needs-a-probe-for-the-condition-that-retires-it.md`
+- [x] ADR? `no: no decision changes; the map still routes one id per tier and #3482 owns the pool decision`
+- [x] Pattern? `no: one repository's model bindings; the cross-project lesson is the probe rule, already in lesson 599`
