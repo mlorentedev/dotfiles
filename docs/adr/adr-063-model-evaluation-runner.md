@@ -141,12 +141,29 @@ curated answer key, grades the output deterministically, and writes a result plu
 
 ### 1. Where the corpus lives and how the key is encoded
 
-The corpus lives at `harness/evals/`, beside the pool and the map its results feed. There is one
-JSON file per case, validated by `harness/evals/case.schema.json`:
+**A replay case lives in the repository whose archive it replays**, at `.dotf/evals/cases/<id>.json`. `.dotf/` is
+where a repository already commits its dotf markers. Each case carries a `repo` field (`owner/name`), so the
+corpus is cross-project by construction (C12). A case has to sit beside its archive because the key is
+checked against `source_review`, and only that repository's CI can read it. A repository adds cases
+without touching dotfiles.
+
+**What is repository-independent lives in dotfiles `harness/evals/`:**
+- `case.schema.json` and `result.schema.json`;
+- `candidates.json`;
+- the planted cases.
+
+`dotf eval run` runs from dotfiles and reads them there. `--repo <path>`, repeatable, adds another
+repository's cases. The vault never holds cases, because repositories do not depend on the store. A
+vault campaign whose synthesis adjudicates claims, such as the Fable correction ledger in
+`10_projects/dotfiles/research/benchmarks/2026-09-23-gentle-ai/`, is a place to mine planted cases
+and decoys, nothing more.
+
+Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 
 ```jsonc
 {
   "id": "ai-055-r2",
+  "repo": "mlorentedev/dotfiles",
   "kind": "replay",                       // replay | planted
   "role": "spec-reviewer",
   "spec": "AI-055-budget-guard-readable-reserve",
@@ -177,8 +194,9 @@ JSON file per case, validated by `harness/evals/case.schema.json`:
   fixed it, `verification.md` dispositioned it as real, or the owner adjudicated it. A finding
   that only carries the reviewer's own `REAL` label goes in `optional`.
 - **The key is self-consistent by construction.** Graded against its own `source_review`, a case
-  must score full recall with no decoy hit. `go test` asserts this for every case, with no model
-  involved: it is the guard that keeps anchors from rotting.
+  must score full recall with no decoy hit. `dotf eval check` asserts this for every case in the
+  current repository, with no model involved, and each repository's CI runs it. It is the guard that keeps
+  anchors from rotting.
 - **Planted cases** carry their input under `harness/evals/planted/<id>/` and use the same
   `expected`/`decoys` fields. #3476's prompt is case one, and its false bash 3.2 claim is its first
   decoy.
@@ -332,6 +350,14 @@ login that CI does not hold, and its quota is the owner's. A scheduled run in ci
 5. **Scheduled runs.** (A) Defer, with the triggers in §7. (B) Schedule NaN and Anthropic runs in
    ci-workflows now.
    *Recommended: A.*
+6. **Corpus scope.**
+   - Measured: kubelab has 73 rounds, 33 of them in the clone, and 16 Blocker or Major REAL rows. 15 of its keys come from the retired `gemini-3.1-pro-high` and `mimo-v2.5`.
+   - Measured: ts-bridge has 31 rounds, 24 in the clone, and 15 rows of the same kind. 27 of its reviews are by `deepseek-v4-flash`.
+   - All three repositories use the same findings-table header.
+
+   (A) Dotfiles only in the first slice, with the schema already carrying `repo`. kubelab and ts-bridge follow in their own PRs, with `dotf eval check` in their CI.
+   (B) Include kubelab now.
+   *Recommended: A.* The corpus is limited by curation time, not raw material. Proving the key format on 5 dotfiles cases first means a schema change is not paid for three times. kubelab is the next corpus, for its keys from retired models.
 
 ## References
 

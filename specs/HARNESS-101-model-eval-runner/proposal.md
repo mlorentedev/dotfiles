@@ -21,11 +21,11 @@ The models in the reviewer pool and the model map have been measured by hand thr
 
 After this spec:
 
-- `harness/evals/` holds a schema-validated corpus:
+- dotfiles' `.dotf/evals/cases/` holds a schema-validated corpus, each case carrying its `repo`, and `harness/evals/` holds the schemas, the candidates and the planted cases:
   - at least 5 replay cases, each an archived review round, pinned to its `reviewed_sha` and `base_sha`;
   - at least 2 planted-defect cases, including #3476's prompt and its known false bash 3.2 claim as a decoy;
   - an anchor-encoded answer key per case.
-- `go test` proves each key against its own source review: full recall and no decoy hit, with no model involved.
+- `dotf eval check` proves each key in the current repository against its own source review: full recall and no decoy hit, with no model involved.
 - `dotf eval run` replays the cases for the named candidates over N epochs:
   - each replay runs in a detached worktree at the pinned commit, outside every repository tree;
   - it launches through a new eval slot of the `internal/spec` review launcher, which takes an explicit candidate and base and writes outside `specs/`;
@@ -36,6 +36,7 @@ After this spec:
 
 ## Out of scope
 
+- Cases from other repositories (kubelab, ts-bridge). The schema supports them; each one lands in its own PR.
 - The PR-Agent, implementer and daily-use roles. ADR-063 §5 names their case kinds, and each one gets its own spec.
 - Scheduled runs in ci-workflows (ADR-063 §7, deferred with triggers).
 - Editing `reviewer-pool.json`, `model-map.json` or `model-pins.json`. Admission stays an owner decision (C36).
@@ -53,8 +54,8 @@ After this spec:
 
 ## Acceptance criteria
 
-- [ ] AC1. `harness/evals/case.schema.json` exists and every case under `harness/evals/cases/` validates against it. At least 5 `replay` and 2 `planted` cases exist for `role: spec-reviewer`.
-- [ ] AC2. A Go test grades every case against its own `source_review` (replay) or recorded reference answer (planted) and asserts full recall over `expected` with zero decoy hits. A key whose anchors no longer match fails the test.
+- [ ] AC1. `harness/evals/case.schema.json` exists and every case under `.dotf/evals/cases/` validates against it, including a `repo` field. At least 5 `replay` and 2 `planted` cases exist for `role: spec-reviewer`.
+- [ ] AC2. `dotf eval check` (exercised by a Go test and run in CI) grades every case against its own `source_review` (replay) or recorded reference answer (planted) and asserts full recall over `expected` with zero decoy hits. A key whose anchors no longer match fails the test.
 - [ ] AC3. A replay of a case resolves its `reviewed_sha`, fetching `fetch_ref` when absent, and checks it out detached outside the repository. A case whose SHA cannot be resolved exits non-zero naming the case, and is not scored.
 - [ ] AC4. The eval slot launches a candidate from `harness/evals/candidates.json` with an explicit base. It never reads the pool, and it writes only to the run directory. A test asserts that `checkReviewGate` refuses an eval record placed in a spec folder.
 - [ ] AC5. The grader reports, per run: completion class, format validity, verdict match, recall, decoy hits, unadjudicated rows, duration and tokens. An unparseable answer is a format failure, not zero findings.
