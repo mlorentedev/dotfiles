@@ -87,13 +87,12 @@ func TestArchiveParkedThreadUsesTheDatedArchive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"# Superseded handoffs 2026-11-14\n", "### thread: feat-a (writer: claude)", "[full thread](threads/feat-a.md)", "[full thread](threads/feat-a+pi.md)"} {
-		if !strings.Contains(string(archive), want) {
-			t.Errorf("archive lacks %q:\n%s", want, archive)
-		}
-	}
-	if strings.Contains(string(archive), "feat-a+agy") || strings.Contains(string(archive), "feat-c") {
-		t.Errorf("archive holds a thread the park keeps:\n%s", archive)
+	// Byte-identical to the blocks MEMORY.md held, in order (AC2).
+	wantArchive := "# Superseded handoffs 2026-11-14\n\n" +
+		"### thread: feat-a (writer: claude)\n\n> Updated: 2026-11-10<br>\n**Next action:** None.<br>\n[full thread](threads/feat-a.md)\n\n" +
+		"### thread: feat-a+pi (writer: pi)\n\n> Updated: 2026-11-10<br>\n**Next action:** None.<br>\n[full thread](threads/feat-a+pi.md)\n"
+	if string(archive) != wantArchive {
+		t.Errorf("archive is\n%q\nwant\n%q", archive, wantArchive)
 	}
 
 	memory, err := os.ReadFile(filepath.Join(memDir, "MEMORY.md"))
@@ -165,5 +164,36 @@ func TestArchiveParkedThreadWithoutMemory(t *testing.T) {
 	got, err := ArchiveParkedThread(t.TempDir(), "feat-a", time.Now())
 	if err != nil || len(got.Archived) != 0 {
 		t.Errorf("archived %v, err %v", got.Archived, err)
+	}
+}
+
+// A park of feat-x leaves threads/feat-x.md in place when its heading says it
+// is feat/x's: the file is another live thread's body (MEMORY-020 review F1).
+func TestArchiveParkedThreadLeavesAFileAnotherKeyHolds(t *testing.T) {
+	projectDir := filepath.Join(t.TempDir(), "p")
+	memDir := filepath.Join(projectDir, "memory")
+	if err := os.MkdirAll(filepath.Join(memDir, "threads"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	memory := "# M\n\n## Session Handoff\n\n### thread: feat-x (writer: claude)\n\n**Next action:** None.<br>\n\n### thread: feat/x (writer: pi)\n\n**Next action:** Keep going.<br>\n[full thread](threads/feat-x.md)\n"
+	held := "### thread: feat/x (writer: pi)\n\n**Next action:** Keep going.\n"
+	if err := os.WriteFile(filepath.Join(memDir, "MEMORY.md"), []byte(memory), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(memDir, "threads", "feat-x.md"), []byte(held), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ArchiveParkedThread(projectDir, "feat-x", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got.Archived, ",") != "feat-x" {
+		t.Errorf("archived %v, want feat-x", got.Archived)
+	}
+	if body, err := os.ReadFile(filepath.Join(memDir, "threads", "feat-x.md")); err != nil || string(body) != held {
+		t.Errorf("feat/x's thread file was moved or changed: %q (%v)", body, err)
+	}
+	if index, _ := os.ReadFile(filepath.Join(memDir, "MEMORY.md")); !strings.Contains(string(index), "### thread: feat/x") {
+		t.Errorf("feat/x's entry left MEMORY.md:\n%s", index)
 	}
 }

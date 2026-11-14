@@ -160,3 +160,32 @@ func TestHandoffWriteFinishedRemovesAnExistingThreadOnDisk(t *testing.T) {
 		t.Errorf("the archive lacks the thread:\n%s", got)
 	}
 }
+
+// A finished write under a key that names another live thread's file (fix/x
+// and fix-x share threads/fix-x.md) is refused before anything is written or
+// removed: the live file is that thread's body (MEMORY-020 review F1).
+func TestHandoffWriteFinishedRefusesALiveFileAnotherKeyHolds(t *testing.T) {
+	memory, archive := finishedSetup(t)
+	if _, _, err := runHandoffWrite(t, memory, "**Next action:** Slash work.\n", "--thread", "feat/x"); err != nil {
+		t.Fatal(err)
+	}
+	live := filepath.Join(filepath.Dir(memory), "threads", "feat-x.md")
+	before, err := os.ReadFile(live)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	beforeIndex, _ := os.ReadFile(memory)
+	_, _, err = runHandoffWrite(t, memory, "**Next action:** None.\n", "--finished")
+	if err == nil || !strings.Contains(err.Error(), `the file thread "feat/x" holds`) {
+		t.Fatalf("err = %v, want the refusal naming feat/x", err)
+	}
+	if after, _ := os.ReadFile(live); string(after) != string(before) {
+		t.Errorf("feat/x's thread file changed:\n%s", after)
+	}
+	if index, _ := os.ReadFile(memory); string(index) != string(beforeIndex) {
+		t.Errorf("a refused write changed MEMORY.md:\n%s", index)
+	}
+	if _, err := os.Stat(archive); !os.IsNotExist(err) {
+		t.Error("a refused write appended to the archive")
+	}
+}

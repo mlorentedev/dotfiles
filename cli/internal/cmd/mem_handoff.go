@@ -141,17 +141,36 @@ func (w *handoffWrite) run(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	prev, err := mem.ReadThreadFile(res.File)
+	prev, err := checkThreadFiles(res, archive)
 	if err != nil {
-		return fmt.Errorf("read %s: %w", res.File, err)
-	}
-	if err := mem.CheckThreadFile(prev, res.Key); err != nil {
 		return err
 	}
 	if err := mem.CheckMemoryBudget(string(current), res.Content); err != nil {
 		return err
 	}
 	return w.publish(cmd, thread, string(current), string(prev), res, archive)
+}
+
+// checkThreadFiles reads the thread file the write replaces and refuses one
+// another key holds. With --finished the live file it removes last is checked
+// too: it must be this thread's, not another key's that sanitizes to the same
+// name (fix/x and fix-x).
+func checkThreadFiles(res mem.StoredThread, archive *archiveWrite) ([]byte, error) {
+	prev, err := mem.ReadThreadFile(res.File)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", res.File, err)
+	}
+	if err := mem.CheckThreadFile(prev, res.Key); err != nil {
+		return nil, err
+	}
+	if archive == nil || archive.live == "" {
+		return prev, nil
+	}
+	live, err := mem.ReadThreadFile(archive.live)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", archive.live, err)
+	}
+	return prev, mem.CheckThreadFile(live, res.Key)
 }
 
 // store computes the write: the thread placed in MEMORY.md, or with --finished

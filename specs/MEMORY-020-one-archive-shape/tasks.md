@@ -29,16 +29,18 @@ owner: manu
 - [x] [AC4] Thread the vault path through `DoneOptions` and `SweepOptions`, carry the report in `DoneResult` and `SweepReport`, drop `ParkLane`'s duplicate call, print it and fail in `worktree done`, `lane park`, `worktree sweep` and `lane apply`
 - [x] [AC1] [AC2] Doctor contract read: thread files move to `archive/threads/`, entries stay byte-identical; `--finished` moves a live file and removes it last
 - [x] Budget refusal and doctor warning name the dated archive and `--finished`
+- [x] Review F1: `--finished` refuses, and a park leaves, a live thread file whose heading names another key
+- [x] Review F3, F4, F6: ADR-060 and the memory runbook name the shape; the park's archive text is asserted exactly; the dated-archive append is its own function
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
-- [ ] Type checks pass
-- [ ] Lint passes
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [x] Type checks pass
+- [x] Lint passes
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in
+- [x] PR opened referencing this spec folder
 
 ## Machine-readable features
 

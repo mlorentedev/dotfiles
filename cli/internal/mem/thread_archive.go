@@ -98,18 +98,8 @@ func ArchiveParkedThread(projectDir, branch string, now time.Time) (ParkArchive,
 	if len(taken) == 0 {
 		return res, nil
 	}
-	existing, err := os.ReadFile(res.Path) // #nosec G304 -- beside the project's MEMORY.md
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := appendArchiveFile(res.Path, date, taken); err != nil {
 		return res, err
-	}
-	text := string(existing)
-	for _, t := range taken {
-		text, _ = AppendArchive(text, date, t.entry)
-	}
-	if text != string(existing) {
-		if err := ReplaceFile(res.Path, text, 0o644); err != nil {
-			return res, err
-		}
 	}
 	if err := ReplaceFile(memoryPath, pruned, 0o644); err != nil {
 		return res, err
@@ -123,16 +113,38 @@ func ArchiveParkedThread(projectDir, branch string, now time.Time) (ParkArchive,
 	return res, nil
 }
 
+// appendArchiveFile appends the taken entries to the dated archive at path.
+func appendArchiveFile(path, date string, taken []takenThread) error {
+	existing, err := os.ReadFile(path) // #nosec G304 -- beside the project's MEMORY.md
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	text := string(existing)
+	for _, t := range taken {
+		text, _ = AppendArchive(text, date, t.entry)
+	}
+	if text == string(existing) {
+		return nil
+	}
+	return ReplaceFile(path, text, 0o644)
+}
+
 // moveThreadFile moves key's thread file, when it has one, from threads/ to
-// archive/threads/. os.Rename replaces an existing target on every platform.
+// archive/threads/. A file whose heading names another key is that thread's
+// (fix/x and fix-x name one file) and stays where it is. os.Rename replaces
+// an existing target on every platform.
 func moveThreadFile(memoryPath, key string) error {
 	name, err := threadFileName(key)
 	if err != nil {
 		return err
 	}
 	src := filepath.Join(filepath.Dir(memoryPath), threadsDir, name)
-	if _, err := os.Stat(src); errors.Is(err, os.ErrNotExist) {
-		return nil // an inline thread has no file
+	held, err := ReadThreadFile(src)
+	if err != nil {
+		return err
+	}
+	if held == nil || CheckThreadFile(held, key) != nil {
+		return nil // an inline thread has no file; another key's file is not ours to move
 	}
 	dst := archivedThreadFile(memoryPath, name)
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
