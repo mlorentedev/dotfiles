@@ -33,8 +33,8 @@ type CheckResult struct {
 // matches the schema, agrees with its source's frontmatter, and its key graded
 // against its own source scores full recall and matches every optional entry;
 // when a planted reference hits no decoy, and a replay source hits one only on
-// a row a sample records; and when each decoy and noise sample matches its own
-// anchors.
+// the row its own sample records; and when each decoy and noise sample matches
+// its own anchors.
 //
 // The error is for a tree that cannot be read; a broken case is a problem in
 // its result, so one bad case never hides the rest.
@@ -244,25 +244,28 @@ func keyProblems(c Case, source, field string) []string {
 	// another row swallows a finding nobody refuted: an expected row would be
 	// reported unmatched, but an unadjudicated one would vanish unnoticed.
 	for _, group := range []struct {
-		name string
-		hits []Match
-	}{{"decoy", g.DecoyHits}, {"noise", g.Noise}} {
+		name    string
+		entries []Finding
+		hits    []Match
+	}{{"decoy", c.Decoys, g.DecoyHits}, {"noise", c.Noise, g.Noise}} {
 		for _, m := range group.hits {
-			if !isSampledRow(c, m.Row) {
-				out = append(out, fmt.Sprintf("%s %s matches line %d of %s, which is not a row any decoy or noise sample records", group.name, m.ID, m.Row.Line, field))
+			if !beginsWithOwnSample(group.entries, m) {
+				out = append(out, fmt.Sprintf("%s %s matches line %d of %s, which is not the row its sample records", group.name, m.ID, m.Row.Line, field))
 			}
 		}
 	}
 	return out
 }
 
-// isSampledRow reports whether a source row is one a decoy or noise entry was
-// mined from: it begins with that entry's sample. A sample may stop before the
-// row's trailing cells.
-func isSampledRow(c Case, r Row) bool {
-	for _, f := range append(append([]Finding{}, c.Decoys...), c.Noise...) {
-		if s := strings.TrimSpace(f.Sample); s != "" && strings.HasPrefix(r.Text, s) {
-			return true
+// beginsWithOwnSample reports whether a hit landed on the row its entry was
+// mined from: the row begins with that entry's sample, which may stop before
+// the row's trailing cells. Another entry's sample does not count, or one
+// decoy could widen onto every row a second one records.
+func beginsWithOwnSample(entries []Finding, m Match) bool {
+	for _, f := range entries {
+		if f.ID == m.ID {
+			s := strings.TrimSpace(f.Sample)
+			return s != "" && strings.HasPrefix(m.Row.Text, s)
 		}
 	}
 	return false

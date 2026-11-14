@@ -144,6 +144,32 @@ func TestCheckRefusesAReplayDecoyThatTakesAnotherRowOfItsSource(t *testing.T) {
 	}
 }
 
+// The row a hit lands on must be the sample of the entry that took it. Another
+// entry's sample does not license it, or one decoy could widen onto every row a
+// second decoy was mined from. bash32-wide is graded first and takes the
+// wording row, which only wording-false's sample records.
+const twoDecoyCase = `{
+  "id": "x-r1", "repo": "o/r", "kind": "replay", "role": "spec-reviewer",
+  "spec": "X", "source_review": "specs/archive/X/review.md", "key_author": "nan/x",
+  "reviewed_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "base_sha": "` + sha + `",
+  "base_derivation": "stated in the review's Sources line",
+  "expected_verdict": "FAIL",
+  "expected": [{"id": "deleted-test", "severity_floor": "Major", "anchors_all": ["ClipFailsClosed"], "anchors_any": ["deleted"], "confirmed_by": "restored in abc"}],
+  "optional": [],
+  "decoys": [
+    {"id": "bash32-wide", "anchors_all": ["code"], "reason": "too broad", "sample": "| x | code |"},
+    {"id": "wording-false", "anchors_all": ["wording"], "reason": "false", "sample": "| Minor | THEORETICAL | code | message wording misleads |"}
+  ],
+  "noise": []
+}`
+
+func TestCheckHoldsEachReplayDecoyToItsOwnSample(t *testing.T) {
+	p := strings.Join(problemsOf(t, writeTree(t, twoDecoyCase, "x-r1.json", sourceReview("FAIL", "nan/x", goodRows...))), "\n")
+	if !strings.Contains(p, "bash32-wide matches line") {
+		t.Fatalf("a decoy taking another decoy's sampled row passed: %q", p)
+	}
+}
+
 const plantedCase = `{
   "id": "p1", "repo": "o/r", "kind": "planted", "role": "spec-reviewer",
   "prompt": "harness/evals/planted/p1/prompt.md", "reference_answer": "harness/evals/planted/p1/reference.md",
