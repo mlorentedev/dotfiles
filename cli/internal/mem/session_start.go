@@ -63,6 +63,10 @@ type BriefOptions struct {
 	// what a caller with no GitHub reach should pass rather than inventing an
 	// empty queue.
 	TriageQueue func() (string, error)
+	// LaneLine is the line that tells the session whether it stands in a lane
+	// (lane.Where). The caller resolves it: mem cannot import lane. "" says
+	// nothing, as for a repository that runs no lanes.
+	LaneLine string
 }
 
 // ansiSeq strips SGR colour codes from the health report, matching the shell's
@@ -86,6 +90,7 @@ func Brief(opts BriefOptions) string {
 	}
 
 	brief := vaultDetect(vaultRoot)
+	brief += laneSection(opts.LaneLine)
 	brief += vaultHealth(vaultRoot, vaultName, opts.VaultHealth)
 	brief += specs(opts.Cwd)
 	brief += lessonsStaleness(opts.Cwd, staleDays, opts.Now)
@@ -138,6 +143,15 @@ func vaultDetect(vaultRoot string) string {
 		return ""
 	}
 	return fmt.Sprintf("Obsidian vault detected: %s (%s)", filepath.Base(vaultRoot), vaultRoot)
+}
+
+// laneSection is the lane line as a section: one leading newline, like the
+// sections after the headline, and nothing when there is no line.
+func laneSection(line string) string {
+	if line == "" {
+		return ""
+	}
+	return "\n" + line
 }
 
 // vaultHealth runs the health report and formats the GUI-down / pass / fail

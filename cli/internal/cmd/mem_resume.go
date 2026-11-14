@@ -20,7 +20,9 @@ func newMemResumeCmd() *cobra.Command {
 		Short: "Render this checkout's handoff thread for the next session",
 		Long: `resume renders one handoff thread: the thread file a MEMORY.md entry points at,
 or the inline block an older release wrote. The output depends only on that
-text and the path it was read from, so two runs print the same bytes.
+text and the path it was read from, so two runs print the same bytes. The one
+exception is the line above it that says whether this directory stands in a lane
+of a repository that runs lanes; a repository that does not gets no such line.
 
 --format prompt (the default) is the paste-ready instruction a session used to
 type by hand; --format context is the block a session-start hook injects. Both
@@ -50,6 +52,9 @@ func runMemResume(cmd *cobra.Command, memoryPath, thread, agent, format string) 
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("resolve the current directory: %w", err)
+	}
+	if line := laneLine(wd, cmd.ErrOrStderr()); line != "" {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), line)
 	}
 	if memoryPath == "" {
 		if memoryPath, err = defaultMemoryPath(wd); err != nil {

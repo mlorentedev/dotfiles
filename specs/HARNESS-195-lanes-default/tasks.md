@@ -45,9 +45,10 @@ owner: manu
 - [ ] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
 
 ### Slice C: tell the session where it stands (AC3)
-- [ ] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
-- [ ] [AC3] Print the line from `dotf mem resume` and `dotf mem session-start`. Golden tests for all three states.
-- [ ] [AC3] Failing test: every manifest entry with a session-start presence has a deployed carrier. It fails today for pi, opencode and agy.
+- [x] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
+- [x] [AC3] Print the line from `dotf mem resume` and `dotf mem session-start`. Golden tests for all three states.
+- [x] [AC3] Failing test: every manifest entry with a session-start presence has a deployed carrier. It fails today for pi, opencode and agy.
+  - As built (C1): `TestEveryPresenceTargetHasADeployedCarrier` lists those three in the `carrierGaps` table and asserts it is exact. The slice that deploys a carrier deletes its row.
 - [ ] [AC3] pi extension (`session_start`) and opencode plugin (`chat.system.transform`): run `dotf mem session-start` and inject its output into the session context. Keep them small and deploy them through dotf's existing deploy path, not bind (the manifest says `emit: false`).
 - [ ] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
 
