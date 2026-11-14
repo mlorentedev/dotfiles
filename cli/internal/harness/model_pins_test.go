@@ -337,20 +337,28 @@ func TestDeclaredSuffixIsSpellingNotPartOfTheID(t *testing.T) {
 
 // agy writes the display name its model picker shows, while `agy --model`
 // takes the id. The pairs below are the gemini rows of `agy models`, measured
-// 2026-10-01; the rule holds for that family only (`Claude Sonnet 4.6
-// (Thinking)` is `claude-sonnet-4-6`), which is why a pin declares it rather
-// than the guard applying it everywhere.
+// 2026-10-01 (3.x) and 2026-11-14 (Gemini 4, agy 1.5.8); the rule holds for
+// that family only (`Claude Sonnet 4.6 (Thinking)` is `claude-sonnet-4-6`,
+// `Orchestrator (Argon)` is `gemini-pro-orchestrator-g1-pro`), which is why a
+// pin declares it rather than the guard applying it everywhere.
 func TestDisplayNameSpellingMatchesTheAgyCatalog(t *testing.T) {
 	for display, id := range map[string]string{
-		"Gemini 3.8 Flash (High)":   "gemini-3.8-flash-high",
-		"Gemini 3.8 Flash (Medium)": "gemini-3.8-flash-medium",
-		"Gemini 3.8 Flash (Low)":    "gemini-3.8-flash-low",
-		"Gemini 3.7 Flash (High)":   "gemini-3.7-flash-high",
-		"Gemini 3.7 Flash (Medium)": "gemini-3.7-flash-medium",
-		"Gemini 3.7 Flash (Low)":    "gemini-3.7-flash-low",
-		"Gemini 3.6 Flash (High)":   "gemini-3.6-flash-high",
-		"Gemini 3.1 Pro (High)":     "gemini-3.1-pro-high",
-		"Gemini 3.1 Pro (Low)":      "gemini-3.1-pro-low",
+		"Gemini 4 Argon (High)":      "gemini-4-argon-high",
+		"Gemini 4 Argon (Medium)":    "gemini-4-argon-medium",
+		"Gemini 4 Argon (Low)":       "gemini-4-argon-low",
+		"Gemini 4 Hydrogen (XHigh)":  "gemini-4-hydrogen-xhigh",
+		"Gemini 4 Hydrogen (High)":   "gemini-4-hydrogen-high",
+		"Gemini 4 Hydrogen (Medium)": "gemini-4-hydrogen-medium",
+		"Gemini 4 Hydrogen (Low)":    "gemini-4-hydrogen-low",
+		"Gemini 3.8 Flash (High)":    "gemini-3.8-flash-high",
+		"Gemini 3.8 Flash (Medium)":  "gemini-3.8-flash-medium",
+		"Gemini 3.8 Flash (Low)":     "gemini-3.8-flash-low",
+		"Gemini 3.7 Flash (High)":    "gemini-3.7-flash-high",
+		"Gemini 3.7 Flash (Medium)":  "gemini-3.7-flash-medium",
+		"Gemini 3.7 Flash (Low)":     "gemini-3.7-flash-low",
+		"Gemini 3.6 Flash (High)":    "gemini-3.6-flash-high",
+		"Gemini 3.1 Pro (High)":      "gemini-3.1-pro-high",
+		"Gemini 3.1 Pro (Low)":       "gemini-3.1-pro-low",
 	} {
 		p := Pin{ID: "agy-model", Kind: "json-path", Locator: "model", Spelling: "display-name", Pool: "gemini"}
 		if got := Normalize(p, display); got != "gemini:"+id {

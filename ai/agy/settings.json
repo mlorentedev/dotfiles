@@ -1,6 +1,6 @@
 {
   "allowNonWorkspaceAccess": true,
-  "model": "Gemini 3.8 Flash (High)",
+  "model": "Gemini 4 Hydrogen (High)",
   "notifications": true,
   "permissions": {
     "allow": [
@@ -52,7 +52,7 @@
     "dangerouslySkipPermissions": false
   },
   "modelConfigs": {
-    "defaultModel": "gemini-3.7-flash",
+    "defaultModel": "gemini-4-hydrogen-high",
     "customAliases": {
       "chat-base": {
         "modelConfig": {

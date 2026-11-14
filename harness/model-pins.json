@@ -38,7 +38,7 @@
     "",
     "NOT LISTED, and each absence is a decision:",
     "  harness/reviewer-pool.json  separate from the map BY DECISION (its own",
-    "                              $comment). Its `agy/gemini-3.8-flash-high` entry",
+    "                              $comment). Its `agy/gemini-4-hydrogen-high` entry",
     "                              is unroutable today — a question about the",
     "                              map's completeness, filed as #1253.",
     "  cli/internal/agent/backends.go  Go rather than JSON on purpose.",
@@ -256,7 +256,7 @@
           "prefix": "",
           "spelling": "display-name",
           "pool": "gemini",
-          "why": "The model agy resolves at start (its log reads `Resolving model Gemini 3.8 Flash (High)`, the deployed value). Written as the picker label, so the rule is declared: `Gemini 3.8 Flash (High)` is `gemini-3.8-flash-high`."
+          "why": "The model agy resolves at start (its log reads `Resolving model <picker label>`, the deployed value). Written as the picker label, so the rule is declared: `Gemini 4 Hydrogen (High)` is `gemini-4-hydrogen-high`, the pair `agy models` prints (agy 1.5.8, 2026-11-14, #3471); `Gemini 3.8 Flash (High)` was `gemini-3.8-flash-high` before it."
         }
       ]
     },

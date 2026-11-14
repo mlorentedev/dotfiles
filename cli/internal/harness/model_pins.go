@@ -254,10 +254,11 @@ func Spelled(p Pin, raw string) bool {
 }
 
 // displayNameID turns agy's picker label into the id `agy --model` takes:
-// `Gemini 3.7 Flash (High)` is `gemini-3.7-flash-high`. Measured against
-// `agy models` on 2026-10-01 for the gemini family only; it does not hold for
-// every row there (`Claude Sonnet 4.6 (Thinking)` is `claude-sonnet-4-6`), so a
-// pin opts in to it rather than the guard applying it everywhere.
+// `Gemini 4 Hydrogen (High)` is `gemini-4-hydrogen-high`. Measured against
+// `agy models` on 2026-10-01 and 2026-11-14 for the gemini family only; it does
+// not hold for every row there (`Claude Sonnet 4.6 (Thinking)` is
+// `claude-sonnet-4-6`, `Orchestrator (Argon)` is `gemini-pro-orchestrator-g1-pro`),
+// so a pin opts in to it rather than the guard applying it everywhere.
 func displayNameID(name string) string {
 	name = strings.NewReplacer("(", "", ")", "").Replace(strings.ToLower(name))
 	return strings.Join(strings.Fields(name), "-")
