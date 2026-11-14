@@ -297,7 +297,8 @@ It writes a lease into the worktree's git admin dir (dotf-worktree.json under
 .git/worktrees/<id>/) to register lease time and creator metadata, and automatically
 adds it to .git/info/exclude. With --issue, add refuses while another worktree of
 the repository holds a live lease on that issue, and names it; --share-issue adds a
-second worktree on it anyway.
+second worktree on it anyway. In a repository that runs lanes, add still
+creates the worktree and prints a hint on stderr naming dotf lane switch <branch>.
 
 --agent <harness> then opens the worktree in herdr and starts that agent in its
 root pane, named after the worktree directory; --prompt-file sends the file as
@@ -340,6 +341,9 @@ refuses before creating anything.`,
 			}
 			if info.Metadata != nil {
 				c.Printf("Lease active until %s\n", info.Metadata.LeaseExpiresAt.Format("2006-01-02 15:04:05 MST"))
+			}
+			if hint := laneHint(root, c.ErrOrStderr()); hint != "" {
+				_, _ = fmt.Fprintln(c.ErrOrStderr(), hint)
 			}
 			if launch == nil {
 				return nil
