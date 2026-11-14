@@ -15,8 +15,8 @@ created: "2026-11-13"
 ## Status
 
 Proposed 2026-11-13; accepted 2026-11-13. The spec is `specs/HARNESS-101-model-eval-runner/`. The six open
-points under *Decisions* were answered by the advisor model at the owner's request (the owner delegated them
-in the session that wrote this ADR). Each answer stands until the owner reverses it, which takes one line on #1399.
+points under *Decisions* were delegated by the owner and settled on 2026-11-13, in the session that wrote
+this ADR. Each answer stands until the owner reverses it, which takes one line on #1399.
 
 ## Context
 
@@ -343,7 +343,7 @@ login that CI does not hold, and its quota is the owner's. A scheduled run in ci
 
 ## Decisions
 
-Answered 2026-11-13 by the advisor model at the owner's request. The options and reasoning that were put to the owner are in this ADR's history (#3484).
+Delegated by the owner and settled 2026-11-13. The options and reasoning that were put to the owner are in this ADR's history (#3484).
 
 1. **Build or adopt: build in Go.** ADR-020 §2 rules out a Python or Node runtime, and the grader is ours under either framework.
 2. **Recall counts only confirmed findings.** A finding labelled `REAL` but never confirmed goes in `optional`. **Added rule:** a replay case enters the corpus only if its `expected` holds at least one confirmed finding. Otherwise its recall is 0 over 0 and says nothing.

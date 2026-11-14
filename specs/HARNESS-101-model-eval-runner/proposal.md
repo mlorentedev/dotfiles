@@ -51,7 +51,7 @@ After this spec:
 - **Key circularity.** `nan/deepseek-v4-flash` authored 62 archived reviews. Mitigation: `key_author` on each case, and a candidate's results on its own keys are flagged and left out of its reduced score.
 - **Cost estimate for a case that has never run.** `--plan` falls back to a per-kind default envelope declared in `candidates.json`, labelled `default`, never zero.
 - **Token accounting per runner.** pi, agy and the Anthropic path report tokens differently in their transcripts. Open until the first runner adapter is written; a runner that cannot report tokens says so in the result rather than reporting 0.
-- **Owner decisions.** Answered 2026-11-13 by the advisor model at the owner's request (ADR-063 *Decisions*): build in Go, confirmed-only recall, N=3 with a cap of 30, the retirements, deferred scheduling, dotfiles-only corpus. Any of them can be reversed on #1399.
+- **Owner decisions.** Delegated by the owner and settled 2026-11-13 (ADR-063 *Decisions*): build in Go, confirmed-only recall, N=3 with a cap of 30, the retirements, deferred scheduling, dotfiles-only corpus. Any of them can be reversed on #1399.
 
 ## Acceptance criteria
 

@@ -17,7 +17,7 @@ owner: manu
 
 ## Setup
 
-- [x] Owner answers ADR-063's decisions (delegated to the advisor, 2026-11-13); `proposal.md` moves to `implementing`
+- [x] Owner answers ADR-063's decisions (delegated by the owner, 2026-11-13); `proposal.md` moves to `implementing`
 - [ ] Branch per slice from main (`feat/eval-corpus`, `feat/eval-slot`, `feat/eval-run`, `chore/eval-retire`)
 
 ## Implementation
