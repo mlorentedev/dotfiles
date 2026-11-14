@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HARNESS-196-vendor-security-audit-web-perf-f1",
+    "behavior": "AC1: every committed harness record's generated_sha equals its own body and the harness reports no drift",
+    "verification": "bats tests/harness-generated-sha.bats && (cd cli && go run ./cmd/dotf harness check --repo-root ..)",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-196-vendor-security-audit-web-perf-f2",
+    "behavior": "AC2: the compiled dependency map equals the records' requires:, security-audit included",
+    "verification": "cd cli && go test -count=1 -run TestTheCompiledDependencyMapMatchesTheRecords ./internal/harness/",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-196-vendor-security-audit-web-perf-f3",
+    "behavior": "AC3: every vendored skill has an ATTRIBUTION.md row stating the license its record declares",
+    "verification": "bats --filter 'HERMES-018' tests/skills-pipeline.bats && grep -F '`web-perf`' harness/skills/ATTRIBUTION.md | grep -qF 'Apache-2.0' && grep -qx 'license: Apache-2.0' harness/skills/web-perf/SKILL.md && grep -F '`security-audit`' harness/skills/ATTRIBUTION.md | grep -qF '| MIT |' && grep -qx 'license: MIT' harness/skills/security-audit/SKILL.md",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-196-vendor-security-audit-web-perf-f4",
+    "behavior": "AC4: the three vendored scripts are byte-identical to upstream at the pinned commit",
+    "verification": "for f in validate-findings.cjs validate-coverage-ledger.cjs report-schema.json; do gh api \"repos/cloudflare/security-audit-skill/contents/skills/security-audit/$f?ref=c1c8a8c1471069fb0e188eeaff69b8e8db6564a8\" --jq .content | base64 -d | cmp - harness/skills/security-audit/scripts/$f || exit 1; done",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-196-vendor-security-audit-web-perf-f5",
+    "behavior": "AC5: no vendored script is executable and none is named by Go or shell code outside the skill",
+    "verification": "test -z \"$(find harness/skills/security-audit/scripts -type f -perm -u+x)\" && ! git grep -lE 'validate-(findings|coverage-ledger)' -- cli scripts .github setup-linux.sh",
+    "state": "pending",
+    "evidence": ""
+  }
+]
