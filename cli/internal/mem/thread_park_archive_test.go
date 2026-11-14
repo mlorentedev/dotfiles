@@ -197,3 +197,26 @@ func TestArchiveParkedThreadLeavesAFileAnotherKeyHolds(t *testing.T) {
 		t.Errorf("feat/x's entry left MEMORY.md:\n%s", index)
 	}
 }
+
+// A move that fails after the entry is archived says which half happened: the
+// entry left MEMORY.md, the file did not leave threads/ (MEMORY-020 review 2).
+func TestArchiveParkedThreadNamesAFailedMove(t *testing.T) {
+	projectDir, memDir := parkVault(t)
+	// A file where archive/threads/ goes: the move cannot create its directory.
+	if err := os.WriteFile(filepath.Join(memDir, "archive", "threads"), []byte("in the way\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ArchiveParkedThread(projectDir, "feat-a", time.Now())
+	if err == nil {
+		t.Fatal("a failed move was not reported")
+	}
+	if !strings.Contains(err.Error(), `thread "feat-a": its entry is archived, but its file stays in threads/`) {
+		t.Errorf("error %q does not say the file stayed in threads/", err)
+	}
+	if strings.Join(got.Archived, ",") != "feat-a" {
+		t.Errorf("archived %v, want feat-a: its entry did leave MEMORY.md", got.Archived)
+	}
+	if _, err := os.Stat(filepath.Join(memDir, "threads", "feat-a.md")); err != nil {
+		t.Errorf("feat-a's file left threads/: %v", err)
+	}
+}

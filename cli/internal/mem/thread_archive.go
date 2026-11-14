@@ -107,7 +107,7 @@ func ArchiveParkedThread(projectDir, branch string, now time.Time) (ParkArchive,
 	for _, t := range taken {
 		res.Archived = append(res.Archived, t.key)
 		if err := moveThreadFile(memoryPath, t.key); err != nil {
-			return res, err
+			return res, fmt.Errorf("thread %q: its entry is archived, but its file stays in %s/, where dotf doctor reports it as a lost handoff: %w", t.key, threadsDir, err)
 		}
 	}
 	return res, nil

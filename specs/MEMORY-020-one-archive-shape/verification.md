@@ -29,6 +29,9 @@ owner: manu
 - A park leaves a `threads/<name>.md` whose heading names another key where it is: `fix/x` and `fix-x` share a file name, and the file is the other live thread's. `--finished` refuses that case, as it did before this change.
 - Review F5 (a park with no vault resolving prints nothing): declined. The behaviour predates this change, and `VaultPath`'s doc names it. A machine without a vault has no MEMORY.md to keep stale.
 - Review F7 (sweep prints its park report on stdout, lane park and worktree done on stderr): declined. Each command keeps the stream its other report lines already use.
+- Second review (PASS at aeaea027), Minor on a failed move reporting the thread as archived: applied. The error now says the entry is archived and the file stays in `threads/`; `TestArchiveParkedThreadNamesAFailedMove` pins it.
+- Second review, Minors on function size (`ArchiveParkedThread`, `takeThreads` over AGENTS.md's CC 10) and on the key-collision park leaving an archived pointer that resolves to nothing: ticketed as #3521. Neither changes what the archive writes.
+- Second review, Minor on sweep's stdout: F7 above, declined.
 - Review question on AC1's `dotf worktree done`: intended. Only a named lane parks; a plain worktree's `done` removes it and archives nothing, as before. The list names the commands that can reach a park.
 
 ## Promotion candidates
