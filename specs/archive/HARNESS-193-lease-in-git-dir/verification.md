@@ -54,5 +54,5 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 - [x] `proposal.md` frontmatter set to `status: archived`
 - [x] Folder moved: `specs/HARNESS-193-lease-in-git-dir/` -> `specs/archive/HARNESS-193-lease-in-git-dir/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
+- [x] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3307 closes with #3460
 - [x] Promotions above executed (if any)
