@@ -1,0 +1,50 @@
+{
+  "id": "bash-count-increment",
+  "repo": "mlorentedev/dotfiles",
+  "kind": "planted",
+  "role": "spec-reviewer",
+  "prompt": "harness/evals/planted/bash-count-increment/prompt.md",
+  "reference_answer": "harness/evals/planted/bash-count-increment/reference.md",
+  "key_author": "human",
+  "expected_verdict": "FAIL",
+  "expected": [
+    {
+      "id": "post-increment-exits",
+      "severity_floor": "Major",
+      "anchors_all": [
+        "count++"
+      ],
+      "anchors_any": [
+        "set -e",
+        "errexit",
+        "exit"
+      ],
+      "confirmed_by": "planted; #3476 measurement 1: both Hydrogen candidates found it and the fix is ((++count)) or count=$((count + 1))"
+    }
+  ],
+  "optional": [
+    {
+      "id": "symlink-counted",
+      "anchors_all": [
+        "symlink"
+      ],
+      "note": "true of [ -f ], and the comment does not say whether links count"
+    }
+  ],
+  "decoys": [
+    {
+      "id": "empty-args-set-u-bash32",
+      "anchors_all": [
+        "set -u"
+      ],
+      "anchors_any": [
+        "3.2",
+        "unbound",
+        "no argument"
+      ],
+      "reason": "false: #3476 measured /bin/bash 3.2.57 on macOS printing 'regular files: 0' and exiting 0 with no arguments; \"$@\" is exempt from set -u",
+      "sample": "| Minor | REAL | portability | With no arguments, \"$@\" fails under set -u on bash 3.2 with an unbound variable error |"
+    }
+  ],
+  "noise": []
+}

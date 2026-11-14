@@ -1,0 +1,42 @@
+{
+  "id": "memory-017",
+  "repo": "mlorentedev/dotfiles",
+  "kind": "replay",
+  "role": "spec-reviewer",
+  "spec": "MEMORY-017-session-end-handoff-lock",
+  "source_review": "specs/archive/MEMORY-017-session-end-handoff-lock/review.md",
+  "key_author": "agy/gemini-3.1-pro-high",
+  "reviewed_sha": "36b92fdd28b3ee7b81a38d5846d1a2be943b35c7",
+  "base_sha": "512cd05751bf7dfd626fb2432ae55602407ad264",
+  "base_derivation": "the review's Sources line and review-request.json base_sha agree",
+  "fetch_ref": "refs/pull/1933/head",
+  "expected_verdict": "PASS",
+  "expected": [
+    {
+      "id": "blocking-window-too-short",
+      "severity_floor": "Minor",
+      "anchors_all": [
+        "50"
+      ],
+      "anchors_any": [
+        "ms",
+        "millisecond"
+      ],
+      "confirmed_by": "verification.md, Review dispositions: 'Applied (Minor): increased the blocking assertion window from 50 ms to 250 ms'"
+    }
+  ],
+  "optional": [
+    {
+      "id": "parent-canonicalization",
+      "anchors_all": [
+        "canonical"
+      ],
+      "anchors_any": [
+        "parent"
+      ],
+      "note": "the reviewed tree's verification.md already records the decision; declined in the dispositions"
+    }
+  ],
+  "decoys": [],
+  "noise": []
+}
