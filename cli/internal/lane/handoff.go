@@ -464,9 +464,23 @@ func manualCommands(o Options, out Outcome, exec string) ([]string, error) {
 		if dotfCmd == "" || !plainWord.MatchString(dotfCmd) {
 			dotfCmd = "dotf"
 		}
+		// `lane switch` checks the branch out in a lane but cannot move the
+		// person's shell, so the lane is named now and the commands end inside
+		// it: the agent starts in the lane, not in the directory the person
+		// was in. Pinning the switch to that lane keeps the cd and the switch
+		// from disagreeing when the routing would have answered differently.
+		laneName, lanePath, err := RouteBranchToLane(o.Parent, o.WorktreeRoot, out.Branch)
+		if err != nil {
+			return nil, err
+		}
+		laneDir, err := humanPath(lanePath)
+		if err != nil {
+			return nil, err
+		}
 		return []string{
 			"git -C " + parent + " fetch " + remote,
-			dotfCmd + " lane switch " + out.Branch,
+			dotfCmd + " lane switch --lane " + laneName + " " + out.Branch,
+			"cd " + laneDir,
 			exec,
 		}, nil
 	}

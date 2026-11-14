@@ -3,8 +3,10 @@ package lane
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -503,5 +505,107 @@ func TestNext_ADryRunReportsTheRestartOfAnIdleWorkspace(t *testing.T) {
 	out, err := Handoff(o, b, queue)
 	if err != nil || out.Started || len(out.Commands) != 1 || len(b.typed) != 0 {
 		t.Fatalf("out = %+v, typed = %v, err = %v", out, b.typed, err)
+	}
+}
+
+// With named lanes and no backend, `lane switch` claims a lane and checks the
+// branch out in it, but it cannot move the person's shell: the printed commands
+// must end inside that lane, or the agent starts in whatever directory the
+// person happened to be in (AC5). The switch is pinned to the lane the cd names,
+// so the two cannot disagree.
+func TestNext_NoBackendWithNamedLanesEntersTheLaneBeforeTheAgent(t *testing.T) {
+	repoDir, _ := setupLaneTestRepo(t)
+	// A space in the root: the cd line is quoted for a person's shell.
+	wtRoot := filepath.Join(t.TempDir(), "wt with space")
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes: %v", err)
+	}
+	o := opts(t)
+	o.Agent, o.DryRun = "claude", true
+	o.Parent, o.WorktreeRoot = repoDir, wtRoot
+	o.PromptDir = filepath.Join(t.TempDir(), "prompts")
+
+	out, err := Handoff(o, nil, queue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	laneDir := filepath.Join(wtRoot, filepath.Base(repoDir), LaneFastTrack) // fix/ routes to fast-track
+	parent, err := humanPath(repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Commands) != 4 {
+		t.Fatalf("commands = %q, want fetch, switch, cd, exec", out.Commands)
+	}
+	if want := "git -C " + parent + " fetch origin"; out.Commands[0] != want {
+		t.Errorf("commands[0] = %q, want %q", out.Commands[0], want)
+	}
+	if want := "dotf lane switch --lane " + LaneFastTrack + " fix/first-thing"; out.Commands[1] != want {
+		t.Errorf("commands[1] = %q, want %q", out.Commands[1], want)
+	}
+	if want := `cd "` + laneDir + `"`; out.Commands[2] != want {
+		t.Errorf("commands[2] = %q, want %q", out.Commands[2], want)
+	}
+	if !strings.HasPrefix(out.Commands[3], "dotf lane exec --agent claude --prompt-file ") {
+		t.Errorf("commands[3] = %q, want the agent command last", out.Commands[3])
+	}
+
+	// The effect, not the text: the line a person pastes must land in the lane in
+	// every shell the proposal names, not merely read well.
+	want, err := filepath.EvalSymlinks(laneDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cd := out.Commands[2]
+	shells := []struct{ name, pwd string }{
+		{"bash", "pwd -P"},
+		{"zsh", "pwd -P"},
+		{"pwsh", "(Get-Location).ProviderPath"},
+	}
+	for _, sh := range shells {
+		t.Run(sh.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && sh.name != "pwsh" {
+				// A POSIX shell there answers /c/... paths that do not compare to a
+				// Windows one; the PowerShell form is what a Windows person pastes.
+				t.Skipf("%s is not what a Windows session pastes into", sh.name)
+			}
+			bin, err := exec.LookPath(sh.name)
+			if err != nil {
+				t.Skipf("%s is not installed here", sh.name)
+			}
+			args := []string{"-c", cd + "; " + sh.pwd}
+			if sh.name == "pwsh" {
+				args = []string{"-NoProfile", "-Command", cd + "; " + sh.pwd}
+			}
+			got, err := exec.Command(bin, args...).Output()
+			if err != nil {
+				t.Fatalf("%s %q: %v", sh.name, args, err)
+			}
+			gotDir, err := filepath.EvalSymlinks(strings.TrimSpace(string(got)))
+			if err != nil || gotDir != want {
+				t.Errorf("%s ends in %q (%v), want %q", sh.name, strings.TrimSpace(string(got)), err, want)
+			}
+		})
+	}
+}
+
+// A lane that cannot be named at print time is not guessed: a cd into the
+// wrong lane is worse than no commands.
+func TestNext_NoBackendWithNamedLanesRefusesWhenEveryLaneIsActive(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes: %v", err)
+	}
+	for _, b := range []string{"fix/101-a", "fix/102-b"} { // fix/ routes to fast-track and secondary
+		if _, _, err := SwitchLane(repoDir, wtRoot, b, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := opts(t)
+	o.Agent, o.DryRun = "claude", true
+	o.Parent, o.WorktreeRoot = repoDir, wtRoot
+	o.PromptDir = filepath.Join(t.TempDir(), "prompts")
+	if out, err := Handoff(o, nil, queue); err == nil || !strings.Contains(err.Error(), "WIP cap") {
+		t.Errorf("Handoff = %+v, %v; want the WIP cap refusal", out.Commands, err)
 	}
 }
