@@ -560,3 +560,70 @@ func TestCheckMiseTools_ADeployedConfigThatDoesNotParseFailsWithTheRemedy(t *tes
 		t.Errorf("no pin can be said to run over that file\n%s", out)
 	}
 }
+
+// On Windows bats.cmd runs bash.exe from PATH, which is WSL's System32 bash
+// unless Git Bash comes first. The sync scopes Git Bash to that probe
+// (tools.HomeRunners); the doctor builds its own sync, so it must scope the
+// same probe, or it reports bats off its pin on a machine the sync just
+// converged (#3507).
+func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	writeFile(t, filepath.Join(root, "bin", "bash.exe"), "")
+	home := t.TempDir()
+	versions := filepath.Join(home, "versions.conf")
+	conf := "# mise: cli\nBATS_VERSION=1.13.0\n"
+	writeFile(t, versions, conf)
+	pins, err := tools.ParseMiseTools([]byte(conf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, nil)))
+
+	const bats = `C:\m\bats.cmd`
+	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
+		"git --exec-path":                        execPath + "\n",
+		"mise which bats":                        bats + "\n",
+		"mise bin-paths --bin-names bats@1.13.0": "bats\n",
+		"mise install":                           "",
+		"mise ls --prunable --json":              "{}",
+	})
+	s.GOOS = "windows"
+	var scoped, unscoped []string
+	s.CommandOutputEnv = func(env []string, name string, args ...string) (string, error) {
+		if name == bats {
+			scoped = env
+			return "Bats 1.13.0", nil
+		}
+		return "", errors.New("unexpected scoped command " + name)
+	}
+	plain := s.CommandOutputDir
+	s.CommandOutputDir = func(dir, name string, args ...string) (string, error) {
+		if name == bats {
+			unscoped = append(unscoped, name)
+			return "", errors.New("bash: WSL has no bats")
+		}
+		return plain(dir, name, args...)
+	}
+	s.VersionOutput = nil // the probe reaches bats through the sync's runner, as in production
+
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, &Config{VersionsPath: versions}, rep, false)
+
+	if len(unscoped) > 0 {
+		t.Fatalf("bats.cmd ran with the caller's PATH, so it falls through to WSL's bash:\n%s", b.String())
+	}
+	var path string
+	for _, kv := range scoped {
+		if strings.HasPrefix(kv, "PATH=") {
+			path = strings.TrimPrefix(kv, "PATH=")
+		}
+	}
+	if !strings.HasPrefix(path, filepath.Join(root, "bin")+string(os.PathListSeparator)) {
+		t.Errorf("bats.cmd's PATH must start with Git Bash's bin dir %s, got %q", filepath.Join(root, "bin"), path)
+	}
+	if rep.Failures() != 0 {
+		t.Errorf("bats at its pin must pass the doctor\n%s", b.String())
+	}
+}

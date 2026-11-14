@@ -1640,3 +1640,42 @@ func TestHomeRunners_FindsGitBashInstalledAfterTheRunnerWasBuilt(t *testing.T) {
 		t.Errorf("bats.cmd PATH after git was installed = %q, want Git Bash first", pathOf(after.Env))
 	}
 }
+
+func TestGitBashEnv_ScopesOnlyTheBatsCommandsOnWindows(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "bin", "bash.exe"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	found := func() ([]byte, error) { return []byte(filepath.Join(root, "mingw64", "libexec", "git-core")), nil }
+	missing := func() ([]byte, error) { return nil, errors.New("git: not found") }
+	t.Setenv("ProgramFiles", t.TempDir())
+	t.Setenv("LocalAppData", t.TempDir())
+
+	lastPath := func(env []string) string {
+		p := ""
+		for _, kv := range env {
+			if strings.HasPrefix(kv, "PATH=") {
+				p = strings.TrimPrefix(kv, "PATH=")
+			}
+		}
+		return p
+	}
+	if p := lastPath(GitBashEnv("windows", found, `C:\m\bats.cmd`, "--version")); !strings.HasPrefix(p, filepath.Join(root, "bin")+string(os.PathListSeparator)) {
+		t.Errorf("bats.cmd on Windows: PATH must start with Git Bash's bin, got %q", p)
+	}
+	if env := GitBashEnv("windows", found, "mise", "install", "--force", "npm:bats"); env == nil {
+		t.Error("the npm:bats install is scoped too")
+	}
+	for name, env := range map[string][]string{
+		"linux":         GitBashEnv("linux", found, "bats.cmd"),
+		"another tool":  GitBashEnv("windows", found, `C:\m\jq.exe`, "--version"),
+		"git not found": GitBashEnv("windows", missing, `C:\m\bats.cmd`, "--version"),
+	} {
+		if env != nil {
+			t.Errorf("%s: want the caller's environment (nil), got a scoped one", name)
+		}
+	}
+}
