@@ -28,8 +28,8 @@ owner: manu
 ### Slice A: activation through converge (AC1)
 - [ ] [P] [AC1] Failing test: `lane.Activate` reads `.dotf/lanes.json` from the default branch's committed tree (`git show <remote>/<base>:…`), not from the working tree. A working-tree-only marker yields "not active".
 - [ ] [AC1] Implement `Activate`: create the missing lanes (reusing `lane init`'s lane creation), and write the activation record under the git common dir. Idempotent.
-- [ ] [AC1] Failing test, then implementation: the `lanes` converge step (`cli/internal/converge/lanes.go`) reports changed, then ok, on a second run. The deploy clone (`DOTFILES_DIR`) is skipped.
-- [ ] [AC1] Remove the marker write from `dotf lane init`'s default path, or make `init` call `Activate`. Whichever is chosen, a test proves a hand-run `init` cannot activate from an uncommitted marker.
+- [ ] [AC1] Failing test, then implementation: the `lanes` converge step (`cli/internal/converge/lanes.go`) reports changed, then ok, on a second run. A test proves the step never activates `DeployDir`, including when `RepoRoot` and `DeployDir` resolve to the same physical path.
+- [ ] [AC1] Remove the marker write from `dotf lane init`'s default path; `init` never writes the activation record. A test proves that a hand-run `init` leaves no record, both with an uncommitted marker and with a committed one.
 
 ### Slice B: the guard arms from the activation record (AC2, #3437, #3438)
 - [ ] [AC2] Failing `TestPreCommitLaneGuard` cases:

@@ -2,49 +2,49 @@
   {
     "id": "HARNESS-195-lanes-default-f1",
     "behavior": "AC1. converge activates lanes from the committed marker, idempotently; a working-tree marker activates nothing",
-    "verification": "cd cli && go test ./internal/lane/ ./internal/converge/ -run 'Activate|Lanes'",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/converge/ -run 'Activate|Lanes' -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-195-lanes-default-f2",
     "behavior": "AC2. the guard arms only from the activation record, never in the deploy clone",
-    "verification": "cd cli && go test ./internal/hooks/ -run TestPreCommitLaneGuard",
+    "verification": "cd cli && go test ./internal/hooks/ -run TestPreCommitLaneGuard -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-195-lanes-default-f3",
     "behavior": "AC3. mem resume and mem session-start print where the session stands",
-    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Where|MemResume|SessionStart'",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Where|MemResume|SessionStart' -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-195-lanes-default-f4",
     "behavior": "AC4. worktree add prints the lane hint in an active repo; AddDetached does not",
-    "verification": "cd cli && go test ./internal/worktree/ -run 'Hint'",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'Hint' -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-195-lanes-default-f5",
     "behavior": "AC5. lane next without a backend prints commands that enter the lane before the agent starts",
-    "verification": "cd cli && go test ./internal/lane/ -run 'ManualCommands'",
+    "verification": "cd cli && go test ./internal/lane/ -run 'ManualCommands' -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-195-lanes-default-f6",
     "behavior": "AC6. launchers hold only observed agents; secrets run refuses npm .cmd shims on Windows",
-    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Launch|BatchShim|SecretsRun'",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Launch|BatchShim|SecretsRun' -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-195-lanes-default-f7",
     "behavior": "AC7. lane doctor reports leaseless detached worktrees, expired leases and guard drift",
-    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Doctor|Audit'",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Doctor|Audit' -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
     "state": "pending",
     "evidence": ""
   },
@@ -58,7 +58,7 @@
   {
     "id": "HARNESS-195-lanes-default-f9",
     "behavior": "AC9. dotfiles is active on Mac, Linux and Windows guests with observed sessions in lanes",
-    "verification": "grep -q 'LANE-READY' specs/HARNESS-195-lanes-default/verification.md",
+    "verification": "grep -Eq '^- \\[x\\] AC9 -> ' specs/HARNESS-195-lanes-default/verification.md && grep -Eq '^\\| [a-z]+ \\| [^|]+ \\| 20[0-9]{2}-[0-9]{2}-[0-9]{2} \\| [^|]+ \\| LANE-READY \\|$' specs/HARNESS-195-lanes-default/verification.md",
     "state": "pending",
     "evidence": ""
   }
