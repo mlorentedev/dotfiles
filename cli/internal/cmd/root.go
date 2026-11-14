@@ -45,6 +45,7 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newConvergeCmd())
 	root.AddCommand(newIdentityCmd())
 	root.AddCommand(newLessonsCmd())
+	root.AddCommand(newEvalCmd())
 	root.AddCommand(newOrcaCmd())
 	root.AddCommand(newPrCmd())
 	root.AddCommand(newForgeCmd())

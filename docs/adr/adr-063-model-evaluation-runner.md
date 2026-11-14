@@ -199,12 +199,27 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
   fixed it, `verification.md` dispositioned it as real, or the owner adjudicated it. A finding
   that only carries the reviewer's own `REAL` label goes in `optional`.
 - **The key is self-consistent by construction.** Graded against its own `source_review`, a case
-  must score full recall with no decoy hit. `dotf eval check` asserts this for every case in the
+  must score full recall and match every `optional` entry, and it must agree with the source's
+  `reviewed_sha`, verdict and reviewer. `dotf eval check` asserts this for every case in the
   current repository, with no model involved, and each repository's CI runs it. It is the guard that keeps
   anchors from rotting.
-- **Planted cases** carry their input under `harness/evals/planted/<id>/` and use the same
-  `expected`/`decoys` fields. #3476's prompt is case one, and its false bash 3.2 claim is its first
-  decoy.
+- **Planted cases** live at `harness/evals/planted/<id>/`: `case.json`, `prompt.md` and
+  `reference.md`, the ideal answer the key is checked against. They use the same
+  `expected`/`decoys` fields and name `human` as `key_author`. #3476's prompt is case one, and its
+  false bash 3.2 claim is its first decoy.
+- **How a row is classed, in order** (amended 2026-11-14, HARNESS-101 slice 1):
+  - noise is discarded first;
+  - then a decoy match is a false positive, even when the row also names a real symbol;
+  - then rows are assigned one to one to `expected`, then to `optional`;
+  - anything left is unadjudicated.
+
+  A row below an entry's `severity_floor` does not satisfy it.
+- **Decoys and the self-check** (amended 2026-11-14). A decoy is usually mined from the source
+  review's own false claim, so a replay source may match its decoys. A planted reference is the
+  ideal answer and may not. A decoy broad enough to swallow a true row still fails the check,
+  because decoys are classed first and that row's `expected` entry goes unmatched. A source never
+  exercises a decoy that is not its own, so every decoy and noise entry carries a recorded `sample`
+  it must match.
 - **What the tree already records is not expected.** A finding that the replayed tree already dispositions (in `verification.md` or `tasks.md`) goes in `optional`, never in `expected`. A reviewer gets credit for repeating it, and no penalty for skipping it.
 - **Archived specs are never edited.** Reviewer artifacts are untouchable, so the key lives beside
   the archive, never inside it.
