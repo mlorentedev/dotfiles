@@ -174,3 +174,21 @@ func TestGitHubReadyPRFailsWhenTheAnswerIsNotReady(t *testing.T) {
 		}
 	}
 }
+
+// A title that already starts with a prefix is not prefixed twice: the round
+// trip through pr ready must end ready.
+func TestGiteaCreatePRDraftDoesNotPrefixTwice(t *testing.T) {
+	for _, title := range []string{"WIP: fix lint", "[wip] fix lint"} {
+		srv, log := prServer(t, "", "WIP:", "[WIP]")
+		g := Gitea{BaseURL: srv.URL, Token: tokenFn}
+		if _, err := g.CreatePR(context.Background(), Repo{"h", "o", "n"}, NewPR{Title: title, Head: "h", Base: "b", Draft: true}); err != nil {
+			t.Fatal(err)
+		}
+		if got := (*log)[0].body["title"]; got != "WIP: fix lint" {
+			t.Errorf("%q was sent as %v", title, got)
+		}
+		if _, err := g.ReadyPR(context.Background(), Repo{"h", "o", "n"}, 7); err != nil {
+			t.Errorf("%q: pr ready after create: %v", title, err)
+		}
+	}
+}

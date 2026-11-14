@@ -93,8 +93,11 @@ func (g Gitea) CreatePR(ctx context.Context, r Repo, in NewPR) (string, error) {
 		return g.writeURL(ctx, http.MethodPost, path,
 			map[string]string{"title": in.Title, "body": in.Body, "head": in.Head, "base": in.Base})
 	}
+	// A title that already carries a prefix keeps one, or pr ready would
+	// strip one of two and still read a draft.
+	title, _ := stripWIPPrefix(in.Title)
 	p, err := g.pull(ctx, http.MethodPost, path,
-		map[string]string{"title": giteaWIPPrefixes[0] + " " + in.Title, "body": in.Body, "head": in.Head, "base": in.Base})
+		map[string]string{"title": giteaWIPPrefixes[0] + " " + title, "body": in.Body, "head": in.Head, "base": in.Base})
 	if err != nil {
 		return "", err
 	}
