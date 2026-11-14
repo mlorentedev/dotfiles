@@ -30,7 +30,7 @@ owner: manu
 - [ ] [AC1] Write `harness/evals/case.schema.json` and the loader in `cli/internal/evals/`
 - [ ] [AC2] Failing test: the anchor grader, table-driven, covering a one-to-one assignment when two findings share a symbol (the AI-055 round-2 shape)
 - [ ] [AC2] Implement the findings-table parser and the anchor grader
-- [ ] [P] [AC1] [AC2] Encode 5 replay cases from multi-round archived specs (AI-055 round 2 first), only confirmed findings in `expected`; record `key_author` and `fetch_ref`
+- [ ] [P] [AC1] [AC2] Encode 5 replay cases from multi-round archived specs (AI-055 round 2 first), only confirmed findings in `expected`, and nothing the replayed tree already dispositions; record `key_author` and `fetch_ref`; choose cases so each candidate has at least three it did not author (keys from retired models such as `agy/gemini-3.1-pro-high` and `nan/mimo-v2.5` qualify)
 - [ ] [P] [AC1] [AC2] Encode 2 planted cases: #3476's `((count++))` prompt with the bash 3.2 decoy, plus one more
 - [ ] [AC2] Self-consistency test: every case scores full recall and zero decoys against its own source
 

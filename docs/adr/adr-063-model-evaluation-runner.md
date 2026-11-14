@@ -55,7 +55,8 @@ Every number below was measured in this session on `main` at `99cd03ae`.
 | `reviewed_sha` values still in the local clone | 80 of 141; 42 are ancestors of `origin/main` |
 | A squash-merged `reviewed_sha` (`fb88359c`, AI-030) | still served by GitHub through PR #1922's ref |
 | AI-055 round 2 at its own `reviewed_sha` (`06f3100b`) | `TestCheckReviewBudget_AFileWithoutAClipFailsClosed` is absent. The deleted test is visible, so the two REAL Majors #3476 could not see can be found |
-| Review files in the spec folder at `06f3100b` | none. The answer key does not leak into the replayed tree |
+| Earlier rounds' `review*.md` inside the replayed tree, over all 122 rounds whose `reviewed_sha` is in the clone | 0. A review file never leaks into the replayed tree. `verification.md` can: at AI-055 round 4 it already dispositions round 2's Minors |
+| Fetching a squash-merged `reviewed_sha` | `git fetch origin refs/pull/1922/head` then `git cat-file -e fb88359c`: present |
 | Anchor matching, tested by hand on AI-055 rounds 2 and 4 | `declaresStreaming`, `answerReserve` and `stepCeiling` each match exactly one findings row in both rounds. `AFileWithoutAClipFailsClosed` matches two rows in round 2, because two different findings name it |
 
 The launcher was read for this ADR too:
@@ -181,12 +182,13 @@ JSON file per case, validated by `harness/evals/case.schema.json`:
 - **Planted cases** carry their input under `harness/evals/planted/<id>/` and use the same
   `expected`/`decoys` fields. #3476's prompt is case one, and its false bash 3.2 claim is its first
   decoy.
+- **What the tree already records is not expected.** A finding that the replayed tree already dispositions (in `verification.md` or `tasks.md`) goes in `optional`, never in `expected`. A reviewer gets credit for repeating it, and no penalty for skipping it.
 - **Archived specs are never edited.** Reviewer artifacts are untouchable, so the key lives beside
   the archive, never inside it.
 
 ### 2. How a replay is built
 
-1. Resolve `reviewed_sha`. If the clone lacks it, `git fetch origin <fetch_ref>`, then verify the SHA.
+1. Resolve `reviewed_sha`. If the clone lacks it, fetch the SHA itself, then `fetch_ref`, then verify. A branch rebased after its review would not carry the SHA on its PR ref.
    If it cannot be resolved, the case fails loudly as infrastructure; it is never scored zero.
 2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotf/evals/<run-id>/<case>-<epoch>/`,
    outside every repository tree, and remove it when the run ends.
@@ -195,7 +197,8 @@ JSON file per case, validated by `harness/evals/case.schema.json`:
      provider, model, secret id. The pool is not read.
    - The base is the case's `base_sha`, passed explicitly instead of resolved.
    - The reviewer writes its verdict to the run directory, never to `specs/`.
-4. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
+4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run, and in a lane-managed repository the lane guard would also refuse it, because the worktree holds no lease. No exemption is needed.
+5. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
    still leaves (today's tools against old code) is listed once in the case's `noise`.
 
 The review gate cannot be satisfied by an eval run (C37), for three reasons:
@@ -211,7 +214,7 @@ Curation is human, once per case. Grading is mechanical, every run. Graded per r
 
 | Measure | How |
 |---|---|
-| Completion | The launcher's exit: answered, stalled, timed out, quota or rate limit, provider error. These are the `--fallback-reason` classes |
+| Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer` |
 | Format | The findings table parses. An unparseable answer is a format failure, scored as such, never as zero findings |
 | Verdict match | `PASS` / `PASS-WITH-GAPS` / `FAIL` against `expected_verdict` |
 | Recall | Matched `expected` over `expected`, weighted by severity floor |
@@ -321,8 +324,8 @@ login that CI does not hold, and its quota is the owner's. A scheduled run in ci
    (B) Every finding labelled `REAL`.
    *Recommended: A.* B rewards agreeing with the key author's mistakes.
 3. **Budget defaults.** (A) N=3 epochs and a cap of 30 runs per invocation. (B) N=5 and 60.
-   *Recommended: A* for the first slice: 5 replays × 3 candidates × 3 epochs = 45 runs, so it is
-   planned in two invocations or raised explicitly.
+   *Recommended: A* for the first slice: (5 replays + 2 planted) × 3 candidates × 3 epochs = 63 runs,
+   so it is planned in three invocations or raised explicitly.
 4. **Retirements.** Retire `nan-quality-bench.sh` and `tests/evals/harness-evals.json` in the
    `dotf eval run` slice: (A) yes, (B) keep them.
    *Recommended: A.*
