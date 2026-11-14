@@ -161,3 +161,22 @@ func TestPrTriageQueue_AHeadReviewRowPrintsNoZeroTime(t *testing.T) {
 		t.Errorf("the row should end at the reading, with no zero time:\n%s", stdout)
 	}
 }
+
+// A finding GitHub no longer places in the diff (line null) prints the line the
+// reviewer anchored, never ":0": the row the author has to write names it (#3455).
+func TestPrTriageQueue_PrintsTheReviewersLineOfAFindingThatLeftTheDiff(t *testing.T) {
+	st := prtriage.Status{PR: prtriage.PR{Number: 42, Title: "mine"}, Pending: true,
+		Reason: "triaged, but 1 REAL finding(s) lack the reproduction their disposition needs",
+		Unreproduced: []prtriage.Unreproduced{{
+			Finding: prtriage.Comment{Path: "specs/x/verification.md", Line: 0, OriginalLine: 39},
+			Problem: "the triage record has no row for it",
+		}}}
+	stubTriageFetch(t, func(int) ([]prtriage.Status, error) { return []prtriage.Status{st}, nil })
+	stdout, _, err := execute(t, "pr", "triage-queue", "--repo", "o/r", "--registry", validRegistry(t), "--pr", "42")
+	if !errors.Is(err, errPending) {
+		t.Fatalf("err = %v, want errPending", err)
+	}
+	if !strings.Contains(stdout, "verification.md:39") || strings.Contains(stdout, "verification.md:0") {
+		t.Errorf("stdout should name the reviewer's line and never :0:\n%s", stdout)
+	}
+}
