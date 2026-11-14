@@ -1,12 +1,12 @@
 ---
-id: spec-AI-054-gemini-4-bindings
+id: spec-AI-057-gemini-4-bindings
 type: spec
 status: implementing
 created: "2026-11-14"
 owner: manu
 issue: "mlorentedev/dotfiles#3471"
 ---
-# AI-054: route the Gemini bindings to Gemini 4 Argon and Hydrogen
+# AI-057: route the Gemini bindings to Gemini 4 Argon and Hydrogen
 
 ## Intent
 

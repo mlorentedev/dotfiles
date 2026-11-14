@@ -152,7 +152,7 @@
       "gemini": "gemini-4-hydrogen-high",
       "nan": "deepseek-v4-flash",
       "opencode": "qwen3.6-plus",
-      "$comment_gemini": "agy's interactive default, routed 2026-10-01 so the pin in ai/agy/settings.json resolves (HARNESS-067 round-1 finding 1, #902). Gemini 4 Hydrogen is the Flash successor: `agy models` (agy 1.5.8, 2026-11-14) lists gemini-4-hydrogen-{low,medium,high,xhigh}, agy writes the picker label `Gemini 4 Hydrogen (High)`, and Hydrogen at High passed the reviewer pool's admission bar in 66 s (#3471). Moved from gemini-3.8-flash-high on 2026-11-14 (AI-054, #3471; that id came from 3.7 by the owner on 2026-10-09, #902). Compile-time only: no chain carries it, so `dotf agent run` dispatch is unchanged."
+      "$comment_gemini": "agy's interactive default, routed 2026-10-01 so the pin in ai/agy/settings.json resolves (HARNESS-067 round-1 finding 1, #902). Gemini 4 Hydrogen is the Flash successor: `agy models` (agy 1.5.8, 2026-11-14) lists gemini-4-hydrogen-{low,medium,high,xhigh}, agy writes the picker label `Gemini 4 Hydrogen (High)`, and Hydrogen at High passed the reviewer pool's admission bar in 66 s (#3471). Moved from gemini-3.8-flash-high on 2026-11-14 (AI-057, #3471; that id came from 3.7 by the owner on 2026-10-09, #902). Compile-time only: no chain carries it, so `dotf agent run` dispatch is unchanged."
     },
     "low": {
       "claude": "haiku",
