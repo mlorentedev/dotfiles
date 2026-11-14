@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/using-git-worktrees/SKILL.md
-generated_sha: 7a729775ee1c02a0
+generated_sha: c67d83c30a2eb6cf
 id: using-git-worktrees-skill
 type: skill
 status: active
@@ -119,12 +119,11 @@ to remove the gitlink. Do not proceed.
 
 ### 1. Create or switch the workspace (Persistent Named Lanes first, Ephemeral fallback)
 
-If the repository uses persistent named lanes (`.dotf/lane.json` present or `dotf lane status` shows `feat-lane-primary` / `feat-lane-secondary` / `fast-track-lane`), **never create a 4th ephemeral worktree**. Provision and switch the persistent lane in-place (ADR-060):
+If the repository runs persistent named lanes (the session-start line says `lane <name> ACTIVE` or `this repository runs lanes`; the test below is the same fact), **never create a 4th ephemeral worktree**. The way in is `dotf lane switch <branch>` (or `dotf lane next` for the next queued issue), which claims a free lane and checks the branch out in it (ADR-060). A repository runs lanes when its activation record, the file `dotf-lanes-active` in the git common dir, exists. Only `dotf converge --only lanes` writes it; run nothing here to create the lanes or the record, and never `dotf lane init`.
 
 ```bash
-if [ -f "$repo_root/.dotf/lane.json" ]; then
+if [ -f "$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)/dotf-lanes-active" ]; then
   cd "$repo_root" &&
-  dotf lane init &&
   dotf lane switch "<type>/$SLUG" &&
   wt_path="$(git -C "$repo_root" worktree list --porcelain | awk -v b="refs/heads/<type>/$SLUG" '/^worktree /{p=substr($0,10)} $0=="branch "b{print p}')" &&
   [ -n "$wt_path" ] &&
@@ -132,7 +131,9 @@ if [ -f "$repo_root/.dotf/lane.json" ]; then
 fi
 ```
 
-Otherwise, create an external worktree via `dotf worktree add`:
+A lane is held only on a branch: a lane the session line calls `PARKED` is nobody's, so start with `dotf lane switch <branch>` before working in it.
+
+Otherwise (no activation record), create an external worktree via `dotf worktree add`:
 
 ```bash
 dotf worktree add "$SLUG" -b "<type>/$SLUG" &&

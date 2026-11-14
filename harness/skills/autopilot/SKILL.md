@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 11b06ae5079a8436
+generated_sha: a3841a63bd0781d9
 id: autopilot-skill
 type: skill
 status: active
@@ -173,11 +173,12 @@ resolve_wt() {
 }
 WT_DIR="$(resolve_wt)"
 if [ -z "$WT_DIR" ]; then
-  # `.dotf/lanes.json` is the committed ADR-060 marker (`LanesMarkerFile`); `.dotf/lane.json` is the
-  # CLI-129 queue contract and says nothing about lanes. A run never calls `dotf lane init`: that
-  # writes the marker into the main checkout and arms the lane guard for every worktree on the
-  # machine, which is the owner's or converge's step (#3426).
-  if [ -f .dotf/lanes.json ]; then
+  # A repository runs lanes on this machine when its activation record exists: the file
+  # `dotf-lanes-active` (`ActivationFile`) in the git common dir. Only `dotf converge --only lanes`
+  # writes it, from the marker the default branch commits (`.dotf/lanes.json`); the marker alone
+  # activates nothing, and neither does `.dotf/lane.json`, the CLI-129 queue contract. A run never
+  # calls `dotf lane init`: activating a repository is converge's or the owner's step (#3426).
+  if [ -f "$(git rev-parse --path-format=absolute --git-common-dir)/dotf-lanes-active" ]; then
     # `lane switch` takes the branch as an argument; `lane claim` takes the lease `worktree add --issue` would
     # A run takes a free lane; when none is free it ENDS (ADR-060). A failed switch (`WIP cap reached`
     # names the candidate lanes) is `parked(wip-cap)`: never fall through to `dotf worktree add`, and
