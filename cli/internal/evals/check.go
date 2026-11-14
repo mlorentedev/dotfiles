@@ -32,8 +32,9 @@ type CheckResult struct {
 // Check validates and self-grades every case under root. A case passes when it
 // matches the schema, agrees with its source's frontmatter, and its key graded
 // against its own source scores full recall and matches every optional entry;
-// when a planted reference hits no decoy; and when each decoy and noise sample
-// matches its own anchors.
+// when a planted reference hits no decoy, and a replay source hits one only on
+// the row its own sample records; and when each decoy and noise sample matches
+// its own anchors.
 //
 // The error is for a tree that cannot be read; a broken case is a problem in
 // its result, so one bad case never hides the rest.
@@ -231,20 +232,48 @@ func keyProblems(c Case, source, field string) []string {
 			out = append(out, fmt.Sprintf("optional %s matches no row of %s left after the expected entries", f.ID, field))
 		}
 	}
-	// A replay source is a model's review and may carry the false claim its
-	// decoy was mined from. A planted reference is the ideal answer and may not.
-	// A decoy broad enough to swallow a true row is caught either way: decoys
-	// are graded first, so that row's expected entry is reported unmatched.
+	// A planted reference is the ideal answer and may carry no decoy.
 	if c.Kind == "planted" {
 		for _, m := range g.DecoyHits {
 			out = append(out, fmt.Sprintf("decoy %s matches line %d of %s, which is the ideal answer", m.ID, m.Row.Line, field))
+		}
+		return out
+	}
+	// A replay source is a model's review and may carry the false claim a decoy
+	// was mined from, on that row only. A decoy or noise entry that also takes
+	// another row swallows a finding nobody refuted: an expected row would be
+	// reported unmatched, but an unadjudicated one would vanish unnoticed.
+	for _, group := range []struct {
+		name    string
+		entries []Finding
+		hits    []Match
+	}{{"decoy", c.Decoys, g.DecoyHits}, {"noise", c.Noise, g.Noise}} {
+		for _, m := range group.hits {
+			if !beginsWithOwnSample(group.entries, m) {
+				out = append(out, fmt.Sprintf("%s %s matches line %d of %s, which is not the row its sample records", group.name, m.ID, m.Row.Line, field))
+			}
 		}
 	}
 	return out
 }
 
+// beginsWithOwnSample reports whether a hit landed on the row its entry was
+// mined from: the row begins with that entry's sample, which may stop before
+// the row's trailing cells. Another entry's sample does not count, or one
+// decoy could widen onto every row a second one records.
+func beginsWithOwnSample(entries []Finding, m Match) bool {
+	for _, f := range entries {
+		if f.ID == m.ID {
+			s := strings.TrimSpace(f.Sample)
+			return s != "" && strings.HasPrefix(m.Row.Text, s)
+		}
+	}
+	return false
+}
+
 // sampleProblems asserts each decoy and noise entry matches its own sample. A
-// source never contains a decoy, so nothing else exercises its anchors.
+// decoy mined from another review appears in no source here, so nothing else
+// exercises its anchors.
 func sampleProblems(c Case) []string {
 	var out []string
 	for _, group := range []struct {
