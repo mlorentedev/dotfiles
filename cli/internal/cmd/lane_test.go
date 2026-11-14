@@ -149,7 +149,7 @@ func TestLane_RefusalsAreShownOnStderr(t *testing.T) {
 		args []string
 		want string
 	}{
-		"unknown agent":       {[]string{"exec", "--agent", "copilot", "--prompt-file", f}, `no launch command for agent "copilot"`},
+		"unknown agent":       {[]string{"exec", "--agent", "codex", "--prompt-file", f}, `no launch command for agent "codex"`},
 		"known agents listed": {[]string{"exec", "--agent", "codex", "--prompt-file", f}, "agy, claude, copilot, opencode, pi"},
 		"missing prompt":      {[]string{"exec", "--agent", "claude", "--prompt-file", f + ".missing"}, "lane exec:"},
 	} {
