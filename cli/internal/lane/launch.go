@@ -72,8 +72,12 @@ func Agents() []string {
 
 // LaunchArgv is the command that starts agent on prompt, interactively. The
 // prompt is refused when it would not reach the agent as one: empty, a leading
-// dash (read as a flag) or a leading @ (pi attaches the file it names).
-func LaunchArgv(agent, prompt string) ([]string, error) {
+// dash (read as a flag) or a leading @ (pi attaches the file it names). A model
+// is inserted as `--model <id>` right after the agent's executable, before its
+// mode flag and the prompt: every agent in the table was observed taking that
+// flag there (#3485). Empty, the launch is the table's own. A model that is
+// blank or starts with a dash would be read as a flag, so it is refused.
+func LaunchArgv(agent, prompt, model string) ([]string, error) {
 	build, ok := launchers[agent]
 	if !ok {
 		return nil, fmt.Errorf("lane: no launch command for agent %q (known: %s)", agent, strings.Join(Agents(), ", "))
@@ -81,7 +85,27 @@ func LaunchArgv(agent, prompt string) ([]string, error) {
 	if p := strings.TrimSpace(prompt); p == "" || p[0] == '-' || p[0] == '@' {
 		return nil, fmt.Errorf("lane: the prompt must start with text, not %q", firstWord(prompt))
 	}
-	return build(prompt), nil
+	argv := build(prompt)
+	if model == "" {
+		return argv, nil
+	}
+	if m := strings.TrimSpace(model); m == "" || m[0] == '-' {
+		return nil, fmt.Errorf("lane: the model must be an id, not %q", model)
+	}
+	at := agentExecutable(argv) + 1
+	return slices.Concat(argv[:at], []string{"--model", model}, argv[at:]), nil
+}
+
+// agentExecutable is the index of the agent's own executable in a launch argv:
+// the word after `--` when the launch goes through `dotf secrets run`, else the
+// first word.
+func agentExecutable(argv []string) int {
+	if len(argv) >= 4 && argv[0] == "dotf" && argv[1] == "secrets" && argv[2] == "run" {
+		if dash := slices.Index(argv, "--"); dash >= 0 && dash+1 < len(argv) {
+			return dash + 1
+		}
+	}
+	return 0
 }
 
 func firstWord(s string) string {

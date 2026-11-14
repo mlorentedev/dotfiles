@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -106,5 +107,38 @@ func TestWorktreeAddRefusesAPromptWithoutAnAgent(t *testing.T) {
 	repo := worktreeTestRepo(t)
 	if _, err := executeWorktree(t, "add", "demo", "--repo", repo, "--prompt-file", "x"); err == nil || !strings.Contains(err.Error(), "--agent") {
 		t.Fatalf("want a refusal naming --agent, got %v", err)
+	}
+}
+
+// --model reaches herdr's agent start as a trailing agent argument, so the
+// harness starts on that model instead of its own default (#3485).
+func TestWorktreeAddForwardsTheModelToHerdr(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	calls := fakeHerdrRunner(t, herdrAnswers(true), map[string]bool{"agent get": true})
+	if out, err := executeWorktree(t, "add", "demo", "--repo", repo, "--agent", "pi", "--model", "nan/qwen3.8-max"); err != nil {
+		t.Fatalf("add --agent --model: %v\n%s", err, out)
+	}
+	want := "agent start feat-demo --kind pi --pane w3:p1 -- --model nan/qwen3.8-max"
+	if !slices.Contains(*calls, want) {
+		t.Errorf("herdr calls =\n%s\nwant one %q", strings.Join(*calls, "\n"), want)
+	}
+}
+
+// --model without --agent names no process to apply to, and an empty or
+// flag-shaped model would start the agent on the wrong thing: both are refused
+// before the worktree exists, like --prompt-file without --agent.
+func TestWorktreeAddRefusesAModelWithoutAnAgentOrWithoutAValue(t *testing.T) {
+	repo := worktreeTestRepo(t)
+	if _, err := executeWorktree(t, "add", "demo", "--repo", repo, "--model", "x"); err == nil || !strings.Contains(err.Error(), "--agent") {
+		t.Fatalf("want a refusal naming --agent, got %v", err)
+	}
+	fakeHerdrRunner(t, herdrAnswers(true), map[string]bool{"agent get": true})
+	for _, m := range []string{"", "-m"} {
+		if _, err := executeWorktree(t, "add", "demo", "--repo", repo, "--agent", "pi", "--model", m); err == nil || !strings.Contains(err.Error(), "--model") {
+			t.Errorf("model %q: want a refusal naming --model, got %v", m, err)
+		}
+	}
+	if _, err := os.Stat(rootWorktree("demo")); err == nil {
+		t.Error("a refused add created the worktree")
 	}
 }

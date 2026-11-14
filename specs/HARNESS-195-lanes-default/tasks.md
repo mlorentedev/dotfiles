@@ -104,6 +104,10 @@ owner: manu
 - [ ] [AC9] PR adding `.dotf/lanes.json` to dotfiles (the switch). Then `dotf converge` on the Mac and each guest, and sweep the merged worktrees.
 - [ ] [AC9] Run a real session of each launchable agent per machine, and record the AC3 line in `verification.md`.
 
+### Slice H: the launch names its model (AC10, #3485)
+- [x] [AC10] Failing tests, then implementation: `herdr.LaunchOptions.Model` appended to `agent start` as `-- --model <id>`; `lane.LaunchArgv(agent, prompt, model)` inserts `--model <id>` after the agent executable (after the `--` of a `dotf secrets run` launch); `--model` on `worktree add` (refused without `--agent`, or blank or flag-shaped, before the worktree exists), `lane exec` and `lane next` (typed on the exec line, refused when not a plain shell word; the line without a model is byte-identical to before). `lane apply` passes no model.
+- [x] [AC10] Observe each launchable agent accepting `--model <id>` in a one-shot run: claude `--model sonnet`, pi `--model nan/qwen3.6`, opencode `run --model nan/qwen3.6`, copilot `--model auto` (`gpt-5.4` is parsed and reported unavailable on this account), agy `--model "Gemini 4 Hydrogen (High)"`, each exit 0 answering `ok`. A real `dotf worktree add probe-3485-model --agent claude --model sonnet` started claude in herdr on `Sonnet 5.5` (pane read), then `worktree done`.
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

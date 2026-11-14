@@ -22,7 +22,7 @@ func TestLaunchEnv_NamesTheAgentOnlyWhereTheWrapperHidesIt(t *testing.T) {
 		{"agy", nil},
 		{"copilot", nil},
 	} {
-		argv, err := LaunchArgv(tc.agent, "go")
+		argv, err := LaunchArgv(tc.agent, "go", "")
 		if err != nil {
 			t.Fatal(err)
 		}

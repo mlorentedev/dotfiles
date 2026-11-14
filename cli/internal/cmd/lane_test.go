@@ -219,3 +219,21 @@ func TestLaneNext_DryRunLeavesTheLegacyPromptDirectoryAlone(t *testing.T) {
 		t.Error("a dry run created the new prompt directory")
 	}
 }
+
+// exec --model lands in the agent's argv right after its executable (#3485).
+func TestLaneExec_HandsTheAgentTheModel(t *testing.T) {
+	var got []string
+	prev := laneExec
+	laneExec = func(argv []string) error { got = argv; return nil }
+	t.Cleanup(func() { laneExec = prev })
+	f := filepath.Join(t.TempDir(), "p.md")
+	if err := os.WriteFile(f, []byte("go\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := runLane(t, "exec", "--agent", "copilot", "--model", "gpt-5.4", "--prompt-file", f); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"copilot", "--model", "gpt-5.4", "-i", "go"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("exec argv = %q, want %q", got, want)
+	}
+}

@@ -159,7 +159,7 @@ func newLaneParkCmd() *cobra.Command {
 }
 
 func newLaneExecCmd() *cobra.Command {
-	var agent, promptFile string
+	var agent, promptFile, model string
 	c := &cobra.Command{
 		Use:   "exec",
 		Short: "Start an agent on a prompt read from a file",
@@ -175,7 +175,7 @@ func newLaneExecCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("lane exec: %w", err)
 			}
-			argv, err := lane.LaunchArgv(agent, strings.TrimSpace(string(b)))
+			argv, err := lane.LaunchArgv(agent, strings.TrimSpace(string(b)), model)
 			if err != nil {
 				return err
 			}
@@ -184,6 +184,7 @@ func newLaneExecCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&agent, "agent", "", "agent to start ("+strings.Join(lane.Agents(), ", ")+")")
 	c.Flags().StringVar(&promptFile, "prompt-file", "", "file holding the prompt")
+	c.Flags().StringVar(&model, "model", "", "start the agent on this model id instead of its default")
 	_ = c.MarkFlagRequired("agent")
 	_ = c.MarkFlagRequired("prompt-file")
 	return c
@@ -206,7 +207,7 @@ func readPrompt(path string) ([]byte, error) {
 }
 
 func newLaneNextCmd() *cobra.Command {
-	var agent string
+	var agent, model string
 	var dryRun bool
 	c := &cobra.Command{
 		Use:   "next",
@@ -223,10 +224,11 @@ func newLaneNextCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runLaneNext(c, agent, dryRun)
+			return runLaneNext(c, agent, model, dryRun)
 		},
 	}
 	c.Flags().StringVar(&agent, "agent", "", "agent to start (default: the calling pane's; "+strings.Join(lane.Agents(), ", ")+")")
+	c.Flags().StringVar(&model, "model", "", "start the successor on this model id instead of the agent's default")
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "decide and print, change nothing")
 	return c
 }
@@ -236,8 +238,8 @@ func gitOut(args ...string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
-func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
-	out, err := doLaneNext(c, agent, dryRun)
+func runLaneNext(c *cobra.Command, agent, model string, dryRun bool) error {
+	out, err := doLaneNext(c, agent, model, dryRun)
 	if err != nil {
 		return err
 	}
@@ -247,7 +249,7 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 
 // doLaneNext hands off to the next queued item and returns what happened, so
 // apply can count a start without parsing what next prints.
-func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, error) {
+func doLaneNext(c *cobra.Command, agent, model string, dryRun bool) (lane.Outcome, error) {
 	top, err := gitOut("rev-parse", "--show-toplevel")
 	if err != nil {
 		return lane.Outcome{}, fmt.Errorf("lane next: not in a git checkout: %w", err)
@@ -270,7 +272,7 @@ func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, erro
 		return lane.Outcome{}, fmt.Errorf("lane next: %w", err)
 	}
 	opts := lane.Options{
-		Agent: agent, DryRun: dryRun, Config: cfg, Template: string(tmpl),
+		Agent: agent, Model: model, DryRun: dryRun, Config: cfg, Template: string(tmpl),
 		Parent: parent, PromptDir: promptDir, Dotf: selfBinary(c), GitDir: common,
 		WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
 		Claims:       laneClaimer(cfg, top, parent),
