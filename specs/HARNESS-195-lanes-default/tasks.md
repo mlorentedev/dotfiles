@@ -31,6 +31,12 @@ owner: manu
 - [x] [AC1] Failing test, then implementation: the `lanes` converge step (`cli/internal/converge/lanes.go`) reports changed, then ok, on a second run. A test proves the step never activates `DeployDir`, including when `RepoRoot` and `DeployDir` resolve to the same physical path.
 - [x] [AC1] Remove the marker write from `dotf lane init`'s default path; `init` never writes the activation record. A test proves that a hand-run `init` leaves no record, both with an uncommitted marker and with a committed one.
 
+> Slice A as built (for the slices that follow):
+> - `lane init` keeps `--write-marker`, which writes `.dotf/lanes.json` for the commit that declares a repository. Without the flag, init writes neither the marker nor the record.
+> - Slice F: the marker findings in `cli/internal/lane/audit.go` still say "run dotf lane init to rewrite the marker"; the repair is now `dotf lane init --write-marker`.
+> - Slice G: the runbook row that says `dotf lane init` arms the guard (`docs/runbooks/guide-persistent-named-lanes.md`) is no longer true.
+> - Plan and apply agree from zero; a lane that exists but lacks a lease or identity record is planned as 0 and applied as 1.
+
 ### Slice B: the guard arms from the activation record (AC2, #3437, #3438)
 - [ ] [AC2] Failing `TestPreCommitLaneGuard` cases:
   - no record → no block;
