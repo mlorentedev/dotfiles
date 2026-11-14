@@ -148,16 +148,12 @@ _write_849_feed() {
     # silently change the script's existing offline output when the flag goes
     # unused. The golden was captured from the pre-change script on this exact
     # fixture; it is a file, not origin/main, so the test cannot skip itself in
-    # a shallow clone and does not move when main does (#2303). The documented
-    # SDD_PR_BODY escape hatch (#854/BUG-061) is stripped from the live output:
-    # it is an intentional, in-scope addition to this path, not a regression.
+    # a shallow clone and does not move when main does (#2303). The body is
+    # set, so the no-PR recipe (#3444) is not printed and nothing is stripped.
     _replay_851_diff
     SDD_PR_BODY="Closes #850" \
         spec_gate_both --base-ref main --head-ref feature --explain
-    local stripped
-    stripped=$(printf '%s\n' "$output" \
-        | sed '/^       If this already archived a spec/,/^       be set by hand for a one-off check/d' | cat -s)
-    [ "$stripped" = "$(cat "$BATS_TEST_DIRNAME/fixtures/spec-gate/no-adjacency-flag.golden")" ]
+    [ "$output" = "$(cat "$BATS_TEST_DIRNAME/fixtures/spec-gate/no-adjacency-flag.golden")" ]
 }
 
 @test "adjacency: a generic basename in a subdirectory does not drag in the backlog" {

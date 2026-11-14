@@ -136,6 +136,16 @@ teardown() {
     grep -qF 'SDD_PR_BODY=[<unset>]' "$GATE_LOG"
 }
 
+@test "spec-gate-prepush: with no open PR the label and body the push was given reach the gate (#3444)" {
+    # The refusal's first-push recipe is SDD_LABELS=... SDD_PR_BODY=... git push.
+    # It only works if this adapter hands those through on the no-PR path.
+    export STUB_PR_JSON='' SDD_LABELS=skip-sdd SDD_PR_BODY=$'## SDD skip rationale\nmechanical move'
+    run "$ADAPTER" --base-ref origin/main --head-ref HEAD
+    [ "$status" -eq 0 ]
+    grep -qF 'SDD_LABELS=[skip-sdd]' "$GATE_LOG"
+    grep -qF 'SDD_PR_BODY=[## SDD skip rationale' "$GATE_LOG"
+}
+
 @test "spec-gate-prepush: forwards every argument to the gate verbatim" {
     run "$ADAPTER" --base-ref origin/main --head-ref HEAD --explain \
         --adjacency-issues /tmp/adjacency.tsv

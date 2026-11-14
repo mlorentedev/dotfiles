@@ -126,6 +126,39 @@ _both() { spec_gate_both "$@"; }
     [[ "$output" == *"rationale"* ]] || false
 }
 
+@test "with no PR context the refusal names the first-push recipe and the merged-PR case (#3444)" {
+    # A first push has no PR to read the label from, and the refusal used to
+    # tell the author to open one, which the push itself has to precede.
+    printf 'line %d\n' {1..60} > big.txt
+    _commit "big change, no PR yet"
+    SDD_LABELS="" SDD_PR_BODY="" _both --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'SDD_LABELS=skip-sdd SDD_PR_BODY="$(cat body.md)" git push'* ]] || false
+    [[ "$output" == *"already merged"* ]] || false
+    [[ "$output" == *"AGENTS.md"* ]] || false
+}
+
+@test "the first-push recipe the refusal names passes the gate (#3444)" {
+    # The recipe, run as written: the body comes from a file, as an author
+    # would keep it to open the PR with afterwards.
+    printf 'line %d\n' {1..60} > big.txt
+    _commit "big change, no PR yet"
+    printf '## Summary\nfoo\n\n## SDD skip rationale\nmechanical move, no logic change.\n' > "$BATS_TEST_TMPDIR/body.md"
+    SDD_LABELS=skip-sdd SDD_PR_BODY="$(cat "$BATS_TEST_TMPDIR/body.md")" \
+        _both --base-ref main --head-ref feature
+    [ "$status" -eq 0 ]
+}
+
+@test "with a PR resolved the refusal does not offer the no-PR recipe (#3444)" {
+    printf 'line %d\n' {1..60} > big.txt
+    _commit "big change, PR open"
+    SDD_LABELS="enhancement" SDD_PR_BODY=$'## Summary\nfoo\n' \
+        _both --base-ref main --head-ref feature
+    [ "$status" -eq 1 ]
+    [[ "$output" != *"No PR was found"* ]] || false
+    [[ "$output" == *"AGENTS.md"* ]] || false
+}
+
 @test "exits 0 when dependencies label present AND author is a bot (#686/C25)" {
     printf 'line %d\n' {1..60} > big.txt
     _commit "dep bump"

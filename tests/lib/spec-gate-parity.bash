@@ -89,11 +89,13 @@ _spec_gate_event() {
           user: {login: $author}}}' >"$1"
 }
 
-# The output without the one paragraph that differs by design: how to re-run
-# the gate by hand, which names the script on one side and not the other.
+# The output without the one paragraph that differs by design: the recipe for
+# a push with no PR yet (#3444). Only the script prints it, because only the
+# local pre-push hook runs without a PR; dotf gate spec always reads one from
+# the event.
 _spec_gate_common() {
     printf '%s\n' "$1" | awk '
-        /If this already archived a spec/ { skip = 1 }
+        /No PR was found for this branch/ { skip = 1 }
         skip && /^[[:space:]]*$/ { skip = 0; next }
         !skip { print }'
 }
