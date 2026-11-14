@@ -1,7 +1,7 @@
 ---
 id: spec-TOOL-037-finding-anchor-drift
 type: spec
-status: active
+status: archived
 created: "2026-11-13"
 owner: manu
 issue: "mlorentedev/dotfiles#3455"
