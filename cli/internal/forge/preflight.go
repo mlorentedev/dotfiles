@@ -61,10 +61,10 @@ func newChecks(declared *Protection, live Protection) []Check {
 
 // mergedPullsQuery asks for the branch's merged pull requests, newest update
 // first, the same 100 the REST page held, and only the two fields the window
-// reads. The REST list it replaces returned every closed pull request with its full repository payload, 1.9 MB
-// on dotfiles, and a slow moment of the API ran it past the call's deadline
-// (#3434). Only merged ones are asked for, so an abandoned change never takes a
-// slot. It costs one point of the GraphQL quota.
+// reads. The REST list it replaces returned every closed pull request with its
+// full repository payload, 1.9 MB on dotfiles, and a slow moment of the API ran
+// it past the call's deadline (#3434). Only merged ones are asked for, so an
+// abandoned change never takes a slot. It costs one point of the GraphQL quota.
 const mergedPullsQuery = `query($owner: String!, $name: String!, $base: String!) {
   repository(owner: $owner, name: $name) {
     pullRequests(baseRefName: $base, states: MERGED, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
