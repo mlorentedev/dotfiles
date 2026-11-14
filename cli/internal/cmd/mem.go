@@ -122,12 +122,14 @@ func newMemSessionStartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "session-start",
 		Short: "Session-start brief: --format for file-based agents, or the Claude hook envelope",
-		Long: "session-start has two modes. With --format=stdout|markdown it renders the\n" +
+		Long: "session-start has three modes. With --format=stdout|markdown it renders the\n" +
 			"agent-agnostic session-brief core (vault detection, health, specs, lessons,\n" +
 			"baseline) that file-based agents (opencode/agy/copilot) inject out-of-band.\n" +
 			"With no --format it is the Claude SessionStart hook: it reads the hook JSON on\n" +
 			"stdin and emits the additionalContext envelope — the same core plus the\n" +
-			"Claude-only injectors. Ported from session-brief.sh + claude-session-start.sh.",
+			"Claude-only injectors. With --format=agy-hook it is agy's PreInvocation hook: the\n" +
+			"brief as an injectSteps systemMessage on a conversation's first invocation, `{}`\n" +
+			"after. Ported from session-brief.sh + claude-session-start.sh.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {

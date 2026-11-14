@@ -59,6 +59,9 @@ owner: manu
 > Slice C2 as built:
 > - pi and opencode: `ai/pi/extensions/dotfiles-gate.ts` and `ai/opencode/plugins/dotfiles-gate.ts`, deployed by the `pi-gate` and `opencode-gate` entries of `ai/deploy.json`. Each runs `dotf mem session-start --format stdout` and fails silent-but-logged when dotf is missing. pi sends it once per session start (not on a reload) for the next turn; opencode adds it to the system prompt, one brief per session. The manifest's opencode `file` now says `plugins/`, the directory opencode reads (the herdr plugin sits there).
 > - agy: a flat `PreInvocation` hook, `dotf mem session-start --format agy-hook`. It answers agy's `{"injectSteps":[{"systemMessage":{"systemMessage":...}}]}` on the first invocation of a `conversationId` and `{}` after, keyed by an O_EXCL marker under the OS temp dir (pruned after seven days). It never fails the turn.
+> - The deploy entries are `pi-gate` and `opencode-gate` because `deployNameWidth` (16) caps a manifest name; `deploy` twice into a temporary home reports `deployed`, then `in sync`.
+> - Observed: `pi -e <extension> -p` and `opencode run` (with `OPENCODE_CONFIG_DIR` holding the plugin) each echoed a line a stand-in `dotf` printed. agy was not launched: whether it shows the hook's `systemMessage` to the model is AC9's observation, and agy leaves `carrierGaps` on the documented contract until then.
+> - agy injects the whole brief, as pi and opencode do, not only the line. A release that carries `--format agy-hook` must precede the next `dotf harness bind` on a machine with agy, or the bound hook fails on every turn.
 > - `carrierGaps` is empty. `TestSessionLineCarriersInjectTheBriefAndSurviveAMissingDotf` runs both TypeScript sources under node with a stand-in dotf.
 
 ### Slice D1: `lane next` without herdr (AC5)
