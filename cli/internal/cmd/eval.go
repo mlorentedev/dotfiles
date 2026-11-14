@@ -3,6 +3,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -53,31 +55,43 @@ func newEvalCheckCmd() *cobra.Command {
 				c.PrintErrln("eval check:", err)
 				return err
 			}
-			out := c.OutOrStdout()
-			if len(results) == 0 {
-				_, err := fmt.Fprintln(out, "[OK] no eval cases in this repository")
+			report, failed := renderEvalCheck(results)
+			if _, err := io.WriteString(c.OutOrStdout(), report); err != nil {
 				return err
 			}
-			failed := 0
-			for _, r := range results {
-				if len(r.Problems) == 0 {
-					fmt.Fprintf(out, "[OK]   %s\n", r.Path)
-					continue
-				}
-				failed++
-				fmt.Fprintf(out, "[FAIL] %s\n", r.Path)
-				for _, p := range r.Problems {
-					fmt.Fprintf(out, "         %s\n", p)
-				}
-			}
 			if failed > 0 {
-				fmt.Fprintf(out, "%d of %d cases failed\n", failed, len(results))
 				return errEvalCheck
 			}
-			_, err = fmt.Fprintf(out, "%d cases checked\n", len(results))
-			return err
+			return nil
 		},
 	}
 	c.Flags().StringVar(&root, "repo-root", "", "repository to check (default: the current one)")
 	return c
+}
+
+// renderEvalCheck formats the check report and counts the failed cases.
+func renderEvalCheck(results []evals.CheckResult) (string, int) {
+	var b strings.Builder
+	if len(results) == 0 {
+		b.WriteString("[OK] no eval cases in this repository\n")
+		return b.String(), 0
+	}
+	failed := 0
+	for _, r := range results {
+		if len(r.Problems) == 0 {
+			fmt.Fprintf(&b, "[OK]   %s\n", r.Path)
+			continue
+		}
+		failed++
+		fmt.Fprintf(&b, "[FAIL] %s\n", r.Path)
+		for _, p := range r.Problems {
+			fmt.Fprintf(&b, "         %s\n", p)
+		}
+	}
+	if failed > 0 {
+		fmt.Fprintf(&b, "%d of %d cases failed\n", failed, len(results))
+	} else {
+		fmt.Fprintf(&b, "%d cases checked\n", len(results))
+	}
+	return b.String(), failed
 }

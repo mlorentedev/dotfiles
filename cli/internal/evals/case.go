@@ -20,7 +20,7 @@ import (
 const CaseSchemaFile = "harness/evals/case.schema.json"
 
 // The embedded schema is a build-time copy of harness/evals/case.schema.json:
-// go:embed cannot reach harness/ from here, and `dotf eval check` must validate
+// an embed directive cannot reach harness/ from here, and `dotf eval check` must validate
 // cases in any repository at the released version without vendoring a copy.
 // TestEmbeddedCaseSchemaEqualsTheRepoSchema holds the two equal.
 //

@@ -49,26 +49,47 @@ func Check(root string) ([]CheckResult, error) {
 	return results, nil
 }
 
-// casePaths lists the case files under root, sorted, slash-separated.
+// casePaths lists the case files under root, sorted, slash-separated. An
+// absent case directory holds no cases; any other read error is returned,
+// because a directory that cannot be read would otherwise check clean.
 func casePaths(root string) ([]string, error) {
 	var out []string
-	replay, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(ReplayCaseDir), "*.json"))
+	replay, err := readDirIfExists(filepath.Join(root, filepath.FromSlash(ReplayCaseDir)))
 	if err != nil {
 		return nil, err
 	}
-	planted, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(PlantedCaseDir), "*", "case.json"))
+	for _, e := range replay {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
+			out = append(out, ReplayCaseDir+"/"+e.Name())
+		}
+	}
+	planted, err := readDirIfExists(filepath.Join(root, filepath.FromSlash(PlantedCaseDir)))
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range append(replay, planted...) {
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
+	for _, e := range planted {
+		if !e.IsDir() {
+			continue
+		}
+		rel := PlantedCaseDir + "/" + e.Name() + "/case.json"
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
 			return nil, err
 		}
-		out = append(out, filepath.ToSlash(rel))
+		out = append(out, rel)
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+func readDirIfExists(dir string) ([]os.DirEntry, error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return entries, err
 }
 
 // LoadCase reads, validates and decodes one case file.
