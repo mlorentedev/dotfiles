@@ -33,7 +33,6 @@ owner: manu
 
 > Slice A as built (for the slices that follow):
 > - `lane init` keeps `--write-marker`, which writes `.dotf/lanes.json` for the commit that declares a repository. Without the flag, init writes neither the marker nor the record.
-> - Slice F: the marker findings in `cli/internal/lane/audit.go` still say "run dotf lane init to rewrite the marker"; the repair is now `dotf lane init --write-marker`.
 > - Plan and apply agree, including for a lane that lacks a lease or its identity record; a lane path another repository occupies is a converge skip carrying the repair, not a failure.
 
 ### Slice B: the guard arms from the activation record (AC2, #3437, #3438)

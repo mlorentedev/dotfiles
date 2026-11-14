@@ -202,21 +202,21 @@ func parseMarker(raw []byte) (lanesMarker, []Finding) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&m); err != nil {
-		return m, []Finding{{LanesMarkerFile, "does not parse: " + err.Error(), "run dotf lane init to rewrite it, then commit the marker"}}
+		return m, []Finding{{LanesMarkerFile, "does not parse: " + err.Error(), "run dotf lane init --write-marker to rewrite it, then commit the marker"}}
 	}
 	if dec.More() {
-		return m, []Finding{{LanesMarkerFile, "carries trailing data after the object", "run dotf lane init to rewrite it, then commit the marker"}}
+		return m, []Finding{{LanesMarkerFile, "carries trailing data after the object", "run dotf lane init --write-marker to rewrite it, then commit the marker"}}
 	}
 	var out []Finding
 	if m.Version != 1 {
-		out = append(out, Finding{"version", fmt.Sprintf("is %d, expected 1", m.Version), "run dotf lane init to rewrite the marker"})
+		out = append(out, Finding{"version", fmt.Sprintf("is %d, expected 1", m.Version), "run dotf lane init --write-marker to rewrite the marker"})
 	}
-	lanes := validateNames("canonical_lanes", m.CanonicalLanes, "run dotf lane init to rewrite the marker")
+	lanes := validateNames("canonical_lanes", m.CanonicalLanes, "run dotf lane init --write-marker to rewrite the marker")
 	if len(lanes) == 0 && !sameSet(m.CanonicalLanes, CanonicalLanes) {
-		lanes = append(lanes, Finding{"canonical_lanes", fmt.Sprintf("declares %v, which differs from the lanes this dotf provisions %v", m.CanonicalLanes, CanonicalLanes), "run dotf lane init to rewrite the marker"})
+		lanes = append(lanes, Finding{"canonical_lanes", fmt.Sprintf("declares %v, which differs from the lanes this dotf provisions %v", m.CanonicalLanes, CanonicalLanes), "run dotf lane init --write-marker to rewrite the marker"})
 	}
 	out = append(out, lanes...)
-	out = append(out, validateNames("third_party_roots", m.ThirdPartyRoots, "edit "+LanesMarkerFile+" by hand (directory names only), then run dotf lane init")...)
+	out = append(out, validateNames("third_party_roots", m.ThirdPartyRoots, "edit "+LanesMarkerFile+" by hand (directory names only), then commit it")...)
 	return m, out
 }
 
