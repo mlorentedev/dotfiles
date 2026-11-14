@@ -55,8 +55,8 @@ After this spec:
 
 ## Acceptance criteria
 
-- [ ] AC1. `harness/evals/case.schema.json` exists and every case under `.dotf/evals/cases/` validates against it, including a `repo` field. A replay case with no confirmed finding in `expected` is rejected. At least 5 `replay` and 2 `planted` cases exist for `role: spec-reviewer`.
-- [ ] AC2. `dotf eval check` (exercised by a Go test and run in CI) grades every case against its own `source_review` (replay) or recorded reference answer (planted) and asserts full recall over `expected` with zero decoy hits. A key whose anchors no longer match fails the test.
+- [x] AC1. `harness/evals/case.schema.json` exists and every case under `.dotf/evals/cases/` and `harness/evals/planted/*/case.json` validates against it, including a `repo` field. A replay case with no confirmed finding in `expected` is rejected. At least 5 `replay` and 2 `planted` cases exist for `role: spec-reviewer`.
+- [x] AC2. `dotf eval check` (exercised by a Go test and run in CI) grades every case against its own `source_review` (replay) or recorded reference answer (planted) and asserts full recall over `expected`, every `optional` entry matched, no decoy hit on a planted reference, and every decoy and noise entry matching its recorded sample. A key whose anchors no longer match fails the test.
 - [ ] AC3. A replay of a case resolves its `reviewed_sha`, fetching `fetch_ref` when absent, and checks it out detached outside the repository. A case whose SHA cannot be resolved exits non-zero naming the case, and is not scored.
 - [ ] AC4. The eval slot launches a candidate from `harness/evals/candidates.json` with an explicit base. It never reads the pool, and it writes only to the run directory. A test asserts that `checkReviewGate` refuses an eval record placed in a spec folder.
 - [ ] AC5. The grader reports, per run: completion class, format validity, verdict match, recall, decoy hits, unadjudicated rows, duration and tokens. An unparseable answer is a format failure, not zero findings.
