@@ -144,7 +144,7 @@
       "claude": "opus",
       "copilot": "claude-opus-5",
       "gemini": "gemini-4-argon-high",
-      "$comment_gemini": "Gemini 4 Argon fills the Pro slot: `agy models` (agy 1.5.8, 2026-11-14) serves gemini-4-argon-{low,medium,high}; Argon at High passed the reviewer pool's admission bar in 50 s (#3471), though the pool's Google arm is Hydrogen (#3476): this tier is agy's interactive top, not the review gate. From 2026-10 to 2026-11-14 agy served no Pro tier, so top named the mid id, gemini-3.8-flash-high; the older gemini-3.1-pro-high was rejected at startup (#2385, #902)."
+      "$comment_gemini": "Gemini 4 Argon fills the Pro slot: `agy models` (agy 1.5.8, 2026-11-14) serves gemini-4-argon-{low,medium,high}; Argon at High cleared the first bar of the reviewer pool's admission, the planted defect, in 50 s (#3471); it is not admitted to the pool, whose Google arm is Hydrogen on both bars (#3476, #3482): this tier is agy's interactive top, not the review gate. From 2026-10 to 2026-11-14 agy served no Pro tier, so top named the mid id, gemini-3.8-flash-high; the older gemini-3.1-pro-high was rejected at startup (#2385, #902)."
     },
     "mid": {
       "claude": "sonnet",

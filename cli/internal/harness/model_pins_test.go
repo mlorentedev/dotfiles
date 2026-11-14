@@ -336,8 +336,10 @@ func TestDeclaredSuffixIsSpellingNotPartOfTheID(t *testing.T) {
 }
 
 // agy writes the display name its model picker shows, while `agy --model`
-// takes the id. The pairs below are the gemini rows of `agy models`, measured
-// 2026-10-01 (3.x) and 2026-11-14 (Gemini 4, agy 1.5.8); the rule holds for
+// takes the id. The pairs below are gemini rows of `agy models`, measured
+// 2026-10-01 (3.x, historical: the catalog no longer serves 3.7, 3.6 or 3.1)
+// and 2026-11-14 (Gemini 4, agy 1.5.8); the rule is a string transform, so the
+// retired rows still pin it. The rule holds for
 // that family only (`Claude Sonnet 4.6 (Thinking)` is `claude-sonnet-4-6`,
 // `Orchestrator (Argon)` is `gemini-pro-orchestrator-g1-pro`), which is why a
 // pin declares it rather than the guard applying it everywhere.
@@ -430,5 +432,56 @@ func TestStripJSONCommentsLeavesStringsAlone(t *testing.T) {
 				t.Fatalf("stripJSONComments(%q) = %q, want %q", c.in, got, c.want)
 			}
 		})
+	}
+}
+
+// The agy seed is the mid tier, not merely a declared model. AGY.md states the
+// seed's `model` is `tiers.mid.gemini`; until AI-057 the top and mid Gemini
+// tiers named one id, so the claim was vacuous and nothing guarded it. With two
+// distinct tiers a seed moved to the top one still resolves in the map, which
+// is all TestEveryRepoRoutingPinResolvesInTheMap checks (AI-057 review,
+// finding 1): this pins the tier.
+func TestAgySeedModelIsTheMidGeminiTier(t *testing.T) {
+	root := repoRootForTest(t)
+	pins, err := LoadModelPins(root)
+	if err != nil {
+		t.Fatalf("registry does not load: %v", err)
+	}
+	m, err := LoadModelMap(root)
+	if err != nil {
+		t.Fatalf("model map does not load: %v", err)
+	}
+	mid, err := ResolveTier(m, "mid", "gemini")
+	if err != nil {
+		t.Fatalf("ResolveTier(mid, gemini): %v", err)
+	}
+	checked := 0
+	for _, site := range pins.Sites {
+		if site.File != "ai/agy/settings.json" {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(root, site.File))
+		if err != nil {
+			t.Fatalf("%s: %v", site.File, err)
+		}
+		for _, p := range site.Pins {
+			if p.ID != "agy-model" {
+				continue
+			}
+			values, err := Extract(p, content)
+			if err != nil {
+				t.Fatalf("%s: %v", site.File, err)
+			}
+			for _, raw := range values {
+				checked++
+				if got, want := Normalize(p, raw), "gemini:"+mid; got != want {
+					t.Errorf("%s pin %q: %q normalizes to %q, want the mid tier %q (AGY.md binds the seed to tiers.mid.gemini)",
+						site.File, p.ID, raw, got, want)
+				}
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("checked 0 values of the agy-model pin — a sweep that inspects nothing reports clean")
 	}
 }
