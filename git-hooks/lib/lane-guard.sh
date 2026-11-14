@@ -107,12 +107,14 @@ for root in $third_party_roots; do
 done
 
 # epoch_of prints the Unix time of an RFC 3339 timestamp, as dotf writes it into
-# the lease (local zone: "Z" or an offset, optional fraction), or nothing when it
-# does not parse. Pure arithmetic: `date -d` is GNU-only and `date -j` BSD-only.
+# the lease (local zone: "Z" or an offset, optional fraction). It fails (status
+# 1) when the text is not that form, and prints nothing, with status 0, for a
+# year before 1970, which is how dotf writes "no expiry" (the zero time). Pure
+# arithmetic: `date -d` is GNU-only and `date -j` BSD-only.
 # The days come from the proleptic Gregorian calendar (Hinnant's days_from_civil).
 epoch_of() {
   parts="$(printf '%s' "$1" | sed -nE 's/^([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?(Z|z|[+-][0-9]{2}:[0-9]{2})$/\1 \2 \3 \4 \5 \6 \8/p')"
-  [ -n "$parts" ] || return 0
+  [ -n "$parts" ] || return 1
   IFS=' ' read -r ey em ed eh emi es ez <<PARTS
 $parts
 PARTS
@@ -141,11 +143,17 @@ PARTS
 # warn_if_lease_expired warns, and never blocks, when the lease has run out: the
 # work it claimed may be over, and sweep may reap or park the worktree under
 # whoever is committing in it (#3438). A lease without an expiry, or whose expiry
-# is the zero time, has not expired.
+# is the zero time, has not expired. An expiry in a form epoch_of cannot read is
+# not "no expiry": staying silent for it would hide every lease written in that
+# form, so it warns and is treated as expired.
 warn_if_lease_expired() {
   expires="$(sed -n 's/.*"lease_expires_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$lease" 2>/dev/null | head -n 1)"
   [ -n "$expires" ] || return 0
-  expires_at="$(epoch_of "$expires")"
+  if ! expires_at="$(epoch_of "$expires")"; then
+    echo "WARN: $top: lease expiry $expires is not RFC 3339, so the lease is treated as expired." >&2
+    echo "FIX: dotf worktree done $top once its branch landed (a lane: dotf lane park <lane>), or dotf worktree adopt $top for a new lease" >&2
+    return 0
+  fi
   [ -n "$expires_at" ] || return 0
   if [ "$expires_at" -le "$(date +%s)" ]; then
     echo "WARN: $top: lease expired $expires, so sweep may reap or park it under whoever works there." >&2

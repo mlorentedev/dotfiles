@@ -140,7 +140,7 @@ Rule summary:
 | 6b | Detached HEAD at the main checkout, no lease | **blocked** |
 | 6c | Detached HEAD in a linked worktree, no lease | **blocked**; recover with `dotf worktree adopt` (keeps the worktree) or `git switch -c <type>/<issue>-<slug>` |
 
-After rule 5 reads the lease, an expired `lease_expires_at` (compared as an instant, across UTC offsets) prints a `WARN`/`FIX` pair on stderr and never blocks (#3438): the commit goes through, and `dotf lane doctor` reports the same lease.
+After rule 5 reads the lease, an expired `lease_expires_at` (compared as an instant, across UTC offsets) prints a `WARN`/`FIX` pair on stderr and never blocks (#3438); an expiry the guard cannot read as RFC 3339 warns the same way and is treated as expired, never as "no expiry": the commit goes through, and `dotf lane doctor` reports the same lease.
 
 The lease is one resolved path for both rules: `$git_dir/dotf-worktree.json`
 first, the legacy `$top/.dotf-worktree.json` second, the order `dotf` reads

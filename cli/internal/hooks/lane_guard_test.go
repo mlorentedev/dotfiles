@@ -583,3 +583,40 @@ func TestPreCommitLaneGuard_ExpiredLeaseWarnsAndDoesNotBlock(t *testing.T) {
 		})
 	}
 }
+
+// An expiry the guard cannot read is not "no expiry": a parser that returns
+// nothing for a form it does not know would stay silent for every lease written
+// in it, the silent negative of lesson 600. The guard warns, treats the lease as
+// expired, and still never blocks.
+func TestPreCommitLaneGuard_UnreadableLeaseExpiryWarnsAndDoesNotBlock(t *testing.T) {
+	script := findLaneGuardScript(t)
+	repo := filepath.Join(t.TempDir(), "armed")
+	initGitRepoForLaneGuard(t, repo, "main")
+	armLaneGuard(t, repo)
+	wt := filepath.Join(t.TempDir(), "review-wt")
+	gitInLaneGuardTest(t, repo, "worktree", "add", "-q", "--detach", wt, "HEAD")
+	lease := filepath.Join(gitInLaneGuardTest(t, wt, "rev-parse", "--absolute-git-dir"), "dotf-worktree.json")
+
+	for name, expires := range map[string]string{
+		"space instead of T, no zone": "2026-11-14 06:00:00",
+		"comma fraction":              "2099-11-14T06:00:00,5Z",
+		"date only":                   "2099-11-14",
+		"not a time":                  "tomorrow",
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := `{"lane":"","state":"ACTIVE","lease_expires_at":"` + expires + `"}`
+			if err := os.WriteFile(lease, []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			out, err := runLaneGuardInDir(t, script, wt)
+			if err != nil {
+				t.Fatalf("a lease must never block a commit here, got err=%v out=%s", err, out)
+			}
+			for _, want := range []string{"WARN:", "lease expiry " + expires, "not RFC 3339", "dotf worktree"} {
+				if !strings.Contains(out, want) {
+					t.Errorf("warning lacks %q:\n%s", want, out)
+				}
+			}
+		})
+	}
+}
