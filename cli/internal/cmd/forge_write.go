@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -78,8 +79,10 @@ func runGH(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
 	c := exec.CommandContext(ctx, "gh", args...)
 	c.Stdin = strings.NewReader(string(stdin))
 	out, err := c.Output()
+	err = deadlineErr(ctx, forgeWriteTimeout, err)
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
 			return out, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(ee.Stderr)))
 		}
 	}

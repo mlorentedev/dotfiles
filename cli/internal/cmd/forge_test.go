@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // forgeSchemaPath is resolved at package init, while the working directory is
@@ -205,5 +207,23 @@ func TestForgeProtectionApplyUnmergedNeedsDryRun(t *testing.T) {
 	}
 	if asked {
 		t.Error("a refused apply must not ask the forge")
+	}
+}
+
+// A gh call killed at its deadline reports "signal: killed", which names
+// neither the deadline nor the cause; the runner says it timed out (#3434).
+func TestDeadlineErrNamesTheTimeout(t *testing.T) {
+	expired, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+	<-expired.Done()
+	killed := errors.New("signal: killed")
+	if got := deadlineErr(expired, 20*time.Second, killed); got == nil || got.Error() != "timed out after 20s: signal: killed" || !errors.Is(got, killed) {
+		t.Fatalf("an expired call must name the timeout and keep its cause, got %v", got)
+	}
+	if got := deadlineErr(context.Background(), 20*time.Second, killed); got != killed {
+		t.Fatalf("a call that failed before its deadline keeps its own error, got %v", got)
+	}
+	if got := deadlineErr(expired, 20*time.Second, nil); got != nil {
+		t.Fatalf("a call that succeeded stays a success, got %v", got)
 	}
 }

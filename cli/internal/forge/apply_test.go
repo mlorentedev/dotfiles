@@ -18,7 +18,7 @@ type forgeFake struct {
 	live       string            // current GET body; "" means "Branch not protected"
 	reported   map[string]string // head sha -> check-runs JSON
 	statuses   map[string]string // head sha -> combined status JSON
-	pulls      string            // closed pulls JSON
+	pulls      string            // merged pull requests, as the GraphQL query answers
 	ignorePut  bool
 	puts       []map[string]any
 	signatures []string // methods sent to required_signatures
@@ -30,6 +30,9 @@ const dotRepo = "mlorentedev/dotfiles"
 func (f *forgeFake) run(args ...string) (string, string, error) {
 	f.calls = append(f.calls, strings.Join(args, " "))
 	method, path, input := "GET", "", ""
+	if len(args) > 1 && args[1] == "graphql" {
+		return f.pulls, "", nil
+	}
 	for i := 1; i < len(args); i++ {
 		switch args[i] {
 		case "-X":
@@ -53,8 +56,6 @@ func (f *forgeFake) run(args ...string) (string, string, error) {
 			return `{"message":"Branch not protected","status":"404"}`, "gh: Branch not protected (HTTP 404)\n", errors.New("exit status 1")
 		}
 		return f.live, "", nil
-	case strings.Contains(path, "/pulls?"):
-		return f.pulls, "", nil
 	case strings.HasSuffix(path, "/check-runs?per_page=100"):
 		return orEmpty(f.reported[shaOf(path)], `{"check_runs":[]}`), "", nil
 	case strings.HasSuffix(path, "/status"):
@@ -131,13 +132,18 @@ func orEmpty(s, empty string) string {
 }
 
 // mergedPulls renders n merged pull requests with heads sha0..sha<n-1>, sha0
-// merged most recently, plus one closed-unmerged PR that must never count.
+// merged most recently, plus a node with no merge time that must never count.
 func mergedPulls(n int) string {
-	items := []string{`{"merged_at":null,"head":{"sha":"unmerged"}}`}
+	nodes := []string{`{"mergedAt":null,"headRefOid":"unmerged"}`}
 	for i := 0; i < n; i++ {
-		items = append(items, fmt.Sprintf(`{"merged_at":"2026-09-%02dT00:00:00Z","head":{"sha":"sha%d"}}`, 28-i, i))
+		nodes = append(nodes, fmt.Sprintf(`{"mergedAt":"2026-09-%02dT00:00:00Z","headRefOid":"sha%d"}`, 28-i, i))
 	}
-	return "[" + strings.Join(items, ",") + "]"
+	return pullNodes(nodes...)
+}
+
+// pullNodes wraps pull request nodes in the GraphQL answer's shape.
+func pullNodes(nodes ...string) string {
+	return `{"data":{"repository":{"pullRequests":{"nodes":[` + strings.Join(nodes, ",") + `]}}}}`
 }
 
 func checkRun(name string, app int) string {
@@ -225,8 +231,11 @@ func TestProtectionApplyRefusesUnreportedContext(t *testing.T) {
 // The list comes in update order. An old pull request that was only commented
 // on recently sits first there, and must not stand in for a recent merge.
 func TestProtectionApplyWindowIsTheNewestMergesNotTheNewestUpdates(t *testing.T) {
-	pulls := `[{"merged_at":"2026-01-01T00:00:00Z","head":{"sha":"old"}}` + strings.TrimPrefix(mergedPulls(5), "[")
-	pulls = strings.Replace(pulls, `}{`, `},{`, 1)
+	nodes := []string{`{"mergedAt":"2026-01-01T00:00:00Z","headRefOid":"old"}`}
+	for i := 0; i < 5; i++ {
+		nodes = append(nodes, fmt.Sprintf(`{"mergedAt":"2026-09-%02dT00:00:00Z","headRefOid":"sha%d"}`, 28-i, i))
+	}
+	pulls := pullNodes(nodes...)
 	f := &forgeFake{t: t, live: string(fixture(t, "get-dotfiles.json")), pulls: pulls,
 		reported: map[string]string{"old": checkRun("spec-gate", 15368)}}
 	if r := ApplyRepo(dotRepo, withSpecGate(t), f.run, false); r.Status != ApplyRefused {
@@ -253,7 +262,7 @@ func TestProtectionApplyPreflightsOnlyNewContexts(t *testing.T) {
 		t.Fatalf("a change that adds no context needs no report, got %+v", r)
 	}
 	for _, c := range f.calls {
-		if strings.Contains(c, "/pulls?") {
+		if strings.Contains(c, "graphql") {
 			t.Fatalf("no new context, so no pull request should be read: %v", f.calls)
 		}
 	}
@@ -319,5 +328,25 @@ func TestProtectionApplyUnanswerableReadFails(t *testing.T) {
 	g := &ghFake{}
 	if r := ApplyRepo(dotRepo, declaredLikeLive(t), g.run, false); r.Status != ApplyFailed {
 		t.Fatalf("a read that could not be answered must fail, never pass, got %+v", r)
+	}
+}
+
+// The query asks for merged pull requests into the declared branch only, so
+// the answer is a few hundred bytes, not every closed pull request's full
+// repository payload (#3434).
+func TestProtectionApplyQueriesOnlyMergedPullRequestsOfTheBranch(t *testing.T) {
+	f := &forgeFake{t: t, live: string(fixture(t, "get-dotfiles.json")), pulls: mergedPulls(5),
+		reported: map[string]string{"sha0": checkRun("spec-gate", 15368)}}
+	ApplyRepo(dotRepo, withSpecGate(t), f.run, false)
+	var q string
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "api graphql") {
+			q = c
+		}
+	}
+	for _, want := range []string{"states: MERGED", "baseRefName: $base", "mergedAt", "headRefOid", "owner=mlorentedev", "name=dotfiles", "base=main"} {
+		if !strings.Contains(q, want) {
+			t.Fatalf("query lacks %q: %s", want, q)
+		}
 	}
 }
