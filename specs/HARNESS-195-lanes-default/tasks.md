@@ -90,10 +90,12 @@ owner: manu
 - [x] [AC7] Expired lease and deployed-guard drift: failing tests, then implementation.
 
 ### Slice G: doctrine and activation (AC8, AC9)
-- [ ] Prerequisite: #3456 (harness re-rendered from the vault) merged, so the doctrine PR renders only its own change.
-- [ ] [AC8] Rename the tiers in AGENTS.md and in `cli/internal/initrepo/templates/agents-spec-section.md` (the Lane Decisor rule becomes a tier rule). First check whether AGENTS.md is rendered from a vault source; if it is, edit the source. Update `using-git-worktrees`, `handoff` and `autopilot` in the vault source, then re-render. Add a test that fails if AGENTS.md calls a tier a "lane".
-- [ ] [AC8] Runbook `docs/runbooks/guide-persistent-named-lanes.md`: activation through converge, what the guard blocks, and recovery.
-- [ ] [AC8] The autopilot skill (`harness/skills/autopilot/SKILL.md`, vault-rendered) and `tests/guard-autopilot-lane-marker.bats` still decide by the marker (`if [ -f .dotf/lanes.json ]`); switch both to the activation record.
+- [x] Prerequisite: #3456 (harness re-rendered from the vault) merged, so the doctrine PR renders only its own change.
+- [x] [AC8] Rename the tiers in AGENTS.md and in `cli/internal/initrepo/templates/agents-spec-section.md` (the Lane Decisor rule becomes a tier rule). First check whether AGENTS.md is rendered from a vault source; if it is, edit the source. Update `using-git-worktrees`, `handoff` and `autopilot` in the vault source, then re-render. Add a test that fails if AGENTS.md calls a tier a "lane".
+- [x] [AC8] Runbook `docs/runbooks/guide-persistent-named-lanes.md`: activation through converge, what the guard blocks, and recovery.
+  As built: section 5.1 (session-start line to entrance, recovery by symptom); activation (section 6) and the blocked set (section 3) were already there from the earlier slices and are linked, not copied.
+- [x] [AC8] The autopilot skill (`harness/skills/autopilot/SKILL.md`, vault-rendered) and `tests/guard-autopilot-lane-marker.bats` still decide by the marker (`if [ -f .dotf/lanes.json ]`); switch both to the activation record.
+  As built (AC8): the vault source (commit 562d316b on vault master) carries the tier rename, the "Where work starts" paragraph and the three skill changes; `tests/guard-autopilot-lane-marker.bats` is renamed `tests/guard-autopilot-lane-record.bats` and reads `ActivationFile` from `cli/internal/lane/activate.go`. `TestNoTierIsCalledALane` (`cli/internal/initrepo/tier_naming_test.go`) fails when a paragraph naming a tier says "lane", in AGENTS.md and in the embedded template, and is non-vacuous (each document must contain such a paragraph). "Fast Lane" (the cognitive-load mode) is a different term and stays.
 - [ ] [AC9] PR adding `.dotf/lanes.json` to dotfiles (the switch). Then `dotf converge` on the Mac and each guest, and sweep the merged worktrees.
 - [ ] [AC9] Run a real session of each launchable agent per machine, and record the AC3 line in `verification.md`.
 

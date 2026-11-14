@@ -185,6 +185,36 @@ else routes to `fast-track-lane` then `feat-lane-secondary`. If every candidate 
 | Add a new session host | edit `third_party_roots`, commit, then `dotf converge --only lanes` | extended | **blocked** for that host only, once converge refreshed the record |
 | Repository this machine never activated (no record), the deploy clone included | — | any | allowed, guard inert |
 
+### 5.1 Where a session starts, and recovery
+
+Where the activation record exists, the session-start line (`dotf mem resume`,
+`dotf mem session-start`) says where the session stands, and the entrance is the
+same in every case: `dotf lane switch <branch>`, or `dotf lane next` for the next
+queued issue. `dotf worktree add` is for repositories that run no lanes; an agent
+that runs it in an active repository creates the fourth worktree the lanes exist
+to prevent. Autopilot and the `using-git-worktrees` skill decide on the record
+(the file `dotf-lanes-active` in the git common dir), not on `.dotf/lanes.json`
+and not on `.dotf/lane.json`, so they stay on `dotf worktree add` in a
+repository nobody activated here.
+
+| Session-start line | Standing | What to do |
+|---|---|---|
+| `lane <name> ACTIVE on <branch>` | in a lane, lease held | work; commits are allowed |
+| `lane <name> is PARKED: start with dotf lane switch <branch>` | in a lane nobody holds, or detached in one | `dotf lane switch <branch>`; commits here are blocked (rule 5a, 6c) |
+| `this repository runs lanes: start with dotf lane switch <branch>` | outside every lane (the main checkout, a third-party root) | `dotf lane switch <branch>`, then `cd` to the lane it prints; commits on `main` are blocked (rule 6a) |
+| no line | this machine runs no lanes here, or the lane state could not be read | check `<git common dir>/dotf-lanes-active`: absent means nothing lane-related applies; present means run `dotf lane doctor`, which names the read error |
+
+What the guard blocks is the table in section 3. Recovery, by symptom:
+
+| Symptom | Recovery |
+|---|---|
+| `direct commits on 'main' are blocked` | in the original checkout, `git stash push -u -m <tag>` (never a bare stash; the stack is shared) and note its SHA from `git stash list --format='%H %gs'`; `dotf lane switch <branch>` and `cd` to the lane; `git stash apply <sha>` there, then drop the entry |
+| `lane at <path> is PARKED` | `dotf lane switch <branch>` in that lane, or switch to a free one |
+| `WIP cap reached` from `lane switch` | park a finished lane (`dotf lane park <lane>`, or `dotf worktree done <branch>` once its PR merged); an unattended run ends with `parked(wip-cap)` instead of creating a worktree |
+| detached HEAD in a linked worktree | `dotf worktree adopt`, or `git switch -c <type>/<issue>-<slug>` |
+| expired lease (`WARN`, never blocks) | `dotf lane park <lane>` or `dotf worktree done <path>`; `dotf lane doctor` reports the same lease |
+| the guard blocks a repository that should be inert | the activation record exists: `rm <git common dir>/dotf-lanes-active` disarms this machine until the next `dotf converge --only lanes` |
+
 ## 6. Activation checklist (after the feature merges)
 
 The marker is deliberately **not** committed by the pull request that ships the
