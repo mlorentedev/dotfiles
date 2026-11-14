@@ -60,8 +60,8 @@ owner: manu
 - [ ] [AC6] #3430: check whether a lane-launched pane carries `HERDR_AGENT`. Set it in `Exec`'s environment if it does not.
 
 ### Slice F: doctor (AC7, #3327)
-- [ ] [P] [AC7] Apply the patch preserved on #3327 (detached worktree with no lease) with its tests.
-- [ ] [AC7] Expired lease and deployed-guard drift: failing tests, then implementation.
+- [x] [P] [AC7] Apply the patch preserved on #3327 (detached worktree with no lease) with its tests.
+- [x] [AC7] Expired lease and deployed-guard drift: failing tests, then implementation.
 
 ### Slice G: doctrine and activation (AC8, AC9)
 - [ ] Prerequisite: #3456 (harness re-rendered from the vault) merged, so the doctrine PR renders only its own change.

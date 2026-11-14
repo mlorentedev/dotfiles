@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
@@ -65,6 +66,146 @@ func TestAuditLanes_IsSilentOnACoherentRepository(t *testing.T) {
 	}
 	wantFindings(t, a, 0)
 }
+
+// A detached worktree with no lease is not drift, but the guard refuses its
+// commits the day the marker lands; the audit warns, naming the recovery, so
+// the owner sees it before then (#3436). Lanes, leased and branch worktrees
+// are not that state and stay out of it.
+func TestAuditLanes_WarnsOfLeaselessDetachedWorktrees(t *testing.T) {
+	repoDir, wtRoot := initialisedLaneRepo(t)
+	base := filepath.Join(wtRoot, "dotfiles")
+	bare := filepath.Join(base, "feat-scratch")
+	leased := filepath.Join(base, "feat-leased")
+	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", bare, "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "--detach", leased, "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/on-a-branch", filepath.Join(base, "feat-branch"), "HEAD")
+	if err := worktree.SaveMetadata(leased, worktree.Metadata{State: string(worktree.StateActive)}); err != nil {
+		t.Fatal(err)
+	}
+
+	a := audit(t, repoDir, wtRoot)
+	wantFindings(t, a, 0)
+	if len(a.Warnings) != 1 {
+		t.Fatalf("want one warning, for %s only, got %d: %+v", bare, len(a.Warnings), a.Warnings)
+	}
+	w := a.Warnings[0].Warning()
+	for _, want := range []string{"WARN:", "feat-scratch", "no lease", "dotf worktree adopt", "git switch -c"} {
+		if !strings.Contains(w, want) {
+			t.Errorf("warning does not mention %q:\n%s", want, w)
+		}
+	}
+}
+
+// An expired lease is not drift either: sweep may reap the worktree or park
+// the lane under its owner once the lease is past. The audit warns, naming the
+// command that ends the work, and leaves alone the leases that cannot expire
+// into trouble: a live one, a parked lane's (it carries no expiry) and a
+// worktree that has no lease at all.
+func TestAuditLanes_WarnsOfAnExpiredLease(t *testing.T) {
+	repoDir, wtRoot := initialisedLaneRepo(t)
+	base := filepath.Join(wtRoot, "dotfiles")
+	stale := filepath.Join(base, "feat-stale")
+	live := filepath.Join(base, "feat-live")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/stale", stale, "HEAD")
+	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/live", live, "HEAD")
+	// git answers with the physical path, which on macOS is not /var/...
+	stale, err := filepath.EvalSymlinks(stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	past, future := time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
+	for path, expires := range map[string]time.Time{stale: past, live: future} {
+		if err := worktree.SaveMetadata(path, worktree.Metadata{Issue: 1, LeaseExpiresAt: expires, ReapOK: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A lane in use whose lease ran out: the fix is to park it, not to remove it.
+	laneName := CanonicalLanes[0]
+	lanePath := filepath.Join(base, laneName)
+	if err := worktree.SaveMetadata(lanePath, worktree.Metadata{Lane: laneName, State: string(worktree.StateActive), Issue: 2, LeaseExpiresAt: past}); err != nil {
+		t.Fatal(err)
+	}
+
+	a := audit(t, repoDir, wtRoot)
+	wantFindings(t, a, 0)
+	var stalePath, lanePathWarning string
+	for _, w := range a.Warnings {
+		switch {
+		case strings.Contains(w.Subject, "feat-stale"):
+			stalePath = w.Warning()
+		case strings.Contains(w.Subject, laneName):
+			lanePathWarning = w.Warning()
+		default:
+			t.Errorf("unexpected warning (live, parked or unleased worktrees stay silent):\n%s", w.Warning())
+		}
+	}
+	for _, want := range []string{"WARN:", "lease expired", "dotf worktree done " + stale} {
+		if !strings.Contains(stalePath, want) {
+			t.Errorf("warning for a worktree lacks %q:\n%s", want, stalePath)
+		}
+	}
+	for _, want := range []string{"WARN:", "lease expired", "dotf lane park " + laneName} {
+		if !strings.Contains(lanePathWarning, want) {
+			t.Errorf("warning for a lane lacks %q:\n%s", want, lanePathWarning)
+		}
+	}
+}
+
+// The guard that runs is the copy deployed under DOTFILES_DIR, not the one in
+// the repository; a deploy that lags it keeps the old rules in force. The
+// warning names the command that redeploys. A repository without its own copy
+// has nothing to lag.
+func TestGuardDrift(t *testing.T) {
+	write := func(root, content string) {
+		t.Helper()
+		p := filepath.Join(root, "git-hooks", "lib", "lane-guard.sh")
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		name         string
+		repo, deploy *string
+		want         string
+	}{
+		{"identical copies", ptr("#!/bin/sh\nexit 0\n"), ptr("#!/bin/sh\nexit 0\n"), ""},
+		{"line endings alone are not drift", ptr("#!/bin/sh\nexit 0\n"), ptr("#!/bin/sh\r\nexit 0\r\n"), ""},
+		{"deployed copy lags", ptr("#!/bin/sh\nexit 1\n"), ptr("#!/bin/sh\nexit 0\n"), "differs"},
+		{"guard never deployed", ptr("#!/bin/sh\nexit 1\n"), nil, "not deployed"},
+		{"repository has no copy of its own", nil, ptr("#!/bin/sh\nexit 0\n"), ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, deploy := t.TempDir(), t.TempDir()
+			if tc.repo != nil {
+				write(repo, *tc.repo)
+			}
+			if tc.deploy != nil {
+				write(deploy, *tc.deploy)
+			}
+			got := GuardDrift(repo, deploy)
+			if tc.want == "" {
+				if len(got) != 0 {
+					t.Fatalf("want no warning, got %+v", got)
+				}
+				return
+			}
+			if len(got) != 1 {
+				t.Fatalf("want one warning, got %+v", got)
+			}
+			for _, want := range []string{"WARN:", tc.want, "dotf hooks install"} {
+				if !strings.Contains(got[0].Warning(), want) {
+					t.Errorf("warning lacks %q:\n%s", want, got[0].Warning())
+				}
+			}
+		})
+	}
+}
+
+func ptr(s string) *string { return &s }
 
 func TestAuditLanes_SeparatesNotInitialisedFromDrift(t *testing.T) {
 	t.Run("no marker is not lane-managed", func(t *testing.T) {
