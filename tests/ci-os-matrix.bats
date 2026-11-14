@@ -159,3 +159,52 @@ print(checks)
 sys.exit(0 if all(checks) else 1)'
     [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
+
+# The other half of CI-013's contract, "every push runs them" (#3446). A job
+# behind a job-level `changes` guard must still run on a push: either the `if:`
+# opens with the push disjunct, or the output it reads is true off a pull
+# request. Without it a documentation-only push to main skips the job, and main
+# has no merge gate to notice. Held for every Windows or macOS job, and for
+# every job ci-gate aggregates, since those block merges through it (CI-017).
+@test "CI-013: a job behind a changes guard still runs on every push" {
+    run _py '
+q = chr(39)
+push_if = f"github.event_name == {q}push{q} ||"
+push_out = f"github.event_name != {q}pull_request{q} ||"
+bad = []
+for wf_file in sorted(glob.glob(os.path.join(sys.argv[1], "*.yml"))):
+    name = os.path.basename(wf_file)
+    wf = load(name)
+    on = wf["on"]
+    events = [on] if isinstance(on, str) else list(on or [])
+    if "push" not in events:
+        continue
+    jobs = wf.get("jobs") or {}
+    aggregated = set((jobs.get("ci-gate") or {}).get("needs") or [])
+    outputs = (jobs.get("changes") or {}).get("outputs") or {}
+    for job_id, job in jobs.items():
+        cond = str(job.get("if", ""))
+        m = re.search(r"needs\.changes\.outputs\.(\w+)", cond)
+        if not m:
+            continue
+        host = str(job.get("runs-on", "")) + str((job.get("strategy") or {}).get("matrix", {}).get("os", ""))
+        if job_id not in aggregated and not any(k in host for k in ("windows", "macos")):
+            continue
+        if cond.strip().startswith(push_if) or push_out in str(outputs.get(m.group(1), "")):
+            continue
+        bad.append(f"{name}:{job_id} ({cond})")
+print("guarded jobs a push can skip:", bad)
+sys.exit(1 if bad else 0)'
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+# CI-017 (#3306, #3446): dotfiles' merge box requires ci.yml through its one
+# aggregate. Dropping `ci-gate` from the declaration, or re-adding a job it
+# aggregates, changes what blocks a merge; neither may pass CI silently.
+@test "CI-017: dotfiles requires ci-gate and none of the ci.yml jobs it aggregates" {
+    run _py '
+aggregated = set(load("ci.yml")["jobs"]["ci-gate"]["needs"])
+print("required:", sorted(REQUIRED), "aggregated and required:", sorted(REQUIRED & aggregated))
+sys.exit(0 if "ci-gate" in REQUIRED and not (REQUIRED & aggregated) else 1)'
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
