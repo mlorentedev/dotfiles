@@ -108,11 +108,6 @@ func TestAuditLanes_WarnsOfAnExpiredLease(t *testing.T) {
 	live := filepath.Join(base, "feat-live")
 	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/stale", stale, "HEAD")
 	runGitLaneTest(t, repoDir, "worktree", "add", "-b", "feat/live", live, "HEAD")
-	// git answers with the physical path, which on macOS is not /var/...
-	stale, err := filepath.EvalSymlinks(stale)
-	if err != nil {
-		t.Fatal(err)
-	}
 	past, future := time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
 	for path, expires := range map[string]time.Time{stale: past, live: future} {
 		if err := worktree.SaveMetadata(path, worktree.Metadata{Issue: 1, LeaseExpiresAt: expires, ReapOK: true}); err != nil {
@@ -128,18 +123,25 @@ func TestAuditLanes_WarnsOfAnExpiredLease(t *testing.T) {
 
 	a := audit(t, repoDir, wtRoot)
 	wantFindings(t, a, 0)
-	var stalePath, lanePathWarning string
+	var staleWarning, laneWarning Finding
 	for _, w := range a.Warnings {
 		switch {
 		case strings.Contains(w.Subject, "feat-stale"):
-			stalePath = w.Warning()
+			staleWarning = w
 		case strings.Contains(w.Subject, laneName):
-			lanePathWarning = w.Warning()
+			laneWarning = w
 		default:
 			t.Errorf("unexpected warning (live, parked or unleased worktrees stay silent):\n%s", w.Warning())
 		}
 	}
-	for _, want := range []string{"WARN:", "lease expired", "dotf worktree done " + stale} {
+	// The path git reports can differ in form from the one the test built
+	// (slashes, 8.3 names, /var against /private/var): the warning must name
+	// this worktree, and its FIX must repeat the path it reports.
+	if !samePath(staleWarning.Subject, stale) {
+		t.Errorf("warning is about %q, not %q", staleWarning.Subject, stale)
+	}
+	stalePath, lanePathWarning := staleWarning.Warning(), laneWarning.Warning()
+	for _, want := range []string{"WARN:", "lease expired", "FIX: dotf worktree done " + staleWarning.Subject + " "} {
 		if !strings.Contains(stalePath, want) {
 			t.Errorf("warning for a worktree lacks %q:\n%s", want, stalePath)
 		}
@@ -151,16 +153,17 @@ func TestAuditLanes_WarnsOfAnExpiredLease(t *testing.T) {
 	}
 }
 
-// The guard that runs is the copy under core.hooksPath, not the one in the
-// repository; a deploy that lags it keeps the old rules in force. The warning
-// names the command that redeploys. A repository without its own copy has
-// nothing to lag, and a hooksPath that is the checkout's own git-hooks is no
-// drift by construction.
+// The guard that runs is the one under the hooks directory git answers with:
+// core.hooksPath when set, $GIT_DIR/hooks otherwise. A deploy that lags the
+// repository's copy keeps the old rules in force; the warning names the command
+// that redeploys. A repository without its own copy has nothing to lag, and a
+// hooks directory that is the checkout's own git-hooks is no drift by
+// construction.
 func TestGuardDrift(t *testing.T) {
 	const current, stale = "#!/bin/sh\nexit 0\n", "#!/bin/sh\nexit 1\n"
-	write := func(root, content string) {
+	writeGuard := func(hooksDir, content string) {
 		t.Helper()
-		p := filepath.Join(root, "git-hooks", "lib", "lane-guard.sh")
+		p := filepath.Join(hooksDir, filepath.FromSlash(GuardRelPath))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -168,25 +171,40 @@ func TestGuardDrift(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// where says which directory the deployed copy is written to and which
+	// core.hooksPath git is given for it ("" leaves it unset).
+	type place struct{ dir, hooksPath string }
+	inDeploy := func(repo, deploy string) place { d := filepath.Join(deploy, "git-hooks"); return place{d, d} }
 	cases := []struct {
-		name         string
-		repo, deploy *string
-		hooksPath    func(repo, deploy string) string // empty leaves core.hooksPath unset
-		want         string
+		name     string
+		repo     *string
+		deployed *string
+		where    func(repo, deploy string) place
+		want     string
 	}{
-		{"identical copies", ptr(current), ptr(current), deployed, ""},
-		{"line endings alone are not drift", ptr(current), ptr("#!/bin/sh\r\nexit 0\r\n"), deployed, ""},
-		{"deployed copy lags", ptr(current), ptr(stale), deployed, "differs"},
-		{"guard missing under the hooks path", ptr(current), nil, deployed, "not deployed"},
-		{"core.hooksPath unset", ptr(current), ptr(current), func(string, string) string { return "" }, "unset"},
-		{"relative hooks path resolves from the repository", ptr(current), ptr(stale),
-			func(repo, deploy string) string {
-				rel, _ := filepath.Rel(repo, filepath.Join(deploy, "git-hooks"))
-				return rel
-			}, "differs"},
-		{"hooks path is the checkout's own git-hooks", ptr(current), nil,
-			func(repo, _ string) string { return filepath.Join(repo, "git-hooks") }, ""},
-		{"repository has no copy of its own", nil, ptr(current), deployed, ""},
+		{"identical copies", ptr(current), ptr(current), inDeploy, ""},
+		{"line endings alone are not drift", ptr(current), ptr("#!/bin/sh\r\nexit 0\r\n"), inDeploy, ""},
+		{"deployed copy lags", ptr(current), ptr(stale), inDeploy, "differs"},
+		{"guard missing under the hooks path", ptr(current), nil, inDeploy, "not deployed"},
+		{"relative hooks path resolves from the repository", ptr(current), ptr(stale), func(repo, deploy string) place {
+			d := filepath.Join(deploy, "git-hooks")
+			rel, _ := filepath.Rel(repo, d)
+			return place{d, rel}
+		}, "differs"},
+		{"hooks path is the checkout's own git-hooks", ptr(current), nil, func(repo, _ string) place {
+			d := filepath.Join(repo, "git-hooks")
+			return place{d, d}
+		}, ""},
+		{"hooks path unset, guard in .git/hooks is current", ptr(current), ptr(current), func(repo, _ string) place {
+			return place{filepath.Join(repo, ".git", "hooks"), ""}
+		}, ""},
+		{"hooks path unset, guard in .git/hooks lags", ptr(current), ptr(stale), func(repo, _ string) place {
+			return place{filepath.Join(repo, ".git", "hooks"), ""}
+		}, "differs"},
+		{"hooks path unset, nothing deployed", ptr(current), nil, func(repo, _ string) place {
+			return place{filepath.Join(repo, ".git", "hooks"), ""}
+		}, "not deployed"},
+		{"repository has no copy of its own", nil, ptr(current), inDeploy, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -196,15 +214,19 @@ func TestGuardDrift(t *testing.T) {
 			repo, deploy := t.TempDir(), t.TempDir()
 			runGitLaneTest(t, repo, "init", "-b", "main")
 			if tc.repo != nil {
-				write(repo, *tc.repo)
+				writeGuard(filepath.Join(repo, "git-hooks"), *tc.repo)
 			}
-			if tc.deploy != nil {
-				write(deploy, *tc.deploy)
+			w := tc.where(repo, deploy)
+			if tc.deployed != nil {
+				writeGuard(w.dir, *tc.deployed)
 			}
-			if hp := tc.hooksPath(repo, deploy); hp != "" {
-				runGitLaneTest(t, repo, "config", "core.hooksPath", hp)
+			if w.hooksPath != "" {
+				runGitLaneTest(t, repo, "config", "core.hooksPath", w.hooksPath)
 			}
-			got := GuardDrift(repo)
+			got, err := GuardDrift(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if tc.want == "" {
 				if len(got) != 0 {
 					t.Fatalf("want no warning, got %+v", got)
@@ -223,7 +245,25 @@ func TestGuardDrift(t *testing.T) {
 	}
 }
 
-func deployed(_, deploy string) string { return filepath.Join(deploy, "git-hooks") }
+// When git cannot say where hooks run from, the answer is an error that names
+// the read, not "no guard deployed": a wrong guess would tell the owner to
+// redeploy what is already there.
+func TestGuardDrift_ReportsAHooksPathGitCannotRead(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	notARepo := t.TempDir()
+	p := filepath.Join(notARepo, "git-hooks", filepath.FromSlash(GuardRelPath))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := GuardDrift(notARepo)
+	if err == nil || !strings.Contains(err.Error(), "cannot read the hooks path") {
+		t.Fatalf("want a hooks path read error, got warnings=%+v err=%v", got, err)
+	}
+}
 
 func ptr(s string) *string { return &s }
 

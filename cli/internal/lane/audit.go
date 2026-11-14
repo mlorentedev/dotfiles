@@ -102,11 +102,11 @@ func AuditLanes(repoRoot, worktreeRoot string) (Audit, error) {
 func leaseWarnings(absRepo string, records map[string][]laneRecord, now time.Time) ([]Finding, error) {
 	out, err := exec.Command("git", "-C", absRepo, "worktree", "list", "--porcelain").Output()
 	if err != nil {
-		return nil, fmt.Errorf("lane doctor: listing the worktrees of %s: %w", absRepo, err)
+		return nil, fmt.Errorf("listing the worktrees of %s: %w", absRepo, err)
 	}
 	linked, err := worktree.LinkedWorktrees(string(out))
 	if err != nil {
-		return nil, fmt.Errorf("lane doctor: reading the worktree list of %s: %w", absRepo, err)
+		return nil, fmt.Errorf("reading the worktree list of %s: %w", absRepo, err)
 	}
 	var lanes []string
 	for _, rs := range records {

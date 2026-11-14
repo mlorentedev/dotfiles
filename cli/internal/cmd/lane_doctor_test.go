@@ -117,7 +117,7 @@ func TestLaneDoctor_WarnsOfADriftedDeployedGuardWithoutFailing(t *testing.T) {
 		t.Fatalf("git config: %v\n%s", err, out)
 	}
 	for root, content := range map[string]string{repo: "new\n", deploy: "old\n"} {
-		p := filepath.Join(root, "git-hooks", "lib", "lane-guard.sh")
+		p := filepath.Join(root, "git-hooks", filepath.FromSlash(lane.GuardRelPath))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
