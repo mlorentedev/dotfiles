@@ -4,6 +4,7 @@
 # not just presence.
 
 load 'lib/refute'
+load 'lib/mise-owned'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -19,8 +20,8 @@ setup() {
     grep -q "OpenCode (secondary AI coding agent" "$SETUP_SCRIPT"
 }
 
-@test "opencode is a packages.json catalog tool (npm) and setup-linux.sh carries no install block (AI-034, ADR-036)" {
-    jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm" and .source.package=="opencode-ai")' "$DOTFILES_DIR/packages.json" >/dev/null
+@test "opencode is a mise npm-backend CLI and setup-linux.sh carries no install block (AI-034, ADR-036, #2438)" {
+    assert_mise_npm_cli opencode opencode-ai
     refute_grep_fixed 'opencode.ai/install' "$SETUP_SCRIPT"
     refute_grep_fixed 'OPENCODE_BIN_DIR=' "$SETUP_SCRIPT"
     refute_grep_fixed 'OPENCODE_VERSION' "$SETUP_SCRIPT"
@@ -52,9 +53,9 @@ setup() {
     refute_grep_fixed '.opencode/bin' "$DOTFILES_DIR/.bashrc"
 }
 
-@test "packages.json is the only opencode pin (versions.conf carries none, ADR-036)" {
-    refute_grep '^OPENCODE_VERSION=' "$DOTFILES_DIR/versions.conf"
-    [ "$(jq -r '.tools[] | select(.name=="opencode") | .version' "$DOTFILES_DIR/packages.json")" != "" ]
+@test "versions.conf is the only opencode pin (packages.json carries none, ADR-036, #2438)" {
+    grep -q '^OPENCODE_VERSION=' "$DOTFILES_DIR/versions.conf"
+    [ -z "$(jq -r '.tools[] | select(.name=="opencode") | .version' "$DOTFILES_DIR/packages.json")" ]
 }
 
 # CLI-018: version-drift-is-WARN (yarn/opencode/pi) was asserted against

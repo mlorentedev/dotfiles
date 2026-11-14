@@ -352,7 +352,7 @@ func checkOpenCode(sys *System, cfg *Config, rep *Report) {
 	case sys.has("opencode"):
 		ver := semverOf(sys, "opencode")
 		rep.Pass("opencode in PATH: " + ver)
-		matchPinFloorFrom(rep, "opencode", ver, catalogPin(sys, cfg, "opencode"), "packages.json")
+		matchPinFloorFrom(rep, "opencode", ver, catalogPin(sys, cfg, "opencode"), pinSource(sys, cfg, "opencode"))
 	case isExecFile(opencodeBin):
 		// The retired curl-script channel (ADR-036) left a copy behind and
 		// nothing on PATH resolves: the rc files no longer add ~/.opencode/bin.

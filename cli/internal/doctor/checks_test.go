@@ -185,10 +185,11 @@ func TestCheckVersionMatch(t *testing.T) {
 	apps := filepath.Join(home, "Applications")
 	mkdirAll(t, filepath.Join(apps, "go-1.26.0"))
 	// Java dir intentionally missing.
-	env := map[string]string{"HOME": home, "APPS_HOME": apps}
-	// yarn's pin comes from packages.json since OPS-042 (#1336), not from
-	// versions.conf, so the fixture is a catalog in the deploy dir.
+	// yarn's pin came from packages.json since OPS-042 (#1336), so the fixture is
+	// a catalog. DOTFILES_REPO_DIR names it: without it the check reads this
+	// checkout's packages.json first, which no longer lists yarn (#2438).
 	mirror := filepath.Join(home, ".dotfiles")
+	env := map[string]string{"HOME": home, "APPS_HOME": apps, "DOTFILES_REPO_DIR": mirror}
 	writeFile(t, filepath.Join(mirror, "packages.json"), `{"tools":[{"name":"yarn","version":"1.22.22","profile":"full","source":{"type":"npm","package":"yarn"}}]}`)
 	cfg := &Config{DotfilesDir: mirror, Versions: map[string]string{
 		"GO_VERSION":   "1.26.0",

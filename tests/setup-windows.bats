@@ -4,6 +4,7 @@
 load 'winpath'
 load 'lib/pwsh'
 load 'lib/refute'
+load 'lib/mise-owned'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -161,8 +162,9 @@ refute_legacy_mise_sync() {
     refute_grep_fixed "gh extension list" "$PS1_SCRIPT"
 }
 
-@test "setup-windows.ps1 no longer installs GitHub.Copilot via winget: copilot is a packages.json npm tool (AI-038, ADR-036)" {
-    jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm" and .source.package == "@github/copilot")' "$DOTFILES_DIR/packages.json" >/dev/null
+@test "setup-windows.ps1 no longer installs GitHub.Copilot via winget: copilot is a mise npm-backend CLI (AI-038, ADR-036, #2438)" {
+    refute_grep_fixed 'GitHub.Copilot' "$PS1_SCRIPT"
+    assert_mise_npm_cli copilot @github/copilot
 }
 
 @test "setup-windows.ps1 removes retired init .ps1 orphans, does not deploy them (CLI-020)" {
@@ -304,7 +306,7 @@ refute_legacy_mise_sync() {
 # must not reintroduce it.
 
 @test "setup-windows.ps1 installs yarn through the tools step and names no obsidian npm package (OPS-042, #1615)" {
-    jq -e '.tools[] | select(.name == "yarn" and .source.type == "npm")' "$DOTFILES_DIR/packages.json" >/dev/null
+    assert_mise_npm_cli yarn yarn
     refute_grep 'Get-Command obsidian' "$PS1_SCRIPT"
     refute_grep 'yarnPkg' "$PS1_SCRIPT"
     refute_grep 'YARN_VERSION' "$PS1_SCRIPT"
@@ -316,13 +318,13 @@ refute_legacy_mise_sync() {
 # reconcile-not-skip, and sync ai/opencode/commands/*.md to the user's
 # OpenCode commands directory.
 
-@test "setup-windows.ps1 installs OpenCode through packages.json (npm), not winget (AI-034, ADR-036)" {
+@test "setup-windows.ps1 installs OpenCode through mise's npm backend, not winget (AI-034, ADR-036, #2438)" {
     # Two channels coexisted on the work box (npm-global first on PATH + winget),
     # and the winget loop's version parse accepted "locked." as a version.
     refute_grep_fixed 'SST.opencode' "$PS1_SCRIPT"
     refute_grep_fixed 'OPENCODE_VERSION' "$PS1_SCRIPT"
     refute_grep_fixed "ContainsKey('Version')" "$PS1_SCRIPT"
-    jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm")' "$DOTFILES_DIR/packages.json" >/dev/null
+    assert_mise_npm_cli opencode opencode-ai
 }
 
 @test "setup-windows.ps1 deploys the harness with dotf harness deploy, the verb setup-linux.sh calls (CLI-026)" {

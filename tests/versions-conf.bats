@@ -54,9 +54,11 @@ setup() {
     [[ -n "$BATS_VERSION" ]] || false
 }
 
-@test "versions.conf does not pin opencode (packages.json is the catalog pin SSOT, ADR-036)" {
+@test "versions.conf pins opencode for mise's npm backend, and packages.json no longer does (ADR-036, #2438)" {
     . "$VERSIONS_CONF"
-    [[ -z "${OPENCODE_VERSION:-}" ]] || false
+    [[ -n "${OPENCODE_VERSION:-}" ]] || false
+    # One owner per tool: a pin in both places would drift apart.
+    [ -z "$(jq -r '.tools[] | select(.name == "opencode") | .name' "$BATS_TEST_DIRNAME/../packages.json")" ]
 }
 
 @test "versions.conf sets PI_VERSION" {
