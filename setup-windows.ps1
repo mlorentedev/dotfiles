@@ -778,7 +778,10 @@ Write-Info "Configuring PATH..."
 $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 
 if ($currentPath -notlike "*$ScriptsDir*") {
-    $newPath = "$ScriptsDir;$currentPath"
+    # Appended, not prepended: `dotf converge` runs this script after env-persist,
+    # which owns the head of the user Path (mise's shims, ~/.local/bin). A prepend
+    # here displaced that head and the next converge had to put it back (#3508).
+    $newPath = "$currentPath;$ScriptsDir"
     [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
     Write-Success "Added $ScriptsDir to User PATH"
     Write-Info "Restart PowerShell for PATH changes to take effect"
