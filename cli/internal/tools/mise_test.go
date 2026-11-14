@@ -1607,3 +1607,36 @@ func TestShippedCatalog_PlacesTheVCRuntimeAheadOfMise(t *testing.T) {
 		t.Errorf("vcredist is a Windows-only system entry, got %+v", got)
 	}
 }
+
+// A converge builds its runners before the catalog installs git. Git Bash must
+// be looked up when bats runs, not when the runner is made, or bats.cmd resolves
+// WSL's bash.exe on a clean box (#3328, #2346).
+func TestHomeRunners_FindsGitBashInstalledAfterTheRunnerWasBuilt(t *testing.T) {
+	installed := false
+	bashDir := filepath.Join(t.TempDir(), "Git", "bin")
+	locate := func() (string, string) {
+		if !installed {
+			return "", "Git Bash not found"
+		}
+		return filepath.Join(bashDir, "bash.exe"), ""
+	}
+	// The last PATH entry wins in a child's environment, so that is the one read.
+	pathOf := func(env []string) string {
+		got := ""
+		for _, kv := range env {
+			if strings.HasPrefix(kv, "PATH=") {
+				got = strings.TrimPrefix(kv, "PATH=")
+			}
+		}
+		return got
+	}
+	command := homeCommand(t.TempDir(), "windows", locate)
+	if before := command("bats.cmd", "--version"); strings.HasPrefix(pathOf(before.Env), bashDir) {
+		t.Fatalf("Git Bash on PATH before git was installed: %q", pathOf(before.Env))
+	}
+	installed = true
+	after := command("bats.cmd", "--version")
+	if !strings.HasPrefix(pathOf(after.Env), bashDir+string(os.PathListSeparator)) {
+		t.Errorf("bats.cmd PATH after git was installed = %q, want Git Bash first", pathOf(after.Env))
+	}
+}
