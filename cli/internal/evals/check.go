@@ -123,8 +123,16 @@ func checkOne(root, rel string) CheckResult {
 	sourceField, sourcePath := "source_review", c.SourceReview
 	if c.Kind == "planted" {
 		sourceField, sourcePath = "reference_answer", c.ReferenceAnswer
+		if p := promptProblem(root, c.Prompt); p != "" {
+			res.Problems = append(res.Problems, p)
+		}
 	}
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(sourcePath)))
+	full, err := insideRoot(root, sourcePath)
+	if err != nil {
+		res.Problems = append(res.Problems, fmt.Sprintf("%s: %v", sourceField, err))
+		return res
+	}
+	data, err := os.ReadFile(full)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			err = fmt.Errorf("%s %s does not exist", sourceField, sourcePath)
@@ -137,6 +145,36 @@ func checkOne(root, rel string) CheckResult {
 	res.Problems = append(res.Problems, keyProblems(c, source, sourceField)...)
 	res.Problems = append(res.Problems, sampleProblems(c)...)
 	return res
+}
+
+// insideRoot resolves a repo-relative case path, refusing one that climbs out
+// of the repository: a case is checked against files its repository owns.
+func insideRoot(root, rel string) (string, error) {
+	clean := filepath.Clean(filepath.FromSlash(rel))
+	if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("%s is outside the repository", rel)
+	}
+	return filepath.Join(root, clean), nil
+}
+
+// promptProblem reports a planted prompt that is not a readable file. The
+// check grades the reference answer; a run sends the prompt.
+func promptProblem(root, rel string) string {
+	full, err := insideRoot(root, rel)
+	if err != nil {
+		return "prompt: " + err.Error()
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Sprintf("prompt %s does not exist", rel)
+		}
+		return "prompt: " + err.Error()
+	}
+	if info.IsDir() {
+		return fmt.Sprintf("prompt %s is a directory", rel)
+	}
+	return ""
 }
 
 // caseNameFor is the id a case file's location promises.

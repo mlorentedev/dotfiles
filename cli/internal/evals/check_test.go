@@ -161,3 +161,26 @@ func TestCheckHoldsAPlantedReferenceToTheIdealAnswer(t *testing.T) {
 		t.Fatalf("a planted reference carrying a decoy passed: %v", p)
 	}
 }
+
+// A planted case is checked against its reference answer, but a run sends its
+// prompt; a prompt that is not there would only surface at dispatch.
+func TestCheckReportsAPlantedCaseWhosePromptIsMissing(t *testing.T) {
+	ideal := "---\nverdict: FAIL\n---\n\n" + tableHeader + "| Major | REAL | sh | `((count++))` exits under set -e | e | t | f |\n"
+	root := writePlanted(t, ideal)
+	if err := os.Remove(filepath.Join(root, "harness", "evals", "planted", "p1", "prompt.md")); err != nil {
+		t.Fatal(err)
+	}
+	if p := problemsOf(t, root); !strings.Contains(strings.Join(p, "\n"), "prompt") {
+		t.Fatalf("a planted case without its prompt passed: %v", p)
+	}
+}
+
+// Case paths are repo-relative. One that climbs out of the repository would
+// read, and quote in its error, a file the case's repository does not own.
+func TestCheckRefusesACasePathOutsideTheRepository(t *testing.T) {
+	escaping := strings.Replace(goodCase, `"source_review": "specs/archive/X/review.md"`, `"source_review": "specs/../../outside/review.md"`, 1)
+	root := writeTree(t, escaping, "x-r1.json", sourceReview("FAIL", "nan/x", goodRows...))
+	if p := problemsOf(t, root); !strings.Contains(strings.Join(p, "\n"), "outside the repository") {
+		t.Fatalf("a path climbing out of the repository was followed: %v", p)
+	}
+}
