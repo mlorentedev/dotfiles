@@ -1,0 +1,65 @@
+[
+  {
+    "id": "HARNESS-195-lanes-default-f1",
+    "behavior": "AC1. converge activates lanes from the committed marker, idempotently; a working-tree marker activates nothing",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/converge/ -run 'Activate|Lanes'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f2",
+    "behavior": "AC2. the guard arms only from the activation record, never in the deploy clone",
+    "verification": "cd cli && go test ./internal/hooks/ -run TestPreCommitLaneGuard",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f3",
+    "behavior": "AC3. mem resume and mem session-start print where the session stands",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Where|MemResume|SessionStart'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f4",
+    "behavior": "AC4. worktree add prints the lane hint in an active repo; AddDetached does not",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'Hint'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f5",
+    "behavior": "AC5. lane next without a backend prints commands that enter the lane before the agent starts",
+    "verification": "cd cli && go test ./internal/lane/ -run 'ManualCommands'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f6",
+    "behavior": "AC6. launchers hold only observed agents; secrets run refuses npm .cmd shims on Windows",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Launch|BatchShim|SecretsRun'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f7",
+    "behavior": "AC7. lane doctor reports leaseless detached worktrees, expired leases and guard drift",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/cmd/ -run 'Doctor|Audit'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f8",
+    "behavior": "AC8. AGENTS.md and the skills name the lane entrances; tiers are not called lanes",
+    "verification": "bats tests/guard-agents-lane-term.bats",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f9",
+    "behavior": "AC9. dotfiles is active on Mac, Linux and Windows guests with observed sessions in lanes",
+    "verification": "grep -q 'LANE-READY' specs/HARNESS-195-lanes-default/verification.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
