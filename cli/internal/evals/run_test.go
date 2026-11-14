@@ -186,7 +186,13 @@ func TestRunFlagsACandidateGradedOnItsOwnKey(t *testing.T) {
 // stays on disk.
 func TestRunStopsOnInterrupt(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	l := &fakeLauncher{onLaunch: cancel}
+	l := &fakeLauncher{onLaunch: cancel, script: map[string]func(Attempt) (LaunchResult, error){
+		"a-r1/1": func(a Attempt) (LaunchResult, error) {
+			res, err := answered(answer("FAIL"))(a)
+			res.Interrupted = true
+			return res, err
+		},
+	}}
 	recs, err := Run(ctx, runPlan(3, "agy/x"), []Case{runCase()}, t.TempDir(), l)
 	if !errors.Is(err, context.Canceled) || len(l.started) != 1 || len(recs) != 1 {
 		t.Fatalf("err %v, started %v, records %d", err, l.started, len(recs))
@@ -207,7 +213,9 @@ func TestRunRefusesACellWithoutItsCase(t *testing.T) {
 func TestRunPassesTheInterruptToTheRunnerInFlight(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	l := &fakeLauncher{script: map[string]func(Attempt) (LaunchResult, error){}}
-	l.script["a-r1/1"] = func(Attempt) (LaunchResult, error) { return LaunchResult{ExitErr: errors.New("signal: killed")}, nil }
+	l.script["a-r1/1"] = func(Attempt) (LaunchResult, error) {
+		return LaunchResult{ExitErr: errors.New("signal: killed"), Interrupted: true}, nil
+	}
 	l.onLaunch = cancel
 	var got context.Context
 	recs, err := Run(ctx, runPlan(1, "agy/x"), []Case{runCase()}, t.TempDir(), launcherFunc(func(c context.Context, a Attempt) (LaunchResult, error) {
@@ -269,6 +277,17 @@ func TestRunFlagsTheRealCorpusOwnKey(t *testing.T) {
 		return LaunchResult{}, nil
 	}))
 	if err != nil || len(recs) != 1 || !recs[0].OwnKey {
+		t.Fatalf("err %v, records %+v", err, recs)
+	}
+}
+
+// An interrupt that lands after the runner finished on its own does not
+// discard its answer: whether the runner was killed is the launcher's to say.
+func TestRunGradesAnAnswerFinishedBeforeTheInterrupt(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	l := &fakeLauncher{onLaunch: cancel}
+	recs, err := Run(ctx, runPlan(2, "agy/x"), []Case{runCase()}, t.TempDir(), l)
+	if !errors.Is(err, context.Canceled) || len(recs) != 1 || recs[0].Completion != CompletionAnswered || recs[0].Grade == nil {
 		t.Fatalf("err %v, records %+v", err, recs)
 	}
 }

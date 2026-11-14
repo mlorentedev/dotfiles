@@ -52,8 +52,11 @@ type Attempt struct {
 type LaunchResult struct {
 	ExitErr  error
 	TimedOut bool
-	Duration time.Duration
-	Tokens   *Tokens // nil when the runner reports none
+	// Interrupted — the launcher killed the runner because the run was
+	// interrupted. A runner that finished before the interrupt landed is not.
+	Interrupted bool
+	Duration    time.Duration
+	Tokens      *Tokens // nil when the runner reports none
 }
 
 // Tokens is what a runner reported spending. Absent is "not reported", never 0.
@@ -152,7 +155,7 @@ func grade(ctx context.Context, a Attempt, l Launcher) Record {
 	case res.TimedOut:
 		rec.Completion = CompletionTimeout
 		return rec
-	case ctx.Err() != nil:
+	case res.Interrupted:
 		rec.Completion, rec.Detail = CompletionInfra, strings.TrimSuffix("interrupted: "+rec.Detail, ": ")
 		return rec
 	}
