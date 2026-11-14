@@ -137,7 +137,7 @@ func checkEvalOutDir(tree, out string) error {
 	if !filepath.IsAbs(out) || !filepath.IsAbs(tree) {
 		return fmt.Errorf("eval launch: the run directory %q and the replay tree %q must both be absolute", out, tree)
 	}
-	realTree, realOut := resolveExisting(tree), resolveExisting(out)
+	realTree, realOut := ResolveExisting(tree), ResolveExisting(out)
 	if rel, err := filepath.Rel(realTree, realOut); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("eval launch: the run directory %s is inside the replay tree %s, which is removed after the run", out, tree)
 	}
@@ -149,10 +149,10 @@ func checkEvalOutDir(tree, out string) error {
 	return nil
 }
 
-// resolveExisting resolves symlinks in the longest existing prefix of p and
+// ResolveExisting resolves symlinks in the longest existing prefix of p and
 // keeps the rest as given, so a path not created yet still compares by where
 // it will be.
-func resolveExisting(p string) string {
+func ResolveExisting(p string) string {
 	p = filepath.Clean(p)
 	var rest []string
 	for {
