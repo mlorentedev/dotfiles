@@ -78,6 +78,10 @@ func TestArchiveParkedThreadUsesTheDatedArchive(t *testing.T) {
 	if strings.Join(got.Archived, ",") != "feat-a,feat-a+pi" || strings.Join(got.Kept, ",") != "feat-a+agy" {
 		t.Errorf("archived %v kept %v, want [feat-a feat-a+pi] and [feat-a+agy]", got.Archived, got.Kept)
 	}
+	// Each file is its own thread's, so none is reported shared (MEMORY-021 review).
+	if len(got.Shared) != 0 {
+		t.Errorf("shared %v, want none: every moved file was its own thread's", got.Shared)
+	}
 	wantPath := filepath.Join(memDir, "archive", "superseded-handoffs-2026-11-14.md")
 	if got.Path != wantPath {
 		t.Errorf("archive path %q, want %q", got.Path, wantPath)
