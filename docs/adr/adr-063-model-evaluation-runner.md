@@ -207,6 +207,12 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
   `reference.md`, the ideal answer the key is checked against. They use the same
   `expected`/`decoys` fields and name `human` as `key_author`. #3476's prompt is case one, and its
   false bash 3.2 claim is its first decoy.
+  A planted run (proposed 2026-11-14, HARNESS-101 slice 3; the owner decides) sends `prompt.md` as
+  written, followed by where to write the answer and the time budget, and runs in an empty directory.
+  The answer is a file at `.dotf-eval/review.md` inside that directory, the place a replay writes to,
+  so one grading path reads both. #3476 took the answer from stdout (`--print`) instead. The file is
+  the replay's contract, unmeasured on a planted case: if a candidate fails to write it, stdout is
+  the fallback to measure.
 - **How a row is classed, in order** (amended 2026-11-14, HARNESS-101 slice 1):
   - noise is discarded first;
   - then a decoy match is a false positive, even when the row also names a real symbol;
@@ -260,7 +266,7 @@ Curation is human, once per case. Grading is mechanical, every run. Graded per r
 
 | Measure | How |
 |---|---|
-| Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer` |
+| Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer`. Amended 2026-11-14 (HARNESS-101 slice 3): `infra-error` is a class of its own, for an attempt that failed on our side (checkout, tree, an answer we cannot read, an interrupt); it is never charged to the model. An attempt the deadline or the interrupt cut short is not graded, even if it left a file. `stalled`, `rate-limit`, `quota` and `content-filter` are not produced yet: they need the transcript, and until then such a run reads `provider-error` |
 | Format | The findings table parses. An unparseable answer is a format failure, scored as such, never as zero findings |
 | Verdict match | `PASS` / `PASS-WITH-GAPS` / `FAIL` against `expected_verdict` |
 | Recall | Matched `expected` over `expected`, weighted by severity floor. An `expected` entry the reviewer described without its anchors is a miss in that grading, even though the row itself is unadjudicated |
