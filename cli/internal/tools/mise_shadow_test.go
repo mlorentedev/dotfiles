@@ -143,10 +143,11 @@ func TestShadowNote_AsksOnlyAboutTheToolsThatFail(t *testing.T) {
 	}
 	s := MiseSync{ConfigDir: cfgDir, Run: run}
 
-	if cause, fix := s.ShadowNote(nil); cause != "" || fix != "" || len(asked) != 0 {
+	pins := []MiseTool{{"node", "24.22.1"}}
+	if cause, fix := s.ShadowNote(pins, nil); cause != "" || fix != "" || len(asked) != 0 {
 		t.Fatalf("nothing missing: want no note and no mise call, got %q %q after %v", cause, fix, asked)
 	}
-	cause, fix := s.ShadowNote([]string{"node"})
+	cause, fix := s.ShadowNote(pins, []string{"node"})
 	if !strings.Contains(cause, foreign+" pins node 24.19.0") || fix == "" {
 		t.Errorf("ShadowNote = %q, %q", cause, fix)
 	}
@@ -174,7 +175,37 @@ func TestShadowNote_ComparesThePathThroughSymlinks(t *testing.T) {
 		return []byte("[" + miseLsEntry("24.19.0", "24.22.1", own, true) + "]"), nil
 	}
 	s := MiseSync{ConfigDir: link, Run: run}
-	if cause, _ := s.ShadowNote([]string{"node"}); cause != "" {
+	if cause, _ := s.ShadowNote([]MiseTool{{"node", "24.22.1"}}, []string{"node"}); cause != "" {
 		t.Errorf("dotfiles' own file under another spelling is not a shadow, got %q", cause)
+	}
+}
+
+// A foreign config is the cause only when it makes the tool run something
+// below the pin. One that resolves the pinned version, or a newer one, did not
+// make the tool fail, and telling the operator to remove it would send them
+// after the wrong file (#3524: "pins a different version").
+func TestShadowNote_NamesAFileOnlyWhenItResolvesBelowThePin(t *testing.T) {
+	foreign := filepath.Join(t.TempDir(), "config.toml")
+	pins := []MiseTool{{"node", "24.22.1"}}
+	for _, tc := range []struct {
+		name    string
+		version string // what the foreign file makes mise run
+		named   bool
+	}{
+		{"below the pin", "24.19.0", true},
+		{"the pinned version, the failure is something else", "24.22.1", false},
+		{"above the pin", "25.0.0", false},
+		{"no resolved version", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := func(string, ...string) ([]byte, error) {
+				return []byte("[" + miseLsEntry(tc.version, "", foreign, true) + "]"), nil
+			}
+			s := MiseSync{ConfigDir: t.TempDir(), Run: run}
+			cause, fix := s.ShadowNote(pins, []string{"node"})
+			if tc.named != (cause != "" && fix != "") {
+				t.Errorf("ShadowNote = %q, %q; want a named cause: %v", cause, fix, tc.named)
+			}
+		})
 	}
 }

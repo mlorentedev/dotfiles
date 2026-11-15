@@ -121,6 +121,27 @@ func TestCheckMiseTools_APinShadowedByAnotherConfigNamesTheFileAndTheFix(t *test
 	}
 }
 
+// Before dotfiles' own config is current, mise has not yet been told the pins:
+// a lower-precedence file (a system /etc/mise/config.toml) can be what runs the
+// tool, and "outranks dotfiles" would be false. The sync guidance stays until
+// the owned config is written.
+func TestCheckMiseTools_NoShadowIsClaimedBeforeTheOwnedConfigIsCurrent(t *testing.T) {
+	ls := `[{"version": "1.1.0", "requested_version": "1.1.0", "installed": true, "active": true, "source": {"type": "mise.toml", "path": "/etc/mise/config.toml"}}]`
+	s, cfg := miseFixture(t, "linux", "1.1.0", false, map[string]string{"mise ls --json age": ls})
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	out := b.String()
+	if !strings.Contains(out, "not running at their pin through mise: age (run: dotf tools sync)") {
+		t.Errorf("want the sync guidance\n%s", out)
+	}
+	for _, w := range []string{"FIX:", "outranks", "/etc/mise/config.toml"} {
+		if strings.Contains(out, w) {
+			t.Errorf("output must not contain %q before the owned config is current\n%s", w, out)
+		}
+	}
+}
+
 func TestCheckMiseTools_AStaleRenderedConfigWarns(t *testing.T) {
 	s, cfg := miseFixture(t, "linux", "1.2.1", false)
 	var b bytes.Buffer

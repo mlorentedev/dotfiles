@@ -29,20 +29,25 @@ type shadow struct {
 }
 
 // ShadowNote says why the named tools do not run at their pin when mise
-// resolves them from a config other than the one the sync owns: cause names
-// each such file and the version it pins, fix says what to do. Both are empty
-// when no tool is shadowed, and also when mise cannot say: a failed or
-// unreadable answer never claims a cause, so the caller keeps its plain
-// message. Only the tools asked about are looked up, so a plan with nothing
-// missing asks mise nothing (#3524).
-func (s MiseSync) ShadowNote(missing []string) (cause, fix string) {
+// resolves them from a config other than the one the sync owns, at a version
+// below the pin: cause names each such file and the version it pins, fix says
+// what to do. Both are empty when no tool is shadowed, and also when mise
+// cannot say: a failed or unreadable answer never claims a cause, and neither
+// does a foreign file that resolves the pinned version or a newer one, so the
+// caller keeps its plain message. Only the tools asked about are looked up, so
+// a plan with nothing missing asks mise nothing (#3524).
+//
+// The caller asks only once the sync's own config is current: before that,
+// mise has not been told the pins, and the file that runs the tool may rank
+// below it.
+func (s MiseSync) ShadowNote(pins []MiseTool, missing []string) (cause, fix string) {
 	run := s.Stdout
 	if run == nil {
 		run = s.Run
 	}
 	var found []shadow
 	for _, name := range missing {
-		if sh, ok := s.shadowOf(run, name); ok {
+		if sh, ok := s.shadowOf(run, pinOf(pins, name)); ok {
 			found = append(found, sh)
 		}
 	}
@@ -50,24 +55,36 @@ func (s MiseSync) ShadowNote(missing []string) (cause, fix string) {
 		return "", ""
 	}
 	var files []string
-	pins := map[string][]string{}
+	byFile := map[string][]string{}
 	for _, sh := range found {
-		if _, seen := pins[sh.path]; !seen {
+		if _, seen := byFile[sh.path]; !seen {
 			files = append(files, sh.path)
 		}
-		pins[sh.path] = append(pins[sh.path], sh.tool+" "+sh.version)
+		byFile[sh.path] = append(byFile[sh.path], sh.tool+" "+sh.version)
 	}
 	parts := make([]string, len(files))
 	for i, path := range files {
-		parts[i] = path + " pins " + strings.Join(pins[path], ", ") + " and outranks " + s.ConfigPath()
+		parts[i] = path + " pins " + strings.Join(byFile[path], ", ") + " and outranks " + s.ConfigPath()
 	}
 	return strings.Join(parts, "; "), shadowFix
 }
 
-// shadowOf asks mise which config the named tool runs from. It reports no
+// pinOf is the pin for name, or a pin with no version when none is declared.
+func pinOf(pins []MiseTool, name string) MiseTool {
+	for _, p := range pins {
+		if p.Name == name {
+			return p
+		}
+	}
+	return MiseTool{Name: name}
+}
+
+// shadowOf asks mise which config the pinned tool runs from. It reports no
 // shadow when the answer is an error, is not the array above, has no active
-// entry, or names the sync's own file.
-func (s MiseSync) shadowOf(run Runner, name string) (shadow, bool) {
+// entry, names the sync's own file, or resolves a version at or above the pin:
+// such a file did not make the tool fail.
+func (s MiseSync) shadowOf(run Runner, pin MiseTool) (shadow, bool) {
+	name := pin.Name
 	out, err := run("mise", "ls", "--json", name)
 	if err != nil {
 		return shadow{}, false
@@ -81,6 +98,9 @@ func (s MiseSync) shadowOf(run Runner, name string) (shadow, bool) {
 			continue
 		}
 		if samePath(e.Source.Path, s.ConfigPath()) {
+			return shadow{}, false
+		}
+		if e.Version == "" || atLeast(e.Version, pin.Version) {
 			return shadow{}, false
 		}
 		version := e.RequestedVersion
@@ -107,8 +127,8 @@ func samePath(a, b string) bool {
 
 // shadowSuffix is ShadowNote as the tail of the sync's failure, or "" when no
 // cause is known.
-func (s MiseSync) shadowSuffix(missing []string) string {
-	cause, fix := s.ShadowNote(missing)
+func (s MiseSync) shadowSuffix(pins []MiseTool, missing []string) string {
+	cause, fix := s.ShadowNote(pins, missing)
 	if cause == "" {
 		return ""
 	}

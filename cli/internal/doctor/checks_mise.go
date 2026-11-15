@@ -74,8 +74,10 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 	}
 	if len(p.Missing) > 0 {
 		// A pin another config holds is not the sync's to fix: it would install
-		// dotfiles' version and lose to that file again (#3524).
-		if cause, fix := s.ShadowNote(p.Missing); cause != "" {
+		// dotfiles' version and lose to that file again (#3524). Only once the
+		// owned config is current: before that mise has not been told the pins,
+		// and the file that runs the tool may rank below it.
+		if cause, fix := shadowNote(s, p, pins); cause != "" {
 			rep.Fail("not running at their pin through mise: " + strings.Join(p.Missing, ", ") + "; " + cause + "\n    FIX: " + fix)
 			return
 		}
@@ -350,4 +352,13 @@ func replaceWithLink(dst, target string) error {
 		return err
 	}
 	return nil
+}
+
+// shadowNote is the sync's ShadowNote for a plan whose owned config is current,
+// and "" for one that is not.
+func shadowNote(s tools.MiseSync, p tools.SyncPlan, pins []tools.MiseTool) (cause, fix string) {
+	if p.ConfigChanged {
+		return "", ""
+	}
+	return s.ShadowNote(pins, p.Missing)
 }
