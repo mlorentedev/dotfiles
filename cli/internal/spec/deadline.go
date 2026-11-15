@@ -78,6 +78,10 @@ type RunResult struct {
 	Code     int
 	Stop     StopReason
 	LastCall string
+	// Signaled — a stop signal this process received ended the run, and the
+	// launcher passed it on. Stop stays StopNone, as it always has for a
+	// signal; an evaluation run reads this to keep the stop off the model.
+	Signaled bool
 }
 
 // RunWithDeadline runs argv under the cap alone. See RunWithLimits.
@@ -138,9 +142,9 @@ func RunWithLimits(l Limits, argv []string, stdin io.Reader, stdout, stderr io.W
 			// ran it.
 			stopGroup(c, deadlineGrace, done)
 			if s, ok := sig.(syscall.Signal); ok {
-				return RunResult{Code: 128 + int(s)}, nil
+				return RunResult{Code: 128 + int(s), Signaled: true}, nil
 			}
-			return RunResult{Code: 1}, nil
+			return RunResult{Code: 1, Signaled: true}, nil
 		}
 	}
 }
