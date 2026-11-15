@@ -412,15 +412,45 @@ func RouteBranchToLane(repoRoot, worktreeRoot, branch string) (string, string, e
 		candidates = []string{LaneFastTrack, LaneFeatSecondary}
 	}
 
+	var active, missing []string
 	for _, name := range candidates {
 		lanePath := filepath.Join(repoWTRoot, name)
 		meta, err := worktree.LoadMetadata(lanePath)
-		if err == nil && meta != nil && strings.EqualFold(meta.State, string(worktree.StateParked)) {
+		switch {
+		case err == nil && meta != nil && strings.EqualFold(meta.State, string(worktree.StateParked)):
 			return name, lanePath, nil
+		case err == nil && meta == nil:
+			missing = append(missing, name+" "+absentReason(lanePath))
+		default:
+			active = append(active, name+" is ACTIVE")
 		}
 	}
 
-	return "", "", fmt.Errorf("lane switch: WIP cap reached for %q: candidate lanes (%s) are all ACTIVE; park a finished lane with `dotf lane park` first", branch, strings.Join(candidates, ", "))
+	return "", "", noParkedLaneError(branch, active, missing)
+}
+
+// absentReason says what a lane with no lease lacks: its worktree, or only the
+// lease inside it. Neither is an ACTIVE lane, and `dotf lane init` restores both.
+func absentReason(lanePath string) string {
+	if _, err := os.Lstat(lanePath); errors.Is(err, fs.ErrNotExist) {
+		return "is absent"
+	}
+	return "has no lease"
+}
+
+// noParkedLaneError is the refusal when no candidate lane is PARKED. Each lane
+// is named with what is wrong with it, because the fixes differ: an ACTIVE lane
+// is parked once its branch lands, and a lane that is absent or has no lease is
+// recreated by `dotf lane init`, which `dotf lane park` cannot do (#3531).
+func noParkedLaneError(branch string, active, missing []string) error {
+	var fixes []string
+	if len(missing) > 0 {
+		fixes = append(fixes, "run `dotf lane init` to restore "+strings.Join(missing, ", "))
+	}
+	if len(active) > 0 {
+		fixes = append(fixes, "park a finished lane with `dotf lane park` ("+strings.Join(active, ", ")+")")
+	}
+	return fmt.Errorf("lane switch: no lane is free for %q (WIP cap reached): %s", branch, strings.Join(fixes, "; "))
 }
 
 // SwitchLane claims a PARKED persistent lane (or explicitLane), checks out branch
@@ -581,6 +611,9 @@ func HasNamedLanes(repoRoot, worktreeRoot string) bool {
 // ParkLane parks the specified lane (or the lane at cwd) in-place, releases any
 // issue claim ref, and archives/prunes its memory thread in vaultPath.
 func ParkLane(repoRoot, lanePath, vaultPath string, force bool) (worktree.DoneResult, error) {
+	if _, statErr := os.Lstat(lanePath); errors.Is(statErr, fs.ErrNotExist) {
+		return worktree.DoneResult{}, fmt.Errorf("lane park: %s is absent, so there is nothing to park; `dotf lane init` recreates a canonical lane", lanePath)
+	}
 	meta, err := worktree.LoadMetadata(lanePath)
 	if err != nil || meta == nil || meta.Lane == "" {
 		return worktree.DoneResult{}, fmt.Errorf("lane park: %s is not a persistent named lane", lanePath)
