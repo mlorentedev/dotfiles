@@ -56,12 +56,12 @@ owner: manu
 - [x] [AC5] Preflight (`evals.Preflight`): every commit resolved, every runner on PATH, every secret checked by exit status, and a replay refused when its reviewed commit holds its `source_review` or its case file; all problems named at once
 - [ ] [AC5] Tokens (input, output, thinking) read from each runner's transcript
 - [ ] [AC5] Flag a run whose transcript shows it reading a commit after `reviewed_sha` (ADR-063, known limit)
-- [ ] [AC3] Wire `dotf eval run` to `Preflight`, `ExecLauncher` and `Run` (real `LookPath`, secrets checked through `dotf secrets run`), and keep it refusing to start without an approved `--plan`
+- [ ] [AC3] Wire `dotf eval run` to `Preflight`, `ExecLauncher` and `Run` (real `LookPath`, secrets checked through `dotf secrets run`), and keep it refusing to start without an approved `--plan`. The runner must receive the candidate's secret, not only pass the preflight check: `RunWithLimits` inherits the parent environment, so inject it per attempt (#3539 review)
 - [ ] [AC5] Tell `rate-limit`, `quota` and `content-filter` apart from `provider-error` by the transcript
 - [ ] [AC5] A request record for a planted run (`WriteEvalRequest` takes only an `EvalLaunch`), with the `prompt.md` digest
 - [ ] [AC5] Remove trees an earlier interrupted run left under `<run>/trees/`
 - [ ] [AC5] Record an attempt's stray writes in its replay tree (`spec.SnapshotTree` before and after, plus `HEAD`, which a status snapshot cannot see move), as `spec review` reports them
-- [ ] [AC3] The run's interrupt context covers the gaps between attempts, and the stall timeout is set per runner so a silent `agy --print` is not cut as stalled (`ExecLauncher.Stall` zero means the 10-minute default; no value turns the detector off today)
+- [ ] [AC3] The run's interrupt context covers the gaps between attempts and reaches a runner in flight (`ExecLauncher.Launch` ignores its context today; a cancelled context waits for the deadline, #3539 review), and the stall timeout is set per runner so a silent `agy --print` is not cut as stalled (`ExecLauncher.Stall` zero means the 10-minute default; no value turns the detector off today)
 - [ ] [AC3] A replay checkout under lanes: check what `dotf lane status` and `dotf lane doctor` report for a worktree the run adds
 - [ ] [AC5] Implement run, grade and epoch reduction; flag results on a candidate's own keys
 - [ ] [AC7] Failing test: `results.json` validates against `result.schema.json` with the provenance fields; no code path opens the pool, map or pins for writing

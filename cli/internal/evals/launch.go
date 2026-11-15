@@ -201,6 +201,11 @@ var errNotRegular = errors.New("the answer is not a regular file")
 // keepAnswer copies the runner's answer out of the tree. It reads only a
 // regular file: a symlink the runner left there is not followed.
 func keepAnswer(from, to string) error {
+	// The folder first: Lstat on the file follows a symlink anywhere above it,
+	// and the runner can replace the folder the launcher made with one.
+	if dir, err := os.Lstat(filepath.Dir(from)); err == nil && !dir.IsDir() {
+		return fmt.Errorf("%w: %s (%s); it was not read", errNotRegular, filepath.Dir(from), dir.Mode().Type())
+	}
 	fi, err := os.Lstat(from)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil

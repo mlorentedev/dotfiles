@@ -171,28 +171,46 @@ func TestLaunchReportsHowTheRunnerEnded(t *testing.T) {
 	}
 }
 
-// A runner that leaves a symlink where its answer goes does not get the file it
-// points at read as its answer.
+// A runner that leaves a symlink where its answer goes, on the file or on the
+// folder that holds it, does not get the file it points at read as its answer.
 func TestLaunchDoesNotFollowAnAnswerSymlink(t *testing.T) {
-	root, c := plantedRoot(t)
-	a := attemptIn(t.TempDir(), c)
-	outside := filepath.Join(t.TempDir(), "secret.md")
-	if err := os.WriteFile(outside, []byte(answer("PASS")), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	answerPath := filepath.Join(a.Tree, spec.EvalAnswerDir, spec.EvalSlot.Review)
-	r := &fakeRunner{act: func(string, io.Writer) (spec.RunResult, error) {
-		if err := os.Symlink(outside, answerPath); err != nil {
-			t.Skipf("cannot create a symlink here: %v", err)
-		}
-		return spec.RunResult{}, nil
-	}}
-	res, err := testLauncher(root, r, nil).Launch(context.Background(), a)
-	if err != nil || res.ExitErr == nil || !strings.Contains(res.ExitErr.Error(), "not a regular file") {
-		t.Fatalf("result %+v, err %v", res, err)
-	}
-	if _, err := os.Stat(filepath.Join(a.OutDir, AnswerFile)); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("the symlink's target was kept as the answer: %v", err)
+	for _, tc := range []struct {
+		name  string
+		plant func(answerPath, outside string) error
+	}{
+		{"on the answer", func(answerPath, outside string) error {
+			return os.Symlink(filepath.Join(outside, spec.EvalSlot.Review), answerPath)
+		}},
+		{"on its folder", func(answerPath, outside string) error {
+			dir := filepath.Dir(answerPath)
+			if err := os.RemoveAll(dir); err != nil {
+				return err
+			}
+			return os.Symlink(outside, dir)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, c := plantedRoot(t)
+			a := attemptIn(t.TempDir(), c)
+			outside := t.TempDir()
+			if err := os.WriteFile(filepath.Join(outside, spec.EvalSlot.Review), []byte(answer("PASS")), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			answerPath := filepath.Join(a.Tree, spec.EvalAnswerDir, spec.EvalSlot.Review)
+			r := &fakeRunner{act: func(string, io.Writer) (spec.RunResult, error) {
+				if err := tc.plant(answerPath, outside); err != nil {
+					t.Skipf("cannot create a symlink here: %v", err)
+				}
+				return spec.RunResult{}, nil
+			}}
+			res, err := testLauncher(root, r, nil).Launch(context.Background(), a)
+			if err != nil || res.ExitErr == nil || !strings.Contains(res.ExitErr.Error(), "not a regular file") {
+				t.Fatalf("result %+v, err %v", res, err)
+			}
+			if _, err := os.Stat(filepath.Join(a.OutDir, AnswerFile)); !errors.Is(err, os.ErrNotExist) {
+				t.Errorf("the symlink's target was kept as the answer: %v", err)
+			}
+		})
 	}
 }
 
