@@ -147,7 +147,14 @@ func (l ExecLauncher) plan(a Attempt, entry spec.ReviewerEntry, tree string) (sp
 func (l ExecLauncher) run(p spec.EvalPlan, tree string) (spec.RunResult, error) {
 	pr, pw := io.Pipe()
 	sunk := make(chan error, 1)
-	go func() { sunk <- spec.SinkTranscript(pr, io.Discard, p.Transcript) }()
+	go func() {
+		err := spec.SinkTranscript(pr, io.Discard, p.Transcript)
+		// A sink that stops early leaves nobody reading the pipe, and the
+		// runner's stdout copier would block on it past any deadline: closing
+		// the read end turns its writes into errors, so the run ends instead.
+		_ = pr.CloseWithError(err)
+		sunk <- err
+	}()
 	stderr, err := os.Create(filepath.Join(filepath.Dir(p.Transcript), "stderr.log"))
 	if err != nil {
 		_ = pw.Close()
