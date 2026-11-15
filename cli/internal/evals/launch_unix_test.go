@@ -77,3 +77,17 @@ func TestLaunchReturnsWhenTheTranscriptCannotBeWritten(t *testing.T) {
 		t.Errorf("err = %v, want the transcript failure", err)
 	}
 }
+
+// A runner the deadline cuts ends the attempt on time even when a child it
+// started still holds its stdout, and the tree goes with it.
+func TestLaunchReturnsWhenTheDeadlineCutsARunnerWithChildren(t *testing.T) {
+	root, c := plantedRoot(t)
+	a := attemptIn(t.TempDir(), c)
+	res, err := launchWithin(t, shellLauncher(root, "sleep 60 & wait", time.Second), a, 15*time.Second)
+	if err != nil || !res.TimedOut {
+		t.Errorf("err %v, result %+v, want a timeout", err, res)
+	}
+	if _, err := os.Stat(a.Tree); !os.IsNotExist(err) {
+		t.Errorf("the tree outlived the attempt: %v", err)
+	}
+}
