@@ -84,7 +84,10 @@ func newPrLandCmd() *cobra.Command {
 The head is read again before the merge, and a head that moved is a refusal.
 Every PR based on this one's branch is pointed at its base first, because
 GitHub closes a PR whose base branch is deleted. The merge is a squash with
---match-head-commit, never --auto.
+--match-head-commit, never --auto. The head branch is then deleted on the
+forge and nothing local is: gh's own --delete-branch would also remove the
+worktree holding the branch, which a persistent lane is, so the
+local branch and worktree are left to dotf worktree done or dotf lane park.
 
 --wait waits for the checks before reading them, and then for GitHub to compute
 the merge state of a PR whose checks are all green: that state can stay UNKNOWN

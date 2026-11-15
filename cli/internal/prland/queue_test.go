@@ -67,9 +67,9 @@ func TestLandQueue_LandsInTheOrderGiven(t *testing.T) {
 		t.Fatalf("results are not in the order given: %v", numbersOf(got))
 	}
 	want := []string{
-		"pr merge 30 --squash --delete-branch --match-head-commit sha30",
-		"pr merge 12 --squash --delete-branch --match-head-commit sha12",
-		"pr merge 31 --squash --delete-branch --match-head-commit sha31",
+		"pr merge 30 --squash --match-head-commit sha30",
+		"pr merge 12 --squash --match-head-commit sha12",
+		"pr merge 31 --squash --match-head-commit sha31",
 	}
 	if strings.Join(g.calls, "\n") != strings.Join(want, "\n") {
 		t.Errorf("merges:\n%s\nwant:\n%s", strings.Join(g.calls, "\n"), strings.Join(want, "\n"))
@@ -90,11 +90,11 @@ func TestLandQueue_UpdatesAPROnlyDuringItsOwnTurn(t *testing.T) {
 	got := LandQueue(context.Background(), o, []int{30, 12, 31}, nil)
 
 	want := []string{
-		"pr merge 30 --squash --delete-branch --match-head-commit sha30",
+		"pr merge 30 --squash --match-head-commit sha30",
 		"pr update-branch 12",
-		"pr merge 12 --squash --delete-branch --match-head-commit sha12",
+		"pr merge 12 --squash --match-head-commit sha12",
 		"pr update-branch 31",
-		"pr merge 31 --squash --delete-branch --match-head-commit sha31",
+		"pr merge 31 --squash --match-head-commit sha31",
 	}
 	if strings.Join(g.calls, "\n") != strings.Join(want, "\n") {
 		t.Errorf("calls:\n%s\nwant:\n%s", strings.Join(g.calls, "\n"), strings.Join(want, "\n"))
