@@ -38,7 +38,7 @@ owner: manu
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/MEMORY-021-shared-thread-file-report/` -> `specs/archive/MEMORY-021-shared-thread-file-report/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/MEMORY-021-shared-thread-file-report/` -> `specs/archive/MEMORY-021-shared-thread-file-report/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
