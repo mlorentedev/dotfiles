@@ -1,7 +1,7 @@
 ---
 id: spec-TOOL-040-mise-pin-shadow
 type: spec
-status: implementing
+status: archived
 created: "2026-11-14"
 owner: manu
 issue: "mlorentedev/dotfiles#3524"
@@ -57,3 +57,8 @@ That is a separate decision (#3524).
 3. `ShadowNote` asks mise nothing for a plan with no missing tool, and treats a symlinked spelling of
    dotfiles' own path as not shadowed.
 4. `go run ./cmd/dotf doctor` on a machine where nothing shadows stays clean.
+
+## Promotion candidates
+- [x] Lesson? `yes: docs/lessons/lesson-604-a-pin-check-that-reports-the-symptom-hides-the-config-that-outranked-it.md`
+- [x] ADR? `no: no decision changes; versions.conf already owns the pins, this only names the file that outranks them`
+- [x] Pattern? `no: one tool's precedence rule; the cross-project point (report the cause, not the symptom) is lesson 604`
