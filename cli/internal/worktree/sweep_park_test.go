@@ -284,6 +284,21 @@ func TestSweepReportNamesLaneSkipsOnTheWire(t *testing.T) {
 	}
 }
 
+// shared_threads is the wire name of a sweep's shared thread files, and an
+// empty report omits it (MEMORY-021 review).
+func TestSweepReportNamesSharedThreadsOnTheWire(t *testing.T) {
+	out, err := json.Marshal(SweepReport{SharedThreads: []string{"feat-x"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"shared_threads":["feat-x"]`; !strings.Contains(string(out), want) {
+		t.Errorf("report = %s, want %s", out, want)
+	}
+	if out, _ = json.Marshal(SweepReport{}); strings.Contains(string(out), "shared_threads") {
+		t.Errorf("empty report still carries shared_threads: %s", out)
+	}
+}
+
 // A dirty named lane is stopped by Classify before the park path, so the
 // sweep loop itself records its reason (CodeRabbit on #3355).
 func TestSweepReportsADirtyLaneItDidNotPark(t *testing.T) {

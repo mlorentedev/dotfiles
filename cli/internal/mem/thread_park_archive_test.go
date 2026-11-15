@@ -78,6 +78,10 @@ func TestArchiveParkedThreadUsesTheDatedArchive(t *testing.T) {
 	if strings.Join(got.Archived, ",") != "feat-a,feat-a+pi" || strings.Join(got.Kept, ",") != "feat-a+agy" {
 		t.Errorf("archived %v kept %v, want [feat-a feat-a+pi] and [feat-a+agy]", got.Archived, got.Kept)
 	}
+	// Each file is its own thread's, so none is reported shared (MEMORY-021 review).
+	if len(got.Shared) != 0 {
+		t.Errorf("shared %v, want none: every moved file was its own thread's", got.Shared)
+	}
 	wantPath := filepath.Join(memDir, "archive", "superseded-handoffs-2026-11-14.md")
 	if got.Path != wantPath {
 		t.Errorf("archive path %q, want %q", got.Path, wantPath)
@@ -189,6 +193,10 @@ func TestArchiveParkedThreadLeavesAFileAnotherKeyHolds(t *testing.T) {
 	}
 	if strings.Join(got.Archived, ",") != "feat-x" {
 		t.Errorf("archived %v, want feat-x", got.Archived)
+	}
+	// The archived entry's pointer names feat/x's file, so the park says so (#3521).
+	if strings.Join(got.Shared, ",") != "feat-x" {
+		t.Errorf("shared %v, want feat-x: its archived pointer names another thread's file", got.Shared)
 	}
 	if body, err := os.ReadFile(filepath.Join(memDir, "threads", "feat-x.md")); err != nil || string(body) != held {
 		t.Errorf("feat/x's thread file was moved or changed: %q (%v)", body, err)
