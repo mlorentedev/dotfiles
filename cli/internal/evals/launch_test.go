@@ -226,3 +226,21 @@ func TestLaunchReportsAnAnswerItCouldNotKeepAsItsOwnFailure(t *testing.T) {
 		t.Fatal("a failure to keep the answer must be returned as the launcher's own error")
 	}
 }
+
+// A launcher with no limits set runs under the defaults `spec review` uses: a
+// zero deadline would stop every runner the moment it started.
+func TestLaunchDefaultsLimitsLeftUnset(t *testing.T) {
+	root, c := plantedRoot(t)
+	r := &fakeRunner{}
+	l := testLauncher(root, r, nil)
+	l.Timeout, l.Stall = 0, 0
+	if _, err := l.Launch(context.Background(), attemptIn(t.TempDir(), c)); err != nil {
+		t.Fatal(err)
+	}
+	if r.limits.Deadline != spec.DefaultReviewerTimeout || r.limits.StallTimeout != spec.DefaultStallTimeout {
+		t.Errorf("limits = %+v, want the review defaults", r.limits)
+	}
+	if !strings.Contains(strings.Join(r.argv, " "), "Time budget:") {
+		t.Errorf("the prompt names no budget: %q", r.argv)
+	}
+}

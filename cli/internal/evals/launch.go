@@ -47,13 +47,21 @@ type ExecLauncher struct {
 	Root       string // the repository the cases and planted prompts are read from
 	Candidates map[string]spec.ReviewerEntry
 	SkillPath  string
-	Timeout    time.Duration
-	Stall      time.Duration
+	Timeout    time.Duration // zero: spec.DefaultReviewerTimeout
+	Stall      time.Duration // zero: spec.DefaultStallTimeout
 	Deps       LaunchDeps
 }
 
 // Launch implements Launcher.
 func (l ExecLauncher) Launch(_ context.Context, a Attempt) (res LaunchResult, err error) {
+	// A zero deadline would stop every runner the moment it started, so an
+	// unset limit takes the value `spec review` runs its reviewers under.
+	if l.Timeout <= 0 {
+		l.Timeout = spec.DefaultReviewerTimeout
+	}
+	if l.Stall <= 0 {
+		l.Stall = spec.DefaultStallTimeout
+	}
 	entry, ok := l.Candidates[a.Candidate]
 	if !ok {
 		return LaunchResult{}, fmt.Errorf("eval launch: candidate %s is not in candidates.json", a.Candidate)
