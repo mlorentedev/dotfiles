@@ -207,12 +207,20 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
   `reference.md`, the ideal answer the key is checked against. They use the same
   `expected`/`decoys` fields and name `human` as `key_author`. #3476's prompt is case one, and its
   false bash 3.2 claim is its first decoy.
-  A planted run (proposed 2026-11-14, HARNESS-101 slice 3; the owner decides) sends `prompt.md` as
-  written, followed by where to write the answer and the time budget, and runs in an empty directory.
-  The answer is a file at `.dotf-eval/review.md` inside that directory, the place a replay writes to,
-  so one grading path reads both. #3476 took the answer from stdout (`--print`) instead. The file is
-  the replay's contract, unmeasured on a planted case: if a candidate fails to write it, stdout is
-  the fallback to measure.
+  A planted run (decided 2026-11-14, HARNESS-101 slice 3, delegated by the owner) sends `prompt.md`
+  as written, followed by where to write the answer and the time budget, and runs in an empty
+  directory. The answer is a file at `.dotf-eval/review.md` inside that directory, the place a replay
+  writes to, so one grading path reads both. #3476 took the answer from stdout (`--print`) instead.
+  The file is chosen for three reasons:
+  - stdout is already the transcript: `pi` runs with `--mode json`, an event stream, so an answer
+    there would need a parser per runner;
+  - one answer channel keeps a gap between planted and replay scores from being an artifact of two
+    channels;
+  - a spec reviewer must write its review to a file, so a candidate that cannot do so is a real
+    `empty-answer`.
+
+  **Reopen if** a planted run ends `empty-answer` while its stored transcript holds a findings table:
+  the model found the defect and answered in chat.
 - **How a row is classed, in order** (amended 2026-11-14, HARNESS-101 slice 1):
   - noise is discarded first;
   - then a decoy match is a false positive, even when the row also names a real symbol;
