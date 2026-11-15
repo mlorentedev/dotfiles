@@ -43,7 +43,7 @@ func leakRepo(t *testing.T) (repo, sha string) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	repo = t.TempDir()
 	git(t, repo, "init", "-q", "-b", "main")
-	for _, f := range []string{"specs/archive/X/review.md", ReplayCaseDir + "/leaky.json", "code.go"} {
+	for _, f := range []string{"specs/archive/X/review.md", "specs/Y/review-round-2.md", ReplayCaseDir + "/leaky.json", "code.go"} {
 		p := filepath.Join(repo, filepath.FromSlash(f))
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -91,6 +91,7 @@ func TestPreflightNamesEverythingThatWouldFailARun(t *testing.T) {
 		{ID: "clean", Kind: "replay", ReviewedSHA: sha, SourceReview: "specs/archive/X/review-round2.md"},
 		{ID: "sees-review", Kind: "replay", ReviewedSHA: sha, SourceReview: "specs/archive/X/review.md"},
 		{ID: "leaky", Kind: "replay", ReviewedSHA: sha, SourceReview: "specs/archive/X/none.md"},
+		{ID: "sees-live", Kind: "replay", ReviewedSHA: sha, SourceReview: "specs/archive/Y/review-round-2.md"},
 		{ID: "gone", Kind: "replay", ReviewedSHA: strings.Repeat("d", 40), SourceReview: "x.md"},
 	}
 	p := Plan{}
@@ -106,8 +107,9 @@ func TestPreflightNamesEverythingThatWouldFailARun(t *testing.T) {
 	for _, want := range []string{
 		"agy/x: runner agy is not on PATH",
 		"nan/glm: secret NAN_API_KEY does not resolve",
-		"sees-review: the reviewed commit holds the source review specs/archive/X/review.md",
+		"sees-review: the reviewed commit holds the source review at specs/archive/X/review.md",
 		"leaky: the reviewed commit holds the case's own key " + ReplayCaseDir + "/leaky.json",
+		"sees-live: the reviewed commit holds the source review at specs/Y/review-round-2.md",
 		"gone",
 	} {
 		if !strings.Contains(err.Error(), want) {

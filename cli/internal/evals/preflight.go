@@ -83,13 +83,26 @@ func caseProblems(repo string, c Case) []string {
 		return []string{fmt.Sprintf("%s: %v", c.ID, err)}
 	}
 	var out []string
-	if hasPath(repo, c.ReviewedSHA, c.SourceReview) {
-		out = append(out, fmt.Sprintf("%s: the reviewed commit holds the source review %s, so the candidate could read the answer", c.ID, c.SourceReview))
+	for _, p := range sourceReviewPaths(c.SourceReview) {
+		if hasPath(repo, c.ReviewedSHA, p) {
+			out = append(out, fmt.Sprintf("%s: the reviewed commit holds the source review at %s, so the candidate could read the answer", c.ID, p))
+		}
 	}
 	if key := ReplayCaseDir + "/" + c.ID + ".json"; hasPath(repo, c.ReviewedSHA, key) {
 		out = append(out, fmt.Sprintf("%s: the reviewed commit holds the case's own key %s", c.ID, key))
 	}
 	return out
+}
+
+// sourceReviewPaths is where the source review can sit at its reviewed commit:
+// the archive path the case records, and the live spec folder it was written
+// to before the spec was archived.
+func sourceReviewPaths(archived string) []string {
+	paths := []string{archived}
+	if live := strings.Replace(archived, "specs/archive/", "specs/", 1); live != archived {
+		paths = append(paths, live)
+	}
+	return paths
 }
 
 // hasPath reports whether path exists in the tree of commit sha.
