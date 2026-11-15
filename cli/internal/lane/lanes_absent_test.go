@@ -132,3 +132,25 @@ func TestHoldingLaneNamesTheLaneThatHasTheBranch(t *testing.T) {
 		t.Errorf("HoldingLane for a lane that is gone = %q, want empty", got)
 	}
 }
+
+// Two repositories with the same basename share one WORKTREE_ROOT directory for
+// their lanes. A lane of the other repository is not this repository's, so it
+// is never named (#3531).
+func TestHoldingLaneIgnoresALaneOfAnotherRepositoryWithTheSameName(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes: %v", err)
+	}
+	if _, _, err := SwitchLane(repoDir, wtRoot, "feat/1-held", ""); err != nil {
+		t.Fatalf("SwitchLane: %v", err)
+	}
+	other := filepath.Join(t.TempDir(), "dotfiles")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runGitLaneTest(t, other, "init", "-b", "main")
+
+	if got := HoldingLane(other, wtRoot, "feat/1-held"); got != "" {
+		t.Errorf("HoldingLane named %q, a lane of a different repository", got)
+	}
+}

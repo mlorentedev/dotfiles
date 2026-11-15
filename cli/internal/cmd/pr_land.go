@@ -298,7 +298,9 @@ func writeLandResult(w io.Writer, res prland.Result) error {
 	}
 	// Landing no longer removes the worktree holding the branch, so a lane is
 	// left on a branch that has landed (#3531); say how to free it.
-	if res.HeadRef != "" {
+	// Only for the current repository: with --repo the PR may be another
+	// repository's, whose branch merely shares a name with a lane here.
+	if res.HeadRef != "" && res.Repo == "" {
 		if name := landHoldingLane(res.HeadRef); name != "" {
 			_, _ = fmt.Fprintf(w, "FIX: dotf lane park %s (#%d landed and the lane still holds %s)\n", name, number, res.HeadRef)
 		}

@@ -49,7 +49,9 @@ lane of the current repository has it checked out. If one does, it prints, befor
 
     FIX: dotf lane park feat-lane-primary (#3538 landed and the lane still holds feat/x)
 
-A branch no lane holds, or a lane that is gone, prints nothing. Covered by
+A branch no lane holds, a lane that is gone, a lane of another repository that shares the
+basename (checked against the git common dir), a fork's head, and a landing with `--repo` print
+nothing. Covered by
 `TestHoldingLaneNamesTheLaneThatHasTheBranch` (real git),
 `TestWriteLandResult_NamesTheLaneStillHoldingTheLandedBranch` and `TestLand_ResultNamesTheHeadBranch`.
 

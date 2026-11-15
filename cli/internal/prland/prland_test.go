@@ -404,6 +404,22 @@ func TestLand_ResultNamesTheHeadBranch(t *testing.T) {
 	}
 }
 
+// A fork's head names a branch of another repository, which no lane of this one
+// can hold; a --repo landing says which repository it was, so the caller can
+// tell whether the current repository's lanes are the ones it landed from.
+func TestLand_ResultNamesNoHeadBranchForAForkAndKeepsTheRepo(t *testing.T) {
+	fork := strings.Replace(readyView, `"mergeStateStatus"`, `"isCrossRepository":true,"mergeStateStatus"`, 1)
+	g := &fakeGH{view: fork, checks: greenChecks, deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged, Repo: "o/r"}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.HeadRef != "" || res.Repo != "o/r" {
+		t.Errorf("HeadRef = %q, Repo = %q; want no head and o/r", res.HeadRef, res.Repo)
+	}
+}
+
 func TestLand_DeletesTheHeadBranchOfTheNamedRepositoryByItsEscapedName(t *testing.T) {
 	view := strings.Replace(readyView, `"headRefName":"feat/x"`, `"headRefName":"fix/3#4-a%b"`, 1)
 	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}

@@ -348,6 +348,15 @@ func TestWriteLandResult_NamesTheLaneStillHoldingTheLandedBranch(t *testing.T) {
 	if strings.Contains(free.String(), "FIX:") {
 		t.Errorf("a branch no lane holds got a fix line:\n%s", free.String())
 	}
+	// The lanes are the current repository's: a PR landed with --repo may be
+	// another repository's, whose branch merely shares the name.
+	var named bytes.Buffer
+	if err := writeLandResult(&named, prland.Result{Number: 32, Merged: true, HeadSHA: "abc1234def", HeadRef: "feat/held", Repo: "o/other"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(named.String(), "FIX:") {
+		t.Errorf("a PR of a named repository got a fix line about this repository's lane:\n%s", named.String())
+	}
 }
 
 // A red review-attestation with a pr-agent run still running on the head is a

@@ -388,11 +388,21 @@ func unionRoots(base, extra []string) []string {
 }
 
 // HoldingLane names the canonical lane whose worktree has branch checked out,
-// or "" when none does, which includes a lane whose worktree is gone.
+// or "" when none does, which includes a lane whose worktree is gone or is
+// another repository's.
 func HoldingLane(repoRoot, worktreeRoot, branch string) string {
 	repoWTRoot := filepath.Join(worktreeRoot, filepath.Base(filepath.Clean(repoRoot)))
+	repoCommonDir, err := resolveGitCommonDir(repoRoot)
+	if err != nil {
+		return ""
+	}
 	for _, name := range CanonicalLanes {
-		out, err := exec.Command("git", "-C", filepath.Join(repoWTRoot, name), "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+		lanePath := filepath.Join(repoWTRoot, name)
+		// Two repositories with one basename share this directory.
+		if assertWorktreeOf(repoRoot, repoCommonDir, lanePath) != nil {
+			continue
+		}
+		out, err := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
 		if err == nil && strings.TrimSpace(string(out)) == branch {
 			return name
 		}
