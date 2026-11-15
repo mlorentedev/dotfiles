@@ -26,6 +26,12 @@ owner: manu
 - The first commit ran a bare `mise prune --yes`. The venv measurement (hive's uv tool and about 55 kubelab `.venv`s on mise's Python 3.13.16) turned that into a hold. mise has no exclusion flag, so the pruner names the tools to prune instead.
 - `cmdsFor` builds the commands at run time; static pruners keep `cmds`. A dry run prints `plan` and does not list the tools, because a plan must not depend on a command that may fail.
 
+- Review (PASS at d282b9df), Minor that the unparseable-listing branch is untested: applied. `TestCacheGC_MiseUnreadableListingFailsTheStepWithoutPruning`.
+- Review, Minor that the `plan` literal can drift from `miseHeld` and that the `cmdsFor` arm of `plannedCommands` is untested: applied. The plan is built from `miseHeld` through `heldNames`, and `TestCacheGC_PlanNamesTheHeldMiseToolsAndRunsNothing` covers the arm.
+- Review, Minor that the `tools` step's orphan prune has no python hold: recorded, not changed. That prune removes only tools no pin names, and python is a hard dependency that stays pinned (#2062). ADR-036 and the `miseHeld` comment now state the assumption.
+- Review, Minor suggesting reuse of `mise ls --prunable --json`: declined. The pruner needs tool names, not versions, and `mise prune` already decides which versions go. Reusing `Orphans` would couple `cache-gc` to the `tools` step's parsing for no change in behaviour.
+- Review, question whether python could appear under another key: confirmed bare `python` on the Mac (`core:python`); no change.
+
 ## Promotion candidates
 
 - [x] Lesson for the repo's `docs/lessons/`? yes: lesson 605 (a pin with no way to move it gets moved by hand), which records the hold

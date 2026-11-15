@@ -153,7 +153,7 @@ Scope:
 
 **dotf collects the caches its tools fill, weekly, and only with each tool's own collection that keeps what is in use.**
 
-The `cache-gc` converge step runs once a week. It uses age-based or unreferenced-only collection: `uv cache prune`, `pre-commit gc`, `npm cache verify`, `mise prune` (tool versions no config asks for, Python excepted because venvs point at it, #3533), Docker build cache and dangling images older than a week, and `limactl prune --keep-referred`. It then runs `fstrim` inside the colima VM, so the host's disk file shrinks. It never clears a cache outright: a cold cache costs a rebuild or a re-download that the disk saving does not repay.
+The `cache-gc` converge step runs once a week. It uses age-based or unreferenced-only collection: `uv cache prune`, `pre-commit gc`, `npm cache verify`, `mise prune` (tool versions no config asks for, Python excepted because venvs point at it, #3533; the `tools` step's orphan prune has no such hold, which is safe only while Python stays pinned), Docker build cache and dangling images older than a week, and `limactl prune --keep-referred`. It then runs `fstrim` inside the colima VM, so the host's disk file shrinks. It never clears a cache outright: a cold cache costs a rebuild or a re-download that the disk saving does not repay.
 
 Left out on purpose:
 - Go's build cache, which trims entries unused for five days on its own.

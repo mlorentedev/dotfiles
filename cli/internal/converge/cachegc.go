@@ -60,7 +60,7 @@ var gcPruners = []gcPruner{
 	// A version a pin moved away from stays installed for good: the tools
 	// step prunes only tools no pin names (#3533). mise prune keeps every
 	// version a tracked config asks for and every one a running process uses.
-	{tool: "mise", cmdsFor: misePrune, plan: "mise prune --tools (every installed tool but python)"},
+	{tool: "mise", cmdsFor: misePrune, plan: "mise prune --tools (every installed tool but " + heldNames() + ")"},
 	{tool: "docker", ready: answers("docker", "info"), cmds: [][]string{
 		{"docker", "builder", "prune", "-f", "--filter", "until=168h"},
 		{"docker", "image", "prune", "-f", "--filter", "until=168h"},
@@ -293,7 +293,22 @@ func (p gcPruner) commands(r cacheGC) ([][]string, error) {
 // records its interpreter by absolute path, so removing a Python a pin moved
 // away from breaks every venv built on it: hive's uv tool and each project's
 // .venv. They move to the new Python when they are rebuilt, not before.
+//
+// Only this pruner holds them. The tools step's orphan prune removes a tool
+// no pin names, python included, which is safe only while python stays
+// pinned (ADR-036).
 var miseHeld = map[string]bool{"python": true}
+
+// heldNames is miseHeld for the dry-run plan, so the plan cannot drift from
+// what the pruner keeps.
+func heldNames() string {
+	names := make([]string, 0, len(miseHeld))
+	for n := range miseHeld {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	return strings.Join(names, ", ")
+}
 
 // misePrune names every installed tool but the held ones, since mise prune
 // takes the tools to prune and has no way to exclude one. With nothing left

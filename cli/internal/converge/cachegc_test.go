@@ -311,3 +311,30 @@ func TestCacheGC_MiseListFailureFailsTheStepAndKeepsItDue(t *testing.T) {
 		}
 	}
 }
+
+func TestCacheGC_MiseUnreadableListingFailsTheStepWithoutPruning(t *testing.T) {
+	state := t.TempDir()
+	f := newGCFake("mise")
+	f.miseInstalled = "not json"
+	if _, err := f.step(state).Reconcile(Env{Home: state}, false); err == nil {
+		t.Fatal("an unreadable listing must fail the step")
+	}
+	if want := []string{"mise ls --installed --json"}; !slices.Equal(f.log, want) {
+		t.Errorf("commands:\n got %q\nwant %q", f.log, want)
+	}
+}
+
+func TestCacheGC_PlanNamesTheHeldMiseToolsAndRunsNothing(t *testing.T) {
+	state := t.TempDir()
+	f := newGCFake("mise")
+	res, err := f.step(state).Reconcile(Env{Home: state}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Detail, "mise prune --tools (every installed tool but python)") {
+		t.Errorf("plan detail = %q", res.Detail)
+	}
+	if len(f.log) != 0 {
+		t.Errorf("a plan runs nothing, ran %q", f.log)
+	}
+}
