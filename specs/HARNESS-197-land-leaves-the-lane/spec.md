@@ -41,6 +41,18 @@ After the loss, `lane switch` counted the missing lane as ACTIVE and sent the op
 Out of scope: refusing `dotf worktree done` on a lane (it already parks one), and the same
 `--delete-branch` in a human's own `gh pr merge`.
 
+## The lane left holding a landed branch
+
+With the worktree left alone, the lane that held the branch keeps it after the merge. `pr land`
+reads the head branch from the PR (`Result.HeadRef`) and asks `lane.HoldingLane` which canonical
+lane of the current repository has it checked out. If one does, it prints, before `[MERGED]`:
+
+    FIX: dotf lane park feat-lane-primary (#3538 landed and the lane still holds feat/x)
+
+A branch no lane holds, or a lane that is gone, prints nothing. Covered by
+`TestHoldingLaneNamesTheLaneThatHasTheBranch` (real git),
+`TestWriteLandResult_NamesTheLaneStillHoldingTheLandedBranch` and `TestLand_ResultNamesTheHeadBranch`.
+
 ## Checklist
 - [x] A red test per behaviour, each watched failing first
 - [x] `go build`, `go vet`, `go test ./...` on Linux and `GOOS=windows go vet`
