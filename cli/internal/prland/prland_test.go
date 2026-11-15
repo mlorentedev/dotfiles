@@ -390,6 +390,20 @@ func TestLand_NeverAsksGhToDeleteTheBranch(t *testing.T) {
 	}
 }
 
+// The caller learns which branch landed, so it can find the lane still holding
+// it: gh no longer removes that worktree (#3531).
+func TestLand_ResultNamesTheHeadBranch(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.HeadRef != "feat/x" {
+		t.Errorf("HeadRef = %q, want feat/x", res.HeadRef)
+	}
+}
+
 func TestLand_DeletesTheHeadBranchOfTheNamedRepositoryByItsEscapedName(t *testing.T) {
 	view := strings.Replace(readyView, `"headRefName":"feat/x"`, `"headRefName":"fix/3#4-a%b"`, 1)
 	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}

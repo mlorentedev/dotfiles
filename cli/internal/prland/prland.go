@@ -213,6 +213,7 @@ type Result struct {
 	Merged     bool
 	Updated    bool // the base was merged into the branch first
 	HeadSHA    string
+	HeadRef    string   // the head branch, which a lane may still hold once it landed
 	Reasons    []string // why it did not merge
 	Retargeted []int    // dependents pointed at the base before the merge
 	Warnings   []string // what went wrong after the merge landed
@@ -245,7 +246,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		f.GrantDeclared, f.Excluded = g.declared, g.excluded
 		return Decide(f)
 	}
-	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: append(decide(f), verdict.reasons(f)...)}
+	res := Result{Number: number, HeadSHA: f.HeadSHA, HeadRef: f.HeadRef, Reasons: append(decide(f), verdict.reasons(f)...)}
 	// Again while the base moves under the new head's CI, which a busy queue
 	// does: one update left the PR behind the next merge (#2041).
 	updates := 0

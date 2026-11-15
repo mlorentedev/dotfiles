@@ -10,7 +10,7 @@ issue: "mlorentedev/dotfiles#3531"
 
 ## Intent
 
-Twice on 2026-11-14 the persistent lane `feat-lane-secondary` vanished within nine seconds of
+Twice on 2026-11-14 the persistent lane `feat-lane-secondary` vanished within seven seconds of
 `dotf pr land` merging the PR it held (#3526, then #3530). Nothing in `sweep`, `worktree done` or
 `lane park` removes a lane that carries its lease: the removal was `gh pr merge --delete-branch`,
 which `prland` passes. With it, gh 2.104.0 (the version on the machine) removes the linked worktree that has the
@@ -28,7 +28,10 @@ After the loss, `lane switch` counted the missing lane as ACTIVE and sent the op
   escaped). A fork's head is left alone (`isCrossRepository`), a branch already gone is not a
   warning, and any other refusal is a warning on a PR that stays merged. The local branch and its
   worktree are left to `dotf worktree done` and `dotf lane park`, which check cwd, sessions and the
-  lease before touching them.
+  lease before touching them. Rather than park the lane itself, `pr land` prints
+  `FIX: dotf lane park <lane>` when a canonical lane still holds the landed branch: parking is a
+  separate, cwd- and lease-checked step, and the message is correct whether land ran in or out of
+  the lane.
 - `lane switch` names each candidate lane with what is wrong with it: ACTIVE (park it) or absent
   or without a lease (`dotf lane init`, which is idempotent). It does not recreate the lane itself:
   `init` also owns the marker and the identity record, and one command that fixes it is simpler
