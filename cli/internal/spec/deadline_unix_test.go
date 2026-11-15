@@ -149,3 +149,14 @@ func TestRunWithLimitsSaysWhenASignalEndedTheRun(t *testing.T) {
 		t.Errorf("own exit 130: %+v err %v, want not Signaled", res, err)
 	}
 }
+
+// An evaluation run launches in-process and cannot change this process's
+// directory: the runner is started in Limits.Dir, which pi reads as its tree.
+func TestRunWithLimitsStartsTheRunnerInItsDirectory(t *testing.T) {
+	dir := ResolveExisting(t.TempDir())
+	var out bytes.Buffer
+	res, err := RunWithLimits(Limits{Deadline: time.Minute, Dir: dir}, []string{"sh", "-c", "pwd -P"}, nil, &out, &bytes.Buffer{})
+	if err != nil || res.Code != 0 || strings.TrimSpace(out.String()) != dir {
+		t.Errorf("ran in %q (code %d, err %v), want %s", strings.TrimSpace(out.String()), res.Code, err, dir)
+	}
+}

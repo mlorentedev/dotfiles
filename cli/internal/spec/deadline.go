@@ -61,6 +61,9 @@ type Limits struct {
 	// Transcript: there is nothing to watch.
 	StallTimeout time.Duration
 	Transcript   string
+	// Dir is where the runner starts; empty means this process's directory.
+	// An evaluation run launches in-process and names its tree here.
+	Dir string
 }
 
 // StopReason says what ended a run, when the launcher did.
@@ -108,6 +111,7 @@ func RunWithLimits(l Limits, argv []string, stdin io.Reader, stdout, stderr io.W
 	}
 	c := exec.Command(argv[0], argv[1:]...) //nolint:gosec // argv is the launcher's own reviewer command
 	c.Stdin, c.Stdout, c.Stderr = stdin, stdout, stderr
+	c.Dir = l.Dir
 	startInOwnGroup(c)
 	if err := c.Start(); err != nil {
 		return RunResult{Code: -1}, err
