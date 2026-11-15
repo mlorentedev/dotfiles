@@ -706,8 +706,8 @@ func (s MiseSync) Apply(tools []MiseTool) (p SyncPlan, err error) {
 		return p, fmt.Errorf("after mise prune, still installed: %s", strings.Join(after.Orphans, ", "))
 	}
 	if len(after.Missing) > 0 {
-		return p, fmt.Errorf("after mise install, not running at their pin: %s%s",
-			strings.Join(after.Missing, ", "), batsRuntimeNote(runtime.GOOS, after.Missing, gitExecPath))
+		return p, fmt.Errorf("after mise install, not running at their pin: %s%s%s",
+			strings.Join(after.Missing, ", "), batsRuntimeNote(runtime.GOOS, after.Missing, gitExecPath), s.shadowSuffix(tools, after.Missing))
 	}
 	if older := regressed(p.current, after.current, after.Outdated); len(older) > 0 {
 		return p, fmt.Errorf("after mise upgrade, older than before: %s", strings.Join(older, ", "))

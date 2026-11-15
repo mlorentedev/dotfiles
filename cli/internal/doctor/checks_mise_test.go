@@ -15,7 +15,8 @@ const miseVersions = "# mise: cli\nJQ_VERSION=1.7.1\n# mise: cli\nAGE_VERSION=1.
 
 // miseFixture is a machine where mise resolves jq and age; ageVersion is what
 // the installed age reports, and synced writes the config the sync renders.
-func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *Config) {
+// extra adds to what the fake mise answers, or replaces an answer.
+func miseFixture(t *testing.T, goos, ageVersion string, synced bool, extra ...map[string]string) (*System, *Config) {
 	t.Helper()
 	home := t.TempDir()
 	versions := filepath.Join(home, "versions.conf")
@@ -27,7 +28,7 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		}
 		writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, nil)))
 	}
-	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
+	answers := map[string]string{
 		"mise which jq":    "/m/jq\n",
 		"/m/jq --version":  "jq-1.7.1",
 		"mise which age":   "/m/age\n",
@@ -36,7 +37,13 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		"mise bin-paths --bin-names age@1.2.1 jq@1.7.1": "age\nage-keygen\njq\n",
 		"mise install":              "",
 		"mise ls --prunable --json": "{}",
-	})
+	}
+	for _, m := range extra {
+		for k, v := range m {
+			answers[k] = v
+		}
+	}
+	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, answers)
 	s.GOOS = goos
 	return s, &Config{VersionsPath: versions}
 }
@@ -60,6 +67,78 @@ func TestCheckMiseTools_ACLIBelowItsPinFailsNamingTheSync(t *testing.T) {
 	checkMiseTools(s, cfg, rep, false)
 	if rep.Failures() != 1 || !strings.Contains(b.String(), "age") || !strings.Contains(b.String(), "dotf tools sync") {
 		t.Errorf("want one FAIL naming age and the sync\n%s", b.String())
+	}
+}
+
+// A pin another mise config holds is not fixed by the sync, which installs
+// dotfiles' version beside it and loses to the other file again. The FAIL names
+// that file, the version it pins and the fix, and not "run: dotf tools sync"
+// (#3524). Where mise cannot say who resolved the tool, the plain FAIL stays.
+func TestCheckMiseTools_APinShadowedByAnotherConfigNamesTheFileAndTheFix(t *testing.T) {
+	foreign := "/home/ace/.config/mise/config.toml"
+	for _, tc := range []struct {
+		name    string
+		ls      string
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "shadowed",
+			ls:   `[{"version": "1.1.0", "requested_version": "1.1.0", "installed": true, "active": true, "source": {"type": "mise.toml", "path": "` + foreign + `"}}]`,
+			want: []string{
+				"not running at their pin through mise: age",
+				foreign + " pins age 1.1.0",
+				"FIX: remove the pin there, or let that file's owner stop pinning a tool versions.conf owns",
+			},
+			notWant: []string{"run: dotf tools sync"},
+		},
+		{
+			name:    "mise output unparseable",
+			ls:      "not json",
+			want:    []string{"not running at their pin through mise: age", "run: dotf tools sync"},
+			notWant: []string{"FIX:", "pins"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, cfg := miseFixture(t, "darwin", "1.1.0", true, map[string]string{"mise ls --json age": tc.ls})
+			var b bytes.Buffer
+			rep := capture(&b)
+			checkMiseTools(s, cfg, rep, false)
+			if rep.Failures() != 1 {
+				t.Errorf("want one FAIL, got %d\n%s", rep.Failures(), b.String())
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(b.String(), w) {
+					t.Errorf("output lacks %q\n%s", w, b.String())
+				}
+			}
+			for _, w := range tc.notWant {
+				if strings.Contains(b.String(), w) {
+					t.Errorf("output must not contain %q\n%s", w, b.String())
+				}
+			}
+		})
+	}
+}
+
+// Before dotfiles' own config is current, mise has not yet been told the pins:
+// a lower-precedence file (a system /etc/mise/config.toml) can be what runs the
+// tool, and "outranks dotfiles" would be false. The sync guidance stays until
+// the owned config is written.
+func TestCheckMiseTools_NoShadowIsClaimedBeforeTheOwnedConfigIsCurrent(t *testing.T) {
+	ls := `[{"version": "1.1.0", "requested_version": "1.1.0", "installed": true, "active": true, "source": {"type": "mise.toml", "path": "/etc/mise/config.toml"}}]`
+	s, cfg := miseFixture(t, "linux", "1.1.0", false, map[string]string{"mise ls --json age": ls})
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	out := b.String()
+	if !strings.Contains(out, "not running at their pin through mise: age (run: dotf tools sync)") {
+		t.Errorf("want the sync guidance\n%s", out)
+	}
+	for _, w := range []string{"FIX:", "outranks", "/etc/mise/config.toml"} {
+		if strings.Contains(out, w) {
+			t.Errorf("output must not contain %q before the owned config is current\n%s", w, out)
+		}
 	}
 }
 
