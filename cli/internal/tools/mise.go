@@ -912,12 +912,7 @@ func homeCommand(home, goos string, locateBash func() (bash, reason string)) fun
 		c := exec.Command(name, args...) //nolint:gosec // mise, or a tool path mise resolved
 		c.Dir = home
 		installerEnv := miseInstallEnv(name, args...)
-		bashBin := ""
-		if goos == "windows" && gitBashScope(name, args...) {
-			if bash, reason := locateBash(); reason == "" {
-				bashBin = filepath.Dir(bash)
-			}
-		}
+		bashBin := gitBashDir(goos, locateBash, name, args...)
 		if bashBin != "" || installerEnv != "" {
 			c.Env = os.Environ()
 		}
@@ -929,6 +924,33 @@ func homeCommand(home, goos string, locateBash func() (bash, reason string)) fun
 		}
 		return c
 	}
+}
+
+// gitBashDir returns the directory of Git Bash's bash.exe when the command
+// needs it first on PATH (see gitBashScope), and "" otherwise or when Git Bash
+// cannot be found.
+func gitBashDir(goos string, locateBash func() (bash, reason string), name string, args ...string) string {
+	if goos != "windows" || !gitBashScope(name, args...) {
+		return ""
+	}
+	if bash, reason := locateBash(); reason == "" {
+		return filepath.Dir(bash)
+	}
+	return ""
+}
+
+// GitBashEnv returns the environment a sync child runs with when it needs Git
+// Bash first on PATH, and nil when it keeps the caller's. It is what
+// HomeRunners applies, for a caller that builds its own runners (the doctor's
+// sync) and so would otherwise run bats.cmd against WSL's bash (#3507).
+// execPath answers `git --exec-path`; Git Bash is looked up on each call,
+// never cached (#3328).
+func GitBashEnv(goos string, execPath func() ([]byte, error), name string, args ...string) []string {
+	dir := gitBashDir(goos, func() (string, string) { return findGitBash(execPath) }, name, args...)
+	if dir == "" {
+		return nil
+	}
+	return append(os.Environ(), "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 // gitExecPath asks git where its helpers live; Git Bash is found from it.

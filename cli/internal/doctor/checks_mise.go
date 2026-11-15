@@ -231,16 +231,35 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) too
 	return tools.MiseSync{
 		ConfigDir: tools.MiseConfigDir(home, sys.Getenv),
 		Run: func(name string, args ...string) ([]byte, error) {
+			if env := gitBashEnv(sys, name, args...); env != nil {
+				out, err := sys.CommandOutputEnvDir(env, home, name, args...)
+				return []byte(out), err
+			}
 			out, err := sys.CommandOutputDir(home, name, args...)
 			return []byte(out), err
 		},
 		Stdout: func(name string, args ...string) ([]byte, error) {
+			if env := gitBashEnv(sys, name, args...); env != nil {
+				out, err := sys.CommandOutputEnvDir(env, home, name, args...)
+				return []byte(out), err
+			}
 			out, err := sys.CommandStdoutDir(home, name, args...)
 			return []byte(out), err
 		},
 		PythonPackages: pythonPackages,
 		Latest:         latest,
 	}
+}
+
+// gitBashEnv scopes Git Bash to the commands that need it, as the sync's own
+// runners do (tools.HomeRunners): bats.cmd runs bash.exe from PATH, and without
+// Git Bash first that is WSL's, so the doctor would report bats off its pin on a
+// machine the sync just converged (#3507). It asks git on each call.
+func gitBashEnv(sys *System, name string, args ...string) []string {
+	return tools.GitBashEnv(sys.GOOS, func() ([]byte, error) {
+		out, err := sys.CommandStdoutDir("", "git", "--exec-path")
+		return []byte(out), err
+	}, name, args...)
 }
 
 // checkShadowingCopies finds the executables mise provides for the pins that
