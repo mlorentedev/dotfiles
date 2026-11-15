@@ -376,6 +376,14 @@ refute_legacy_mise_sync() {
     grep -q 'Configuring PATH' "$PS1_SCRIPT"
 }
 
+@test "setup-windows.ps1 appends the scripts directory to the user Path, never prepends it (#3508)" {
+    # env-persist owns the head of the user Path (mise's shims, ~/.local/bin) and
+    # the converge runs this script after it: a prepend here displaced that head,
+    # so the second converge put it back and was not changed=0.
+    refute_grep_fixed '$newPath = "$ScriptsDir;' "$PS1_SCRIPT"
+    grep -qF '$newPath = "$currentPath;$ScriptsDir"' "$PS1_SCRIPT"
+}
+
 @test "setup-windows.ps1 has summary section" {
     grep -q 'Setup Complete' "$PS1_SCRIPT"
 }
