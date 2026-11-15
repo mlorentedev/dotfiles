@@ -71,9 +71,16 @@ func (l ExecLauncher) Launch(_ context.Context, a Attempt) (res LaunchResult, er
 		return LaunchResult{}, err
 	}
 	defer func() {
-		if rmErr := tree.Remove(); rmErr != nil && err == nil {
-			err = fmt.Errorf("eval launch: remove the tree %s: %w", tree.Dir, rmErr)
+		rmErr := tree.Remove()
+		if rmErr == nil {
+			return
 		}
+		rmErr = fmt.Errorf("eval launch: tree %s left behind: %w", tree.Dir, rmErr)
+		if err != nil {
+			err = errors.Join(err, rmErr)
+			return
+		}
+		res.Leftover = rmErr
 	}()
 	if err := os.MkdirAll(filepath.Join(tree.Dir, spec.EvalAnswerDir), 0o755); err != nil {
 		return LaunchResult{}, err

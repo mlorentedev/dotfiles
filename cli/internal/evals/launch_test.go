@@ -244,3 +244,23 @@ func TestLaunchDefaultsLimitsLeftUnset(t *testing.T) {
 		t.Errorf("the prompt names no budget: %q", r.argv)
 	}
 }
+
+// A tree that will not go away is the operator's problem, not the model's: the
+// answer the run paid for is still graded, and the record says what was left.
+func TestATreeThatWillNotGoAwayKeepsTheGrade(t *testing.T) {
+	c := Case{ID: "a-r1", Kind: "replay", Spec: "AI-055", ReviewedSHA: strings.Repeat("a", 40), BaseSHA: strings.Repeat("b", 40),
+		ExpectedVerdict: "FAIL", KeyAuthor: "human"}
+	a := attemptIn(t.TempDir(), c)
+	answerPath := filepath.Join(a.Tree, spec.EvalAnswerDir, spec.EvalSlot.Review)
+	checkout := func(_ Case, _ string, _ int) (Tree, error) {
+		return Tree{Dir: a.Tree, Remove: func() error { return errors.New("device busy") }}, os.MkdirAll(a.Tree, 0o755)
+	}
+	r := &fakeRunner{act: writesAnswer(&answerPath, answer("FAIL"))}
+	rec := grade(context.Background(), a, testLauncher(t.TempDir(), r, checkout))
+	if rec.Completion != CompletionAnswered || rec.Grade == nil {
+		t.Fatalf("record = %+v, want the answer graded", rec)
+	}
+	if !strings.Contains(rec.Detail, "device busy") || !strings.Contains(rec.Detail, a.Tree) {
+		t.Errorf("detail = %q, want the tree left behind named", rec.Detail)
+	}
+}

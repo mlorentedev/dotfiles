@@ -66,6 +66,10 @@ type LaunchResult struct {
 	Interrupted bool
 	Duration    time.Duration
 	Tokens      *Tokens // nil when the runner reports none
+	// Leftover — the attempt ended but its tree could not be removed. It is
+	// the operator's to clean up and says nothing about the model, so it is
+	// recorded beside the result instead of replacing it.
+	Leftover error
 }
 
 // Tokens is what a runner reported spending. Absent is "not reported", never 0.
@@ -148,8 +152,8 @@ func attemptFor(runDir string, c Case, candidate string, epoch int) Attempt {
 	}
 }
 
-func grade(ctx context.Context, a Attempt, l Launcher) Record {
-	rec := Record{
+func grade(ctx context.Context, a Attempt, l Launcher) (rec Record) {
+	rec = Record{
 		Case: a.Case.ID, Kind: a.Case.Kind, Candidate: a.Candidate, Epoch: a.Epoch,
 		OwnKey: a.Case.KeyAuthor == a.Candidate,
 	}
@@ -157,6 +161,9 @@ func grade(ctx context.Context, a Attempt, l Launcher) Record {
 	if err != nil {
 		rec.Completion, rec.Detail = CompletionInfra, err.Error()
 		return rec
+	}
+	if res.Leftover != nil {
+		defer func() { rec.Detail = strings.TrimPrefix(rec.Detail+"; "+res.Leftover.Error(), "; ") }()
 	}
 	rec.DurationSeconds, rec.Tokens = res.Duration.Seconds(), res.Tokens
 	if res.ExitErr != nil {
