@@ -168,8 +168,7 @@ func TestRenovate_NoGroupCanOutgrowTheSpecGate(t *testing.T) {
 		perGroup[m[re.SubexpIndex("depType")]]++
 	}
 	perGroup["runtime"]++ // cli/go.mod's go line moves with GO_VERSION
-	perGroup["catalog"] += strings.Count(readRepoFile(t, "packages.json"), `"type": "github-`) +
-		strings.Count(readRepoFile(t, "packages.json"), `"type": "uv-tool"`)
+	perGroup["catalog"] += catalogRenovatePins(t)
 
 	threshold := specGateThreshold(t)
 	for group, pins := range perGroup {
@@ -180,6 +179,41 @@ func TestRenovate_NoGroupCanOutgrowTheSpecGate(t *testing.T) {
 			t.Errorf("group %q moves %d pins, %d lines, and the spec-gate fails at %d: split it", group, pins, lines, threshold)
 		}
 	}
+}
+
+// catalogRenovatePinSources are the packages.json source types renovate.json's
+// jsonata manager reads; "system" entries track the OS package manager instead.
+var catalogRenovatePinSources = map[string]bool{"github-release": true, "github-archive": true, "uv-tool": true}
+
+// catalogRenovatePins counts the packages.json entries Renovate moves, and fails
+// on a source type renovate.json does not map: a new type would otherwise get no
+// PR and no error.
+func catalogRenovatePins(t *testing.T) int {
+	t.Helper()
+	var catalog struct {
+		Tools []struct {
+			Name   string `json:"name"`
+			Source struct {
+				Type string `json:"type"`
+			} `json:"source"`
+		} `json:"tools"`
+	}
+	if err := json.Unmarshal([]byte(readRepoFile(t, "packages.json")), &catalog); err != nil {
+		t.Fatalf("parse packages.json: %v", err)
+	}
+	n := 0
+	for _, tool := range catalog.Tools {
+		switch {
+		case catalogRenovatePinSources[tool.Source.Type]:
+			n++
+		case tool.Source.Type != "system":
+			t.Errorf("packages.json entry %s has source type %q, which renovate.json's jsonata manager does not map", tool.Name, tool.Source.Type)
+		}
+	}
+	if n == 0 {
+		t.Fatal("packages.json yielded no Renovate-managed entries: the reader is broken, not the file")
+	}
+	return n
 }
 
 // The npm-backend CLIs install the package npmBackend names, and Renovate must
