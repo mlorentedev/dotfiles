@@ -14,7 +14,7 @@ Twice on 2026-11-14 the persistent lane `feat-lane-secondary` vanished within ni
 `dotf pr land` merging the PR it held (#3526, then #3530). Nothing in `sweep`, `worktree done` or
 `lane park` removes a lane that carries its lease: the removal was `gh pr merge --delete-branch`,
 which `prland` passes. With it, gh 2.104.0 (the version on the machine) removes the linked worktree that has the
-branch checked out ("Removed worktree %s" in the binary, with "navigate out of the worktree" when
+branch checked out ("Removed worktree %s" in the binary and `WorktreeRemove` in `pkg/cmd/pr/merge/merge.go` at v2.104.0, reached only when the flag is set, with "navigate out of the worktree" when
 the caller stands inside it). The transcript of the session that landed both PRs shows no other
 command anywhere in that window.
 

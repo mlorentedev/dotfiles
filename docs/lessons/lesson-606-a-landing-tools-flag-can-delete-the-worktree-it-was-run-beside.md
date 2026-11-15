@@ -20,7 +20,10 @@ Neither could have. A lane with its lease is parked by both, never removed, and 
 carried its lease. The code that removes worktrees is a short list, and none of it ran. The removal
 was in a binary the code only calls: `gh pr merge --delete-branch` removes the linked worktree that
 has the branch checked out, in gh 2.104.0 (the version installed; others were not tested). The flag name says "branch", and the side effect on a
-directory is in no help text; it showed only in the strings of the binary ("Removed worktree %s").
+directory is in no help text; it showed only in the strings of the binary ("Removed worktree %s"), and
+the source at the v2.104.0 tag confirms it: `pkg/cmd/pr/merge/merge.go` reaches `WorktreeRemove` only
+through `deleteLocalBranch`, which returns first unless `deleteBranch` is set, and without the flag a
+non-interactive merge sets nothing.
 
 ## Solution
 
