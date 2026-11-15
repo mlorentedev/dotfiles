@@ -592,9 +592,10 @@ func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
 	})
 	s.GOOS = "windows"
 	var scoped, unscoped []string
-	s.CommandOutputEnv = func(env []string, name string, args ...string) (string, error) {
+	var scopedDir string
+	s.CommandOutputEnvDir = func(env []string, dir, name string, args ...string) (string, error) {
 		if name == bats {
-			scoped = env
+			scoped, scopedDir = env, dir
 			return "Bats 1.13.0", nil
 		}
 		return "", errors.New("unexpected scoped command " + name)
@@ -624,6 +625,9 @@ func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
 	}
 	if !strings.HasPrefix(path, filepath.Join(root, "bin")+string(os.PathListSeparator)) {
 		t.Errorf("bats.cmd's PATH must start with Git Bash's bin dir %s, got %q", filepath.Join(root, "bin"), path)
+	}
+	if scopedDir != home {
+		t.Errorf("the scoped probe must run from HOME like the sync's runners, ran from %q", scopedDir)
 	}
 	if rep.Failures() != 0 {
 		t.Errorf("bats at its pin must pass the doctor\n%s", b.String())

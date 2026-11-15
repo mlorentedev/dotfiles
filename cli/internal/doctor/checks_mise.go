@@ -224,7 +224,7 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) too
 		ConfigDir: tools.MiseConfigDir(home, sys.Getenv),
 		Run: func(name string, args ...string) ([]byte, error) {
 			if env := gitBashEnv(sys, name, args...); env != nil {
-				out, err := sys.CommandOutputEnv(env, name, args...)
+				out, err := sys.CommandOutputEnvDir(env, home, name, args...)
 				return []byte(out), err
 			}
 			out, err := sys.CommandOutputDir(home, name, args...)
@@ -232,7 +232,7 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) too
 		},
 		Stdout: func(name string, args ...string) ([]byte, error) {
 			if env := gitBashEnv(sys, name, args...); env != nil {
-				out, err := sys.CommandOutputEnv(env, name, args...)
+				out, err := sys.CommandOutputEnvDir(env, home, name, args...)
 				return []byte(out), err
 			}
 			out, err := sys.CommandStdoutDir(home, name, args...)

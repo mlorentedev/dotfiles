@@ -62,6 +62,11 @@ type System struct {
 	// CommandOutputEnv is CommandOutput with an explicit environment. Checks use
 	// it when inherited process state could redirect a probe to another target.
 	CommandOutputEnv func(env []string, name string, args ...string) (string, error)
+	// CommandOutputEnvDir is CommandOutputEnv with a working directory: the
+	// sync's runners run from home, so a project mise.toml in the caller's
+	// directory is not installed as a side effect, and a scoped environment
+	// (Git Bash first on PATH, #3507) must not give that up.
+	CommandOutputEnvDir func(env []string, dir, name string, args ...string) (string, error)
 	// CommandOutputDir is CommandOutput with a working directory — for tools that
 	// resolve their target from the process cwd rather than an argument (e.g.
 	// `pre-commit install`, which locates the git repo relative to where it runs).
@@ -263,6 +268,13 @@ func realSystem() *System {
 		CommandOutputEnv: func(env []string, name string, args ...string) (string, error) {
 			cmd := exec.Command(name, args...)
 			cmd.Env = env
+			out, err := cmd.CombinedOutput()
+			return string(out), err
+		},
+		CommandOutputEnvDir: func(env []string, dir, name string, args ...string) (string, error) {
+			cmd := exec.Command(name, args...)
+			cmd.Env = env
+			cmd.Dir = dir
 			out, err := cmd.CombinedOutput()
 			return string(out), err
 		},
