@@ -56,7 +56,7 @@ Every number below was measured in this session on `main` at `99cd03ae`.
 | `reviewed_sha` values still in the local clone | 80 of 141; 42 are ancestors of `origin/main` |
 | A squash-merged `reviewed_sha` (`fb88359c`, AI-030) | still served by GitHub through PR #1922's ref |
 | AI-055 round 2 at its own `reviewed_sha` (`06f3100b`) | `TestCheckReviewBudget_AFileWithoutAClipFailsClosed` is absent. The deleted test is visible, so the two REAL Majors #3476 could not see can be found |
-| Earlier rounds' `review*.md` inside the replayed tree, over all 122 rounds whose `reviewed_sha` is in the clone | 0. A review file never leaks into the replayed tree. `verification.md` can: at AI-055 round 4 it already dispositions round 2's Minors |
+| Earlier rounds' `review*.md` inside the replayed tree, over all 122 rounds whose `reviewed_sha` is in the clone | Corrected 2026-11-15: not 0. `harness-088-r2`'s tree holds `specs/HARNESS-088-handoff-threads/review-round-1.md`. An earlier round is state the original reviewer also had, so it stays; only the round's own `source_review` would leak its key, and `Preflight` refuses that. `verification.md` can carry later dispositions: at AI-055 round 4 it already dispositions round 2's Minors |
 | Fetching a squash-merged `reviewed_sha` | `git fetch origin refs/pull/1922/head` then `git cat-file -e fb88359c`: present |
 | Anchor matching, tested by hand on AI-055 rounds 2 and 4 | `declaresStreaming`, `answerReserve` and `stepCeiling` each match exactly one findings row in both rounds. `AFileWithoutAClipFailsClosed` matches two rows in round 2, because two different findings name it |
 
@@ -260,9 +260,10 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
    - The reviewer writes its verdict inside the replay tree, to `.dotf-eval/review.md`, never to
      `specs/`. The answer is then kept in the run directory, beside the launch request and the
      transcript. Amended 2026-11-14: a verdict path outside the tree is out of reach of agy's
-     `--add-dir` scope and of the launcher's stray-write snapshot, which runs `git status` in
-     the verdict's folder.
-4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run. The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
+     `--add-dir` scope and of `spec review`'s stray-write snapshot, which runs `git status` in
+     the verdict's folder. Amended 2026-11-15: the eval launcher runs the runner in-process and
+     does not take that snapshot yet; recording an attempt's stray writes is a task of its own.
+4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits; a commit made anyway is a defect of the run, which the attempt's record will name once stray writes are recorded (a `git status` snapshot alone cannot see a commit, so that check compares `HEAD` too). The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
 5. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
    still leaves (today's tools against old code) is listed once in the case's `noise`.
 

@@ -60,6 +60,8 @@ owner: manu
 - [ ] [AC5] Tell `rate-limit`, `quota` and `content-filter` apart from `provider-error` by the transcript
 - [ ] [AC5] A request record for a planted run (`WriteEvalRequest` takes only an `EvalLaunch`), with the `prompt.md` digest
 - [ ] [AC5] Remove trees an earlier interrupted run left under `<run>/trees/`
+- [ ] [AC5] Record an attempt's stray writes in its replay tree (`spec.SnapshotTree` before and after, plus `HEAD`, which a status snapshot cannot see move), as `spec review` reports them
+- [ ] [AC3] The run's interrupt context covers the gaps between attempts, and the stall timeout is set per runner so a silent `agy --print` is not cut as stalled
 - [ ] [AC3] A replay checkout under lanes: check what `dotf lane status` and `dotf lane doctor` report for a worktree the run adds
 - [ ] [AC5] Implement run, grade and epoch reduction; flag results on a candidate's own keys
 - [ ] [AC7] Failing test: `results.json` validates against `result.schema.json` with the provenance fields; no code path opens the pool, map or pins for writing
