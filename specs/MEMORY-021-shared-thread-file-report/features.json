@@ -1,0 +1,16 @@
+[
+  {
+    "id": "MEMORY-021-shared-thread-file-report-f1",
+    "behavior": "a park of a key whose threads/ file another key holds archives the entry, leaves the file, records the key in ParkArchive.Shared, and lane park, worktree done and worktree sweep name it",
+    "verification": "cd cli && go test ./internal/mem ./internal/cmd ./internal/worktree -run 'TestArchiveParkedThreadLeavesAFileAnotherKeyHolds|TestReportParkThreadsNamesASharedThreadFile|TestSweepReportRecordsThreadArchives' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-021-shared-thread-file-report-f2",
+    "behavior": "every function in cli/internal/mem/thread_archive.go is at most 40 lines, and the existing archive tests pass unchanged",
+    "verification": "awk '/^func /{s=NR} /^}/{if(s&&NR-s+1>40){print FILENAME\":\"s; bad=1} s=0} END{exit bad}' cli/internal/mem/thread_archive.go && cd cli && go test ./internal/mem -run 'Archive' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

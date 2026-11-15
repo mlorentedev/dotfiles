@@ -133,10 +133,13 @@ func TestParkWithoutAVaultLeavesMemoryAlone(t *testing.T) {
 // are listed, and a failure names the lane (MEMORY-020 AC3, AC4).
 func TestSweepReportRecordsThreadArchives(t *testing.T) {
 	r := &SweepReport{}
-	r.record(Info{Path: "/wt/a"}, sweepOutcome{reaped: true, threads: mem.ParkArchive{Archived: []string{"feat-a"}, Kept: []string{"feat-a+agy"}}})
+	r.record(Info{Path: "/wt/a"}, sweepOutcome{reaped: true, threads: mem.ParkArchive{Archived: []string{"feat-a"}, Kept: []string{"feat-a+agy"}, Shared: []string{"feat-a"}}})
 	r.record(Info{Path: "/wt/b"}, sweepOutcome{reaped: true, threadsErr: errors.New("disk full")})
 	if strings.Join(r.ArchivedThreads, ",") != "feat-a" || strings.Join(r.KeptThreads, ",") != "feat-a+agy" {
 		t.Errorf("archived %v kept %v", r.ArchivedThreads, r.KeptThreads)
+	}
+	if strings.Join(r.SharedThreads, ",") != "feat-a" {
+		t.Errorf("shared %v, want feat-a (#3521)", r.SharedThreads)
 	}
 	if len(r.ArchiveFailures) != 1 || r.ArchiveFailures[0].Path != "/wt/b" || r.ArchiveFailures[0].Reason != "disk full" {
 		t.Errorf("failures %+v", r.ArchiveFailures)

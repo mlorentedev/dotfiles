@@ -60,6 +60,10 @@ type ParkArchive struct {
 	Path     string   // the dated archive the entries go to
 	Archived []string // thread keys moved out of MEMORY.md
 	Kept     []string // thread keys left in MEMORY.md: they still await Manu
+	// Shared are archived keys whose thread file another key holds (fix/x and
+	// fix-x name one file): the file stays, so the archived entry's pointer
+	// does not lead to this thread's body (#3521).
+	Shared []string
 }
 
 // ArchiveParkedThread archives the handoff threads of a parked lane's branch:
@@ -71,12 +75,8 @@ type ParkArchive struct {
 // neither, and at worst a file in threads/ that doctor reports. A key reused
 // after an earlier archive replaces the archived file of the same name.
 func ArchiveParkedThread(projectDir, branch string, now time.Time) (ParkArchive, error) {
-	key := sanitizeThread(branch)
-	if strings.TrimSpace(projectDir) == "" || key == "" || key == "main" || key == "master" {
-		return ParkArchive{}, nil
-	}
-	memoryPath := filepath.Join(projectDir, "memory", "MEMORY.md")
-	if _, err := os.Stat(memoryPath); errors.Is(err, os.ErrNotExist) {
+	memoryPath, key, ok := parkTarget(projectDir, branch)
+	if !ok {
 		return ParkArchive{}, nil
 	}
 	unlock, err := LockHandoffMemory(memoryPath)
@@ -84,7 +84,25 @@ func ArchiveParkedThread(projectDir, branch string, now time.Time) (ParkArchive,
 		return ParkArchive{}, err
 	}
 	defer unlock()
+	return archiveParked(memoryPath, key, now)
+}
 
+// parkTarget is the MEMORY.md and thread key a park of branch archives from,
+// or false when there is none: no project, the default branch, no MEMORY.md.
+func parkTarget(projectDir, branch string) (string, string, bool) {
+	key := sanitizeThread(branch)
+	if strings.TrimSpace(projectDir) == "" || key == "" || key == "main" || key == "master" {
+		return "", "", false
+	}
+	memoryPath := filepath.Join(projectDir, "memory", "MEMORY.md")
+	if _, err := os.Stat(memoryPath); errors.Is(err, os.ErrNotExist) {
+		return "", "", false
+	}
+	return memoryPath, key, true
+}
+
+// archiveParked is ArchiveParkedThread under the MEMORY.md lock.
+func archiveParked(memoryPath, key string, now time.Time) (ParkArchive, error) {
 	raw, err := os.ReadFile(memoryPath) // #nosec G304 -- the project's own MEMORY.md
 	if err != nil {
 		return ParkArchive{}, err
@@ -113,11 +131,15 @@ func ArchiveParkedThread(projectDir, branch string, now time.Time) (ParkArchive,
 func moveThreadFiles(memoryPath string, taken []takenThread, res *ParkArchive) error {
 	var errs []error
 	for _, t := range taken {
-		if err := moveThreadFile(memoryPath, t.key); err != nil {
+		shared, err := moveThreadFile(memoryPath, t.key)
+		if err != nil {
 			errs = append(errs, fmt.Errorf("thread %q: its entry is archived, but its file stays in %s/, where dotf doctor reports it as a lost handoff: %w", t.key, threadsDir, err))
 			continue
 		}
 		res.Archived = append(res.Archived, t.key)
+		if shared {
+			res.Shared = append(res.Shared, t.key)
+		}
 	}
 	return errors.Join(errs...)
 }
@@ -140,26 +162,26 @@ func appendArchiveFile(path, date string, taken []takenThread) error {
 
 // moveThreadFile moves key's thread file, when it has one, from threads/ to
 // archive/threads/. A file whose heading names another key is that thread's
-// (fix/x and fix-x name one file) and stays where it is. os.Rename replaces
-// an existing target on every platform.
-func moveThreadFile(memoryPath, key string) error {
+// (fix/x and fix-x name one file): it stays where it is, and shared says so.
+// os.Rename replaces an existing target on every platform.
+func moveThreadFile(memoryPath, key string) (shared bool, err error) {
 	name, err := threadFileName(key)
 	if err != nil {
-		return err
+		return false, err
 	}
 	src := filepath.Join(filepath.Dir(memoryPath), threadsDir, name)
 	held, err := ReadThreadFile(src)
-	if err != nil {
-		return err
+	if err != nil || held == nil {
+		return false, err // an inline thread has no file
 	}
-	if held == nil || CheckThreadFile(held, key) != nil {
-		return nil // an inline thread has no file; another key's file is not ours to move
+	if CheckThreadFile(held, key) != nil {
+		return true, nil // another key's file is not ours to move
 	}
 	dst := archivedThreadFile(memoryPath, name)
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
+		return false, err
 	}
-	return os.Rename(src, dst)
+	return false, os.Rename(src, dst)
 }
 
 // archivedThreadFile is where an archived thread's file lives: under
@@ -205,18 +227,12 @@ func takeThreads(content, key string, forks bool, keep func(block string) bool) 
 	out := append([]string{}, lines[:start+1]...)
 	for i := start + 1; i < end; {
 		hk, ok := threadHeadingKey(lines[i])
-		if !ok || hk != key && (!forks || !strings.HasPrefix(hk, key+"+")) {
+		if !ok || !takesThread(hk, key, forks) {
 			out = append(out, lines[i])
 			i++
 			continue
 		}
-		j := i + 1
-		for j < end {
-			if _, next := threadHeadingKey(lines[j]); next {
-				break
-			}
-			j++
-		}
+		j := blockEnd(lines, i, end)
 		block := strings.Join(trimBlankEdges(lines[i:j]), "\n")
 		if keep != nil && keep(block) {
 			kept = append(kept, hk)
@@ -230,6 +246,24 @@ func takeThreads(content, key string, forks bool, keep func(block string) bool) 
 		return content, nil, kept
 	}
 	return strings.Join(append(out, lines[end:]...), "\n"), taken, kept
+}
+
+// takesThread reports whether the block headed hk is key's, or with forks one
+// of key's <key>+<agent> forks.
+func takesThread(hk, key string, forks bool) bool {
+	return hk == key || forks && strings.HasPrefix(hk, key+"+")
+}
+
+// blockEnd is the index of the first thread heading after line i, or end.
+func blockEnd(lines []string, i, end int) int {
+	j := i + 1
+	for j < end {
+		if _, next := threadHeadingKey(lines[j]); next {
+			break
+		}
+		j++
+	}
+	return j
 }
 
 // awaitsManu reports whether a thread's text still has Awaiting Manu items.

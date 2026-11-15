@@ -136,8 +136,10 @@ type SweepReport struct {
 	// ArchivedThreads are the handoff threads the parks archived, KeptThreads
 	// the ones they left because they still await Manu, and ArchiveFailures
 	// the parked lanes whose threads could not be archived (MEMORY-020).
-	ArchivedThreads []string      `json:"archived_threads,omitempty"`
-	KeptThreads     []string      `json:"kept_threads,omitempty"`
+	ArchivedThreads []string `json:"archived_threads,omitempty"`
+	KeptThreads     []string `json:"kept_threads,omitempty"`
+	// SharedThreads are archived threads whose file another thread holds.
+	SharedThreads   []string      `json:"shared_threads,omitempty"`
 	ArchiveFailures []SessionSkip `json:"archive_failures,omitempty"`
 	DryRun          bool          `json:"dry_run"`
 	// ProcessDiscovery is false when Gate f has no implementation on this
@@ -392,6 +394,7 @@ func (r *SweepReport) record(info Info, out sweepOutcome) {
 	}
 	r.ArchivedThreads = append(r.ArchivedThreads, out.threads.Archived...)
 	r.KeptThreads = append(r.KeptThreads, out.threads.Kept...)
+	r.SharedThreads = append(r.SharedThreads, out.threads.Shared...)
 	if out.threadsErr != nil {
 		r.ArchiveFailures = append(r.ArchiveFailures, SessionSkip{Path: info.Path, Reason: out.threadsErr.Error()})
 	}

@@ -56,3 +56,24 @@ func TestReportSweepThreadsFailsOnAnArchiveFailure(t *testing.T) {
 		t.Errorf("a clean sweep failed: %v", err)
 	}
 }
+
+// A thread archived while its file is another key's is named: the archived
+// entry's pointer leads to no file of its own (#3521).
+func TestReportParkThreadsNamesASharedThreadFile(t *testing.T) {
+	var out bytes.Buffer
+	a := mem.ParkArchive{Path: "/v/archive/superseded-handoffs-2026-11-14.md", Archived: []string{"feat-x"}, Shared: []string{"feat-x"}}
+	if err := reportParkThreads(&out, "/wt/lane", a, nil); err != nil {
+		t.Fatal(err)
+	}
+	want := `archived   thread "feat-x": its thread file is another thread's and stays in threads/, so the archived entry's link does not lead to it`
+	if !strings.Contains(out.String(), want) {
+		t.Errorf("output lacks %q:\n%s", want, out.String())
+	}
+	var sweep bytes.Buffer
+	if err := reportSweepThreads(&sweep, &worktree.SweepReport{ArchivedThreads: []string{"feat-x"}, SharedThreads: []string{"feat-x"}}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sweep.String(), "  - archived thread: feat-x (its thread file is another thread's and stays in threads/)") {
+		t.Errorf("sweep output lacks the shared file:\n%s", sweep.String())
+	}
+}
