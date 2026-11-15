@@ -63,6 +63,7 @@ jobs:
               - 'harness/**'
               - 'versions.conf'
               - 'packages.json'
+              - 'renovate.json'
               - 'mcp-servers.json'
               - '.PSScriptAnalyzerSettings.psd1'
               - '.golangci.yml'

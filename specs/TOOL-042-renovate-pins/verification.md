@@ -12,9 +12,9 @@ owner: manu
 ## Evidence
 
 - [x] AC1 -> `TestVersionsConf_EveryPinNamesItsUpstreamOrWhyItHasNone`, `TestVersionsConf_RenovateFindsEveryAnnotatedPinAtItsValue` (the second compiles the regex `renovate.json` runs)
-- [x] AC2 -> `TestRenovate_NoGroupCanOutgrowTheSpecGate`, which reads `THRESHOLD=` from `scripts/check-spec-gate.sh`. Groups today: cli 18 pins, k8s 11, lint 11, runtime 6 + `cli/go.mod`, catalog 8.
+- [x] AC2 -> `TestRenovate_NoGroupCanOutgrowTheSpecGate`, which reads `THRESHOLD=` from `scripts/check-spec-gate.sh`. Groups after the review fixes: cli 18 pins, k8s 12, lint 10, runtime 5 + `cli/go.mod`, catalog 8.
 - [x] AC3 -> `TestVersionsConf_NpmCLIsTrackThePackageDotfInstalls` (reads `npmBackend`)
-- [x] AC4 -> `renovate-config-validator --strict` with `ghcr.io/renovatebot/renovate:44.199.2` (the engine the central run pins): `Config validated successfully against 1 file(s)`. A `RENOVATE_PLATFORM=local RENOVATE_DRY_RUN=extract` run over a copy of the pin files extracted 55 deps (versions.conf 46, cli/go.mod 1, packages.json 8), each at its current value and depType; jq and kustomize carried their own `extractVersion`, the rest `^v?(?<version>.+)$`. The GitHub-backed deps report `github-token-required` locally only: the run had no token, and the central run uses `RENOVATE_TOKEN`.
+- [x] AC4 -> `renovate-config-validator --strict` with `ghcr.io/renovatebot/renovate:44.199.2` (the engine the central run pins): `Config validated successfully against 1 file(s)`. A `RENOVATE_PLATFORM=local RENOVATE_DRY_RUN=extract` run over a copy of the pin files extracted 55 deps (versions.conf 46, cli/go.mod 1, packages.json 8), each at its current value and depType; jq and kustomize carried their own `extractVersion`, the rest `^v?(?<version>.+)$`. The extract output also showed `skipReason: github-token-required` on the GitHub-backed deps, which Renovate 44 sets at extraction when the platform has no GitHub token (`RENOVATE_PLATFORM=local`); the central run has `RENOVATE_TOKEN`. The same output carried `depType: catalog` on all 8 packages.json deps.
 - [x] AC5 -> `dotf tools sync --dry-run --versions <file>` printed the same 48 lines for `HEAD:versions.conf` and the annotated file. The 28 bats files that reference versions.conf: 570 tests, all ok. The PowerShell readers in ci.yml select `^KEY_VERSION=` lines, which the annotations do not touch.
 - [x] AC6 -> `TestRenovate_GoMovesByPatchTogetherWithGoMod` (also asserts `GO_VERSION` equals `cli/go.mod`'s go line), `TestVersionsConf_PinsRenovateMustNotMoveAreSkipped`
 
@@ -56,8 +56,25 @@ Each deliberate break below, applied alone to `versions.conf` and reverted, fail
 - Release binaries (`github-releases`, `github-tags`) wait three days, as the preset already does for npm, pypi and go: they run in CI with the repository's secrets.
 - The fleet preset's `fix(deps):` prefix is kept; whether a pin bump should cut a release is the owner's call (PR body).
 
+## Review dispositions (review.md, PASS-WITH-GAPS)
+
+| Finding | Disposition |
+|---|---|
+| 1 Major: ZSH_AUTOSUGGESTIONS needs its digest in a released dotf before a bump | apply: the pin is now `# renovate: skip`, and `TestVersionsConf_PinsRenovateMustNotMoveAreSkipped` requires a skip for every `fileTools` entry |
+| 2 Minor: merged grouping over the preset is not measured | apply on the first real run: the first Monday run's branch list (one `renovate/<group>-pins` branch per depType) is recorded on #3284. Documented semantics: child `packageRules` apply after the preset's |
+| 3 Minor: extract evidence vs `github-token-required` | apply: the AC4 line now says where that skipReason comes from |
+| 4 Minor: catalog depType not asserted | apply: the recorded extract shows `depType: catalog` on all 8; no test, since no test can run Renovate's jsonata engine, and the bounded harm is 16 lines |
+| 5 Minor: the lint group moves terraform | apply: TERRAFORM moves to `k8s` (infrastructure CLIs); trivy and bats stay in `lint` as checking tools |
+| 6, 7 Minor: proposal says two managers; closing boxes unticked | decline for now: both are in the contract set, and editing it would void this review. Fixed when the spec archives |
+
+## CI fixes after the first push
+
+- `tests/ci-path-filtering.bats` (HARNESS-041): `renovate.json` is a new top-level entry that a test reads, so it joins ci.yml's `code` allow-list. That is a `.github/**` change; the owner lands this PR.
+- `test (windows-latest)`: the Windows checkout gives `cli/go.mod` CRLF, so the `\ngo …\n` regex missed it. `readRepoFile` now normalises CRLF, as Renovate reads LF.
+- hygiene: lesson 606 was taken on main meanwhile; this lesson is 607.
+
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-606-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token.md
+- [ ] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-607-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token.md
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: Renovate is the fleet's existing decision (ci-workflows#30); this adopts it and records the per-repo shape in the runbook
 - [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the author-keyed skip exists only in this repo's spec-gate

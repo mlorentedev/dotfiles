@@ -39,7 +39,8 @@ func readRepoFile(t *testing.T, rel string) string {
 	if err != nil {
 		t.Fatalf("read %s: %v", rel, err)
 	}
-	return string(raw)
+	// A Windows checkout may carry CRLF; the regexes here, like Renovate's, read LF.
+	return strings.ReplaceAll(string(raw), "\r\n", "\n")
 }
 
 func loadRenovateConfig(t *testing.T) renovateConfig {
@@ -205,6 +206,11 @@ func TestVersionsConf_PinsRenovateMustNotMoveAreSkipped(t *testing.T) {
 		"MINIKUBE": "names a directory nothing installs",
 		"GIT":      "a floor, not an install pin",
 		"DOTF":     "release-please moves it",
+	}
+	// A file tool's pin needs its digest in a released dotf before it moves
+	// (mise_files.go), so a Renovate PR could never land it in one step.
+	for name := range fileTools {
+		mustSkip[strings.ToUpper(strings.ReplaceAll(name, "-", "_"))] = "its sha256 must ship in a released dotf first"
 	}
 	lines := strings.Split(readRepoFile(t, "versions.conf"), "\n")
 	for i, line := range lines {

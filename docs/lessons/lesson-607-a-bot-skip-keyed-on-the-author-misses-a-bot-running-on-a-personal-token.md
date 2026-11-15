@@ -1,5 +1,5 @@
 ---
-id: "lesson-606-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token"
+id: "lesson-607-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token"
 type: lesson
 status: active
 title: "A bot skip keyed on the author misses a bot running on a personal token"
