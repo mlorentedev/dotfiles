@@ -298,8 +298,10 @@ func writeLandResult(w io.Writer, res prland.Result) error {
 	}
 	// Landing no longer removes the worktree holding the branch, so a lane is
 	// left on a branch that has landed (#3531); say how to free it.
-	if name := landHoldingLane(res.HeadRef); res.HeadRef != "" && name != "" {
-		_, _ = fmt.Fprintf(w, "FIX: dotf lane park %s (#%d landed and the lane still holds %s)\n", name, number, res.HeadRef)
+	if res.HeadRef != "" {
+		if name := landHoldingLane(res.HeadRef); name != "" {
+			_, _ = fmt.Fprintf(w, "FIX: dotf lane park %s (#%d landed and the lane still holds %s)\n", name, number, res.HeadRef)
+		}
 	}
 	_, _ = fmt.Fprintf(w, "[MERGED] #%d at %.7s\n", number, res.HeadSHA)
 	return nil
