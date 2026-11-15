@@ -129,7 +129,7 @@ func TestCacheGC_NotDueWithinAWeekRunsNothing(t *testing.T) {
 func TestCacheGC_ApplyRunsEveryPresentPrunerInOrderAndWritesTheStamp(t *testing.T) {
 	state := t.TempDir()
 	writeStamp(t, state, gcNow.Add(-8*24*time.Hour))
-	f := newGCFake("uv", "pre-commit", "npm", "docker", "limactl", "colima")
+	f := newGCFake("uv", "pre-commit", "npm", "mise", "docker", "limactl", "colima")
 	res, err := f.step(state).Reconcile(Env{Home: state}, false)
 	if err != nil {
 		t.Fatal(err)
@@ -139,6 +139,7 @@ func TestCacheGC_ApplyRunsEveryPresentPrunerInOrderAndWritesTheStamp(t *testing.
 		"uv cache prune",
 		"pre-commit gc",
 		"npm cache verify",
+		"mise prune --yes",
 		"docker info",
 		"docker builder prune -f --filter until=168h",
 		"docker image prune -f --filter until=168h",

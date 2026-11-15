@@ -51,6 +51,10 @@ var gcPruners = []gcPruner{
 	{tool: "uv", ready: uvCacheFree, cmds: [][]string{{"uv", "cache", "prune"}}},
 	{tool: "pre-commit", cmds: [][]string{{"pre-commit", "gc"}}},
 	{tool: "npm", cmds: [][]string{{"npm", "cache", "verify"}}},
+	// A version a pin moved away from stays installed for good: the tools
+	// step prunes only tools no pin names (#3533). mise prune keeps every
+	// version a tracked config asks for and every one a running process uses.
+	{tool: "mise", cmds: [][]string{{"mise", "prune", "--yes"}}},
 	{tool: "docker", ready: answers("docker", "info"), cmds: [][]string{
 		{"docker", "builder", "prune", "-f", "--filter", "until=168h"},
 		{"docker", "image", "prune", "-f", "--filter", "until=168h"},
@@ -74,7 +78,7 @@ func (r cacheGC) Reconcile(e Env, dryRun bool) (Result, error) {
 	}
 	present := r.present()
 	if len(present) == 0 {
-		return Result{Skip: "none of uv, pre-commit, npm, docker, limactl or colima is on PATH"}, nil
+		return Result{Skip: "none of uv, pre-commit, npm, mise, docker, limactl or colima is on PATH"}, nil
 	}
 	stamp, err := r.stampPath(e)
 	if err != nil {
