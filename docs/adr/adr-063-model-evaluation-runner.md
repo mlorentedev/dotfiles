@@ -245,8 +245,14 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 
 1. Resolve `reviewed_sha`. If the clone lacks it, fetch the SHA itself, then `fetch_ref`, then verify. A branch rebased after its review would not carry the SHA on its PR ref.
    If it cannot be resolved, the case fails loudly as infrastructure; it is never scored zero.
-2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotfiles/evals/<run-id>/<case>-<epoch>/`,
-   outside every repository tree, and remove it when the run ends.
+2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotfiles/evals/<run-id>/trees/<candidate>/<case>-<epoch>/`,
+   outside every repository tree, and remove it when the attempt ends, however it ends. The
+   attempt's answer, transcript and record are kept apart from it, under
+   `<run-id>/runs/<candidate>/<case>/<epoch>/` (amended 2026-11-15, HARNESS-101 slice 3: the
+   candidate level keeps two candidates' attempts at one case apart).
+   Before the first attempt, a preflight resolves every case's commit, finds every candidate's
+   runner, checks every secret by exit status alone, and refuses a replay whose reviewed commit
+   holds its own `source_review` or its case file. It names every problem at once.
 3. Launch through `internal/spec`'s review launcher in a new **eval slot**:
    - The candidate comes from `harness/evals/candidates.json`, using a pool entry's shape: runner,
      provider, model, secret id. The pool is not read.
@@ -274,7 +280,7 @@ Curation is human, once per case. Grading is mechanical, every run. Graded per r
 
 | Measure | How |
 |---|---|
-| Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer`. Amended 2026-11-14 (HARNESS-101 slice 3): `infra-error` is a class of its own, for an attempt that failed on our side (checkout, tree, an answer we cannot read, an interrupt); it is never charged to the model. An attempt the deadline or the interrupt cut short is not graded, even if it left a file. `stalled`, `rate-limit`, `quota` and `content-filter` are not produced yet: they need the transcript, and until then such a run reads `provider-error` |
+| Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer`. Amended 2026-11-14 (HARNESS-101 slice 3): `infra-error` is a class of its own, for an attempt that failed on our side (checkout, tree, an answer we cannot read, an interrupt); it is never charged to the model. An attempt the deadline or the interrupt cut short is not graded, even if it left a file. `stalled` is produced from the launcher's stall detector (amended 2026-11-15) and, like a timeout, is not graded. `rate-limit`, `quota` and `content-filter` are not produced yet: they need the transcript, and until then such a run reads `provider-error` |
 | Format | The findings table parses. An unparseable answer is a format failure, scored as such, never as zero findings |
 | Verdict match | `PASS` / `PASS-WITH-GAPS` / `FAIL` against `expected_verdict` |
 | Recall | Matched `expected` over `expected`, weighted by severity floor. An `expected` entry the reviewer described without its anchors is a miss in that grading, even though the row itself is unadjudicated |
@@ -372,6 +378,11 @@ login that CI does not hold, and its quota is the owner's. A scheduled run in ci
   scores as unadjudicated, not as a match, until someone adjudicates it.
 - A replay runs today's skill and tools against old code. Results compare models with each other,
   not with the reviewer that originally ran.
+- A replay worktree shares the repository's object store, so a candidate that runs
+  `git log --all` or `git show <later sha>` can read commits after `reviewed_sha`, the source
+  review among them. The preflight keeps the answer out of the tree, not out of reach. A candidate
+  whose transcript shows it reading a later commit has its run flagged by hand until a check
+  exists (known limit, recorded 2026-11-15).
 
 **Neutral**
 

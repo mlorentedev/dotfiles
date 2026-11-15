@@ -40,7 +40,7 @@ owner: manu
 - [x] [AC4] Failing test: an eval launch with an explicit base and candidate reads no pool file and writes nothing under `specs/`
 - [x] [AC4] Implement the eval slot (`internal/spec`): candidate from `harness/evals/candidates.json`, base passed explicitly, output directory supplied by the caller
 - [x] [AC3] Failing test: a case whose `reviewed_sha` is absent locally is fetched from `fetch_ref`; an unresolvable one exits non-zero naming the case
-- [x] [AC3] Implement replay checkout: a detached worktree at `<run dir>/<case>-<epoch>/`, removed afterwards; the run dir is the caller's
+- [x] [AC3] Implement replay checkout: a detached worktree at `<run dir>/<case>-<epoch>/`, removed afterwards; the run dir is the caller's (the launcher passes `<run>/trees/<candidate>/`)
 
 ### Slice 3: `dotf eval run`
 
@@ -52,7 +52,11 @@ owner: manu
 - [x] [AC5] Launch path for a planted case: it has no commit or tree, only `prompt.md`; decide how the eval slot sends it (ADR-063 §1). `spec.PlanPlantedLaunch`, answer at `.dotf-eval/review.md` in an empty tree
 - [ ] [AC5] Concurrency bounded per pool by `model-map.json`, the bound `dotf agent run` holds
 - [x] [AC5] Failing test: per-run grading record, with completion class mapped from the launcher's exit, and format failure distinct from zero findings. `evals.Run` with an injected launcher: one attempt at a time, `record.json` before the next, `infra-error` never charged to the model, own-key flag, interrupt passed to the runner in flight
-- [ ] [AC5] The real launcher: create and remove the tree (replay checkout or empty dir, removed on interrupt), exec under `deadlineWrap`, copy the answer out without following a symlink the runner left in its tree (PR-Agent on #3527), report `Interrupted` only when it killed the runner, tokens from the transcript; preflight resolves every commit and runner binary before the first launch, and refuses a replay whose source review is present at `reviewed_sha`
+- [x] [AC5] The real launcher (`evals.ExecLauncher`): the tree is a replay checkout or an empty dir with `.dotf-eval/` made up front, removed however the attempt ends; the runner starts in the tree (`spec.Limits.Dir`) under `spec.RunWithLimits`, its stdout filtered into the transcript by `spec.SinkTranscript`; a deadline, a stall and a signal (`spec.RunResult.Signaled`) map to their classes; the answer is copied out without following a symlink. Tokens stay "not reported": no transcript usage reader exists yet
+- [x] [AC5] Preflight (`evals.Preflight`): every commit resolved, every runner on PATH, every secret checked by exit status, and a replay refused when its reviewed commit holds its `source_review` or its case file; all problems named at once
+- [ ] [AC5] Tokens (input, output, thinking) read from each runner's transcript
+- [ ] [AC5] Flag a run whose transcript shows it reading a commit after `reviewed_sha` (ADR-063, known limit)
+- [ ] [AC3] Wire `dotf eval run` to `Preflight`, `ExecLauncher` and `Run` (real `LookPath`, secrets checked through `dotf secrets run`), and keep it refusing to start without an approved `--plan`
 - [ ] [AC5] Tell `rate-limit`, `quota` and `content-filter` apart from `provider-error` by the transcript
 - [ ] [AC5] A request record for a planted run (`WriteEvalRequest` takes only an `EvalLaunch`), with the `prompt.md` digest
 - [ ] [AC5] Remove trees an earlier interrupted run left under `<run>/trees/`
