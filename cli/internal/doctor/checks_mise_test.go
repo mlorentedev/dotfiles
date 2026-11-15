@@ -672,7 +672,8 @@ func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
 	s.GOOS = "windows"
 	var scoped, unscoped []string
 	var scopedDir string
-	s.CommandOutputEnvDir = func(env []string, dir, name string, args ...string) (string, error) {
+	// The probe reads stdout first, so that is the scoped call to capture.
+	s.CommandStdoutEnvDir = func(env []string, dir, name string, args ...string) (string, error) {
 		if name == bats {
 			scoped, scopedDir = env, dir
 			return "Bats 1.13.0", nil
@@ -710,5 +711,56 @@ func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
 	}
 	if rep.Failures() != 0 {
 		t.Errorf("bats at its pin must pass the doctor\n%s", b.String())
+	}
+}
+
+// A failed bats run that prints a version on stderr is not bats at its pin:
+// the sync reads the probe's stdout alone and takes the merged output only from
+// a run that exited 0, and the doctor's scoped probe must keep that rule
+// (BUG-142). Bats 1.13 names its own version in a stderr warning when it fails.
+func TestCheckMiseTools_WindowsBatsProbeReadsStdoutAlone(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	writeFile(t, filepath.Join(root, "bin", "bash.exe"), "")
+	home := t.TempDir()
+	versions := filepath.Join(home, "versions.conf")
+	conf := "# mise: cli\nBATS_VERSION=1.13.0\n"
+	writeFile(t, versions, conf)
+	pins, err := tools.ParseMiseTools([]byte(conf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, nil)))
+
+	const bats = `C:\m\bats.cmd`
+	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
+		"git --exec-path":                        execPath + "\n",
+		"mise which bats":                        bats + "\n",
+		"mise which bats.cmd":                    bats + "\n",
+		"mise bin-paths --bin-names bats@1.13.0": "bats\n",
+		"mise install":                           "",
+		"mise ls --prunable --json":              "{}",
+	})
+	s.GOOS = "windows"
+	failed := errors.New("exit status 1")
+	// stdout is empty, stderr names the pin: the merged output reads as a pass.
+	s.CommandStdoutEnvDir = func(_ []string, _, name string, _ ...string) (string, error) {
+		if name == bats {
+			return "", failed
+		}
+		return "", errors.New("unexpected scoped command " + name)
+	}
+	s.CommandOutputEnvDir = func(_ []string, _, name string, _ ...string) (string, error) {
+		if name == bats {
+			return "warning: Bats 1.13.0 could not start bash", failed
+		}
+		return "", errors.New("unexpected scoped command " + name)
+	}
+
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, &Config{VersionsPath: versions}, rep, false)
+	if rep.Failures() == 0 {
+		t.Errorf("a failed bats run whose stderr names the pin must not pass\n%s", b.String())
 	}
 }

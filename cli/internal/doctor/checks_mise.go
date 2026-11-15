@@ -240,7 +240,7 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) too
 		},
 		Stdout: func(name string, args ...string) ([]byte, error) {
 			if env := gitBashEnv(sys, name, args...); env != nil {
-				out, err := sys.CommandOutputEnvDir(env, home, name, args...)
+				out, err := sys.CommandStdoutEnvDir(env, home, name, args...)
 				return []byte(out), err
 			}
 			out, err := sys.CommandStdoutDir(home, name, args...)
