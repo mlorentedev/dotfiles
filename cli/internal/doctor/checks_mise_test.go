@@ -760,7 +760,8 @@ func TestCheckMiseTools_WindowsBatsProbeReadsStdoutAlone(t *testing.T) {
 	var b bytes.Buffer
 	rep := capture(&b)
 	checkMiseTools(s, &Config{VersionsPath: versions}, rep, false)
-	if rep.Failures() == 0 {
-		t.Errorf("a failed bats run whose stderr names the pin must not pass\n%s", b.String())
+	// The failure must be the bats pin, not some unrelated fixture error.
+	if rep.Failures() == 0 || !strings.Contains(b.String(), "not running at their pin through mise: bats") {
+		t.Errorf("a failed bats run whose stderr names the pin must fail the bats pin\n%s", b.String())
 	}
 }
