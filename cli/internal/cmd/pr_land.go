@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -15,13 +16,29 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/execerr"
+	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // errNotLanded is returned when a PR fails a landing condition; the reasons
 // are printed first. Same exit contract as errPending.
 var errNotLanded = errors.New("pr land: not merged")
+
+// landHoldingLane names the canonical lane of the current repository that has
+// branch checked out, or "" when none does; tests replace it.
+var landHoldingLane = func(branch string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+	if err != nil {
+		return ""
+	}
+	return lane.HoldingLane(repoRoot, env.ResolvePath("WORKTREE_ROOT"), branch)
+}
 
 // prLandOptions builds the GitHub wiring; tests replace it.
 var prLandOptions = func(repo string, registry registryLoader) prland.Options {
@@ -88,6 +105,8 @@ GitHub closes a PR whose base branch is deleted. The merge is a squash with
 forge and nothing local is: gh's own --delete-branch would also remove the
 worktree holding the branch, which a persistent lane is, so the
 local branch and worktree are left to dotf worktree done or dotf lane park.
+When a canonical lane still holds the landed branch, land prints the
+FIX: line naming dotf lane park for it.
 
 --wait waits for the checks before reading them, and then for GitHub to compute
 the merge state of a PR whose checks are all green: that state can stay UNKNOWN
@@ -276,6 +295,15 @@ func writeLandResult(w io.Writer, res prland.Result) error {
 	}
 	for _, warning := range res.Warnings {
 		_, _ = fmt.Fprintf(w, "warning: #%d %s\n", number, warning)
+	}
+	// Landing no longer removes the worktree holding the branch, so a lane is
+	// left on a branch that has landed (#3531); say how to free it.
+	// Only for the current repository: with --repo the PR may be another
+	// repository's, whose branch merely shares a name with a lane here.
+	if res.HeadRef != "" && res.Repo == "" {
+		if name := landHoldingLane(res.HeadRef); name != "" {
+			_, _ = fmt.Fprintf(w, "FIX: dotf lane park %s (#%d landed and the lane still holds %s)\n", name, number, res.HeadRef)
+		}
 	}
 	_, _ = fmt.Fprintf(w, "[MERGED] #%d at %.7s\n", number, res.HeadSHA)
 	return nil

@@ -322,6 +322,43 @@ func TestWriteLandResult_ALandedMergePrintsItsWarning(t *testing.T) {
 	}
 }
 
+// Landing no longer removes the worktree that holds the branch, so a canonical
+// lane keeps a branch that has landed. The output names the command that frees
+// it (#3531); a branch no lane holds prints nothing extra.
+func TestWriteLandResult_NamesTheLaneStillHoldingTheLandedBranch(t *testing.T) {
+	saved := landHoldingLane
+	t.Cleanup(func() { landHoldingLane = saved })
+	landHoldingLane = func(branch string) string {
+		if branch == "feat/held" {
+			return "feat-lane-primary"
+		}
+		return ""
+	}
+
+	var held, free bytes.Buffer
+	if err := writeLandResult(&held, prland.Result{Number: 30, Merged: true, HeadSHA: "abc1234def", HeadRef: "feat/held"}); err != nil {
+		t.Fatal(err)
+	}
+	if want := "FIX: dotf lane park feat-lane-primary"; !strings.Contains(held.String(), want) {
+		t.Errorf("output lacks %q:\n%s", want, held.String())
+	}
+	if err := writeLandResult(&free, prland.Result{Number: 31, Merged: true, HeadSHA: "abc1234def", HeadRef: "feat/other"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(free.String(), "FIX:") {
+		t.Errorf("a branch no lane holds got a fix line:\n%s", free.String())
+	}
+	// The lanes are the current repository's: a PR landed with --repo may be
+	// another repository's, whose branch merely shares the name.
+	var named bytes.Buffer
+	if err := writeLandResult(&named, prland.Result{Number: 32, Merged: true, HeadSHA: "abc1234def", HeadRef: "feat/held", Repo: "o/other"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(named.String(), "FIX:") {
+		t.Errorf("a PR of a named repository got a fix line about this repository's lane:\n%s", named.String())
+	}
+}
+
 // A red review-attestation with a pr-agent run still running on the head is a
 // verdict on its way (#2724): land waits for it up to --verdict-wait, says on
 // stderr what it waits for, and a refusal after the budget says how long.

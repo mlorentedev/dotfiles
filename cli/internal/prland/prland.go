@@ -213,6 +213,8 @@ type Result struct {
 	Merged     bool
 	Updated    bool // the base was merged into the branch first
 	HeadSHA    string
+	HeadRef    string   // the head branch in this repository, which a lane may still hold once it landed; empty for a fork's
+	Repo       string   // the --repo the PR was landed in; empty is the current repository
 	Reasons    []string // why it did not merge
 	Retargeted []int    // dependents pointed at the base before the merge
 	Warnings   []string // what went wrong after the merge landed
@@ -245,7 +247,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		f.GrantDeclared, f.Excluded = g.declared, g.excluded
 		return Decide(f)
 	}
-	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: append(decide(f), verdict.reasons(f)...)}
+	res := Result{Number: number, HeadSHA: f.HeadSHA, HeadRef: localHead(f), Repo: o.Repo, Reasons: append(decide(f), verdict.reasons(f)...)}
 	// Again while the base moves under the new head's CI, which a busy queue
 	// does: one update left the PR behind the next merge (#2041).
 	updates := 0
@@ -457,6 +459,15 @@ func merge(ctx context.Context, gh ghFunc, o Options, n string, f Facts, res Res
 		res.Warnings = append(res.Warnings, warning)
 	}
 	return res, nil
+}
+
+// localHead is the head branch when it lives in this repository, and "" for a
+// fork's: the same name here would be another branch.
+func localHead(f Facts) string {
+	if f.CrossRepo {
+		return ""
+	}
+	return f.HeadRef
 }
 
 // deleteHead removes the merged PR's head branch from this repository over

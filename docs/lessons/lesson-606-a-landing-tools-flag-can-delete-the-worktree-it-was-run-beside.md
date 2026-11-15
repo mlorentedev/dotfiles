@@ -10,8 +10,10 @@ created: "2026-11-15"
 
 ## Context
 
-A persistent lane (`feat-lane-secondary`) disappeared twice within nine seconds of `dotf pr land`
-merging the PR it held (#3531). The first reading was that `sweep` or `worktree done` reaped it,
+A persistent lane (`feat-lane-secondary`) disappeared twice within seven seconds of `dotf pr land`
+merging the PR it held (#3531). The session transcript (UTC) shows `[MERGED] #3526` at 01:53:30 and the
+first `lane park` refusing the missing worktree at 01:53:37; then `[MERGED] #3530` at 02:00:29 and the
+same refusal at 02:00:36, the directory confirmed gone at 02:00:53. The first reading was that `sweep` or `worktree done` reaped it,
 because both can remove a worktree and a squash-merged branch is what they look for.
 
 ## Problem
@@ -28,7 +30,7 @@ non-interactive merge sets nothing.
 ## Solution
 
 Find what ran before reading what could run. The session transcripts held every command of every
-agent, and in the nine-second window there was one, `dotf pr land`. That narrowed a search of three
+agent, and in the seven-second window there was one, `dotf pr land`. That narrowed a search of three
 tools to one subprocess, and the binary's strings confirmed the mechanism.
 
 Keep a tool that lands PRs away from worktrees: merge without `--delete-branch`, delete the remote

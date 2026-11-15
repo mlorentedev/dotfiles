@@ -387,19 +387,37 @@ func unionRoots(base, extra []string) []string {
 	return out
 }
 
+// HoldingLane names the canonical lane whose worktree has branch checked out,
+// or "" when none does, which includes a lane whose worktree is gone or is
+// another repository's.
+func HoldingLane(repoRoot, worktreeRoot, branch string) string {
+	repoWTRoot := filepath.Join(worktreeRoot, filepath.Base(filepath.Clean(repoRoot)))
+	repoCommonDir, err := resolveGitCommonDir(repoRoot)
+	if err != nil {
+		return ""
+	}
+	for _, name := range CanonicalLanes {
+		lanePath := filepath.Join(repoWTRoot, name)
+		// Two repositories with one basename share this directory.
+		if assertWorktreeOf(repoRoot, repoCommonDir, lanePath) != nil {
+			continue
+		}
+		out, err := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+		if err == nil && strings.TrimSpace(string(out)) == branch {
+			return name
+		}
+	}
+	return ""
+}
+
 // RouteBranchToLane deterministically selects a PARKED canonical lane for branch (M5).
 func RouteBranchToLane(repoRoot, worktreeRoot, branch string) (string, string, error) {
 	repoName := filepath.Base(filepath.Clean(repoRoot))
 	repoWTRoot := filepath.Join(worktreeRoot, repoName)
 
 	// If a canonical lane already holds this exact branch, return it idempotently.
-	for _, name := range CanonicalLanes {
-		lanePath := filepath.Join(repoWTRoot, name)
-		if out, err := exec.Command("git", "-C", lanePath, "symbolic-ref", "--quiet", "--short", "HEAD").Output(); err == nil {
-			if strings.TrimSpace(string(out)) == branch {
-				return name, lanePath, nil
-			}
-		}
+	if name := HoldingLane(repoRoot, worktreeRoot, branch); name != "" {
+		return name, filepath.Join(repoWTRoot, name), nil
 	}
 
 	prefix, _, _ := strings.Cut(branch, "/")
