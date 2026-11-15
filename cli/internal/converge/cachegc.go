@@ -1,10 +1,12 @@
 package converge
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -43,6 +45,10 @@ type gcPruner struct {
 	tool  string
 	ready func(cacheGC) string // nil: always ready
 	cmds  [][]string
+	// cmdsFor builds the commands at run time, when they depend on what the
+	// machine holds; plan names them for a dry run. It replaces cmds.
+	cmdsFor func(cacheGC) ([][]string, error)
+	plan    string
 }
 
 // gcPruners run in this order: Docker frees blocks inside the colima VM, and
@@ -54,7 +60,7 @@ var gcPruners = []gcPruner{
 	// A version a pin moved away from stays installed for good: the tools
 	// step prunes only tools no pin names (#3533). mise prune keeps every
 	// version a tracked config asks for and every one a running process uses.
-	{tool: "mise", cmds: [][]string{{"mise", "prune", "--yes"}}},
+	{tool: "mise", cmdsFor: misePrune, plan: "mise prune --tools (every installed tool but python)"},
 	{tool: "docker", ready: answers("docker", "info"), cmds: [][]string{
 		{"docker", "builder", "prune", "-f", "--filter", "until=168h"},
 		{"docker", "image", "prune", "-f", "--filter", "until=168h"},
@@ -126,7 +132,12 @@ func (r cacheGC) prune(stamp string, present []gcPruner, before uint64, beforeEr
 				continue
 			}
 		}
-		for _, argv := range p.cmds {
+		cmds, err := p.commands(r)
+		if err != nil {
+			failed = append(failed, fmt.Errorf("%s: %w", p.tool, err))
+			continue
+		}
+		for _, argv := range cmds {
 			cmd := strings.Join(argv, " ")
 			if _, err := r.run(argv[0], argv[1:]...); err != nil {
 				failed = append(failed, fmt.Errorf("%s: %w", cmd, err))
@@ -260,11 +271,53 @@ func writeGCStamp(stamp string, at time.Time) error {
 func plannedCommands(present []gcPruner) []string {
 	var out []string
 	for _, p := range present {
+		if p.cmdsFor != nil {
+			out = append(out, p.plan)
+			continue
+		}
 		for _, argv := range p.cmds {
 			out = append(out, strings.Join(argv, " "))
 		}
 	}
 	return out
+}
+
+func (p gcPruner) commands(r cacheGC) ([][]string, error) {
+	if p.cmdsFor == nil {
+		return p.cmds, nil
+	}
+	return p.cmdsFor(r)
+}
+
+// miseHeld are the tools whose old versions mise prune must keep. A venv
+// records its interpreter by absolute path, so removing a Python a pin moved
+// away from breaks every venv built on it: hive's uv tool and each project's
+// .venv. They move to the new Python when they are rebuilt, not before.
+var miseHeld = map[string]bool{"python": true}
+
+// misePrune names every installed tool but the held ones, since mise prune
+// takes the tools to prune and has no way to exclude one. With nothing left
+// to name it runs nothing: an empty list would prune every tool.
+func misePrune(r cacheGC) ([][]string, error) {
+	out, err := r.run("mise", "ls", "--installed", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("mise ls --installed --json: %w", err)
+	}
+	var installed map[string]json.RawMessage
+	if err := json.Unmarshal(out, &installed); err != nil {
+		return nil, fmt.Errorf("reading mise ls --installed --json: %w", err)
+	}
+	var names []string
+	for name := range installed {
+		if !miseHeld[name] {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil, nil
+	}
+	slices.Sort(names)
+	return [][]string{append([]string{"mise", "prune", "--tools", "--yes"}, names...)}, nil
 }
 
 func orNone(s []string) string {

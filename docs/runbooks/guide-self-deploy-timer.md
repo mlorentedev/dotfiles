@@ -66,7 +66,7 @@ kind that keeps what is in use:
 | uv (cache not in use) | `uv cache prune` | entries no environment refers to, leftover temp dirs |
 | pre-commit | `pre-commit gc` | hook repos no config uses |
 | npm | `npm cache verify` | unreferenced cache data |
-| mise | `mise prune --yes` | tool versions no tracked config asks for and no running process uses, such as the one a pin moved away from |
+| mise | `mise prune --tools --yes <every installed tool but python>` | tool versions no tracked config asks for and no running process uses, such as the one a pin moved away from. Python is held: venvs name their interpreter by absolute path |
 | docker (daemon answering) | `docker builder prune -f --filter until=168h`, `docker image prune -f --filter until=168h` | build cache and dangling images older than a week; tagged images are kept |
 | lima | `limactl prune --keep-referred` | downloads no instance or template refers to |
 | colima (running) | `colima ssh -- sudo fstrim -a` | hands the blocks Docker freed back to the host's disk file |

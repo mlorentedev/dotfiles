@@ -30,4 +30,5 @@ Restore with `dotf tools sync` and `dotf converge --only tools`, and remove from
 tool `conf.d` already pins. Judge the result in a new shell. The lasting fix is a channel that moves
 pins through a reviewed PR (#3284). Without one, an exact pin is a pin people learn to break. The
 cleanup half was already automatic (brew in `system-upgrade`, caches in `cache-gc`) except old mise
-versions, which #3533 adds to `cache-gc`.
+versions, which #3533 adds to `cache-gc`. That prune holds Python back: hive's uv tool and about 55 kubelab venvs
+name mise's Python by absolute path, so pruning the version a pin left would break them.
