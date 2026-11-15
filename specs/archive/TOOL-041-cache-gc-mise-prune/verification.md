@@ -34,13 +34,13 @@ owner: manu
 
 ## Promotion candidates
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: lesson 605 (a pin with no way to move it gets moved by hand), which records the hold
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-605-a-pin-with-no-way-to-move-it-gets-moved-by-hand.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: ADR-036's `cache-gc` section is amended in place
-- [x] New pattern candidate for `00_meta/patterns/`? no
+- [x] New pattern candidate for `00_meta/patterns/`? no: the hold is specific to how this repository's venvs reach mise's Python
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/TOOL-041-cache-gc-mise-prune/` -> `specs/archive/TOOL-041-cache-gc-mise-prune/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/TOOL-041-cache-gc-mise-prune/` -> `specs/archive/TOOL-041-cache-gc-mise-prune/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
