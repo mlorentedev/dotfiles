@@ -31,6 +31,9 @@ const (
 	CompletionEmptyAnswer Completion = "empty-answer"
 	// CompletionTimeout — the deadline killed the runner.
 	CompletionTimeout Completion = "timeout"
+	// CompletionStalled — the runner's transcript stopped changing and the
+	// launcher stopped it.
+	CompletionStalled Completion = "stalled"
 	// CompletionProviderError — the runner failed and left no answer. Telling a
 	// rate limit, a quota or a content filter apart needs its transcript.
 	CompletionProviderError Completion = "provider-error"
@@ -38,6 +41,10 @@ const (
 	// It is never charged to the model.
 	CompletionInfra Completion = "infra-error"
 )
+
+// ErrInterrupted is returned when a launcher reports that an interrupt
+// stopped the attempt in flight; the run ends there.
+var ErrInterrupted = errors.New("eval run: interrupted")
 
 // Attempt is one epoch of one cell, and where it runs and keeps its files.
 type Attempt struct {
@@ -52,6 +59,8 @@ type Attempt struct {
 type LaunchResult struct {
 	ExitErr  error
 	TimedOut bool
+	// Stalled — the launcher stopped a runner whose transcript stopped changing.
+	Stalled bool
 	// Interrupted — the launcher killed the runner because the run was
 	// interrupted. A runner that finished before the interrupt landed is not.
 	Interrupted bool
@@ -87,6 +96,7 @@ type Record struct {
 	OwnKey          bool       `json:"own_key"`
 	Grade           *Grade     `json:"grade"`
 	Tree            string     `json:"-"`
+	interrupted     bool
 }
 
 // Run executes the plan's attempts one at a time and writes each record before
@@ -121,6 +131,9 @@ func Run(ctx context.Context, p Plan, cases []Case, runDir string, l Launcher) (
 				return recs, err
 			}
 			recs = append(recs, rec)
+			if rec.interrupted {
+				return recs, errors.Join(ErrInterrupted, ctx.Err())
+			}
 		}
 	}
 	return recs, ctx.Err()
@@ -155,7 +168,11 @@ func grade(ctx context.Context, a Attempt, l Launcher) Record {
 	case res.TimedOut:
 		rec.Completion = CompletionTimeout
 		return rec
+	case res.Stalled:
+		rec.Completion = CompletionStalled
+		return rec
 	case res.Interrupted:
+		rec.interrupted = true
 		rec.Completion, rec.Detail = CompletionInfra, strings.TrimSuffix("interrupted: "+rec.Detail, ": ")
 		return rec
 	}

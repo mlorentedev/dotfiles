@@ -291,3 +291,32 @@ func TestRunGradesAnAnswerFinishedBeforeTheInterrupt(t *testing.T) {
 		t.Fatalf("err %v, records %+v", err, recs)
 	}
 }
+
+// The launcher that saw the interrupt reports it before the run's context may
+// know: the loop stops on the report, not on a race with the context.
+func TestRunStopsWhenTheLauncherReportsAnInterrupt(t *testing.T) {
+	l := &fakeLauncher{script: map[string]func(Attempt) (LaunchResult, error){
+		"a-r1/1": func(Attempt) (LaunchResult, error) {
+			return LaunchResult{Interrupted: true, ExitErr: errors.New("signal: interrupt")}, nil
+		},
+	}}
+	recs, err := Run(context.Background(), runPlan(3, "agy/x"), []Case{runCase()}, t.TempDir(), l)
+	if !errors.Is(err, ErrInterrupted) || len(l.started) != 1 || len(recs) != 1 || recs[0].Completion != CompletionInfra {
+		t.Fatalf("err %v, started %v, records %+v", err, l.started, recs)
+	}
+}
+
+// ADR-063 §3: a run whose transcript stopped changing is stalled, and, like a
+// timeout, it is not graded.
+func TestRunRecordsAStalledRunWithoutGradingIt(t *testing.T) {
+	l := &fakeLauncher{script: map[string]func(Attempt) (LaunchResult, error){
+		"a-r1/1": func(a Attempt) (LaunchResult, error) {
+			_, _ = answered(answer("FAIL"))(a)
+			return LaunchResult{Stalled: true, ExitErr: errors.New("stalled after read_file")}, nil
+		},
+	}}
+	recs, err := Run(context.Background(), runPlan(1, "agy/x"), []Case{runCase()}, t.TempDir(), l)
+	if err != nil || recs[0].Completion != CompletionStalled || recs[0].Grade != nil || !strings.Contains(recs[0].Detail, "read_file") {
+		t.Fatalf("err %v, record %+v", err, recs[0])
+	}
+}
