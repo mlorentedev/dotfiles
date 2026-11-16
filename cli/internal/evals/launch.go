@@ -46,10 +46,12 @@ func DefaultLaunchDeps(repo string) LaunchDeps {
 type ExecLauncher struct {
 	Root       string // the repository the cases and planted prompts are read from
 	Candidates map[string]spec.ReviewerEntry
-	SkillPath  string
-	Timeout    time.Duration // zero: spec.DefaultReviewerTimeout
-	Stall      time.Duration // zero: spec.DefaultStallTimeout
-	Deps       LaunchDeps
+	// SkillPath names the review skill a runner reads; nil is the deployed
+	// copy `spec review` points that runner at (spec.ReviewerSkillPath).
+	SkillPath func(runner string) string
+	Timeout   time.Duration // zero: spec.DefaultReviewerTimeout
+	Stall     time.Duration // zero: spec.DefaultStallTimeout
+	Deps      LaunchDeps
 }
 
 // Launch implements Launcher.
@@ -108,6 +110,13 @@ func (l ExecLauncher) Launch(_ context.Context, a Attempt) (res LaunchResult, er
 	return res, nil
 }
 
+func (l ExecLauncher) skillPath(runner string) string {
+	if l.SkillPath != nil {
+		return l.SkillPath(runner)
+	}
+	return spec.ReviewerSkillPath(runner)
+}
+
 func (l ExecLauncher) prepareTree(a Attempt) (Tree, error) {
 	if a.Case.Kind == "planted" {
 		if err := os.MkdirAll(a.Tree, 0o755); err != nil {
@@ -140,7 +149,7 @@ func (l ExecLauncher) plan(a Attempt, entry spec.ReviewerEntry, tree string) (sp
 	}
 	launch := spec.EvalLaunch{
 		Candidate: entry, SpecID: a.Case.Spec, Tree: tree, ReviewedSHA: a.Case.ReviewedSHA, BaseSHA: a.Case.BaseSHA,
-		OutDir: a.OutDir, SkillPath: l.SkillPath, Timeout: l.Timeout,
+		OutDir: a.OutDir, SkillPath: l.skillPath(entry.Runner), Timeout: l.Timeout,
 	}
 	p, err := spec.PlanEvalLaunch(launch)
 	if err != nil {
