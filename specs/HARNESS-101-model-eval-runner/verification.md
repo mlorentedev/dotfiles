@@ -25,9 +25,9 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 
 ## Test status
 
-- Test suite: `<command> -> <output / coverage %>`
-- Manual smoke test: what was exercised, what was observed
-- No regressions in existing test suite: yes / no (if no, document)
+- Test suite (2026-11-15, the run wiring, under `GOTOOLCHAIN=go1.26.10` because this Mac's PATH resolves go 1.27.4, #3532): `go build ./... && go vet ./... && GOOS=windows go vet ./...` clean; `go test ./...` every package ok; golangci-lint 2.12.2 on Linux and Windows builds, 0 issues after `golangci-lint cache clean` (a cached finding came from another worktree, lesson 353).
+- Manual smoke test: `dotf eval run --plan` on the real corpus for each first-run candidate; output recorded in the AC3 wiring entry above. No model was run.
+- No regressions in existing test suite: yes. The one test that drove the real command without `--plan` (`TestEvalRunWithoutPlanSaysItCannotRunYet`) was removed with the refusal it tested; its replacements run on injected deps.
 
 ## Decisions made during implementation
 
