@@ -18,6 +18,7 @@ const upgradeCatalog = `{"tools": [
   {"name": "git", "source": {"type": "system", "apt": "git", "brew": "git", "winget": "Git.Git"}},
   {"name": "wget", "source": {"type": "system", "apt": "wget", "brew": "wget"}},
   {"name": "eza", "source": {"type": "system", "apt": "eza", "winget": "eza-community.eza"}},
+  {"name": "gh", "source": {"type": "system", "winget": "GitHub.cli"}},
   {"name": "firefox", "source": {"type": "system", "cask": "firefox"}},
   {"name": "veracrypt", "source": {"type": "system", "cask": "veracrypt", "needs_sudo": true}}
 ]}`
@@ -34,6 +35,8 @@ type pkgFake struct {
 	fail     map[string]error // a command, as joined argv, that fails
 	// wingetOverride, when set, is the `winget upgrade` listing verbatim.
 	wingetOverride []byte
+	// machine is the ids `winget list --scope machine` answers.
+	machine []string
 }
 
 func newPkgFake(outdated map[string][]string) *pkgFake {
@@ -73,6 +76,8 @@ func (f *pkgFake) run(name string, args ...string) ([]byte, error) {
 		f.clear("apt", args[3:]...)
 	case argv == "winget upgrade --accept-source-agreements":
 		return f.wingetTable(), nil
+	case argv == "winget list --scope machine --accept-source-agreements --disable-interactivity":
+		return wingetRows(f.machine), nil
 	case strings.HasPrefix(argv, "winget upgrade --id "):
 		f.clear("winget", args[2])
 	case slices.Contains([]string{
@@ -108,6 +113,18 @@ func (f *pkgFake) aptList() []byte {
 		lines = append(lines, n+"/jammy-updates 2.0 amd64 [upgradable from: 1.0]")
 	}
 	return []byte(strings.Join(lines, "\n") + "\n")
+}
+
+// wingetRows is a winget table of ids, as `winget list` prints one.
+func wingetRows(ids []string) []byte {
+	lines := []string{
+		"Name           Id                 Version Source",
+		"-------------------------------------------------",
+	}
+	for _, id := range ids {
+		lines = append(lines, "Some App       "+id+"   1.0     winget")
+	}
+	return []byte(strings.Join(lines, "\r\n") + "\r\n")
 }
 
 func (f *pkgFake) wingetTable() []byte {
@@ -381,13 +398,15 @@ func TestSystemUpgradeLinuxAsRootRunsWithoutSudo(t *testing.T) {
 
 // AC5: one winget upgrade per outdated catalog id, ids matched without regard
 // to case; a failing id does not stop the next, fails the step, and the probe
-// names it.
+// names it. That holds for an elevated run, where nothing stands between dotf
+// and the upgrade, so a failure is one (#3553).
 func TestSystemUpgradeWindowsUpgradesPerIdAndIsolatesAFailure(t *testing.T) {
 	env := upgradeEnv(t, "windows")
 	f := newPkgFake(map[string][]string{"winget": {"GIT.git", "EZA-Community.Eza"}})
 	failing := "winget upgrade --id Git.Git -e --silent --accept-source-agreements --accept-package-agreements"
 	f.fail[failing] = errors.New("exit status 0x8a150056: elevation required")
 	step := upgradeStep(f)
+	step.root = func() bool { return true }
 
 	res, err := step.Reconcile(env, false)
 	if err == nil || !strings.Contains(err.Error(), "Git.Git") {
@@ -412,6 +431,103 @@ func TestSystemUpgradeWindowsUpgradesPerIdAndIsolatesAFailure(t *testing.T) {
 	}
 	if err := step.Probe(env); err != nil {
 		t.Errorf("Probe after the retry = %v", err)
+	}
+}
+
+// #3553: without elevation a machine-wide install is never attempted, because
+// its installer raises an administrator prompt the account cannot answer, and
+// an id that is attempted and fails is left waiting, not failed. The same ids
+// would otherwise fail every run and keep every later converge step from being
+// reached. The statuses are the ones a non-administrator Windows workstation
+// returned on 2026-11-16; the second is an install-technology mismatch, not an
+// elevation error, which is why the rule is the token and not a list of codes.
+func TestSystemUpgradeWindowsWithoutElevationSkipsMachineWideAndToleratesAFailure(t *testing.T) {
+	const upgrade = "winget upgrade --id "
+	for _, status := range []string{"exit status 0x8a15010c", "exit status 0x8a15008e", "exit status 0x8a150006"} {
+		t.Run(status, func(t *testing.T) {
+			env := upgradeEnv(t, "windows")
+			f := newPkgFake(map[string][]string{"winget": {"Git.Git", "eza-community.eza", "GitHub.cli"}})
+			f.machine = []string{"GITHUB.cli", "Unrelated.App"}
+			f.fail[upgrade+"Git.Git -e --silent --accept-source-agreements --accept-package-agreements"] = errors.New(status + ": Installer log is available at: C:\\logs\\a.log\nsecond line")
+			step := upgradeStep(f)
+
+			res, err := step.Reconcile(env, false)
+			if err != nil {
+				t.Fatalf("err = %v, want nil: a privilege the run cannot obtain is not a failure", err)
+			}
+			if got := f.ran(upgrade + "GitHub.cli"); len(got) != 0 {
+				t.Errorf("ran %q, want a machine-wide install never attempted without elevation", got)
+			}
+			if res.Changes != 1 || !strings.Contains(res.Detail, "upgraded: eza-community.eza") {
+				t.Errorf("res = %+v, want the one id that upgraded counted and named", res)
+			}
+			for _, want := range []string{NeedsElevationNote, "GitHub.cli (" + machineWide + ")", "Git.Git (" + status + ")"} {
+				if !strings.Contains(res.Detail, want) {
+					t.Errorf("Detail = %q, want it to hold %q", res.Detail, want)
+				}
+			}
+			if strings.Contains(res.Detail, "a.log") || strings.Contains(res.Detail, "second line") {
+				t.Errorf("Detail = %q, want the exit status alone, not winget's output", res.Detail)
+			}
+			if err := step.Probe(env); err != nil {
+				t.Errorf("Probe = %v, want nil: it must not re-fail the step on the ids left waiting", err)
+			}
+		})
+	}
+}
+
+// A plan says what a run would leave waiting, and attempts nothing either.
+func TestSystemUpgradeWindowsPlanNamesMachineWideWithoutElevation(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	f := newPkgFake(map[string][]string{"winget": {"Git.Git", "GitHub.cli"}})
+	f.machine = []string{"GitHub.cli"}
+
+	res, err := upgradeStep(f).Reconcile(env, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Changes != 1 || !strings.Contains(res.Detail, "GitHub.cli ("+machineWide+")") {
+		t.Errorf("res = %+v, want one change planned and the machine-wide id named as waiting", res)
+	}
+	if got := f.ran("winget upgrade --id "); len(got) != 0 {
+		t.Errorf("ran %q, want a plan to upgrade nothing", got)
+	}
+}
+
+// When the scope cannot be read nothing is attempted: a prompt nobody can
+// answer is worse than an upgrade that waits.
+func TestSystemUpgradeWindowsWithoutElevationAttemptsNothingWhenScopeIsUnknown(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	f := newPkgFake(map[string][]string{"winget": {"Git.Git"}})
+	f.fail["winget list --scope machine --accept-source-agreements --disable-interactivity"] = errors.New("exit status 1: boom")
+	step := upgradeStep(f)
+
+	res, err := step.Reconcile(env, false)
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if got := f.ran("winget upgrade --id "); len(got) != 0 {
+		t.Errorf("ran %q, want nothing attempted", got)
+	}
+	if res.Changes != 0 || !strings.Contains(res.Detail, "Git.Git (install scope unknown: winget list: exit status 1)") {
+		t.Errorf("res = %+v, want the id named as waiting with the reason", res)
+	}
+}
+
+// Elevated, the scope is not asked: every outdated id is attempted.
+func TestSystemUpgradeWindowsElevatedUpgradesMachineWide(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	f := newPkgFake(map[string][]string{"winget": {"GitHub.cli"}})
+	f.machine = []string{"GitHub.cli"}
+	step := upgradeStep(f)
+	step.root = func() bool { return true }
+
+	res, err := step.Reconcile(env, false)
+	if err != nil || res.Changes != 1 {
+		t.Fatalf("res = %+v, err = %v, want the machine-wide id upgraded", res, err)
+	}
+	if got := f.ran("winget list"); len(got) != 0 {
+		t.Errorf("ran %q, want no scope query on an elevated run", got)
 	}
 }
 

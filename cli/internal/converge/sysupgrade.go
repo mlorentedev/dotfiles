@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path"
 	"runtime"
@@ -29,7 +28,7 @@ import (
 type systemUpgrade struct {
 	run  tools.Runner      // ExecManager in production; nil: the step is skipped
 	has  func(string) bool // is a command on PATH
-	root func() bool       // does dotf run as root; nil means os.Geteuid() == 0
+	root func() bool       // does dotf run privileged (root, or elevated on Windows); nil asks the process
 	arch string            // the Windows GOARCH that picks a winget_arch id; "" means runtime.GOARCH
 }
 
@@ -80,7 +79,7 @@ func (r systemUpgrade) Reconcile(env Env, dryRun bool) (Result, error) {
 }
 
 // Probe holds the post-condition: no catalog entry is still outdated, except a
-// cask left for sudo, which Reconcile names. It lists again and does not
+// cask left for sudo or a winget id left for elevation, which Reconcile names. It lists again and does not
 // refresh: a second refresh could move the index under the apply it checks.
 func (r systemUpgrade) Probe(env Env) error {
 	if r.run == nil {
@@ -95,6 +94,13 @@ func (r systemUpgrade) Probe(env Env) error {
 		return err
 	}
 	due, _ := r.splitPrivilege(behind)
+	if env.GOOS == "windows" && !r.isRoot() {
+		// What is still behind is what Reconcile left waiting for elevation:
+		// a machine-wide install it did not attempt, or an id whose upgrade
+		// failed. The step keeps no state between the two calls, so the rule
+		// is the one both can read: the token.
+		due = nil
+	}
 	if len(due) > 0 {
 		return fmt.Errorf("still outdated after the upgrade: %s", pkgNames(due))
 	}
@@ -157,8 +163,16 @@ func (r systemUpgrade) linux(dryRun bool, targets []sysTarget) (Result, error) {
 }
 
 // windows: winget source update, the outdated catalog ids, and one winget
-// upgrade per id. Winget has no housekeeping. An id that fails (a package that
-// needs elevation) is reported and does not stop the others.
+// upgrade per id. Winget has no housekeeping. An id that fails does not stop
+// the others, and elevated it fails the step.
+//
+// Without elevation a machine-wide install is never attempted: its installer
+// asks for an administrator, on screen, on every run, and an account that
+// cannot answer is left with a prompt and a failed step that keeps each
+// converge from reaching the steps after this one (#3553). Those ids are left
+// waiting and named. An id that is attempted and still fails waits too, with
+// its status. It is the rule linux and darwin apply to apt without sudo and to
+// a needs_sudo cask.
 func (r systemUpgrade) windows(dryRun bool, targets []sysTarget) (Result, error) {
 	if reason := r.refresh("winget", "winget", "source", "update"); reason != "" {
 		return Result{Skip: reason}, nil
@@ -167,22 +181,79 @@ func (r systemUpgrade) windows(dryRun bool, targets []sysTarget) (Result, error)
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Changes: len(due), Detail: upgradeDetail(dryRun, "winget source update", due, due, nil)}
+	elevated := r.isRoot()
+	var waiting []string
+	if !elevated && len(due) > 0 {
+		due, waiting = r.splitMachineWide(due)
+	}
 	if dryRun {
-		return res, nil
+		return Result{Changes: len(due), Detail: upgradeDetail(true, "winget source update", due, due, nil) + elevationNote(waiting)}, nil
 	}
 	var failed []error
 	var done []sysTarget
 	for _, t := range due {
 		argv := []string{"winget", "upgrade", "--id", t.pkg, "-e", "--silent", "--accept-source-agreements", "--accept-package-agreements"}
-		if _, err := r.run(argv[0], argv[1:]...); err != nil {
+		_, err := r.run(argv[0], argv[1:]...)
+		switch {
+		case err == nil:
+			done = append(done, t)
+		case elevated:
 			failed = append(failed, fmt.Errorf("%s: %w", t.pkg, err))
-			continue
+		default:
+			waiting = append(waiting, fmt.Sprintf("%s (%s)", t.pkg, exitStatus(err)))
 		}
-		done = append(done, t)
 	}
-	res.Changes, res.Detail = len(done), upgradeDetail(false, "winget source update", due, done, nil)
+	res := Result{Changes: len(done), Detail: upgradeDetail(false, "winget source update", due, done, nil) + elevationNote(waiting)}
 	return res, errors.Join(failed...)
+}
+
+// NeedsElevationNote opens the part of the step's detail that names the winget
+// ids left waiting for an elevated run. `dotf update` reads it to record a
+// quiet day that left some behind.
+const NeedsElevationNote = "left, needs elevation: "
+
+// elevationNote is the detail's account of the ids left waiting, "" for none.
+func elevationNote(waiting []string) string {
+	if len(waiting) == 0 {
+		return ""
+	}
+	return "; " + NeedsElevationNote + strings.Join(waiting, ", ") + " (run `dotf converge --only system-upgrade` from an elevated terminal)"
+}
+
+// machineWide marks an id winget lists under the machine scope.
+const machineWide = "machine-wide install"
+
+// splitMachineWide separates the ids installed for the whole machine, which a
+// non-elevated run must not attempt, from the ones it can upgrade. The scope
+// comes from `winget list --scope machine`, which only reads. An id installed
+// under both scopes counts as machine-wide. When the listing fails nothing is
+// attempted: an upgrade that may raise a prompt nobody can answer is worse
+// than one that waits for the next run.
+func (r systemUpgrade) splitMachineWide(behind []sysTarget) (due []sysTarget, waiting []string) {
+	out, err := r.run("winget", "list", "--scope", "machine", "--accept-source-agreements", "--disable-interactivity")
+	if err != nil && !isExitCode(err, wingetNoneFound) {
+		for _, t := range behind {
+			waiting = append(waiting, fmt.Sprintf("%s (install scope unknown: winget list: %s)", t.pkg, exitStatus(err)))
+		}
+		return nil, waiting
+	}
+	machine := wingetMatcher(wingetIDs(string(out)))
+	for _, t := range behind {
+		if machine(t) {
+			waiting = append(waiting, t.pkg+" ("+machineWide+")")
+		} else {
+			due = append(due, t)
+		}
+	}
+	return due, waiting
+}
+
+// exitStatus is the head of a failed command's error, its exit status: the
+// runner appends the command's output after it, and winget's holds a log path.
+func exitStatus(err error) string {
+	line, _, _ := strings.Cut(err.Error(), "\n")
+	line, _, _ = strings.Cut(line, ": ")
+	return strings.TrimSpace(line)
 }
 
 // refresh runs the manager's index refresh and returns the skip reason when it
@@ -371,7 +442,12 @@ func (r systemUpgrade) wingetBehind([]sysTarget) (func(sysTarget) bool, error) {
 	if err != nil && !isExitCode(err, wingetNoneFound) {
 		return nil, fmt.Errorf("winget upgrade: %w", err)
 	}
-	ids := wingetIDs(string(out))
+	return wingetMatcher(wingetIDs(string(out))), nil
+}
+
+// wingetMatcher reports whether a catalog id is one of a winget table's Id
+// cells, an ellipsis-cut cell matching the ids it is a prefix of.
+func wingetMatcher(ids []string) func(sysTarget) bool {
 	return func(t sysTarget) bool {
 		id := strings.ToLower(t.pkg)
 		for _, cell := range ids {
@@ -380,7 +456,7 @@ func (r systemUpgrade) wingetBehind([]sysTarget) (func(sysTarget) bool, error) {
 			}
 		}
 		return false
-	}, nil
+	}
 }
 
 // wingetNoneFound is APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND.
@@ -474,7 +550,7 @@ func (r systemUpgrade) isRoot() bool {
 	if r.root != nil {
 		return r.root()
 	}
-	return os.Geteuid() == 0
+	return processElevated()
 }
 
 // asRoot runs argv through `sudo -n` unless dotf is root: -n fails instead of

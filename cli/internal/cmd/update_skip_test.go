@@ -19,6 +19,7 @@ func TestSystemUpgradeSkipReadsOnlyTheStepsSkip(t *testing.T) {
 	}{
 		{name: "skipped", rep: converge.Report{Entries: []converge.Entry{{Name: "system-upgrade", Status: converge.StatusSkipped, Detail: reason}}}, want: reason},
 		{name: "ran", rep: converge.Report{Entries: []converge.Entry{{Name: "system-upgrade", Status: converge.StatusOK, Detail: "catalog entries up to date"}}}},
+		{name: "ran but left ids waiting for elevation", rep: converge.Report{Entries: []converge.Entry{{Name: "system-upgrade", Status: converge.StatusChange, Changes: 1, Detail: "upgraded: a; " + converge.NeedsElevationNote + "b (exit status 1)"}}}, want: "upgraded: a; " + converge.NeedsElevationNote + "b (exit status 1)"},
 		{name: "changed", rep: converge.Report{Entries: []converge.Entry{{Name: "system-upgrade", Status: converge.StatusChange, Changes: 2}}}},
 		{name: "failed is not a skip", rep: converge.Report{Entries: []converge.Entry{{Name: "system-upgrade", Status: converge.StatusFailed, Detail: "brew upgrade: exit 1"}}}},
 		{name: "another step's skip", rep: converge.Report{Entries: []converge.Entry{{Name: "tools", Status: converge.StatusSkipped, Detail: "x"}}}},
