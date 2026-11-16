@@ -40,7 +40,7 @@ After this spec, in a repository that carries the committed `.dotf/lanes.json`:
 
    - **claude:** through the `mem session-start` hook already bound in `harness/manifest.json`.
    - **pi and opencode:** the manifest declares a `dotfiles-gate.ts` session-start extension for each, but nothing writes either file (`emit: false`; `docs/runbooks/guide-agent-provisioning.md` says "not written by bind"). Neither exists on the Mac. This spec builds one small extension per harness that runs `dotf mem session-start` at session start and adds its output to the session's context: pi's `session_start` event, and opencode's `chat.system.transform`, which injects into the system prompt rather than printing. dotf deploys both.
-   - **agy:** its hooks document has no session-start event, only `PreInvocation`, which fires before each turn. The spec binds a `PreInvocation` hook that prints the line once per session. Whether agy shows that hook's output to the model is unverified; the observed launch (AC9) decides. If it does not, agy joins copilot and codex below.
+   - **agy:** its hooks document has no session-start event, only `PreInvocation`, which fires before each turn. The spec binds a `PreInvocation` hook that prints the line once per session. agy does show that hook's output to the model: observed on 2026-11-15 (AC9, verification.md).
    - **copilot and codex:** they have no hook surface yet (#803). They get the line from `dotf mem resume`, which AGENTS.md tells every session to run first. This is the one non-mechanical path, stated as such, and it closes when they gain hooks.
 
 4. **`dotf worktree add` coexists with lanes.** In a repository with active lanes it still creates the worktree, and prints the lane command to use instead. Detached worktrees, and those `spec review` creates, print nothing.
@@ -78,7 +78,7 @@ These are true unknowns. The design decisions are recorded in **What**.
 - [ ] AC6. `launchers` holds an entry for each agent with a recorded observed launch (`LANE-READY`) in `verification.md`. `dotf secrets run` refuses an npm `.cmd` shim on Windows the same way `lane exec` does.
 - [ ] AC7. `dotf lane doctor` reports a detached worktree with no lease, an expired lease, and a drifted deployed guard, each with its fix. Exit status is unchanged for warnings.
 - [ ] AC8. AGENTS.md, the `dotf init` template that seeds other repositories' AGENTS.md (`cli/internal/initrepo/templates/agents-spec-section.md`) and the three skills name the lane entrances. Neither AGENTS.md nor the template calls the implementation tiers "lanes", and a test fails if either does again.
-- [ ] AC9. dotfiles is active on the Mac, the Linux guest and the Windows guest. A real session of each launched agent starts in a lane and reports it through AC3's line. The evidence is recorded in `verification.md`.
+- [x] AC9. dotfiles is active on the Mac, the Linux guest and the Windows guest. A real session of each launched agent starts in a lane and reports it through AC3's line. The evidence is recorded in `verification.md`.
 
 ## References
 
