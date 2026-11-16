@@ -595,13 +595,29 @@ $footer"
 }
 
 # Renovate opens its PRs with a personal token, so they are authored by the
-# token's owner and the bot skip never applies; renovate.json's prBodyNotes is
-# what answers the gate (#3284). The notes are read from the committed config.
-@test "a Renovate pin bump passes on the Knowledge section renovate.json writes" {
-    SDD_PR_BODY="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["prBodyNotes"][0])' "$BATS_TEST_DIRNAME/../renovate.json")"
+# token's owner and the bot skip never applies; the prBodyNotes renovate.json
+# gives minor and patch bumps is what answers the gate (#3284). The notes are
+# read from the committed config. A major gets none and must fail.
+_renovate_notes() {
+    python3 -c 'import json,sys
+rules = json.load(open(sys.argv[1]))["packageRules"]
+print("".join(n for r in rules if r.get("matchUpdateTypes") == ["minor", "patch"] for n in r.get("prBodyNotes", [])))' "$BATS_TEST_DIRNAME/../renovate.json"
+}
+
+@test "a Renovate minor or patch bump passes on the Knowledge section renovate.json writes" {
+    SDD_PR_BODY="$(_renovate_notes)"
+    [ -n "$SDD_PR_BODY" ] || { echo "renovate.json gives minor and patch bumps no prBodyNotes"; false; }
     export SDD_PR_BODY SDD_PR_AUTHOR=mlorentedev SDD_LABELS=dependencies,renovate
     echo "FD_VERSION=10.6.0" > versions.conf
     _commit "fix(deps): update cli pins"
     _gate
     [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "a Renovate major bump without a written Knowledge section fails" {
+    export SDD_PR_BODY="This PR updates helm from v3 to v4." SDD_PR_AUTHOR=mlorentedev SDD_LABELS=dependencies,renovate
+    echo "HELM_VERSION=4.0.0" > versions.conf
+    _commit "fix(deps): update helm to v4"
+    _gate
+    [ "$status" -eq 1 ] || { echo "$output"; false; }
 }
