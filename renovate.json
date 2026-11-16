@@ -3,6 +3,9 @@
   "description": "Moves the pins in versions.conf and packages.json (#3284). Dependabot keeps gomod, github-actions and docker, so only the custom managers run here.",
   "extends": ["github>mlorentedev/ci-workflows//renovate/default#v0.8.0"],
   "enabledManagers": ["custom.regex", "custom.jsonata"],
+  "prBodyNotes": [
+    "## Knowledge\n\n- Lesson: none: a pin bump records no new behaviour\n- ADR: none: no decision is made by moving a pin\n- Runbook: none: docs/runbooks/tool-installation.md already says how pins move"
+  ],
   "customManagers": [
     {
       "customType": "regex",

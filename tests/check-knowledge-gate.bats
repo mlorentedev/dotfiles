@@ -593,3 +593,15 @@ $footer"
     _gate
     [ "$status" -eq 0 ]
 }
+
+# Renovate opens its PRs with a personal token, so they are authored by the
+# token's owner and the bot skip never applies; renovate.json's prBodyNotes is
+# what answers the gate (#3284). The notes are read from the committed config.
+@test "a Renovate pin bump passes on the Knowledge section renovate.json writes" {
+    SDD_PR_BODY="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["prBodyNotes"][0])' "$BATS_TEST_DIRNAME/../renovate.json")"
+    export SDD_PR_BODY SDD_PR_AUTHOR=mlorentedev SDD_LABELS=dependencies,renovate
+    echo "FD_VERSION=10.6.0" > versions.conf
+    _commit "fix(deps): update cli pins"
+    _gate
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
