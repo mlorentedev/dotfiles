@@ -1049,6 +1049,6 @@ jobs:
     timeout-minutes: 2
     permissions: {}
     steps:
-      - uses: mlorentedev/ci-workflows/.github/actions/gate@2355330358344bb08c0b7a305be4ed6488f23d0c # v0.6.0
+      - uses: mlorentedev/ci-workflows/.github/actions/gate@c05dd6f3fd1691b3b2ee4e0f78305f0cf150e402 # v0.7.0
         with:
           needs: ${{ toJSON(needs) }}
