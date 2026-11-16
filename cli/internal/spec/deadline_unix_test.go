@@ -112,3 +112,51 @@ func TestRunWithDeadlinePassesAStopSignalToTheRunnersGroup(t *testing.T) {
 		t.Errorf("the runner's child (pid %d) outlived the stop signal", pid)
 	}
 }
+
+// An evaluation run must tell a runner the launcher stopped on a signal from
+// one that exited 130 by itself: only the first is not the model's doing. The
+// stop reason stays StopNone, so `spec review` reads a signal as it always has.
+func TestRunWithLimitsSaysWhenASignalEndedTheRun(t *testing.T) {
+	sigs := make(chan os.Signal, 1)
+	prev := interrupts
+	interrupts = func() (<-chan os.Signal, func()) { return sigs, func() {} }
+	t.Cleanup(func() { interrupts = prev })
+
+	started := filepath.Join(t.TempDir(), "started")
+	ran := make(chan RunResult, 1)
+	go func() {
+		res, _ := RunWithLimits(Limits{Deadline: time.Minute}, []string{"sh", "-c", "touch " + started + "; sleep 60"}, nil, &bytes.Buffer{}, &bytes.Buffer{})
+		ran <- res
+	}()
+	for i := 0; i < 100; i++ {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	sigs <- syscall.SIGINT
+	select {
+	case res := <-ran:
+		if !res.Signaled || res.Stop != StopNone {
+			t.Errorf("signal: %+v, want Signaled and StopNone", res)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("a stop signal did not end the run")
+	}
+
+	res, err := RunWithLimits(Limits{Deadline: time.Minute}, []string{"sh", "-c", "exit 130"}, nil, &bytes.Buffer{}, &bytes.Buffer{})
+	if err != nil || res.Signaled || res.Code != 130 {
+		t.Errorf("own exit 130: %+v err %v, want not Signaled", res, err)
+	}
+}
+
+// An evaluation run launches in-process and cannot change this process's
+// directory: the runner is started in Limits.Dir, which pi reads as its tree.
+func TestRunWithLimitsStartsTheRunnerInItsDirectory(t *testing.T) {
+	dir := ResolveExisting(t.TempDir())
+	var out bytes.Buffer
+	res, err := RunWithLimits(Limits{Deadline: time.Minute, Dir: dir}, []string{"sh", "-c", "pwd -P"}, nil, &out, &bytes.Buffer{})
+	if err != nil || res.Code != 0 || strings.TrimSpace(out.String()) != dir {
+		t.Errorf("ran in %q (code %d, err %v), want %s", strings.TrimSpace(out.String()), res.Code, err, dir)
+	}
+}

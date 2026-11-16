@@ -31,6 +31,9 @@ const (
 	CompletionEmptyAnswer Completion = "empty-answer"
 	// CompletionTimeout — the deadline killed the runner.
 	CompletionTimeout Completion = "timeout"
+	// CompletionStalled — the runner's transcript stopped changing and the
+	// launcher stopped it.
+	CompletionStalled Completion = "stalled"
 	// CompletionProviderError — the runner failed and left no answer. Telling a
 	// rate limit, a quota or a content filter apart needs its transcript.
 	CompletionProviderError Completion = "provider-error"
@@ -38,6 +41,10 @@ const (
 	// It is never charged to the model.
 	CompletionInfra Completion = "infra-error"
 )
+
+// ErrInterrupted is returned when a launcher reports that an interrupt
+// stopped the attempt in flight; the run ends there.
+var ErrInterrupted = errors.New("eval run: interrupted")
 
 // Attempt is one epoch of one cell, and where it runs and keeps its files.
 type Attempt struct {
@@ -52,11 +59,17 @@ type Attempt struct {
 type LaunchResult struct {
 	ExitErr  error
 	TimedOut bool
+	// Stalled — the launcher stopped a runner whose transcript stopped changing.
+	Stalled bool
 	// Interrupted — the launcher killed the runner because the run was
 	// interrupted. A runner that finished before the interrupt landed is not.
 	Interrupted bool
 	Duration    time.Duration
 	Tokens      *Tokens // nil when the runner reports none
+	// Leftover — the attempt ended but its tree could not be removed. It is
+	// the operator's to clean up and says nothing about the model, so it is
+	// recorded beside the result instead of replacing it.
+	Leftover error
 }
 
 // Tokens is what a runner reported spending. Absent is "not reported", never 0.
@@ -87,6 +100,7 @@ type Record struct {
 	OwnKey          bool       `json:"own_key"`
 	Grade           *Grade     `json:"grade"`
 	Tree            string     `json:"-"`
+	interrupted     bool
 }
 
 // Run executes the plan's attempts one at a time and writes each record before
@@ -121,6 +135,9 @@ func Run(ctx context.Context, p Plan, cases []Case, runDir string, l Launcher) (
 				return recs, err
 			}
 			recs = append(recs, rec)
+			if rec.interrupted {
+				return recs, errors.Join(ErrInterrupted, ctx.Err())
+			}
 		}
 	}
 	return recs, ctx.Err()
@@ -135,8 +152,8 @@ func attemptFor(runDir string, c Case, candidate string, epoch int) Attempt {
 	}
 }
 
-func grade(ctx context.Context, a Attempt, l Launcher) Record {
-	rec := Record{
+func grade(ctx context.Context, a Attempt, l Launcher) (rec Record) {
+	rec = Record{
 		Case: a.Case.ID, Kind: a.Case.Kind, Candidate: a.Candidate, Epoch: a.Epoch,
 		OwnKey: a.Case.KeyAuthor == a.Candidate,
 	}
@@ -144,6 +161,9 @@ func grade(ctx context.Context, a Attempt, l Launcher) Record {
 	if err != nil {
 		rec.Completion, rec.Detail = CompletionInfra, err.Error()
 		return rec
+	}
+	if res.Leftover != nil {
+		defer func() { rec.Detail = strings.TrimPrefix(rec.Detail+"; "+res.Leftover.Error(), "; ") }()
 	}
 	rec.DurationSeconds, rec.Tokens = res.Duration.Seconds(), res.Tokens
 	if res.ExitErr != nil {
@@ -155,7 +175,11 @@ func grade(ctx context.Context, a Attempt, l Launcher) Record {
 	case res.TimedOut:
 		rec.Completion = CompletionTimeout
 		return rec
+	case res.Stalled:
+		rec.Completion = CompletionStalled
+		return rec
 	case res.Interrupted:
+		rec.interrupted = true
 		rec.Completion, rec.Detail = CompletionInfra, strings.TrimSuffix("interrupted: "+rec.Detail, ": ")
 		return rec
 	}
