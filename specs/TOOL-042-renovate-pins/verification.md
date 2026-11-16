@@ -75,6 +75,6 @@ Each deliberate break below, applied alone to `versions.conf` and reverted, fail
 
 ## Promotion candidates
 
-- [ ] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-607-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token.md
+- [ ] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-608-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token.md
 - [ ] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: Renovate is the fleet's existing decision (ci-workflows#30); this adopts it and records the per-repo shape in the runbook
 - [ ] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: the author-keyed skip exists only in this repo's spec-gate
