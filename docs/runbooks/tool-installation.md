@@ -47,12 +47,16 @@ dotf doctor                     # pins, drift and leftovers, per tool
 
 ## Adding or bumping a CLI that mise installs
 
-Put the pin in `versions.conf` with the marker on the line before it:
+Put the pin in `versions.conf` with the marker on the line before it, and the `# renovate:` line above the marker:
 
 ```sh
+# renovate: datasource=github-releases depName=jesseduffield/lazygit depType=cli
 # mise: cli
 LAZYGIT_VERSION=0.66.0
 ```
+
+- **Bumping.** Renovate proposes bumps every Monday as PRs, one per `depType` for minor and patch, one per major (#3284). Merge the PR and `dotf update` converges the machine to it. Never `mise upgrade --bump`: it rewrites the rendered file and leaves the SSOT behind (lesson 605). To bump one pin now, edit the line in a PR like any other change.
+- **The renovate line.** `datasource` and `depName` say where the upstream lives (an npm-backend CLI names the package in `npmBackend`, `cli/internal/tools/mise.go`); `depType` is the update group (`runtime`, `cli`, `lint`, `k8s`); `extractVersion` handles a tag that is not `vX.Y.Z` (`jq-1.8.2`). A pin Renovate must not move gets `# renovate: skip <reason>`. `cli/internal/tools/renovate_test.go` fails on a pin without the line, on a npm package that differs from `npmBackend`, and on a group large enough that its PR would fail the spec-gate (lesson 607).
 
 - **Name.** `NAME_VERSION` becomes mise's `name`, with underscores turned into hyphens (`GOLANGCI_LINT_VERSION` becomes `golangci-lint`). Check its backend with `mise registry | grep '^name '`; Node uses mise's built-in backend. On Windows, `dotf` renders bats through npm and direnv through the GitHub backend with `bin = "direnv.exe"` because their aqua recipes do not provide discoverable Windows executables.
 - **Marker placement.** The marker goes on its own line, never after the value. Every reader of this file (the shell, doctor, `setup-windows.ps1`) skips comment lines, but a trailing comment would be read as part of the version. A marker that is not followed by a `NAME_VERSION=<pin>` line makes `sync` fail.
