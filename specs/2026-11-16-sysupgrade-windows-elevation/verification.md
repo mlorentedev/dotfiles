@@ -30,12 +30,13 @@ Tests are in `cli/internal/converge/sysupgrade_test.go` unless a path is given.
 - `go test ./internal/converge/` -> `ok` (382s on the Windows workstation), 2026-11-16.
 - `go test ./internal/cmd/ -run 'SystemUpgradeSkip|Update'` -> `ok`.
 - `go build ./...`, `go vet ./...` for windows, linux and darwin -> exit 0.
-- `golangci-lint` 2.12.2 (the pin): the only findings are `gofmt` on files this change does not touch, from the
-  CRLF checkout of this workstation (`core.autocrlf=true`). CI lints an LF checkout.
-- `go test ./...` on this workstation is not green and was not before this change: `doctor`, `evals`, `lane`,
-  `reproduce`, `spec` and `worktree` fail or hit the 10-minute package timeout here (symlink tests without the
-  privilege to create one, and a slow non-elevated machine). None of those packages is touched. CI is the
-  reference for the full suite.
+- `golangci-lint` 2.12.2 (the pin) exits 1 on this workstation with `gofmt` findings on files of the CRLF
+  checkout (`core.autocrlf=true`); the three it printed (`bind.go`, `cachegc.go`, `catalog.go`) are not in this
+  diff. Local lint therefore proves nothing here; CI's lint job on an LF checkout is the check.
+- `go test ./...` in one parallel run on this workstation exited 1: `cmd`, `converge`, `reproduce` and `spec` hit
+  the 10-minute package timeout, `lane` and `worktree` failed at 660s, and `doctor` and `evals` had failing
+  tests. `converge` run alone passes (above). The same run was not made on `main`, so this record does not say
+  which of those are older than this change. CI is the reference for the full suite.
 - Manual, on the non-administrator workstation of #3553:
   - First version of the fix (tolerate the failure only): `go run ./cmd/dotf converge --only system-upgrade`
     exited 0 in 5m38s, and raised an administrator prompt for the VC++ redistributable and for Docker Desktop.

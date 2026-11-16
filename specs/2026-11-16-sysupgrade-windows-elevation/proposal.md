@@ -29,8 +29,8 @@ On Windows, when the process is not elevated, the step asks winget which outdate
 id it does attempt and that fails is left waiting instead of failing the step. The step exits 0, counts the ids
 that did upgrade, and its detail names each waiting id with its reason (machine-wide install, or winget's exit
 status) and how to run the step elevated. A plan names them too. The probe does not re-fail the step on those ids. A quiet
-day's `dotf update` records `upgrade-skipped` with that detail, so `last.json` and `dotf doctor` keep showing a
-machine that never upgrades them. An elevated run is unchanged: a failing id fails the step and the probe names it.
+day's `dotf update` records `upgrade-skipped` with that detail, so `last.json` keeps showing a machine that never
+upgrades them. An elevated run is unchanged: a failing id fails the step and the probe names it.
 
 ## Out of scope
 
