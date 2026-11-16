@@ -1,15 +1,24 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"sort"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/evals"
+	"github.com/mlorentedev/dotfiles/cli/internal/spec"
 )
 
 // errEvalCheck is returned when at least one case fails its self-check.
@@ -69,10 +78,6 @@ func newEvalCheckCmd() *cobra.Command {
 	return c
 }
 
-// errEvalRunNotYet is returned by a run without --plan until the run path lands
-// (HARNESS-101 slice 3).
-var errEvalRunNotYet = errors.New("eval run: only --plan exists so far; launching candidates is not implemented yet")
-
 // evalRunOpts are eval run's flags.
 type evalRunOpts struct {
 	root       string
@@ -83,25 +88,76 @@ type evalRunOpts struct {
 	planOnly   bool
 }
 
-// evalRunDeps is the command's filesystem surface: the corpus and the
-// candidates it reads.
+// evalRunDeps is every step of a run past the flags, so a test drives the
+// command without a corpus on disk or a runner that spends anything.
 type evalRunDeps struct {
 	loadCases      func(root string) ([]evals.Case, error)
 	loadCandidates func(root string) (evals.Candidates, error)
+	check          func(root string) ([]evals.CheckResult, error)
+	preflight      func(root string, p evals.Plan, cases []evals.Case, cands map[string]spec.ReviewerEntry) error
+	newRunDir      func() (string, error)
+	run            func(ctx context.Context, root string, p evals.Plan, cases []evals.Case, runDir string, cands map[string]spec.ReviewerEntry) ([]evals.Record, error)
+}
+
+func defaultEvalRunDeps() evalRunDeps {
+	return evalRunDeps{
+		loadCases:      evals.LoadCases,
+		loadCandidates: evals.LoadCandidates,
+		check:          evals.Check,
+		preflight: func(root string, p evals.Plan, cases []evals.Case, cands map[string]spec.ReviewerEntry) error {
+			return evals.Preflight(root, p, cases, cands, evals.PreflightDeps{LookPath: exec.LookPath, CheckSecret: verifySecret})
+		},
+		newRunDir: newEvalRunDir,
+		run: func(ctx context.Context, root string, p evals.Plan, cases []evals.Case, runDir string, cands map[string]spec.ReviewerEntry) ([]evals.Record, error) {
+			l := evals.ExecLauncher{Root: root, Candidates: cands, Deps: evals.DefaultLaunchDeps(root)}
+			return evals.Run(ctx, p, cases, runDir, l)
+		},
+	}
+}
+
+// verifySecret checks a secret the way the runner will receive it: through
+// the dotf on PATH, by exit status. `secrets verify` prints a status per id,
+// never a value.
+func verifySecret(id string) error {
+	out, err := exec.Command("dotf", "secrets", "verify", "--require-all", id).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// newEvalRunDir makes a fresh run directory under dotf's state directory,
+// named for the UTC second it started. An existing one is never reused.
+func newEvalRunDir() (string, error) {
+	state, err := env.StateDir()
+	if err != nil {
+		return "", err
+	}
+	parent := filepath.Join(state, "evals")
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return "", err
+	}
+	dir := filepath.Join(parent, time.Now().UTC().Format("20060102T150405Z"))
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		return "", fmt.Errorf("eval run: a run directory: %w", err)
+	}
+	return dir, nil
 }
 
 func newEvalRunCmd() *cobra.Command {
 	var o evalRunOpts
 	c := &cobra.Command{
 		Use:   "run",
-		Short: "Plan an evaluation run of the eval cases for named candidates (launching is not implemented yet)",
+		Short: "Run the eval cases for named candidates, or plan the run with --plan",
 		Long: "run builds the matrix of every eval case × each --candidate × --epochs, and\n" +
 			"refuses it above --max-runs: the cap is what authorises spend. --plan prints the\n" +
 			"matrix and each candidate's estimate (NaN credits, agy runs) and launches nothing.\n" +
-			"A corpus whose keys fail `dotf eval check` is not run. Candidates come from\n" +
-			evals.CandidatesFile + ", never from the reviewer pool. Only --plan works so far:\n" +
-			"launching and grading candidates is not implemented yet.",
-		Example:       "  dotf eval run --plan --candidate nan/glm5.3-flash\n  dotf eval run --plan --candidate agy/gemini-4-hydrogen-high --case harness-088-r2 --epochs 1",
+			"Without --plan the run checks the corpus as `dotf eval check` does, then runs a\n" +
+			"preflight that names every runner, secret, commit or answer leak that would fail\n" +
+			"an attempt, and launches nothing unless both pass. Attempts are recorded under\n" +
+			"dotf's state directory (evals/<run-id>/). Candidates come from\n" +
+			evals.CandidatesFile + ", never from the reviewer pool.",
+		Example:       "  dotf eval run --plan --candidate nan/glm5.3-flash\n  dotf eval run --candidate agy/gemini-4-hydrogen-high --case harness-088-r2 --epochs 1",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -112,8 +168,11 @@ func newEvalRunCmd() *cobra.Command {
 			if o.root == "" {
 				return fmt.Errorf("eval run: not inside a repository — pass --repo-root")
 			}
-			deps := evalRunDeps{loadCases: evals.LoadCases, loadCandidates: evals.LoadCandidates}
-			return runEvalRun(c.OutOrStdout(), deps, o)
+			// The interrupt is caught here so the loop stops between attempts
+			// too, not only while a runner is alive.
+			ctx, stop := signal.NotifyContext(c.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			return runEvalRun(ctx, c.OutOrStdout(), defaultEvalRunDeps(), o)
 		},
 	}
 	c.Flags().StringVar(&o.root, "repo-root", "", "repository holding the cases and candidates (default: the current one)")
@@ -125,8 +184,9 @@ func newEvalRunCmd() *cobra.Command {
 	return c
 }
 
-// runEvalRun loads the corpus and candidates, plans the run and prints it.
-func runEvalRun(w io.Writer, deps evalRunDeps, o evalRunOpts) error {
+// runEvalRun plans the run and prints it; without --plan it checks the corpus,
+// runs the preflight, and launches the matrix.
+func runEvalRun(ctx context.Context, w io.Writer, deps evalRunDeps, o evalRunOpts) error {
 	cases, err := deps.loadCases(o.root)
 	if err != nil {
 		return fmt.Errorf("eval run: %w", err)
@@ -152,7 +212,75 @@ func runEvalRun(w io.Writer, deps evalRunDeps, o evalRunOpts) error {
 	if o.planOnly {
 		return nil
 	}
-	return errEvalRunNotYet
+	return launchEvalRun(ctx, w, deps, o.root, plan, cases, cs)
+}
+
+// launchEvalRun is everything that can spend, behind the corpus check and the
+// preflight.
+func launchEvalRun(ctx context.Context, w io.Writer, deps evalRunDeps, root string, plan evals.Plan, cases []evals.Case, cs evals.Candidates) error {
+	results, err := deps.check(root)
+	if err != nil {
+		return fmt.Errorf("eval run: %w", err)
+	}
+	if report, failed := renderEvalCheck(results); failed > 0 {
+		if _, werr := io.WriteString(w, report); werr != nil {
+			return werr
+		}
+		return fmt.Errorf("eval run: the corpus fails `dotf eval check`; nothing was launched")
+	}
+	cands := make(map[string]spec.ReviewerEntry, len(cs.Entries))
+	for _, e := range cs.Entries {
+		cands[e.ID] = e
+	}
+	if err := deps.preflight(root, plan, cases, cands); err != nil {
+		return fmt.Errorf("%w\nnothing was launched", err)
+	}
+	runDir, err := deps.newRunDir()
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "\nrun %s\n", runDir); err != nil {
+		return err
+	}
+	records, runErr := deps.run(ctx, root, plan, cases, runDir, cands)
+	if _, err := io.WriteString(w, renderEvalRecords(records)); err != nil {
+		return err
+	}
+	if runErr != nil {
+		return fmt.Errorf("eval run: %w", runErr)
+	}
+	return nil
+}
+
+// renderEvalRecords prints one line per attempt and a count per completion.
+func renderEvalRecords(records []evals.Record) string {
+	var b strings.Builder
+	counts := map[evals.Completion]int{}
+	for _, r := range records {
+		counts[r.Completion]++
+		fmt.Fprintf(&b, "  %-24s %-32s #%d  %-14s", r.Case, r.Candidate, r.Epoch, r.Completion)
+		switch {
+		case r.Grade != nil:
+			match := "mismatch"
+			if r.Grade.VerdictMatch {
+				match = "match"
+			}
+			fmt.Fprintf(&b, " %s, verdict %s (%s), recall %.2f", r.Grade.Format, r.Grade.Verdict, match, r.Grade.Recall)
+			if r.OwnKey {
+				b.WriteString(", own key")
+			}
+		case r.Detail != "":
+			b.WriteString(" " + r.Detail)
+		}
+		b.WriteString("\n")
+	}
+	kinds := make([]string, 0, len(counts))
+	for k, n := range counts {
+		kinds = append(kinds, fmt.Sprintf("%d %s", n, k))
+	}
+	sort.Strings(kinds)
+	fmt.Fprintf(&b, "%d attempts: %s\n", len(records), strings.Join(kinds, ", "))
+	return b.String()
 }
 
 // renderEvalCheck formats the check report and counts the failed cases.
