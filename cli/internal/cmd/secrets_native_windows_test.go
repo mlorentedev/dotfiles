@@ -25,7 +25,8 @@ func TestRunChild_StartsTheNativeExecutableBehindABatchShim(t *testing.T) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	prev := nativeBehind
 	t.Cleanup(func() { nativeBehind = prev })
-	nativeBehind = func(string) string { return os.Args[0] }
+	asked := 0
+	nativeBehind = func(string) string { asked++; return os.Args[0] }
 
 	out := filepath.Join(dir, "args")
 	prompt := "a & b %PATH% ^ | < > \"q\"\nsecond line"
@@ -46,6 +47,11 @@ func TestRunChild_StartsTheNativeExecutableBehindABatchShim(t *testing.T) {
 	}
 	if _, err := os.Stat(ran); err == nil {
 		t.Error("the batch shim ran")
+	}
+	// One resolution serves the check and the launch: a second could answer
+	// differently, and each is a `mise which`.
+	if asked != 1 {
+		t.Errorf("the tool manager was asked %d times, want 1", asked)
 	}
 }
 

@@ -30,6 +30,7 @@ Where Windows would run a launch target through `cmd.exe`, `dotf lane exec` and 
 - Retiring the npm pi block in `setup-windows.ps1` and reordering PATH: PLAT-001c AC4 follow-up.
 - Agents mise holds only as npm packages (opencode): mise has no `.exe` for them, so they stay refused.
 - Any change to what counts as a batch shim, or to the refusal's wording.
+- `dotf doctor` reporting a batch-only agent launcher before the first launch: #3569 asks for it, and it is its own check with its own tests, so it has its own ticket (#3572).
 
 ## Risks / open questions
 
@@ -50,7 +51,7 @@ Observable outcomes. Each must be testable.
 
 ## References
 
-- Bit·cora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
+- Bit√°cora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - #3440, #3442, #3506: the refusal this builds on
 - `specs/PLAT-001c-tools-via-mise/tasks.md`: "has no `mise-shim.exe` beside it, so mise falls back to file shims"
 - `docs/lessons/lesson-611-a-tool-managers-path-for-a-command-is-not-a-file-windows-will-start.md`

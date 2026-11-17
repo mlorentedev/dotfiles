@@ -716,13 +716,10 @@ func wantsInteractiveChild() bool {
 }
 
 func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	if err := assertSafeChildCommand(argv); err != nil {
-		return 1, err
-	}
-	// The check above and this launch must agree on the file: a check that
-	// passed for a native executable while the launch started the shim PATH
-	// holds would be #3440 again.
-	target, err := childTarget(argv)
+	// The check and the launch share one resolution: a check that passed for a
+	// native executable while the launch started the shim PATH holds would be
+	// #3440 again, and a second lookup could answer differently from the first.
+	target, err := safeChildTarget(argv, false)
 	if err != nil {
 		return 1, err
 	}
@@ -778,26 +775,33 @@ func ageKeyPath() string {
 // the environment or inspect secrets to standard output (e.g. `env`, `printenv`, `export`).
 // Enforces ADR-028 and cross-agent doctrine: "Never dump a secrets store to standard output".
 func assertSafeChildCommand(argv []string) error {
-	return assertSafeChild(argv, false)
+	_, err := safeChildTarget(argv, false)
+	return err
 }
 
-// assertSafeChild is assertSafeChildCommand, told whether argv is the command
-// dotf starts itself or one a multi-call binary starts for it (nested). The
-// difference is the batch shim: dotf can start the native executable behind
-// its own child's shim, and cannot choose what busybox starts.
-func assertSafeChild(argv []string, nested bool) error {
+// safeChildTarget is the check of assertSafeChildCommand and, when it passes,
+// the file runChild starts. It is told whether argv is the command dotf starts
+// itself or one a multi-call binary starts for it (nested). The difference is
+// the batch shim: dotf can start the native executable behind its own child's
+// shim, and cannot choose what busybox starts, so a nested command has no
+// target of its own.
+func safeChildTarget(argv []string, nested bool) (string, error) {
 	if len(argv) == 0 {
-		return errors.New("no command given after --")
+		return "", errors.New("no command given after --")
 	}
 	base := commandName(argv[0])
 	if base == "env" || base == "printenv" || base == "export" {
 		// ADR-028 doctrine
-		return fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout", base)
+		return "", fmt.Errorf("refusing to run introspection command %q under dotf secrets run: never dump decrypted secrets to stdout", base)
 	}
 	// busybox is a multi-call binary whose first argument is the command it runs,
 	// so `busybox env` is `env` and `busybox sh -c` is a shell (round 2, F5).
 	if base == "busybox" && len(argv) >= 2 {
-		return assertSafeChild(argv[1:], true)
+		// What busybox runs is checked; what dotf starts is still busybox.
+		if _, err := safeChildTarget(argv[1:], true); err != nil || nested {
+			return "", err
+		}
+		return childTarget(argv)
 	}
 
 	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -lc "'env'"`, `bash -c "set"`, etc.
@@ -805,15 +809,14 @@ func assertSafeChild(argv []string, nested bool) error {
 		for _, snippet := range shellSnippets(argv[1:]) {
 			if word, ok := snippetIntrospection(snippet); ok {
 				// ADR-028 doctrine
-				return fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout", word)
+				return "", fmt.Errorf("refusing to run introspection shell snippet containing %q under dotf secrets run: never dump decrypted secrets to stdout", word)
 			}
 		}
 	}
 	if nested {
-		return refuseBatchShimChild(argv)
+		return "", refuseBatchShimChild(argv)
 	}
-	_, err := childTarget(argv)
-	return err
+	return childTarget(argv)
 }
 
 // nativeBehind is where childTarget asks for the executable behind a batch
