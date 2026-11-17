@@ -160,6 +160,8 @@ func StoppedRunRecord(reviewPath string) string {
 	switch {
 	case r.Verdict == VerdictPending:
 		return "provisional " + name + " kept (verdict PENDING): the findings so far, unsigned; `dotf spec archive` refuses it"
+	case r.Verdict == VerdictError:
+		return name + " records verdict ERROR: this run signed nothing; `dotf spec archive` refuses it"
 	case perr == nil:
 		return fmt.Sprintf("%s holds the verdict %s, written before the run was stopped", name, r.Verdict)
 	default:

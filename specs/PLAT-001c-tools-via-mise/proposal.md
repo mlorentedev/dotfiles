@@ -69,7 +69,7 @@ One PR per row of #2013 track T (Wave 1, CLIs only):
 - [ ] AC7: a `system` entry is installed through the OS manager (`sudo -n apt-get install -y --no-remove`, `brew install`, `winget install --id <id> -e` with both agreement flags), skipped with a message on an OS whose manager it does not name, a sudo password is reported as "needs sudo" with the command to run and does not fail the run, and a second run runs no manager command.
 - [ ] AC8: `Load` rejects a `system` entry that names no manager, names an unknown key, or declares a `version`, naming the entry; `Install` skips a source type it does not know instead of failing.
 
-- [ ] AC9: `dotf tools sync` installs mise's Python with the packages `versions.conf` marks `# mise: python-package`, through mise's `python.default_packages_file` on a fresh install and through pip into a Python already at its pin; `dotf doctor` fails when the shell's Python is below 3.11 or cannot import one of them at its pin, naming the remedy that clears it.
+- [ ] AC9: `dotf tools sync` installs mise's Python with the packages `versions.conf` marks `# mise: python-package`, through the `python` tool's `postinstall` hook on a fresh install (mise's `python.default_packages_file` until #3363: mise 2026.11 deprecates it) and through pip into a Python already at its pin; `dotf doctor` fails when the shell's Python is below 3.11 or cannot import one of them at its pin, naming the remedy that clears it.
 
 ## Amendment 2026-10-09: Python, the Wave 3 canary (#2062)
 

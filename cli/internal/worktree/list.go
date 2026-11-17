@@ -1,7 +1,6 @@
 package worktree
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/forgewrite"
+	"github.com/mlorentedev/dotfiles/cli/internal/gitenv"
 )
 
 type GitRunner interface {
@@ -46,7 +46,7 @@ type RealGitRunner struct {
 }
 
 func (r *RealGitRunner) WorktreeListPorcelain(repoRoot string) (string, error) {
-	cmd := exec.Command("git", "-C", repoRoot, "worktree", "list", "--porcelain")
+	cmd := gitIn(repoRoot, "worktree", "list", "--porcelain")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git worktree list: %w", err)
@@ -55,7 +55,7 @@ func (r *RealGitRunner) WorktreeListPorcelain(repoRoot string) (string, error) {
 }
 
 func (r *RealGitRunner) Dirt(worktreePath string) (Dirt, error) {
-	cmd := exec.Command("git", "-C", worktreePath, "status", "--porcelain")
+	cmd := gitIn(worktreePath, "status", "--porcelain")
 	out, err := cmd.Output()
 	if err != nil {
 		return Dirt{}, fmt.Errorf("git status: %w", err)
@@ -67,7 +67,7 @@ func (r *RealGitRunner) Dirt(worktreePath string) (Dirt, error) {
 	// Fail-closed data loss guard: check for non-disposable gitignored local content (e.g. .env, scratchpad notes)
 	// -z: paths unquoted and NUL-separated, so a name with a space is reported
 	// as itself rather than in git's C-style quotes.
-	ignoredCmd := exec.Command("git", "-C", worktreePath, "status", "--ignored", "--porcelain", "-z")
+	ignoredCmd := gitIn(worktreePath, "status", "--ignored", "--porcelain", "-z")
 	ignoredOut, err := ignoredCmd.Output()
 	if err != nil {
 		return Dirt{}, fmt.Errorf("git status --ignored: %w", err)
@@ -123,7 +123,7 @@ func isBranchAncestor(repoRoot, branch string) bool {
 	if baseRef == "" {
 		return false
 	}
-	ancestorCmd := exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", branch, baseRef)
+	ancestorCmd := gitIn(repoRoot, "merge-base", "--is-ancestor", branch, baseRef)
 	return ancestorCmd.Run() == nil
 }
 
@@ -138,7 +138,7 @@ func (r *RealGitRunner) landedHeads() LandedHeads {
 // then under-reports and sweep keeps the worktree, never the reverse, and
 // both can say why (#2873).
 func queryPRMerged(repoRoot, branch string, heads LandedHeads) (bool, error) {
-	tip, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", branch+"^{commit}").Output()
+	tip, err := gitIn(repoRoot, "rev-parse", "--verify", branch+"^{commit}").Output()
 	if err != nil {
 		return false, nil
 	}
@@ -155,7 +155,7 @@ var mergedPRHeads LandedHeads = ghMergedPRHeads
 
 func ghMergedPRHeads(repoRoot, branch string) ([]string, error) {
 	args := []string{"pr", "list", "--head", branch, "--state", "merged", "--json", "headRefOid", "--jq", ".[].headRefOid"}
-	if out, err := exec.Command("git", "-C", repoRoot, "config", "--get", "remote.origin.url").Output(); err == nil {
+	if out, err := gitIn(repoRoot, "config", "--get", "remote.origin.url").Output(); err == nil {
 		if slug := ParseGitHubSlug(string(out)); slug != "" {
 			args = append(args, "--repo", slug)
 		} else if r, perr := forgewrite.ParseOrigin(string(out)); perr == nil && r.Host != "github.com" {
@@ -186,7 +186,7 @@ func landedInMergedPR(repoRoot, branch, tip string, landedHeads LandedHeads) (bo
 	}
 	var unfetched []error
 	for _, head := range heads {
-		if exec.Command("git", "-C", repoRoot, "cat-file", "-e", head+"^{commit}").Run() != nil {
+		if gitIn(repoRoot, "cat-file", "-e", head+"^{commit}").Run() != nil {
 			// The head may exist only on the remote; GitHub serves a merged
 			// PR's head by its SHA.
 			if err := fetchCommit(repoRoot, head); err != nil {
@@ -194,7 +194,7 @@ func landedInMergedPR(repoRoot, branch, tip string, landedHeads LandedHeads) (bo
 				continue
 			}
 		}
-		if exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", tip, head).Run() == nil {
+		if gitIn(repoRoot, "merge-base", "--is-ancestor", tip, head).Run() == nil {
 			return true, nil
 		}
 	}
@@ -208,12 +208,18 @@ func landedInMergedPR(repoRoot, branch, tip string, landedHeads LandedHeads) (bo
 // credentials: `list` and `sweep` ask this too, and a listing must fail fast
 // rather than wait on a terminal nobody is watching.
 func fetchCommit(repoRoot, sha string) error {
-	cmd := exec.Command("git", "-C", repoRoot, "fetch", "--quiet", "--no-tags", "origin", sha)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := fetchCommitCmd(repoRoot, sha).CombinedOutput(); err != nil {
 		return fmt.Errorf("fetch merged head %s from origin: %w: %s", shortSHA(sha), err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+// fetchCommitCmd adds the no-prompt setting to gitIn's scrubbed environment,
+// never to os.Environ(), which would bring an inherited GIT_DIR back.
+func fetchCommitCmd(repoRoot, sha string) *exec.Cmd {
+	cmd := gitIn(repoRoot, "fetch", "--quiet", "--no-tags", "origin", sha)
+	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0")
+	return cmd
 }
 
 func shortSHA(sha string) string {
@@ -236,9 +242,9 @@ func (r *RealGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
 	if branch == "" {
 		return false, nil
 	}
-	cmd := exec.Command("git", "-C", repoRoot, "rev-parse", "--symbolic-full-name", branch+"@{u}")
+	cmd := gitIn(repoRoot, "rev-parse", "--symbolic-full-name", branch+"@{u}")
 	if err := cmd.Run(); err != nil {
-		cfgCmd := exec.Command("git", "-C", repoRoot, "config", "--get", "branch."+branch+".remote")
+		cfgCmd := gitIn(repoRoot, "config", "--get", "branch."+branch+".remote")
 		if out, cfgErr := cfgCmd.Output(); cfgErr == nil && len(strings.TrimSpace(string(out))) > 0 {
 			return true, nil
 		}
@@ -281,16 +287,6 @@ func (m *MockGitRunner) IsOrphan(repoRoot, branch string) (bool, error) {
 	return m.OrphanBranches[branch], nil
 }
 
-// SaveMetadata writes metadata to .dotf-worktree.json in target directory.
-func SaveMetadata(worktreePath string, meta Metadata) error {
-	metaPath := filepath.Join(worktreePath, MetadataFileName)
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshaling metadata: %w", err)
-	}
-	return os.WriteFile(metaPath, data, 0o644)
-}
-
 func isMainWorktree(path string, index int) bool {
 	// In Git architecture, the main worktree has a .git directory, while linked worktrees have a .git file.
 	fi, err := os.Stat(filepath.Join(path, ".git"))
@@ -326,8 +322,8 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 		isMain := isMainWorktree(raw.Path, i)
 		isCurrent := (absPath == absRepoRoot)
 
-		dirt, err := runner.Dirt(raw.Path)
-		if err != nil {
+		dirt, dirtErr := runner.Dirt(raw.Path)
+		if dirtErr != nil {
 			// Fail-closed: treat error in status check as dirty so it is never reaped (F2)
 			dirt = Dirt{Tracked: true}
 		}
@@ -355,10 +351,17 @@ func ListWithRunner(repoRoot string, runner GitRunner, now time.Time) ([]Info, e
 			IgnoredContent: dirt.Ignored,
 		}
 
+		if dirtErr != nil {
+			info.DirtUnknown = dirtErr.Error()
+		}
 		if mergeErr != nil {
 			info.PRMergedUnknown = mergeErr.Error()
 		}
 		info.State, info.StateReason = Classify(info, now)
+		if meta != nil && LeaseLegacyOnly(raw.Path) {
+			info.LeaseLegacyOnly = true
+			info.StateReason += legacyLeaseNote
+		}
 		list = append(list, info)
 	}
 
@@ -412,3 +415,17 @@ func ListAll(parentDir string, heads LandedHeads) ([]Info, error) {
 
 	return all, nil
 }
+
+// gitIn runs git against dir and nothing else. git reads GIT_DIR and its
+// siblings ahead of -C, so one inherited from a hook or a parent git would
+// point every call at another repository's worktrees (#3122).
+func gitIn(dir string, args ...string) *exec.Cmd {
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = gitenv.WithoutRepository(os.Environ())
+	return cmd
+}
+
+// legacyLeaseNote is appended to the reason of a worktree whose lease the
+// admin dir does not hold yet: the next write of the lease moves it, and the
+// follow-up that drops the in-tree fallback must find no worktree carrying it.
+const legacyLeaseNote = "; lease at the legacy in-tree location only, the next lease write moves it into the worktree's git dir"

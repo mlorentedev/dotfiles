@@ -1,0 +1,33 @@
+{
+  "id": "harness-105",
+  "repo": "mlorentedev/dotfiles",
+  "kind": "replay",
+  "role": "spec-reviewer",
+  "spec": "HARNESS-105",
+  "source_review": "specs/archive/HARNESS-105/review.md",
+  "key_author": "agy/gemini-3.1-pro-high",
+  "reviewed_sha": "dd47c5d0110d880b85c7943ce733b8ab8240d595",
+  "base_sha": "ef00fc7909512066eb16f07a09b76f37c69de75a",
+  "base_derivation": "git merge-base origin/main dd47c5d0: the review's Sources line names git diff origin/main...HEAD",
+  "fetch_ref": "refs/pull/1404/head",
+  "expected_verdict": "FAIL",
+  "expected": [
+    {
+      "id": "wrapped-latch-prefix",
+      "severity_floor": "Major",
+      "anchors_all": [
+        "latch"
+      ],
+      "anchors_any": [
+        "wrap",
+        "prefix",
+        "%w",
+        "errors.As"
+      ],
+      "confirmed_by": "at dd47c5d0 cli/cmd/dotf/main.go printed err.Error() behind IsTerminalFailure; #1404 merged as d4ea0f57 with goerrors.As(err, &tfe) printing tfe.Error()"
+    }
+  ],
+  "optional": [],
+  "decoys": [],
+  "noise": []
+}

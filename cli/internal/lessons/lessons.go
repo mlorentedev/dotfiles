@@ -281,6 +281,38 @@ func StrayIndexes(dir string) ([]string, error) {
 	return out, nil
 }
 
+// lessonsDirDocs are the markdown files a lessons directory holds besides its
+// lessons: its own documents, and the index StrayIndexes already reports.
+var lessonsDirDocs = map[string]bool{"_format.md": true, "README.md": true, "_index.md": true}
+
+// StrayNames names every markdown file, in dir and its first-level category
+// directories (where Plan reads lessons), that is neither a
+// lesson-NNN-<slug>.md file nor one of the directory's own documents. Such a
+// file is a lesson nothing formats or indexes: one named in another scheme
+// passed --check before and never reached the index (#3415).
+func StrayNames(dir string) ([]string, error) {
+	dirs, err := lessonDirs(dir)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, d := range dirs {
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || !strings.HasSuffix(name, ".md") || lessonsDirDocs[name] || fileRE.MatchString(name) {
+				continue
+			}
+			out = append(out, filepath.Join(d, name))
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
 // Change is one file fmt would rewrite.
 type Change struct {
 	Path string

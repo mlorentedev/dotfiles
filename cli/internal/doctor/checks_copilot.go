@@ -22,5 +22,5 @@ func checkCopilot(sys *System, cfg *Config, rep *Report) {
 		return
 	}
 	rep.Pass("copilot in PATH: " + ver)
-	matchPinFloorFrom(rep, "copilot", ver, catalogPin(sys, cfg, "copilot"), "packages.json")
+	matchPinFloorFrom(rep, "copilot", ver, catalogPin(sys, cfg, "copilot"), pinSource(sys, cfg, "copilot"))
 }

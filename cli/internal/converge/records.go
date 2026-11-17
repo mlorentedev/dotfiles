@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/diskfree"
+
 	"github.com/mlorentedev/dotfiles/cli/internal/agy"
 	"github.com/mlorentedev/dotfiles/cli/internal/claude"
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
@@ -62,6 +64,10 @@ type Options struct {
 	// env-persist step is skipped.
 	Launchctl env.LaunchctlRunner
 	UID       int
+	// UserEnv and UserPath are HKCU\Environment on Windows (env.NewUserEnvStore,
+	// env.NewUserPathStore); unset, env-persist skips there.
+	UserEnv  func() (env.UserEnvStore, error)
+	UserPath func() (env.UserPathStore, error)
 	// DotfPath is the dotf binary the bound hooks name;
 	// harness.ResolveDotfPath in production. Unset, the records-bind step
 	// is skipped with the reason rather than guess.
@@ -83,6 +89,13 @@ type Options struct {
 	// HerdrRun runs herdr for its agent integrations; unset, that half of
 	// agent-extensions is skipped.
 	HerdrRun tools.Runner
+	// SystemRun runs the OS package manager (brew, apt-get, winget) for the
+	// system-upgrade step and returns stdout; ExecManager in production. Unset,
+	// that step is skipped.
+	SystemRun tools.Runner
+	// CacheRun runs the cache tools (uv, npm, docker …) for the cache-gc step;
+	// ExecManager in production. Unset, that step is skipped.
+	CacheRun tools.Runner
 	// PwshRun runs pwsh for the pwsh-modules step; tools.ExecRunner in
 	// production. Unset, that step is skipped.
 	PwshRun pwsh.Runner
@@ -119,6 +132,8 @@ func Registry(o Options) []Reconciler {
 		envGenerate{},
 		recordsHarness{run: o.RunHarnessDeploy, preview: HarnessPreview, has: onPath},
 		toolsSync{run: o.MiseRun, stdout: o.MiseStdout, has: onPath, catalog: o.ToolsCatalog, bins: o.ToolsBinDirs, registered: o.RegisteredPath},
+		systemUpgrade{run: o.SystemRun, has: onPath},
+		cacheGC{run: o.CacheRun, has: onPath, free: diskfree.Free},
 		pwshModules{run: o.PwshRun, has: onPath},
 		piSettings{has: onPath},
 		configsDeploy{render: o.RenderConfigs, resolve: o.ResolvePath, has: onPath},
@@ -126,9 +141,11 @@ func Registry(o Options) []Reconciler {
 		shellCompletions{run: o.CompletionRun, has: onPath},
 		recordsBind{dotf: o.DotfPath, has: onPath, resolve: o.ResolvePath},
 		gitConfig{run: o.GitRun, stored: o.GitStoredAuth, has: onPath},
+		tsBridgeClient{},
 		gitLFS{run: o.GitRun, has: onPath},
 		gitHooks{run: o.GitRun, has: onPath},
-		envPersist{launchctl: o.Launchctl, uid: o.UID},
+		lanes{resolve: o.ResolvePath, has: onPath},
+		envPersist{launchctl: o.Launchctl, uid: o.UID, userEnv: o.UserEnv, userPath: o.UserPath, expand: env.ExpandUserPath, bins: o.ToolsBinDirs},
 		selfDeploy{scheduler: o.Scheduler},
 		hiveUpgradeRetire{scheduler: o.Scheduler},
 		workstationTarget{root: o.SSHRoot, run: o.UserRun, addrs: addrs, paths: sshtarget.PathsFor, user: sshtarget.CurrentUser},

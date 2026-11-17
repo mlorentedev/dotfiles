@@ -124,12 +124,22 @@ func tableRows(body string) [][]string {
 // does. A name is bounded on both sides, so a.go:4 is not ba.go:4 or a.go:40.
 // It is f's path or a tail of it at a directory, so a/util.go:4 is neither
 // b/util.go:4 nor x/a/util.go:4, and the bare base name counts only when
-// baseShared is false.
+// baseShared is false. The line is the reviewer's anchor: the row was written
+// when the reviewer spoke, and the diff may have moved since (#3455).
 func rowFor(f Comment, rows [][]string, baseShared bool) ([]string, int) {
-	if f.Path == "" || f.Line == 0 {
+	if f.Path == "" {
 		return nil, 0
 	}
-	name := regexp.MustCompile(`(?:^|[^\w.\-/])([\w.\-/]*` + regexp.QuoteMeta(path.Base(f.Path)) + fmt.Sprintf(`):%d(?:\D|$)`, f.Line))
+	for _, line := range f.Anchors() {
+		if cells, at := rowForLine(f, line, rows, baseShared); cells != nil {
+			return cells, at
+		}
+	}
+	return nil, 0
+}
+
+func rowForLine(f Comment, line int, rows [][]string, baseShared bool) ([]string, int) {
+	name := regexp.MustCompile(`(?:^|[^\w.\-/])([\w.\-/]*` + regexp.QuoteMeta(path.Base(f.Path)) + fmt.Sprintf(`):%d(?:\D|$)`, line))
 	for _, cells := range rows {
 		for i, c := range cells {
 			for _, m := range name.FindAllStringSubmatch(c, -1) {

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "BUG-164-copilot-settings-guard-f1",
+    "behavior": "A synthetic Copilot home reproduces retired local settings, and doctor names file and key without values.",
+    "verification": "cd cli && go test ./internal/doctor -run '^TestCheckCopilotSettings'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: focused doctor selector exit 0 in 0.960s. Synthetic output names settings.json and telemetry.disabled, never the fixture value."
+  },
+  {
+    "id": "BUG-164-copilot-settings-guard-f2",
+    "behavior": "The versioned checkout policy rejects malformed, unknown, unsupported, empty, duplicate and unsafe paths.",
+    "verification": "cd cli && go test ./internal/copilotsettings -run '^TestLoadPolicy'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: TestLoadPolicy selector exit 0 in 0.341s, including current repository policy, unknown/trailing JSON, unsupported version, empty/duplicate/overlapping/unsafe paths and missing policy."
+  },
+  {
+    "id": "BUG-164-copilot-settings-guard-f3",
+    "behavior": "Repair removes only declared leaves, preserves siblings, prunes empty parents and keeps the standard backup.",
+    "verification": "cd cli && go test ./internal/copilotsettings -run 'Test(Inspect|Repair)'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: Inspect/Repair selector exit 0 in 0.322s. Tests prove leaf-only removal, sibling preservation, empty-parent pruning, .pre-dotf backup, dry-run and second-run idempotence."
+  },
+  {
+    "id": "BUG-164-copilot-settings-guard-f4",
+    "behavior": "Bare and named deploy plus configs converge apply the same repair and a second run reports zero changes.",
+    "verification": "cd cli && go test ./internal/cmd ./internal/converge -run 'Test(Deploy.*CopilotRetired|ConfigsDeploy.*CopilotRetired)'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: command integration exit 0 in 8.529s; converge integration exit 0 in 0.811s. Bare/named deploy and plan/apply/second-plan share RepairConfig."
+  },
+  {
+    "id": "BUG-164-copilot-settings-guard-f5",
+    "behavior": "Missing settings remain absent for normal deploy creation, while malformed, non-object or unreadable inputs fail loud.",
+    "verification": "cd cli && go test ./internal/copilotsettings ./internal/doctor -run 'Test.*(Missing|Malformed|Unreadable|NonObject)'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: missing/malformed/unreadable/non-object selector passed in copilotsettings (0.296s) and doctor (2.606s). Failed paths leave settings and backup untouched."
+  },
+  {
+    "id": "BUG-164-copilot-settings-guard-f6",
+    "behavior": "The guard does not execute or trust copilot config --list.",
+    "verification": "! rg -n 'copilot\\s+config\\s+--list|exec\\.Command\\(\"copilot\"|CommandOutput.*copilot' cli/internal/copilotsettings cli/internal/doctor/checks_copilot_settings.go",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: ripgrep found no copilot config --list, copilot exec, or doctor CommandOutput dependency in the new guard."
+  }
+]

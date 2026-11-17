@@ -13,10 +13,10 @@ import (
 // read, or is not open, is an error rather than an empty queue.
 func TestFetchPRScopesTheQueueToOnePullRequest(t *testing.T) {
 	const (
-		open10     = `{"number":10,"title":"mine","html_url":"https://github.com/o/r/pull/10","state":"open"}`
+		open10     = `{"head":{"sha":"0123456789abcdef"},"number":10,"title":"mine","html_url":"https://github.com/o/r/pull/10","state":"open"}`
 		reviewed   = `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nfindings","created_at":"2026-10-15T08:00:00Z"}]`
 		triaged    = `[{"user":{"login":"github-actions[bot]"},"body":"## PR Reviewer Guide\nfindings","created_at":"2026-10-15T08:00:00Z"},{"user":{"login":"manu"},"author_association":"OWNER","body":"## Review triage\nall disposed","created_at":"2026-10-15T08:10:00Z"}]`
-		otherPRs   = `[{"number":10,"title":"mine","html_url":"u10"},{"number":11,"title":"another session's","html_url":"u11"}]`
+		otherPRs   = `[{"head":{"sha":"0123456789abcdef"},"number":10,"title":"mine","html_url":"u10"},{"head":{"sha":"0123456789abcdef"},"number":11,"title":"another session's","html_url":"u11"}]`
 		pendingOn  = `[{"user":{"login":"coderabbitai[bot]"},"body":"No actionable comments were generated","created_at":"2026-10-15T07:00:00Z"}]`
 		wantNoList = "pulls?state"
 	)
@@ -53,12 +53,12 @@ func TestFetchPRScopesTheQueueToOnePullRequest(t *testing.T) {
 		},
 		{
 			name:      "an answer for another number is refused",
-			responses: map[string]string{"/pulls/10": `{"number":12,"title":"x","html_url":"u","state":"open"}`},
+			responses: map[string]string{"/pulls/10": `{"head":{"sha":"0123456789abcdef"},"number":12,"title":"x","html_url":"u","state":"open"}`},
 			wantErr:   "#12",
 		},
 		{
 			name:      "a closed or merged PR is refused, naming its state",
-			responses: map[string]string{"/pulls/10": `{"number":10,"title":"x","html_url":"u","state":"closed"}`, "/issues/10/comments": `[]`},
+			responses: map[string]string{"/pulls/10": `{"head":{"sha":"0123456789abcdef"},"number":10,"title":"x","html_url":"u","state":"closed"}`, "/issues/10/comments": `[]`},
 			wantErr:   "closed",
 		},
 	}

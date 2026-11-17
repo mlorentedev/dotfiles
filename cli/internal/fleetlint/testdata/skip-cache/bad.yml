@@ -1,0 +1,9 @@
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: golangci/golangci-lint-action@0123456789abcdef0123456789abcdef01234567 # v9
+        with:
+          skip-cache: true

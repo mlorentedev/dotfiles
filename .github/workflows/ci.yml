@@ -32,6 +32,8 @@ jobs:
       pr_agent_contract: ${{ steps.filter.outputs.pr_agent_contract }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
@@ -61,6 +63,7 @@ jobs:
               - 'harness/**'
               - 'versions.conf'
               - 'packages.json'
+              - 'renovate.json'
               - 'mcp-servers.json'
               - '.PSScriptAnalyzerSettings.psd1'
               - '.golangci.yml'
@@ -144,6 +147,8 @@ jobs:
     needs: [changes]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Validate shell scripts syntax
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -215,6 +220,8 @@ jobs:
     needs: [changes]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       # #2052: this job is the ONE owner of PowerShell lint; the bats tests that
       # re-linted three files (and passed when the module could not load) are
@@ -279,6 +286,8 @@ jobs:
     needs: [changes]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install age (pinned release — honours AGE_VERSION, as Windows does)
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -433,6 +442,8 @@ jobs:
     if: github.event_name == 'push' || needs.changes.outputs.pi_nan == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -487,6 +498,8 @@ jobs:
     if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Resolve pins from versions.conf
         id: pins
@@ -643,6 +656,9 @@ jobs:
     # only with a run that crossed it and a ticket that names the cause.
     timeout-minutes: 20
     needs: [changes]
+    # Not a required check since CI-017: ci-gate aggregates it, so it may skip
+    # at job level and a documentation-only pull request starts no Windows runner.
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     # issues: read is for the spec issue-state audit, the one step handed
     # GH_TOKEN below. The workflow default grants contents only.
     permissions:
@@ -650,9 +666,10 @@ jobs:
       issues: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install age (deterministic release + registry PATH — BUG-025)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $ver = ((Get-Content versions.conf | Select-String '^AGE_VERSION=').Line -split '=', 2)[1]
@@ -678,13 +695,11 @@ jobs:
       # tree; the integration container builds from source for the same
       # reason) and make it reachable by effect before setup runs.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         with:
           go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
 
       - name: Build dotf from this PR and put ~/.local/bin on PATH (TEST-003)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $bin = "$env:USERPROFILE\.local\bin"
@@ -702,7 +717,6 @@ jobs:
           & "$bin\dotf.exe" version
 
       - name: Verify harness regions and records, offline (dotf harness check)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           dotf harness check --repo-root $env:GITHUB_WORKSPACE
@@ -727,21 +741,16 @@ jobs:
       # inside it) and its three shims. Not the prefix, which also holds the
       # image's own globals.
       #
-      # #2059: the same cache holds the three npm CLIs `dotf tools install`
-      # pins in packages.json (bw, opencode, copilot). They were the largest
-      # uncached part of setup on a PR, ~90 s of a 228-309 s step (bw alone
-      # ~60 s), measured 2026-10-31 on three PR runs. packages.json and the
-      # installer's code join the key (cli/internal/tools, the platform and env
-      # packages it and `dotf tools` import, cli/internal/cmd/tools.go), so
-      # a pin bump or a PR that changes how they install misses and installs
-      # fresh: the install path stays covered on exactly the PRs that can break
-      # it, which is why #2050 had left these out. On a hit the installer's
-      # version probe skips them; a restored package that does not answer the
-      # probe is reinstalled, so a bad hit costs today's time, not a red job.
-      # yarn is not here: the runner image already ships it.
+      # #2059 added the three npm CLIs `dotf tools install` then pinned in
+      # packages.json (bw, opencode, copilot) to this cache: ~90 s of a 228-309 s
+      # setup step on a PR, measured 2026-10-31. #2438 moved them to mise's npm
+      # backend, which installs under mise's data directory and not under the npm
+      # prefix cached here, so the cache holds pi only again and its key drops
+      # packages.json and the installer's code. Their install is no longer
+      # cached on a PR; the cost is read from test-windows' setup step on the run
+      # that moved them. yarn is not here: the runner image ships it.
       - name: Resolve the npm CLI cache key
         id: picli
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $v = ((Get-Content versions.conf | Select-String '^PI_VERSION=').Line -split '=', 2)[1]
@@ -756,7 +765,6 @@ jobs:
 
       - name: Restore the pinned npm CLIs (pull requests; a lookup on main)
         id: picli-cache
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           lookup-only: ${{ github.event_name == 'push' }}
@@ -765,19 +773,7 @@ jobs:
             ${{ steps.picli.outputs.prefix }}\pi
             ${{ steps.picli.outputs.prefix }}\pi.cmd
             ${{ steps.picli.outputs.prefix }}\pi.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@bitwarden\cli
-            ${{ steps.picli.outputs.prefix }}\bw
-            ${{ steps.picli.outputs.prefix }}\bw.cmd
-            ${{ steps.picli.outputs.prefix }}\bw.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\opencode-ai
-            ${{ steps.picli.outputs.prefix }}\opencode
-            ${{ steps.picli.outputs.prefix }}\opencode.cmd
-            ${{ steps.picli.outputs.prefix }}\opencode.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@github\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot.cmd
-            ${{ steps.picli.outputs.prefix }}\copilot.ps1
-          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('packages.json') }}-${{ hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go') }}-${{ hashFiles('setup-windows.ps1') }}
+          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
 
       # Install-Dotf leaves a source build (`dotf version` = dev) in place, so
       # the binary built above survives setup. No DOTFILES_DIR override: the
@@ -833,11 +829,14 @@ jobs:
       # a red main being noticed. Stated out loud because an unread signal is how
       # CI-001 stayed invisible for as long as it did.
       - name: Run setup-windows.ps1 end-to-end (PS 5.1 -> BUG-005 re-exec)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: powershell
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
           DOTFILES_SKIP_PI_PACKAGES: ${{ (github.event_name == 'pull_request' && needs.changes.outputs.pi != 'true') && '1' || '' }}
+          # For mise alone: it verifies GitHub artifact attestations through
+          # the API, and a shared runner IP has used up the anonymous limit
+          # (#3182). mise never reads GH_TOKEN, so gh here stays unauthenticated.
+          MISE_GITHUB_TOKEN: ${{ github.token }}
         run: .\setup-windows.ps1
 
       # The gate. Setup itself stays non-fatal on doctor (degrade-not-break, C9,
@@ -854,7 +853,6 @@ jobs:
       # obsidian stub. That scope also skips doctor's gh checks, so the spec
       # issue-state audit they carried is the next step, on its own.
       - name: Post-setup doctor gate (TEST-003)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           DOTFILES_REPO_DIR: ${{ github.workspace }}
@@ -874,7 +872,6 @@ jobs:
       # audit cannot block that PR: its merge ref no longer holds the active
       # spec, and a specs-only diff skips this step.
       - name: Spec issue-state audit (CI-004 AC8)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -888,7 +885,7 @@ jobs:
       # Scheduled Task's last result and the daemon's own output. Print both on a
       # red run, so it explains itself without a Windows box.
       - name: Hive daemon diagnostics (on failure)
-        if: failure() && (github.event_name == 'push' || needs.changes.outputs.code == 'true')
+        if: failure()
         shell: pwsh
         run: |
           schtasks /Query /TN HiveVaultDaemon /V /FO LIST 2>&1 | Select-String -Pattern 'Status|Last Run Time|Last Result|Run As User|Logon Mode|Task To Run'
@@ -909,7 +906,6 @@ jobs:
       # Read in pwsh, as AGE_VERSION is: a CRLF checkout would hand bash a `\r`.
       - name: Resolve the Pester pin
         id: pester
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         run: |
           $v = ((Get-Content versions.conf | Select-String '^PESTER_VERSION=').Line -split '=', 2)[1]
@@ -917,14 +913,12 @@ jobs:
           "version=$($v.Trim())" >> $env:GITHUB_OUTPUT
 
       - name: Restore the pinned Pester
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/Documents/PowerShell/Modules/Pester/${{ steps.pester.outputs.version }}
           key: pester-${{ runner.os }}-${{ steps.pester.outputs.version }}
 
       - name: Run Pester suites
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: pwsh
         env:
           PESTER_VERSION: ${{ steps.pester.outputs.version }}
@@ -957,7 +951,6 @@ jobs:
           Invoke-Pester -Path tests -CI
 
       - name: Run PowerShell bats subset (Git Bash, pinned bats)
-        if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         shell: bash
         env:
           DOTFILES_CI_EXPECT_PWSH: '1' # pwsh is this job's shell; see tests/lib/pwsh.bash
@@ -966,21 +959,25 @@ jobs:
           curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" -o bats.tar.gz
           tar -xzf bats.tar.gz
           bash "bats-core-${BATS_VERSION}/install.sh" "$HOME/.local"
-          # Only the `windows` tier: the tests that run pwsh, and the sentinel
-          # that Windows checks out the bytes Linux reads. The rest of these
-          # files read the checkout, and Linux `test` runs them (#2059 N1).
+          # Only the `windows` tier: the tests that run pwsh, the sentinel
+          # that Windows checks out the bytes Linux reads, and the review gate's
+          # OS-sensitive cases — a jq-produced field carrying CRLF, and a path
+          # handed to a native python3, are correct on Linux and wrong here
+          # (#3270). The rest of these files read the checkout, and Linux `test`
+          # runs them (#2059 N1).
           # tests/ci-windows-bats-tier.bats keeps this list and the tags honest.
           "$HOME/.local/bin/bats" --filter-tags windows \
             tests/powershell-profile.bats \
             tests/profile-heal-ps1.bats \
             tests/setup-windows.bats \
-            tests/obs-cli-ps1.bats
+            tests/obs-cli-ps1.bats \
+            tests/check-review-attestation.bats
 
       # CI-010: the other half of the restore above. Last, so only a run whose
       # every step passed writes the cache. The first clause is every step's
       # guard (HARNESS-041); the rest narrows it to a miss on main.
       - name: Save the npm CLIs that main installed
-        if: (github.event_name == 'push' || needs.changes.outputs.code == 'true') && github.event_name == 'push' && steps.picli-cache.outputs.cache-hit != 'true'
+        if: github.event_name == 'push' && steps.picli-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -988,19 +985,7 @@ jobs:
             ${{ steps.picli.outputs.prefix }}\pi
             ${{ steps.picli.outputs.prefix }}\pi.cmd
             ${{ steps.picli.outputs.prefix }}\pi.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@bitwarden\cli
-            ${{ steps.picli.outputs.prefix }}\bw
-            ${{ steps.picli.outputs.prefix }}\bw.cmd
-            ${{ steps.picli.outputs.prefix }}\bw.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\opencode-ai
-            ${{ steps.picli.outputs.prefix }}\opencode
-            ${{ steps.picli.outputs.prefix }}\opencode.cmd
-            ${{ steps.picli.outputs.prefix }}\opencode.ps1
-            ${{ steps.picli.outputs.prefix }}\node_modules\@github\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot
-            ${{ steps.picli.outputs.prefix }}\copilot.cmd
-            ${{ steps.picli.outputs.prefix }}\copilot.ps1
-          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('packages.json') }}-${{ hashFiles('cli/internal/tools/**', 'cli/internal/platform/**', 'cli/internal/env/**', 'cli/internal/cmd/tools.go') }}-${{ hashFiles('setup-windows.ps1') }}
+          key: npm-clis-${{ runner.os }}-${{ steps.picli.outputs.image }}-${{ steps.picli.outputs.version }}-${{ hashFiles('setup-windows.ps1') }}
 
   integration:
     runs-on: ubuntu-latest
@@ -1008,6 +993,8 @@ jobs:
     needs: [changes, lint]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Extract versions from versions.conf
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
@@ -1020,21 +1007,48 @@ jobs:
             echo "GO_VERSION=$(sed -n 's/^go //p' cli/go.mod)"
           } >> "$GITHUB_OUTPUT"
 
+      # The shared docker-build composite (ci-workflows CI-010) with a GitHub
+      # Actions layer cache (CI-013, #3149): the layers before the COPY of the
+      # tree (apt, Node, Go, age, bats; about 53 s cold) come from cache. What
+      # follows the COPY, the dotf build and setup-linux.sh, is the subject under
+      # test and rebuilds on every commit. The cache is read on every run and
+      # written by the push to main only: a pull request reads its base branch's
+      # cache, and a write per PR run would store layers no other run reuses and
+      # evict the setup-go caches from the repository's budget.
       - name: Build integration test container
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        env:
-          BATS_VERSION: ${{ steps.versions.outputs.BATS_VERSION }}
-          AGE_VERSION: ${{ steps.versions.outputs.AGE_VERSION }}
-          GO_VERSION: ${{ steps.versions.outputs.GO_VERSION }}
-        run: |
-          docker build \
-            --build-arg BATS_VERSION="$BATS_VERSION" \
-            --build-arg AGE_VERSION="$AGE_VERSION" \
-            --build-arg GO_VERSION="$GO_VERSION" \
-            -f tests/Dockerfile.integration \
-            -t dotfiles-integration-test .
+        uses: mlorentedev/ci-workflows/.github/actions/docker-build@9b34f5b2815a3090d77d7589ef8bcc5087045544 # v0.8.0
+        with:
+          image: dotfiles-integration-test
+          file: tests/Dockerfile.integration
+          load: "true"
+          build-args: |
+            BATS_VERSION=${{ steps.versions.outputs.BATS_VERSION }}
+            AGE_VERSION=${{ steps.versions.outputs.AGE_VERSION }}
+            GO_VERSION=${{ steps.versions.outputs.GO_VERSION }}
+          cache-scope: integration
+          cache-write: ${{ github.event_name == 'push' }}
 
       - name: Run integration tests
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         run: |
           docker run --rm dotfiles-integration-test
+
+  # The one check of this workflow that branch protection can require
+  # (ci-workflows ADR-001 decision 3, CI-017 #3306). It reports on every pull
+  # request and push, and fails when any job it needs failed or was cancelled; a
+  # job skipped by `changes` passes. `if: always()` is required: without it a
+  # failed need skips this job, and GitHub counts a skipped required check as
+  # passing. It needs every other job here, because it sees only its own needs
+  # (tests/lib/check-workflow-contexts.py, rule 3). Named `ci-gate`, not `gate`:
+  # spec-gate.yml's `gate` job already reports that name.
+  ci-gate:
+    needs: [changes, lint, lint-powershell, test, pi-nan-package, test-macos, test-windows, integration]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - uses: mlorentedev/ci-workflows/.github/actions/gate@2355330358344bb08c0b7a305be4ed6488f23d0c # v0.6.0
+        with:
+          needs: ${{ toJSON(needs) }}

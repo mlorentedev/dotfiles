@@ -39,6 +39,9 @@ func Trigger(goos, home string, getenv func(string) string) schedule.Job {
 		Program:     path.Join(home, ".local", "bin", "dotf"),
 		Args:        []string{"update"},
 		Daily:       &schedule.Clock{Hour: 3},
+		// It runs unattended, so it yields CPU and I/O to whatever the user
+		// is doing; the weekly cache-gc it drives is disk-heavy (#3367).
+		Background: true,
 	}
 	switch goos {
 	case "windows":

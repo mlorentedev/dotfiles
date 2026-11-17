@@ -101,9 +101,12 @@ func Preflight(run tools.Runner, harness, name string) error {
 	return nil
 }
 
-// LaunchOptions names the worktree to open and the agent to start in it.
+// LaunchOptions names the worktree to open and the agent to start in it. Model,
+// when set, is handed to the agent as `--model <id>` through herdr's trailing
+// agent arguments (every launchable harness takes that flag, #3485); empty, the
+// start line carries nothing after the pane.
 type LaunchOptions struct {
-	Repo, Worktree, Harness, Name, Prompt string
+	Repo, Worktree, Harness, Name, Prompt, Model string
 }
 
 // Launch opens the worktree as a herdr workspace, starts the agent in its root
@@ -127,7 +130,11 @@ func Launch(run tools.Runner, o LaunchOptions) error {
 		return fmt.Errorf("herdr worktree open: no root pane in %q", strings.TrimSpace(string(out)))
 	}
 	pane := opened.Result.RootPane.PaneID
-	if out, err := run("herdr", "agent", "start", o.Name, "--kind", o.Harness, "--pane", pane); err != nil {
+	start := []string{"agent", "start", o.Name, "--kind", o.Harness, "--pane", pane}
+	if o.Model != "" {
+		start = append(start, "--", "--model", o.Model)
+	}
+	if out, err := run("herdr", start...); err != nil {
 		code, msg := errorCode(out, err)
 		return fmt.Errorf("herdr agent start %s in %s: %s (%s); the prompt was not sent: inspect it with `herdr agent read %s`", o.Name, pane, msg, code, o.Name)
 	}

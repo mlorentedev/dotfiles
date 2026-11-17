@@ -3,6 +3,7 @@ package env
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -11,6 +12,12 @@ func TestLoadMachineRolesAbsentFileHasNone(t *testing.T) {
 	roles, err := LoadMachineRoles(filepath.Join(t.TempDir(), "machine.json"))
 	if err != nil || len(roles) != 0 {
 		t.Fatalf("LoadMachineRoles(absent) = %v, %v; want none and no error", roles, err)
+	}
+}
+
+func TestKnownRolesIncludesTsBridgeClient(t *testing.T) {
+	if !slices.Contains(KnownRoles(), RoleTSBridgeClient) {
+		t.Fatalf("known roles = %v, want %q", KnownRoles(), RoleTSBridgeClient)
 	}
 }
 

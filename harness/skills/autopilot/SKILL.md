@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: 9c64789731c9bbb6
+generated_sha: efdb0f4d44880c48
 id: autopilot-skill
 type: skill
 status: active
@@ -92,14 +92,20 @@ When the operator says (any variant): *"Me voy a ausentar / a dormir / a trabaja
 
    A missing or malformed envelope parks the run (`envelope-invalid`) — never a default for an authority field. Widening the envelope, the filter or the budget is the one move that voids the grant.
 
-   **Host precondition — the failure everyone forgets.** The dominant real case for "I'm going to sleep" is a laptop whose lid closes. Arm with a wake-lock, or state in the report that the window was not covered:
+   **Host precondition — the failure everyone forgets.** The dominant real case for "I'm going to sleep" is a laptop whose lid closes. Arm with a wake-lock bounded by the envelope's `expires_at`, or state in the report that the window was not covered:
    ```bash
-   caffeinate -i -w $$ &                      # macOS
+   # macOS: run this line as a harness background job (it blocks until expiry).
+   # `exec` gives caffeinate the shell's PID, so the file names the lock itself.
+   PIDFILE="${TMPDIR:-/tmp}/autopilot-${RUN_ID}.caffeinate.pid"
+   sh -c 'echo $$ > "$1"; exec caffeinate -i -t "$2"' sh "$PIDFILE" "$SECONDS_UNTIL_EXPIRY"
    systemd-inhibit --what=idle:sleep -- <cmd> # Linux
    powercfg /change standby-timeout-ac 0      # Windows
    ```
+   Let `-t` end it at expiry. To disarm early, kill the recorded PID and nothing else: `kill "$(cat "$PIDFILE")"`. **Never `pkill -f caffeinate`, nor any pattern**: every session on the host arms the same command line, so a pattern kills their wake locks too (dotfiles lesson 592). `caffeinate -w $$` does not fit an agent either: `$$` is the shell of one tool call, which lives only as long as that call, and a bare `&` job dies with it.
 
    Defaults when the operator gave no numbers: 3–5 tickets, 30 min per ticket, and `merge: standing-grant` only where `.github/merge-grant.yml` exists (otherwise `never`). **Ask degrades to deny:** in unattended mode any ambiguity, missing input or interactive prompt degrades to **Deny / Escalate / Parked**, never to silent approval ("idle is not authorization").
+
+   **Arming is not a stopping point.** Writing and committing the envelope is the first half of the arming turn, not its end. Start iteration 1 in this same response: go straight to §2 and select the first ticket. Say the run is armed only as the opening line of a response that goes on to work. A turn that stops after arming leaves a committed envelope and a claim comment with no PR and no report, which reads exactly like a crashed run (dotfiles#3086). If this harness cannot start iteration 1 in the arming response, say so and do not call the run armed.
 
 ---
 
@@ -114,16 +120,23 @@ A ticket is pilot-eligible only if ALL hold:
   # 1. Text search. --limit is not optional: the CLI default is 30, so a match at 31 is invisible.
   gh issue list --state all --limit 500 --search "<the run's topic or epic>"
   # 2. The board itself, by field — this is the query the run actually picks FROM.
-  gh project item-list 1 --owner mlorentedev --format json --limit 200 \
-  | jq -c --arg repo "https://github.com/mlorentedev/<repo>" '
-      [ .items[] | select(.status == "Backlog")
-        | select(.repository == $repo)                                   # repository is a FULL URL: there is no .repo field
-        | select(.type == "spec" or .type == "bug" or .type == "chore") ]
+  #    Filter on the server with --query: the board holds every repository's items, and a
+  #    client-side filter over a --limit window reads only the OLDEST items (dotfiles#2704).
+  #    Capture gh first: piped straight into jq, a failed gh (no --query on an old gh, an
+  #    expired token, the network) gives jq empty input, which exits 0 and reads as an empty queue.
+  board=$(gh project item-list 1 --owner mlorentedev --format json --limit 500 \
+    --query 'repo:mlorentedev/<repo> status:Backlog is:open type:spec,bug,chore') \
+    || { echo "pre-flight: gh project item-list failed"; exit 1; }       # -> reason: preflight-failed
+  printf '%s' "$board" | jq -c '
+      if (.totalCount | type) != "number" then error("pre-flight: no totalCount, so truncation cannot be ruled out")
+      elif (.items | length) < .totalCount
+      then error("pre-flight truncated: \(.items | length) of \(.totalCount) items read")  # never pick from a partial list
+      else .items end
       | sort_by([(.priority // "P3"), .content.number])                  # P0<P1<P2<P3, then issue number asc
-      | .[0:3]'                                                          # bounded look-ahead; never scan the whole board
+      | .[0:3]' || exit 1                                                 # -> reason: preflight-failed
   ```
-  *Verified live 2026-10-14:* `gh project item-list` exposes `status`, `priority`, `type`, `repository` (full URL) and `content.{number,title,type,url}`. A query written against `.repo` selects nothing, silently, in every repository — the run then ends `queue-empty` at minute zero and reports it honestly.
-- **Three vetoes, in order; take the first survivor:** (1) **already attempted** — `git log --oneline "$BASE..$BRANCH" --grep="Item: #<N>"` is non-empty; (2) **out of scope** — the item's paths are not a subset of `scope.write_paths`, or its diff exceeds `scope.max_loc` → record `parked(scope-violation)` so the operator sees what was out of bounds; (3) **WIP limit** — `dotf spec init` refuses (ADR-043); a refusal is a stop, not a retry.
+  *Verified live 2026-11-10:* `gh project item-list` exposes `status`, `priority`, `type`, `repository` (full URL) and `content.{number,title,type,url}`, and under `--query` its `totalCount` counts the filtered items, so `returned < totalCount` is the truncation signal (lesson 088). The earlier form fetched `--limit 200` of a 4,891-item board and filtered in `jq`: for dotfiles it saw 54 open items, the newest #462, while 442 were open (dotfiles#2704). Both failures look the same from inside the run: a short or empty list, then `queue-empty` at minute zero. A truncated pre-flight is a stop, not a smaller queue: end with `reason: preflight-failed` and say the list was truncated.
+- **Three vetoes, in order; take the first survivor:** (1) **already attempted** — `git log --oneline "$BASE..$BRANCH" --grep="Item: #<N>"` is non-empty; (2) **out of scope** — the item's paths are not a subset of `scope.write_paths`, or its diff exceeds `scope.max_loc` → record `parked(scope-violation)` so the operator sees what was out of bounds; (3) **WIP limit, checked before the work exists** — count the active specs (`ls specs/ | grep -vc README.md` on the base) and judge whether the item needs one, by the gate's own count (insertions **plus** deletions of production lines against the SDD threshold, not the executable lines you add). At the ADR-043 limit, an item that will need a spec is ineligible now: `dotf spec init` refuses, a refusal is a stop, not a retry, and a refusal after the fix is written parks finished work (dotfiles#3263, 2026-11-11: 66 gate lines, 33 added, 10 of 10 specs active).
 - **When the eligible set is empty, the run ENDS — it does not widen.** Not another repo, not another status, not past `Priority`; and never `gh issue create` / `dotf spec init` to manufacture work *for the queue*: a run rewarded for motion produces motion. This does not forbid filing a defect or follow-up **found while working an item** (detect→ticket, `new-ticket` non-interactive mode): that is debt recorded, not work invented, and the run must file it rather than drop it. It ends with `reason: queue-empty` and says so.
 - **No Path Contention:** Check open PRs and branches (`gh pr list --state open`, `git branch -r`) to ensure no peer session is editing the same files/subsystems.
 - **Atomic Claim:** Self-assign the ticket to lease it:
@@ -160,7 +173,25 @@ resolve_wt() {
 }
 WT_DIR="$(resolve_wt)"
 if [ -z "$WT_DIR" ]; then
-  dotf worktree add "$SLUG" -b "$BRANCH" --issue "$ISSUE_NUM"
+  # A repository runs lanes on this machine when its activation record exists: the file
+  # `dotf-lanes-active` (`ActivationFile`) in the git common dir. Only `dotf converge --only lanes`
+  # writes it, from the marker the default branch commits (`.dotf/lanes.json`); the marker alone
+  # activates nothing, and neither does `.dotf/lane.json`, the CLI-129 queue contract. A run never
+  # calls `dotf lane init`: activating a repository is converge's or the owner's step (#3426).
+  if [ -f "$(git rev-parse --path-format=absolute --git-common-dir)/dotf-lanes-active" ]; then
+    # `lane switch` takes the branch as an argument; `lane claim` takes the lease `worktree add --issue` would
+    # A run takes a free lane; when none is free it ENDS (ADR-060). A failed switch (`WIP cap reached`
+    # names the candidate lanes) is `parked(wip-cap)`: never fall through to `dotf worktree add`, and
+    # never reach the generic lease-lost path below.
+    if ! lane_err="$(dotf lane switch "$BRANCH" 2>&1)"; then
+      echo "parked(wip-cap): no lane is free for ${BRANCH}: ${lane_err}"
+      exit 1
+    fi
+    lane_dir="$(resolve_wt)" && [ -n "$lane_dir" ] &&
+      ( cd "$lane_dir" && dotf lane claim "$ISSUE_NUM" )
+  else
+    dotf worktree add "$SLUG" -b "$BRANCH" --issue "$ISSUE_NUM"
+  fi
   WT_DIR="$(resolve_wt)"
 fi
 [ -n "$WT_DIR" ] || { echo "worktree resolution failed -> park(lease-lost)"; exit 1; }
@@ -223,7 +254,7 @@ PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 echo "Opened PR #${PR_NUM} at ${PR_URL}"
 ```
 
-*Note:* Opening as a draft prevents reviewer noise while checks run. Mark ready when checks stabilize: `gh pr ready "$PR_NUM"`.
+*Note:* Opening as a draft prevents reviewer noise while checks run. Mark ready when checks stabilize: `dotf forge pr ready "$PR_NUM"` (GitHub and Gitea alike, ADR-052).
 
 ---
 
@@ -393,7 +424,7 @@ real check would go in, and spends the attention that would have written one.
 
 **Run-level stops** (nothing else is picked; the disarm report is written): `expired` · `budget-iterations` ·
 `budget-items` · `stalled` (two iterations changing neither the ledger nor the envelope) · `queue-empty` ·
-`goal-blocked` · `lease-lost` · `envelope-invalid` · `preflight-failed` · `advisor-unavailable`.
+`goal-blocked` · `wip-cap` · `lease-lost` · `envelope-invalid` · `preflight-failed` · `advisor-unavailable`.
 
 **A check that cannot run is `pending`, never `pass`.** If `dotf pr land` is absent, unauthenticated,
 rate-limited, or returns something you cannot interpret: post the triage comment with a

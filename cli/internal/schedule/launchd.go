@@ -40,6 +40,10 @@ func LaunchdPlist(job Job) []byte {
 	if job.RunAtLoad {
 		b.WriteString("\t<key>RunAtLoad</key>\n\t<true/>\n")
 	}
+	if job.Background {
+		b.WriteString("\t<key>ProcessType</key>\n\t<string>Background</string>\n" +
+			"\t<key>LowPriorityIO</key>\n\t<true/>\n")
+	}
 	if c := job.Daily; c != nil {
 		b.WriteString("\t<key>StartCalendarInterval</key>\n\t<dict>\n" +
 			"\t\t<key>Hour</key>\n\t\t<integer>" + strconv.Itoa(c.Hour) + "</integer>\n" +

@@ -15,7 +15,8 @@ const miseVersions = "# mise: cli\nJQ_VERSION=1.7.1\n# mise: cli\nAGE_VERSION=1.
 
 // miseFixture is a machine where mise resolves jq and age; ageVersion is what
 // the installed age reports, and synced writes the config the sync renders.
-func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *Config) {
+// extra adds to what the fake mise answers, or replaces an answer.
+func miseFixture(t *testing.T, goos, ageVersion string, synced bool, extra ...map[string]string) (*System, *Config) {
 	t.Helper()
 	home := t.TempDir()
 	versions := filepath.Join(home, "versions.conf")
@@ -25,9 +26,9 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		if err != nil {
 			t.Fatal(err)
 		}
-		writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, "")))
+		writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, nil)))
 	}
-	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
+	answers := map[string]string{
 		"mise which jq":    "/m/jq\n",
 		"/m/jq --version":  "jq-1.7.1",
 		"mise which age":   "/m/age\n",
@@ -36,7 +37,13 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool) (*System, *
 		"mise bin-paths --bin-names age@1.2.1 jq@1.7.1": "age\nage-keygen\njq\n",
 		"mise install":              "",
 		"mise ls --prunable --json": "{}",
-	})
+	}
+	for _, m := range extra {
+		for k, v := range m {
+			answers[k] = v
+		}
+	}
+	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, answers)
 	s.GOOS = goos
 	return s, &Config{VersionsPath: versions}
 }
@@ -60,6 +67,78 @@ func TestCheckMiseTools_ACLIBelowItsPinFailsNamingTheSync(t *testing.T) {
 	checkMiseTools(s, cfg, rep, false)
 	if rep.Failures() != 1 || !strings.Contains(b.String(), "age") || !strings.Contains(b.String(), "dotf tools sync") {
 		t.Errorf("want one FAIL naming age and the sync\n%s", b.String())
+	}
+}
+
+// A pin another mise config holds is not fixed by the sync, which installs
+// dotfiles' version beside it and loses to the other file again. The FAIL names
+// that file, the version it pins and the fix, and not "run: dotf tools sync"
+// (#3524). Where mise cannot say who resolved the tool, the plain FAIL stays.
+func TestCheckMiseTools_APinShadowedByAnotherConfigNamesTheFileAndTheFix(t *testing.T) {
+	foreign := "/home/ace/.config/mise/config.toml"
+	for _, tc := range []struct {
+		name    string
+		ls      string
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "shadowed",
+			ls:   `[{"version": "1.1.0", "requested_version": "1.1.0", "installed": true, "active": true, "source": {"type": "mise.toml", "path": "` + foreign + `"}}]`,
+			want: []string{
+				"not running at their pin through mise: age",
+				foreign + " pins age 1.1.0",
+				"FIX: remove the pin there, or let that file's owner stop pinning a tool versions.conf owns",
+			},
+			notWant: []string{"run: dotf tools sync"},
+		},
+		{
+			name:    "mise output unparseable",
+			ls:      "not json",
+			want:    []string{"not running at their pin through mise: age", "run: dotf tools sync"},
+			notWant: []string{"FIX:", "pins"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, cfg := miseFixture(t, "darwin", "1.1.0", true, map[string]string{"mise ls --json age": tc.ls})
+			var b bytes.Buffer
+			rep := capture(&b)
+			checkMiseTools(s, cfg, rep, false)
+			if rep.Failures() != 1 {
+				t.Errorf("want one FAIL, got %d\n%s", rep.Failures(), b.String())
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(b.String(), w) {
+					t.Errorf("output lacks %q\n%s", w, b.String())
+				}
+			}
+			for _, w := range tc.notWant {
+				if strings.Contains(b.String(), w) {
+					t.Errorf("output must not contain %q\n%s", w, b.String())
+				}
+			}
+		})
+	}
+}
+
+// Before dotfiles' own config is current, mise has not yet been told the pins:
+// a lower-precedence file (a system /etc/mise/config.toml) can be what runs the
+// tool, and "outranks dotfiles" would be false. The sync guidance stays until
+// the owned config is written.
+func TestCheckMiseTools_NoShadowIsClaimedBeforeTheOwnedConfigIsCurrent(t *testing.T) {
+	ls := `[{"version": "1.1.0", "requested_version": "1.1.0", "installed": true, "active": true, "source": {"type": "mise.toml", "path": "/etc/mise/config.toml"}}]`
+	s, cfg := miseFixture(t, "linux", "1.1.0", false, map[string]string{"mise ls --json age": ls})
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	out := b.String()
+	if !strings.Contains(out, "not running at their pin through mise: age (run: dotf tools sync)") {
+		t.Errorf("want the sync guidance\n%s", out)
+	}
+	for _, w := range []string{"FIX:", "outranks", "/etc/mise/config.toml"} {
+		if strings.Contains(out, w) {
+			t.Errorf("output must not contain %q before the owned config is current\n%s", w, out)
+		}
 	}
 }
 
@@ -558,5 +637,131 @@ func TestCheckMiseTools_ADeployedConfigThatDoesNotParseFailsWithTheRemedy(t *tes
 	}
 	if strings.Contains(out, "at their pin through mise") {
 		t.Errorf("no pin can be said to run over that file\n%s", out)
+	}
+}
+
+// On Windows bats.cmd runs bash.exe from PATH, which is WSL's System32 bash
+// unless Git Bash comes first. The sync scopes Git Bash to that probe
+// (tools.HomeRunners); the doctor builds its own sync, so it must scope the
+// same probe, or it reports bats off its pin on a machine the sync just
+// converged (#3507).
+func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	writeFile(t, filepath.Join(root, "bin", "bash.exe"), "")
+	home := t.TempDir()
+	versions := filepath.Join(home, "versions.conf")
+	conf := "# mise: cli\nBATS_VERSION=1.13.0\n"
+	writeFile(t, versions, conf)
+	pins, err := tools.ParseMiseTools([]byte(conf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, nil)))
+
+	const bats = `C:\m\bats.cmd`
+	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
+		"git --exec-path": execPath + "\n",
+		"mise which bats": bats + "\n",
+		// A Windows host asks for the launcher by name; any other host, for bats.
+		"mise which bats.cmd":                    bats + "\n",
+		"mise bin-paths --bin-names bats@1.13.0": "bats\n",
+		"mise install":                           "",
+		"mise ls --prunable --json":              "{}",
+	})
+	s.GOOS = "windows"
+	var scoped, unscoped []string
+	var scopedDir string
+	// The probe reads stdout first, so that is the scoped call to capture.
+	s.CommandStdoutEnvDir = func(env []string, dir, name string, args ...string) (string, error) {
+		if name == bats {
+			scoped, scopedDir = env, dir
+			return "Bats 1.13.0", nil
+		}
+		return "", errors.New("unexpected scoped command " + name)
+	}
+	plain := s.CommandOutputDir
+	s.CommandOutputDir = func(dir, name string, args ...string) (string, error) {
+		if name == bats {
+			unscoped = append(unscoped, name)
+			return "", errors.New("bash: WSL has no bats")
+		}
+		return plain(dir, name, args...)
+	}
+	s.VersionOutput = nil // the probe reaches bats through the sync's runner, as in production
+
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, &Config{VersionsPath: versions}, rep, false)
+
+	if len(unscoped) > 0 {
+		t.Fatalf("bats.cmd ran with the caller's PATH, so it falls through to WSL's bash:\n%s", b.String())
+	}
+	var path string
+	for _, kv := range scoped {
+		if strings.HasPrefix(kv, "PATH=") {
+			path = strings.TrimPrefix(kv, "PATH=")
+		}
+	}
+	if !strings.HasPrefix(path, filepath.Join(root, "bin")+string(os.PathListSeparator)) {
+		t.Errorf("bats.cmd's PATH must start with Git Bash's bin dir %s, got %q", filepath.Join(root, "bin"), path)
+	}
+	if scopedDir != home {
+		t.Errorf("the scoped probe must run from HOME like the sync's runners, ran from %q", scopedDir)
+	}
+	if rep.Failures() != 0 {
+		t.Errorf("bats at its pin must pass the doctor\n%s", b.String())
+	}
+}
+
+// A failed bats run that prints a version on stderr is not bats at its pin:
+// the sync reads the probe's stdout alone and takes the merged output only from
+// a run that exited 0, and the doctor's scoped probe must keep that rule
+// (BUG-142). Bats 1.13 names its own version in a stderr warning when it fails.
+func TestCheckMiseTools_WindowsBatsProbeReadsStdoutAlone(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	writeFile(t, filepath.Join(root, "bin", "bash.exe"), "")
+	home := t.TempDir()
+	versions := filepath.Join(home, "versions.conf")
+	conf := "# mise: cli\nBATS_VERSION=1.13.0\n"
+	writeFile(t, versions, conf)
+	pins, err := tools.ParseMiseTools([]byte(conf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(home, ".config", "mise", "conf.d", "dotfiles.toml"), string(tools.RenderMiseConfig(pins, nil)))
+
+	const bats = `C:\m\bats.cmd`
+	s := newSys(map[string]string{"HOME": home}, []string{"mise"}, map[string]string{
+		"git --exec-path":                        execPath + "\n",
+		"mise which bats":                        bats + "\n",
+		"mise which bats.cmd":                    bats + "\n",
+		"mise bin-paths --bin-names bats@1.13.0": "bats\n",
+		"mise install":                           "",
+		"mise ls --prunable --json":              "{}",
+	})
+	s.GOOS = "windows"
+	failed := errors.New("exit status 1")
+	// stdout is empty, stderr names the pin: the merged output reads as a pass.
+	s.CommandStdoutEnvDir = func(_ []string, _, name string, _ ...string) (string, error) {
+		if name == bats {
+			return "", failed
+		}
+		return "", errors.New("unexpected scoped command " + name)
+	}
+	s.CommandOutputEnvDir = func(_ []string, _, name string, _ ...string) (string, error) {
+		if name == bats {
+			return "warning: Bats 1.13.0 could not start bash", failed
+		}
+		return "", errors.New("unexpected scoped command " + name)
+	}
+
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, &Config{VersionsPath: versions}, rep, false)
+	// The failure must be the bats pin, not some unrelated fixture error.
+	if rep.Failures() == 0 || !strings.Contains(b.String(), "not running at their pin through mise: bats") {
+		t.Errorf("a failed bats run whose stderr names the pin must fail the bats pin\n%s", b.String())
 	}
 }

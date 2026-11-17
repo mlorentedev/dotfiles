@@ -1,0 +1,85 @@
+{
+  "id": "ai-055-r2",
+  "repo": "mlorentedev/dotfiles",
+  "kind": "replay",
+  "role": "spec-reviewer",
+  "spec": "AI-055-budget-guard-readable-reserve",
+  "source_review": "specs/archive/AI-055-budget-guard-readable-reserve/review-round2.md",
+  "key_author": "nan/glm5.3-flash",
+  "reviewed_sha": "06f3100b7efafdfdf77d250553b23994eefc7bd2",
+  "base_sha": "2aa3ad1693bd95b19de67fd37aea1df8e798b6f1",
+  "base_derivation": "the review's Sources line (git diff 2aa3ad16...HEAD), the base its launch request stated",
+  "fetch_ref": "refs/pull/3349/head",
+  "expected_verdict": "FAIL",
+  "expected": [
+    {
+      "id": "deleted-clip-test",
+      "severity_floor": "Major",
+      "anchors_all": [
+        "AFileWithoutAClipFailsClosed"
+      ],
+      "anchors_any": [
+        "deleted",
+        "removed"
+      ],
+      "confirmed_by": "verification.md, Round 2 review disposition: 'Fixed. Both restored verbatim from origin/main'"
+    },
+    {
+      "id": "false-ac6-claim",
+      "severity_floor": "Minor",
+      "anchors_all": [
+        "AC6"
+      ],
+      "anchors_any": [
+        "does not exist",
+        "no longer exist",
+        "deleted",
+        "removed"
+      ],
+      "confirmed_by": "verification.md, Round 2 review disposition: 'AC6 named a test that no longer existed ... Fixed'"
+    },
+    {
+      "id": "dropped-equal-window-assertion",
+      "severity_floor": "Minor",
+      "anchors_all": [
+        "AStepThatLowersItsOwnWindow"
+      ],
+      "anchors_any": [
+        "drop",
+        "removed",
+        "delet",
+        "weaken"
+      ],
+      "confirmed_by": "verification.md, after the Round 2 table: main's equal-window negative assertion in AStepThatLowersItsOwnWindowIsMeasuredAgainstIt was restored"
+    }
+  ],
+  "optional": [
+    {
+      "id": "streaming-presence-only",
+      "anchors_all": [
+        "declaresStreaming"
+      ],
+      "note": "declined in scope, tracked as #3302"
+    },
+    {
+      "id": "nonpositive-cap-wording",
+      "anchors_all": [
+        "answerReserve"
+      ],
+      "anchors_any": [
+        "\"-5\"",
+        "\"0\""
+      ],
+      "note": "declined in scope, tracked as #3302"
+    },
+    {
+      "id": "both-gaps-masked",
+      "anchors_all": [
+        "stepCeiling"
+      ],
+      "note": "declined: one gap per step is the AI-054 shape"
+    }
+  ],
+  "decoys": [],
+  "noise": []
+}

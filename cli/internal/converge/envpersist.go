@@ -20,13 +20,25 @@ import (
 // launchd session, so VAULT_PATH and the rest are written there through
 // `launchctl setenv` (env.LaunchdUserEnv). That session is cleared at logout,
 // so a LaunchAgent re-runs `dotf env persist` at every login.
+//
+// On Windows the same step writes HKCU\Environment, which every new process
+// reads, profile or not: the contract variables, and the tool layer's
+// directories at the head of the user Path. Without them a clean box had
+// neither dotf nor mise on PATH outside a shell that ran the profile, and the
+// profile could not activate mise because it finds it on PATH (PLAT-001c
+// blocker 2, W2b PR 2).
 type envPersist struct {
 	launchctl env.LaunchctlRunner // env.ExecLaunchctl in production
 	uid       int
+
+	userEnv  func() (env.UserEnvStore, error)  // env.NewUserEnvStore in production
+	userPath func() (env.UserPathStore, error) // env.NewUserPathStore in production
+	expand   func(string) string               // env.ExpandUserPath in production
+	bins     []string                          // Options.ToolsBinDirs: mise's shims, then ~/.local/bin
 }
 
 func (envPersist) Name() string        { return "env-persist" }
-func (envPersist) Platforms() []string { return []string{"darwin"} }
+func (envPersist) Platforms() []string { return []string{"darwin", "windows"} }
 
 type envPersistState struct {
 	vars        []env.ResolvedVar
@@ -98,6 +110,9 @@ func (r envPersist) inspect(e Env) (envPersistState, error) {
 }
 
 func (r envPersist) Reconcile(e Env, dryRun bool) (Result, error) {
+	if e.GOOS == "windows" {
+		return r.reconcileUser(e, dryRun)
+	}
 	if r.launchctl == nil {
 		return Result{Skip: "no launchctl runner is wired into this registry"}, nil
 	}
@@ -154,6 +169,9 @@ func (r envPersist) loadAgent(e Env, st envPersistState) error {
 // Probe holds the post-condition: the agent is current and loaded, so the next
 // login re-applies the scope, and this session already holds every variable.
 func (r envPersist) Probe(e Env) error {
+	if e.GOOS == "windows" {
+		return r.probeUser(e)
+	}
 	if r.launchctl == nil {
 		return nil
 	}

@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -114,7 +116,22 @@ func (c Claimer) Acquire(issue int) (Claim, error) {
 	if _, err := rand.Read(nonce); err != nil {
 		return Claim{}, fmt.Errorf("claim #%d: %w", issue, err)
 	}
-	msg := fmt.Sprintf("claim #%d\n\nholder: %s\nat: %s\nnonce: %s\n", issue, c.who(), now.Format(time.RFC3339), hex.EncodeToString(nonce))
+	machineID := strings.TrimSpace(os.Getenv("DOTF_MACHINE_ID"))
+	if machineID == "" {
+		if h, err := os.Hostname(); err == nil {
+			machineID = strings.TrimSpace(h)
+		}
+	}
+	if machineID == "" {
+		machineID = "unknown"
+	}
+	osArch := runtime.GOOS + "/" + runtime.GOARCH
+	laneName := strings.TrimSpace(os.Getenv("DOTF_LANE"))
+	if laneName == "" {
+		laneName = "main"
+	}
+	msg := fmt.Sprintf("claim #%d\n\nholder: %s\nat: %s\nmachine: %s\nos: %s\nlane: %s\nnonce: %s\n",
+		issue, c.who(), now.Format(time.RFC3339), machineID, osArch, laneName, hex.EncodeToString(nonce))
 	sha, err := c.git("-c", "user.name=dotf", "-c", "user.email=dotf@localhost", "commit-tree", emptyTree, "-m", msg)
 	if err != nil {
 		return Claim{}, fmt.Errorf("claim #%d: build the claim commit: %w", issue, err)

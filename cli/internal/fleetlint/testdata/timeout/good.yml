@@ -1,0 +1,10 @@
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: make
+  # A caller cannot set timeout-minutes: the called workflow's jobs do.
+  review:
+    uses: owner/repo/.github/workflows/review.yml@0123456789abcdef0123456789abcdef01234567

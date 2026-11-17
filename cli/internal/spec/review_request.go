@@ -102,6 +102,19 @@ type ReviewScope struct {
 	BaseSHA  string
 	BaseTree string
 	RootSHA  string
+	// Own is the spec's own commits inside BaseSHA..HEAD (HARNESS-158), which
+	// the prompt names so the reviewer starts from them rather than from
+	// everything other work merged in between. Advice to the reviewer only:
+	// the request and the archive gate still record and check BaseSHA.
+	Own OwnCommitSet
+	// OwnIssue is the issue number Own was matched against, or 0 when the
+	// folder alone decided it.
+	OwnIssue int
+	// OwnFolderOnly is why no issue was matched, when OwnIssue is 0.
+	OwnFolderOnly string
+	// WidenedFrom is the traced base when BaseSHA was widened to the fork
+	// point (BUG-166), else "". Advice to the reviewer, like Own.
+	WidenedFrom string
 }
 
 // Initial reports whether the scope reviews from the empty tree.
@@ -156,6 +169,10 @@ func RequestIgnoredIn(repoRoot, specDir string, slot ReviewSlot) bool {
 // That second case is the whole point: it is the one the old code got wrong by
 // having no answer at all.
 //
+// On a work branch whose spec folder came after its code, the parent of the
+// adding commit is after the code; ResolveReviewBaseDetail widens it to the
+// fork point then, and only ever earlier (BUG-166).
+//
 // A folder that was renamed -- by hand, or by `spec archive` moving it under
 // specs/archive/ -- appears ADDED under its new path, so the search follows each
 // rename back to the folder's first name (BUG-108, #1829). Without that, the base
@@ -195,48 +212,107 @@ type ReviewBase struct {
 	SHA     string
 	Refusal BaseRefusal
 	RootSHA string
+	// WidenedFrom is the traced base when SHA was widened to the fork point
+	// (BUG-166), else "". The commits between them are work the branch did
+	// before it committed the spec folder.
+	WidenedFrom string
 }
 
 // ResolveReviewBaseDetail is ResolveReviewBase that also names why no base
 // resolved. The launcher needs the reason, not just the absence: only a spec
 // born in the root commit has a supported review without a base commit, and an
 // untraceable move must stay refused however it is asked for.
+//
+// A resolved base then widens to the fork point when that is earlier (BUG-166,
+// #3258): a spec folder committed after the code it describes otherwise puts
+// the base after the code, and the reviewer certifies a diff without it.
 func ResolveReviewBaseDetail(repoRoot, specDir string) ReviewBase {
+	base, _ := traceSpecFolder(repoRoot, specDir)
+	if base.SHA == "" {
+		return base
+	}
+	if fork := forkPoint(repoRoot); fork != "" && fork != base.SHA && isAncestor(repoRoot, fork, base.SHA) {
+		base.WidenedFrom, base.SHA = base.SHA, fork
+	}
+	return base
+}
+
+// defaultBranchRefs is where the remote's default branch is looked for, in
+// order: the same list `dotf worktree add` bases a new branch on.
+var defaultBranchRefs = []string{"origin/HEAD", "origin/main", "origin/master"}
+
+// forkPoint is where HEAD left the remote's default branch, or "" when no such
+// ref exists. A stale ref only makes it older, which widens a review and never
+// narrows one.
+func forkPoint(repoRoot string) string {
+	for _, ref := range defaultBranchRefs {
+		if exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", "--quiet", ref).Run() != nil {
+			continue
+		}
+		out, err := exec.Command("git", "-C", repoRoot, "merge-base", "HEAD", ref).Output()
+		if err != nil {
+			continue
+		}
+		return strings.TrimSpace(string(out))
+	}
+	return ""
+}
+
+// isAncestor reports whether a is an ancestor of b. Any failure is false, so
+// the base stays the traced one.
+func isAncestor(repoRoot, a, b string) bool {
+	return exec.Command("git", "-C", repoRoot, "merge-base", "--is-ancestor", a, b).Run() == nil
+}
+
+// SpecFolderNames returns every repository-relative path the spec folder has
+// had, current name first, as the base resolver followed them. A review's own
+// commits (HARNESS-158) are found by these paths: a slice committed before a
+// rename touched the old name, not the one on disk now.
+func SpecFolderNames(repoRoot, specDir string) []string {
+	_, names := traceSpecFolder(repoRoot, specDir)
+	return names
+}
+
+// traceSpecFolder is ResolveReviewBaseDetail that also returns each folder name
+// it followed, so the base and the folder's names cannot disagree.
+func traceSpecFolder(repoRoot, specDir string) (ReviewBase, []string) {
 	rel, err := filepath.Rel(repoRoot, specDir)
 	if err != nil {
 		rel = specDir
 	}
 	rel = filepath.ToSlash(rel)
+	names := []string{rel}
 	// Bounded so a pathological history cannot loop; a spec renamed more than
 	// a handful of times is refused, not reviewed against a guessed base.
 	for hop := 0; hop < 8; hop++ {
 		adding := earliestAdding(repoRoot, rel)
 		if adding == "" {
 			if hop == 0 {
-				return ReviewBase{Refusal: BaseNotCommitted}
+				return ReviewBase{Refusal: BaseNotCommitted}, names
 			}
-			return ReviewBase{Refusal: BaseUntraceable}
+			return ReviewBase{Refusal: BaseUntraceable}, names
 		}
 		parent, isRoot := parentOf(repoRoot, adding)
 		if isRoot {
-			return ReviewBase{Refusal: BaseRootCommit, RootSHA: adding}
+			return ReviewBase{Refusal: BaseRootCommit, RootSHA: adding}, names
 		}
 		if parent == "" {
-			return ReviewBase{Refusal: BaseUntraceable}
+			return ReviewBase{Refusal: BaseUntraceable}, names
 		}
 		from, renamed := renamedFrom(repoRoot, parent, adding, rel)
 		if !renamed {
-			return ReviewBase{SHA: parent}
+			return ReviewBase{SHA: parent}, names
 		}
 		if from == "" {
 			// Something was renamed into the folder but its source cannot be
 			// traced. The parent would be a base after the work, which is the
 			// partial diff this function exists to refuse.
-			return ReviewBase{Refusal: BaseUntraceable}
+			return ReviewBase{Refusal: BaseUntraceable}, names
 		}
 		rel = from
+		names = append(names, rel)
 	}
-	return ReviewBase{Refusal: BaseUntraceable}
+	return ReviewBase{Refusal: BaseUntraceable}, names
 }
 
 // parentOf returns commit's first parent. isRoot is true only when git lists
@@ -521,7 +597,11 @@ func VerifyReviewProducedIn(specDir string, slot ReviewSlot, transcript string) 
 			"the transcript of the run that wrote nothing: %s",
 			slot.Review, transcript)
 	}
-	if _, _, err := FindReviewIn(specDir, slot); err != nil {
+	if r, _, err := FindReviewIn(specDir, slot); err != nil {
+		if r.Verdict == VerdictError {
+			// The launcher wrote it, not the reviewer (BUG-168).
+			return fmt.Errorf("%w\nreview transcript: %s", err, transcript)
+		}
 		return fmt.Errorf("the reviewer wrote a malformed %s: %w\nreview transcript: %s",
 			slot.Review, err, transcript)
 	}

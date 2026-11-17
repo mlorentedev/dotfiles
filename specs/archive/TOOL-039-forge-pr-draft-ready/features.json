@@ -1,0 +1,30 @@
+[
+  {
+    "id": "TOOL-039-forge-pr-draft-ready-f1",
+    "behavior": "AC1: Gitea pr create --draft sends a WIP: title and verifies draft on the answer",
+    "verification": "cd cli && go test ./internal/forgewrite/ -run 'TestGiteaCreatePRDraft' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-039-forge-pr-draft-ready-f2",
+    "behavior": "AC2: Gitea pr ready strips the prefix and verifies draft is false",
+    "verification": "cd cli && go test ./internal/forgewrite/ -run 'TestGiteaReadyPR' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-039-forge-pr-draft-ready-f3",
+    "behavior": "AC3: GitHub pr ready sends markPullRequestReadyForReview with the PR node id",
+    "verification": "cd cli && go test ./internal/forgewrite/ -run 'TestGitHubReadyPR' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-039-forge-pr-draft-ready-f4",
+    "behavior": "AC4: dotf forge pr ready exists on both forges and takes one number",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestForgePRReady' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

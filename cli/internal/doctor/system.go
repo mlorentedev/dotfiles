@@ -24,6 +24,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/diskfree"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
@@ -61,6 +62,15 @@ type System struct {
 	// CommandOutputEnv is CommandOutput with an explicit environment. Checks use
 	// it when inherited process state could redirect a probe to another target.
 	CommandOutputEnv func(env []string, name string, args ...string) (string, error)
+	// CommandOutputEnvDir is CommandOutputEnv with a working directory: the
+	// sync's runners run from home, so a project mise.toml in the caller's
+	// directory is not installed as a side effect, and a scoped environment
+	// (Git Bash first on PATH, #3507) must not give that up.
+	CommandOutputEnvDir func(env []string, dir, name string, args ...string) (string, error)
+	// CommandStdoutEnvDir is CommandOutputEnvDir returning stdout alone, the
+	// scoped form of CommandStdoutDir: a version probe must not read a stderr
+	// line as the tool's banner (BUG-142).
+	CommandStdoutEnvDir func(env []string, dir, name string, args ...string) (string, error)
 	// CommandOutputDir is CommandOutput with a working directory — for tools that
 	// resolve their target from the process cwd rather than an argument (e.g.
 	// `pre-commit install`, which locates the git repo relative to where it runs).
@@ -89,6 +99,9 @@ type System struct {
 	// checks (skip POSIX-only tools / tmux / shell-rc symlinks on Windows) are
 	// table-testable; the zero value "" behaves like a POSIX host.
 	GOOS string
+	// GOARCH is the target arch (runtime.GOARCH in production), for a catalog
+	// entry that names a package per arch (winget_arch).
+	GOARCH string
 	// AgeRoundTrip proves the age key at keyPath actually decrypts: it derives
 	// the recipient, encrypts a sentinel, and decrypts it back, returning a
 	// non-nil error if any step fails or the bytes don't match. The real impl
@@ -132,6 +145,9 @@ type System struct {
 	// state (secrets.BWServeDaemon.Status's own contract) — only a genuinely
 	// unparseable response surfaces as err. CLI-024-secrets-bw-serve, AC4.
 	BWServeStatus func() (string, error)
+	// DiskFree is the space the user may still write on the volume holding
+	// a path; diskfree.Free in production. Nil skips the disk check.
+	DiskFree func(path string) (uint64, error)
 	// BWServeReadable asks whether the daemon will serve a read, WITHOUT calling
 	// GET /status (secrets.BWServeClient.Readable): secrets.BWServeAbsent,
 	// BWServeRefused or BWServeReady. Any check that gates a read on the daemon
@@ -151,6 +167,9 @@ type System struct {
 	// HKCU\Environment), the scope a profile-less process inherits; nil where
 	// the OS has no such scope, which skips checkPersistedEnv (CLI-058, #1324).
 	UserEnv func(name string) (string, bool, error)
+	// UserPath reads the user scope's stored Path (Windows: HKCU\Environment),
+	// unexpanded; nil where the OS keeps no such value.
+	UserPath func() (string, error)
 
 	// SSHTargetPaths and MeshAddrs point checkWorkstationTarget at a test tree
 	// and a test address list; nil means /etc/ssh and the real interfaces.
@@ -256,6 +275,20 @@ func realSystem() *System {
 			out, err := cmd.CombinedOutput()
 			return string(out), err
 		},
+		CommandOutputEnvDir: func(env []string, dir, name string, args ...string) (string, error) {
+			cmd := exec.Command(name, args...)
+			cmd.Env = env
+			cmd.Dir = dir
+			out, err := cmd.CombinedOutput()
+			return string(out), err
+		},
+		CommandStdoutEnvDir: func(env []string, dir, name string, args ...string) (string, error) {
+			cmd := exec.Command(name, args...)
+			cmd.Env = env
+			cmd.Dir = dir
+			out, err := cmd.Output()
+			return string(out), err
+		},
 		CommandOutputDir: func(dir, name string, args ...string) (string, error) {
 			cmd := exec.Command(name, args...)
 			cmd.Dir = dir
@@ -286,14 +319,17 @@ func realSystem() *System {
 		},
 		HTTPGetBody:     httpGetBody,
 		Now:             time.Now,
-		GOOS:            runtime.GOOS, //nolint:forbidigo // the production wiring of the seam
+		GOOS:            runtime.GOOS,   //nolint:forbidigo // the production wiring of the seam
+		GOARCH:          runtime.GOARCH, //nolint:forbidigo // the production wiring of the seam
 		AgeRoundTrip:    ageRoundTrip,
 		BWBackedSecrets: bwBackedSecrets,
+		DiskFree:        diskfree.Free,
 		BWServeStatus: func() (string, error) {
 			return (&secrets.BWServeDaemon{Client: secrets.BWServeClient{}}).Status()
 		},
 		BWServeReadable: secrets.BWServeClient{}.Readable,
 		UserEnv:         userEnvReader(),
+		UserPath:        userPathReader(),
 		Scheduler: func(goos, home string) (schedule.Backend, error) {
 			return update.NativeBackend(goos, home, os.Getenv, os.Getuid(), schedule.Elevated)
 		},
@@ -427,6 +463,16 @@ func userEnvReader() func(name string) (string, bool, error) {
 		return nil
 	}
 	return store.Get
+}
+
+// userPathReader adapts env.NewUserPathStore to the seam: nil where the OS
+// keeps no user Path value.
+func userPathReader() func() (string, error) {
+	store, err := env.NewUserPathStore()
+	if err != nil {
+		return nil
+	}
+	return store.ReadPath
 }
 
 // httpGetBody is the production HTTPGetBody. 15s covers /v1/usage, which

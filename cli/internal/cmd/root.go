@@ -45,6 +45,7 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newConvergeCmd())
 	root.AddCommand(newIdentityCmd())
 	root.AddCommand(newLessonsCmd())
+	root.AddCommand(newEvalCmd())
 	root.AddCommand(newOrcaCmd())
 	root.AddCommand(newPrCmd())
 	root.AddCommand(newForgeCmd())
@@ -54,8 +55,10 @@ func New(version, commit string) *cobra.Command {
 	root.AddCommand(newWorktreeCmd())
 	root.AddCommand(newLaneCmd())
 	root.AddCommand(newLintCmd())
+	root.AddCommand(newGateCmd())
 	root.AddCommand(newVMCmd())
 	root.AddCommand(newHerdrCmd())
+	root.AddCommand(newBridgeCmd())
 	return root
 }
 

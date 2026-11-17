@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-192-draft-push-warns-f1",
+    "behavior": "AC1: on a draft PR a closing reference to an active spec exits 0 with a [WARN] SDD archive-on-merge naming the spec and dotf spec archive <id>, from the script under both shells and from dotf gate spec",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC9: a draft PR at push time'",
+    "state": "verified",
+    "evidence": "PASS on 1a0d45e9 (1 test, 2026-11-12): [WARN] SDD archive-on-merge with FOO-001-demo and 'dotf spec archive FOO-001-demo', exit 0 under bash and zsh, and dotf gate spec on the same event and env agrees (parity helper)"
+  },
+  {
+    "id": "HARNESS-192-draft-push-warns-f2",
+    "behavior": "AC2: with SDD_PR_DRAFT=false or unset the PR is refused as before, and a draft with skip-archive and no rationale is still refused",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC1: closing an issue whose active spec|AC9: a PR that is not a draft|AC9: a draft does not waive'",
+    "state": "verified",
+    "evidence": "PASS on 1a0d45e9 (3 tests, 2026-11-12): unset and SDD_PR_DRAFT=false both exit 1 with the [FAIL] archive-on-merge violation; a draft with skip-archive and no rationale exits 1"
+  },
+  {
+    "id": "HARNESS-192-draft-push-warns-f3",
+    "behavior": "AC3: the pre-push adapter hands the gate SDD_PR_DRAFT=true for a draft, false for a ready PR or a missing field, unset with no PR, and its --jq expression carries draft",
+    "verification": "bats tests/spec-gate-prepush.bats -f 'a draft PR hands the gate|a PR that is ready|the --jq expression|a failed lookup falls through|a stray SDD_PR_DRAFT'",
+    "state": "verified",
+    "evidence": "PASS on 1a0d45e9 (4 tests, 2026-11-12): the stub gate logs SDD_PR_DRAFT=[true] for draft:true, [false] for draft:false and for an answer without the field, [<unset>] on a failed lookup; the --jq expression read from the script maps the REST shape to {labels, body, author, draft}; PASS on 0590276c (6 more tests): a stray SDD_PR_DRAFT=true in the caller's environment reaches the gate as [<unset>] on each fall-through path (missing gh, missing jq, detached HEAD, failed lookup, no open PR) and as [false] for a resolved PR that is ready"
+  },
+  {
+    "id": "HARNESS-192-draft-push-warns-f4",
+    "behavior": "AC4: CI keeps the refusal: spec-gate-pr.sh never names SDD_PR_DRAFT and dotf gate spec on an event with draft:true still fails",
+    "verification": "bats tests/spec-gate-archive.bats -f 'AC9: dotf gate spec does not read|AC9: CI.s adapter never hands'",
+    "state": "verified",
+    "evidence": "PASS on 1a0d45e9 (2 tests, 2026-11-12): dotf gate spec on an event with draft:true and no variable exits 1 with the [FAIL] violation; grep -c SDD_PR_DRAFT scripts/spec-gate-pr.sh is 0"
+  }
+]

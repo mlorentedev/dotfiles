@@ -5,9 +5,13 @@
 # described the shape the fix did not cover, sat open on the board.
 
 load 'lib/both-shells'
+load 'lib/dotf-bin'
+load 'lib/spec-gate-parity'
+load 'lib/refute'
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    dotf_bin_resolve "$BATS_FILE_TMPDIR/dotf" || return 1
     REPO_FIXTURE="/tmp/bats_adjacency_$$_${BATS_TEST_NUMBER:-0}"
     mkdir -p "$REPO_FIXTURE"
     cd "$REPO_FIXTURE" || exit 1
@@ -53,7 +57,7 @@ _write_849_feed() {
     _replay_851_diff
     _write_849_feed
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature \
             --adjacency-issues "$REPO_FIXTURE/adjacency.tsv"
     [[ "$output" == *"849"* ]] || false
@@ -69,7 +73,7 @@ _write_849_feed() {
         'An unrelated-looking title with no filename at all, but the body cites `scripts/knowledge-crystallize.ps1` in a code span.' \
         > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"777"* ]] || false
 }
@@ -78,7 +82,7 @@ _write_849_feed() {
     _replay_851_diff
     printf '%s\t%s\n' 900 'OPS-001: rotate the age key on the Windows box, see sensitive/env-mapping.conf' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"900"* ]] || false
 }
@@ -87,7 +91,7 @@ _write_849_feed() {
     _replay_851_diff
     printf '%s\t%s\n' 850 'BUG-060: crystallize appends past the handoff block in scripts/knowledge-crystallize.sh' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"#850"* ]] || false
 }
@@ -108,7 +112,7 @@ _write_849_feed() {
         printf '%s\t%s\n' 333 'BUG-999: scripts/real-change.sh mishandles the second input shape'
     } > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"111"* ]] || false
     [[ "$output" != *"222"* ]] || false
@@ -119,10 +123,10 @@ _write_849_feed() {
     _replay_851_diff
     _write_849_feed
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature
+        spec_gate_both --base-ref main --head-ref feature
     local without_status="$status"
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature \
             --adjacency-issues "$REPO_FIXTURE/adjacency.tsv"
     [ "$status" -eq "$without_status" ]
@@ -133,7 +137,7 @@ _write_849_feed() {
     # no file, and the gate must behave exactly as it did before this change.
     _replay_851_diff
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues /nonexistent/feed.tsv
     [ "$status" -ne 2 ]
     [[ "$output" != *"Adjacent open issues"* ]] || false
@@ -144,16 +148,12 @@ _write_849_feed() {
     # silently change the script's existing offline output when the flag goes
     # unused. The golden was captured from the pre-change script on this exact
     # fixture; it is a file, not origin/main, so the test cannot skip itself in
-    # a shallow clone and does not move when main does (#2303). The documented
-    # SDD_PR_BODY escape hatch (#854/BUG-061) is stripped from the live output:
-    # it is an intentional, in-scope addition to this path, not a regression.
+    # a shallow clone and does not move when main does (#2303). The body is
+    # set, so the no-PR recipe (#3444) is not printed and nothing is stripped.
     _replay_851_diff
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --base-ref main --head-ref feature --explain
-    local stripped
-    stripped=$(printf '%s\n' "$output" \
-        | sed '/^       If this already archived a spec/,/^       be set by hand for a one-off check/d' | cat -s)
-    [ "$stripped" = "$(cat "$BATS_TEST_DIRNAME/fixtures/spec-gate/no-adjacency-flag.golden")" ]
+        spec_gate_both --base-ref main --head-ref feature --explain
+    [ "$output" = "$(cat "$BATS_TEST_DIRNAME/fixtures/spec-gate/no-adjacency-flag.golden")" ]
 }
 
 @test "adjacency: a generic basename in a subdirectory does not drag in the backlog" {
@@ -162,7 +162,7 @@ _write_849_feed() {
     _commit "nested Makefile"
     printf '%s\t%s\n' 444 'DX-001: the Makefile is slow to start' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"444"* ]] || false
 }
@@ -177,7 +177,7 @@ _write_849_feed() {
         printf '%s\t%s\n' 556 'OPS-003: the config file is read twice'
     } > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"555"* ]] || false
     [[ "$output" == *"556"* ]] || false
@@ -189,7 +189,7 @@ _write_849_feed() {
     _commit "dotted name"
     printf '%s\t%s\n' 666 'BUG-1: aXb.sh fails' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" != *"666"* ]] || false
 }
@@ -207,7 +207,7 @@ _write_849_feed() {
     _commit "rename"
     printf '%s\t%s\n' 777 'BUG-2: scripts/old-name.sh drops the last line' > feed.tsv
     SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"777"* ]] || false
 }
@@ -218,7 +218,7 @@ _write_849_feed() {
     _commit "percent"
     printf '%s\t%s\n' 888 'BUG-3: scripts/100%.sh breaks' > feed.tsv
     GITHUB_ACTIONS=true SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     [[ "$output" == *"::warning title=Adjacent open issues::#888 (scripts/100%25.sh)"* ]] || false
 }
@@ -229,13 +229,125 @@ _write_849_feed() {
     _commit "pipe"
     printf '%s\t%s\n' 999 'BUG-4: scripts/a|b.sh breaks' > feed.tsv
     GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
-        run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" \
+        spec_gate_both \
             --base-ref main --head-ref feature --adjacency-issues feed.tsv
     grep -qF '| #999 | `scripts/a\|b.sh` |' "$REPO_FIXTURE/summary.md"
 }
 
+# Issue titles are writable by anyone who can open an issue (#3389). The feed is
+# line-based, so a newline cannot pass, but a carriage return can: it would end
+# a workflow command early and start another on the runner's side.
+@test "adjacency: control characters in an issue title reach no output" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 901 $'BUG-5: scripts/tool.sh breaks\r::error::injected\033[31m' > feed.tsv
+    GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"#901"* ]] || false
+    [[ "$output" != *$'\r'* ]] || false
+    [[ "$output" != *$'\033'* ]] || false
+    refute_grep $'[\r\033]' "$REPO_FIXTURE/summary.md"
+    grep -qF 'breaks ::error::injected \[31m' "$REPO_FIXTURE/summary.md"
+}
+
+# The runner trims leading whitespace before it reads a workflow command, so the
+# report's indentation does not protect a title that starts with one (#3389).
+@test "adjacency: workflow-command syntax in an issue title is broken on stdout" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    {
+        printf '%s\t%s\n' 903 '::error::scripts/tool.sh broke'
+        printf '%s\t%s\n' 904 'BUG-7: scripts/tool.sh ##[error]legacy'
+    } > feed.tsv
+    SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"#903"* && "$output" == *"#904"* ]] || false
+    printf '%s\n' "$output" > out.txt
+    refute_grep '^[[:space:]]*::error' out.txt
+    refute_grep_fixed '##[' out.txt
+}
+
+# Escaping lengthens the cell, so clipping after it could cut an entity in half
+# and the page would show "&l". Clip the title first, then escape it.
+@test "adjacency: a summary cell is clipped before it is escaped" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 905 "scripts/tool.sh $(printf 'x%.0s' {1..70})<b>tail" > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qE 'x&lt;b \|$' "$REPO_FIXTURE/summary.md"
+}
+
+@test "adjacency: angle brackets in an issue title are escaped in the step summary" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 902 'BUG-6: scripts/tool.sh <img src=x onerror=alert(1)> breaks' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF '&lt;img src=x onerror=alert(1)&gt; breaks' "$REPO_FIXTURE/summary.md"
+    refute_grep_fixed '<img' "$REPO_FIXTURE/summary.md"
+}
+
+# #3414: the cell escape covered the table and raw HTML but not markdown's
+# inline syntax, so a title rendered a live image or link in the summary.
+@test "adjacency: markdown link and image syntax in an issue title renders as text" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 903 'BUG-7: scripts/tool.sh ![t](https://example.invalid/p.gif) [x](https://example.invalid)' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF '\!\[t\](https://example.invalid/p.gif) \[x\](https://example.invalid)' "$REPO_FIXTURE/summary.md"
+    refute_grep_fixed '![t]' "$REPO_FIXTURE/summary.md"
+    refute_grep_fixed ' [x]' "$REPO_FIXTURE/summary.md"
+}
+
+# A backslash already in the title must not cancel the escape: `\[x\](u)`
+# escaped naively becomes `\\[x\\](u)`, which renders a live link (#3424 review).
+@test "adjacency: a backslash in an issue title cannot cancel the link escape" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    printf '%s\t%s\n' 904 'BUG-8: scripts/tool.sh \[x\](https://example.invalid) a|b' > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    grep -qF 'tool.sh \\\[x\\\](https://example.invalid) a\|b |' "$REPO_FIXTURE/summary.md"
+}
+
+# #3413: printf '%.88s' counts bytes in bash, so a multibyte character that
+# straddles byte 88 was cut in half; gate.Clip backs off to the character
+# boundary. Both now emit the same whole-character prefix on stdout and in the
+# step summary.
+@test "adjacency: a multibyte character straddling byte 88 is clipped whole" {
+    mkdir -p scripts
+    printf 'line %d\n' {1..60} > scripts/tool.sh
+    _commit "tool"
+    local pad title
+    pad="scripts/tool.sh $(printf 'a%.0s' {1..71})"
+    title="${pad}"$'\xc3\xb1'"b"
+    printf '%s\t%s\n' 906 "$title" > feed.tsv
+    GITHUB_STEP_SUMMARY="$REPO_FIXTURE/summary.md" SDD_PR_BODY="Closes #850" \
+        spec_gate_both \
+            --base-ref main --head-ref feature --adjacency-issues feed.tsv
+    [[ "$output" == *"${pad}"$'\n'* ]] || false
+    [[ "$output" != *$'\xc3'* ]] || false
+    grep -qF "| ${pad} |" "$REPO_FIXTURE/summary.md"
+    # A lone 0xC3 is not a valid pattern under a UTF-8 locale: count bytes.
+    [ "$(LC_ALL=C grep -c $'\xc3' "$REPO_FIXTURE/summary.md")" = 0 ]
+}
+
 @test "adjacency: --help documents the flag" {
-    run_both_shells "$SCRIPTS_DIR/check-spec-gate.sh" --help
+    spec_gate_both --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"--adjacency-issues"* ]] || false
 }

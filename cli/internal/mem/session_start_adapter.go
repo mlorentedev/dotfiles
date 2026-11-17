@@ -46,6 +46,8 @@ type ClaudeContextInput struct {
 	// TriageQueue returns the pull requests awaiting a disposition, or an error
 	// when the question could not be answered. nil skips the section.
 	TriageQueue func() (string, error)
+	// LaneLine tells the session whether it stands in a lane; see BriefOptions.
+	LaneLine string
 }
 
 // ClaudeContext assembles the additionalContext string in claude-session-start.sh's
@@ -54,7 +56,7 @@ type ClaudeContextInput struct {
 // memory-temperature, claude.json-size.
 func ClaudeContext(in ClaudeContextInput) string {
 	cfg := loadAdapterConfig(in.ConfigPath)
-	ctx := sddReminder
+	ctx := sddReminder + laneSection(in.LaneLine)
 
 	// doctor-drift is gated on a deployed env-contract (the hermetic test skips it).
 	if in.DoctorQuick != nil && fileExists(in.ContractPath) {

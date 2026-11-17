@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -74,7 +75,7 @@ func TestAddWorktreeWithRunner(t *testing.T) {
 		OnWorktreeAdd: func(repo, target, branch, base string) error {
 			executedCommands = append(executedCommands, target)
 			// Simulate git creating target directory
-			_ = os.MkdirAll(target, 0o755)
+			_ = fakeAdd(repo, target)
 			return nil
 		},
 	}
@@ -120,14 +121,18 @@ func TestAddWorktreeWithRunner(t *testing.T) {
 }
 
 type MockAddRunner struct {
-	OnWorktreeAdd    func(repo, target, branch, base string) error
-	OnDefaultBase    func(repo string) (string, error)
-	OnExistingBranch func(repo, branch string) (remote string, exists bool)
-	OnWorktreeAttach func(repo, target, branch, remote string) error
-	OnWorktreeList   func(repo string) (string, error)
-	OnDirt           func(path string) (Dirt, error)
-	DefaultBaseRan   bool
-	WorktreeListRan  bool
+	OnWorktreeAdd func(repo, target, branch, base string) error
+	// Unset, a detached add fails: a test that never asked for one gets an
+	// error, not a silent directory.
+	OnWorktreeAddDetached func(repo, target, commit string) error
+	OnDefaultBase         func(repo string) (string, error)
+	OnExistingBranch      func(repo, branch string) (remote string, exists bool)
+	OnWorktreeAttach      func(repo, target, branch, remote string) error
+	OnWorktreeList        func(repo string) (string, error)
+	OnDirt                func(path string) (Dirt, error)
+	OnWorktreeRemoveForce func(repo, target string) error
+	DefaultBaseRan        bool
+	WorktreeListRan       bool
 }
 
 func (m *MockAddRunner) Dirt(path string) (Dirt, error) {
@@ -156,7 +161,7 @@ func (m *MockAddRunner) WorktreeAttach(repo, target, branch, remote string) erro
 	if m.OnWorktreeAttach != nil {
 		return m.OnWorktreeAttach(repo, target, branch, remote)
 	}
-	return os.MkdirAll(target, 0o755)
+	return fakeAdd(repo, target)
 }
 
 func (m *MockAddRunner) DefaultBase(repo string) (string, error) {
@@ -172,6 +177,20 @@ func (m *MockAddRunner) WorktreeAdd(repo, target, branch, base string) error {
 		return m.OnWorktreeAdd(repo, target, branch, base)
 	}
 	return nil
+}
+
+func (m *MockAddRunner) WorktreeAddDetached(repo, target, commit string) error {
+	if m.OnWorktreeAddDetached != nil {
+		return m.OnWorktreeAddDetached(repo, target, commit)
+	}
+	return errors.New("MockAddRunner: WorktreeAddDetached not stubbed")
+}
+
+func (m *MockAddRunner) WorktreeRemoveForce(repo, target string) error {
+	if m.OnWorktreeRemoveForce != nil {
+		return m.OnWorktreeRemoveForce(repo, target)
+	}
+	return errors.New("MockAddRunner: WorktreeRemoveForce not stubbed")
 }
 
 func TestCheckAutoCommitHooks(t *testing.T) {

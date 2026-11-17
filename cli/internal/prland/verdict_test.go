@@ -16,9 +16,9 @@ import (
 // time and saying what for, and that it does not wait when nothing is coming.
 
 const (
-	attestRed   = `[{"name":"test","bucket":"pass"},{"name":"review-attestation","bucket":"fail"}]`
-	attestGreen = `[{"name":"test","bucket":"pass"},{"name":"review-attestation","bucket":"pass"}]`
-	lintRed     = `[{"name":"lint","bucket":"fail"},{"name":"review-attestation","bucket":"pass"}]`
+	attestRed   = `[{"name":"review","bucket":"pass"},{"name":"test","bucket":"pass"},{"name":"review-attestation","bucket":"fail"}]`
+	attestGreen = `[{"name":"review","bucket":"pass"},{"name":"test","bucket":"pass"},{"name":"review-attestation","bucket":"pass"}]`
+	lintRed     = `[{"name":"review","bucket":"pass"},{"name":"lint","bucket":"fail"},{"name":"review-attestation","bucket":"pass"}]`
 
 	runsActive = `[{"status":"in_progress"}]`
 	runsQueued = `[{"status":"queued"}]`

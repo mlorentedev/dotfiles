@@ -2,7 +2,6 @@ package worktree
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,14 +12,14 @@ import (
 // issue 2824 expires at expires.
 func heldIssueRunner(t *testing.T, expires time.Time) (*MockAddRunner, string) {
 	t.Helper()
-	other := t.TempDir()
+	other := linkedTempDir(t)
 	if err := SaveMetadata(other, Metadata{Issue: 2824, LeaseExpiresAt: expires}); err != nil {
 		t.Fatal(err)
 	}
 	porcelain := "worktree " + other + "\nHEAD abc\nbranch refs/heads/fix/held\n\n"
 	return &MockAddRunner{
 		OnWorktreeList: func(string) (string, error) { return porcelain, nil },
-		OnWorktreeAdd:  func(_, target, _, _ string) error { return os.MkdirAll(target, 0o755) },
+		OnWorktreeAdd:  func(repo, target, _, _ string) error { return fakeAdd(repo, target) },
 	}, other
 }
 

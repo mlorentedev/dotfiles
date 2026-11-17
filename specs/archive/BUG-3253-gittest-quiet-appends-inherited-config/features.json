@@ -1,0 +1,30 @@
+[
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f1",
+    "behavior": "Quiet keeps every config pair the environment already carries and appends its own after them, so both the caller's keys and Quiet's apply — including where the caller pins the same key to the opposite value, and where it pins the key twice and so ends on a value Quiet must still outrank: the two cases where precedence is observable.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietKeepsTheCallersConfig|TestQuietAppendsAfterAForeignEnvironment|TestQuietOutranksAConflictingCallerPair|TestQuietOutranksACallerThatSetsTheSameKeyTwice)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietKeepsTheCallersConfig' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietAppendsAfterAForeignEnvironment' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietOutranksAConflictingCallerPair' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietOutranksACallerThatSetsTheSameKeyTwice'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f2",
+    "behavior": "A second Quiet call in a re-executed test binary adds nothing: no duplicate pairs and no nested system config.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietAcceptsItsOwnKeys|TestQuietDoesNotIncludeItsOwnFile)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietAcceptsItsOwnKeys' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietDoesNotIncludeItsOwnFile'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f3",
+    "behavior": "The refusals that must survive still panic — a malformed GIT_CONFIG_COUNT, a count promising a pair the environment does not carry, a count too large to be real, and GIT_CONFIG_NOSYSTEM — and a refused call leaves the environment as it found it.",
+    "verification": "cd cli && out=\"$(go test ./internal/gittest -run '^(TestQuietRefusesAMalformedCount|TestQuietRefusesBeforeItTouchesTheEnvironment|TestQuietRefusesNoSystem)$' -v -count=1)\" && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesAMalformedCount' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesBeforeItTouchesTheEnvironment' && printf '%s\\n' \"$out\" | grep -q -- '--- PASS: TestQuietRefusesNoSystem'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-3253-gittest-quiet-appends-inherited-config-f4",
+    "behavior": "The internal/cmd test binary starts and exits cleanly under the harness environment that used to abort it at TestMain. The claim is startup, not the whole suite: a host with a global core.hooksPath runs a full hook chain on every fixture commit, which pushes the suite past Go's per-binary timeout, so CI owns the full run.",
+    "verification": "cd cli && GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=explicit GIT_CONFIG_KEY_1=credential.interactive GIT_CONFIG_VALUE_1=never GIT_CONFIG_KEY_2=core.fsmonitor GIT_CONFIG_VALUE_2=false go test ./internal/cmd -run '^$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

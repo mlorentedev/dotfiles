@@ -15,6 +15,7 @@ import (
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/herdr"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +52,7 @@ func newWorktreeAdoptCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "adopt [path|slug]",
 		Short: "Give a worktree created without dotf (by herdr or git) a lease, so sweep may reap it",
-		Long: `adopt writes the .dotf-worktree.json lease add would have written, for a
+		Long: `adopt writes the lease add would have written, for a
 linked worktree that has none: list shows such a worktree as UNADOPTED, and
 sweep never reaps it. With a lease it is reaped like any other once merged,
 clean and past the lease. A worktree that already has a lease keeps it.
@@ -164,6 +165,19 @@ func resolveCommandRepoRoot(repoDir string) (string, error) {
 	return root, nil
 }
 
+// branchCell is the BRANCH column. A review worktree has no branch, so it is
+// named by kind and commit rather than left blank (HARNESS-142).
+func branchCell(info worktree.Info) string {
+	if info.Metadata == nil || info.Metadata.Kind != worktree.KindReview {
+		return info.Branch
+	}
+	head := info.Head
+	if len(head) > 7 {
+		head = head[:7]
+	}
+	return "(review " + head + ")"
+}
+
 func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 	w := tabwriter.NewWriter(out, 0, 0, 3, ' ', 0)
 	if _, err := fmt.Fprintln(w, "PATH\tBRANCH\tSTATUS\tPR\tSTATE\tREASON"); err != nil {
@@ -192,7 +206,7 @@ func printWorktreeTable(out io.Writer, infos []worktree.Info) error {
 
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			info.Path,
-			info.Branch,
+			branchCell(info),
 			status,
 			prStatus,
 			info.State,
@@ -266,6 +280,7 @@ func newWorktreeAddCmd() *cobra.Command {
 		ttl        time.Duration
 		agent      string
 		promptFile string
+		model      string
 	)
 
 	cmd := &cobra.Command{
@@ -280,16 +295,19 @@ starts from origin's default branch unless --base names another. A branch that
 already exists, locally or on origin, is checked out under its own name (one only
 on origin tracks it), whatever its shape: a release or dependabot branch. Only its
 directory is slugified, and --base is refused for it.
-It writes .dotf-worktree.json to register lease time and creator metadata, and automatically
+It writes a lease into the worktree's git admin dir (dotf-worktree.json under
+.git/worktrees/<id>/) to register lease time and creator metadata, and automatically
 adds it to .git/info/exclude. With --issue, add refuses while another worktree of
 the repository holds a live lease on that issue, and names it; --share-issue adds a
-second worktree on it anyway.
+second worktree on it anyway. In a repository that runs lanes, add still
+creates the worktree and prints a hint on stderr naming dotf lane switch <branch>.
 
 --agent <harness> then opens the worktree in herdr and starts that agent in its
 root pane, named after the worktree directory; --prompt-file sends the file as
-its first prompt. add returns once the prompt is sent, without waiting on the
-agent. With herdr absent, its server down, or an agent of that name live, add
-refuses before creating anything.`,
+its first prompt, and --model starts it on that model id instead of its own
+default. add returns once the prompt is sent, without waiting on the agent.
+With herdr absent, its server down, or an agent of that name live, add refuses
+before creating anything.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			slug := args[0]
@@ -314,6 +332,16 @@ refuses before creating anything.`,
 			if err != nil {
 				return err
 			}
+			if c.Flags().Changed("model") {
+				if launch == nil {
+					return errors.New("--model needs --agent")
+				}
+				m := strings.TrimSpace(model)
+				if m == "" || m[0] == '-' {
+					return fmt.Errorf("--model must be a model id, not %q", model)
+				}
+				launch.Model = m
+			}
 
 			info, err := worktree.Add(opts)
 			if err != nil {
@@ -326,6 +354,9 @@ refuses before creating anything.`,
 			}
 			if info.Metadata != nil {
 				c.Printf("Lease active until %s\n", info.Metadata.LeaseExpiresAt.Format("2006-01-02 15:04:05 MST"))
+			}
+			if hint := laneHint(root, c.ErrOrStderr()); hint != "" {
+				_, _ = fmt.Fprintln(c.ErrOrStderr(), hint)
 			}
 			if launch == nil {
 				return nil
@@ -348,6 +379,7 @@ refuses before creating anything.`,
 	cmd.Flags().DurationVar(&ttl, "ttl", 24*time.Hour, "initial lease duration before eligible for reap")
 	cmd.Flags().StringVar(&agent, "agent", "", "start this harness (claude, codex, pi, agy, opencode, copilot) in herdr on the new worktree")
 	cmd.Flags().StringVar(&promptFile, "prompt-file", "", "with --agent, send this file as the agent's first prompt")
+	cmd.Flags().StringVar(&model, "model", "", "with --agent, start the agent on this model id instead of its default")
 
 	return cmd
 }
@@ -416,6 +448,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 				DryRun:      dryRun,
 				Sessions:    sessionStores(),
 				LandedHeads: forgeLandedHeads,
+				VaultPath:   vault.ResolveVault(),
 			}
 
 			report, err := worktree.Sweep(opts)
@@ -448,7 +481,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 					report.UninspectableProcesses)
 			}
 
-			for _, skips := range [][]worktree.SessionSkip{report.SessionSkips, report.MergeUnknownSkips} {
+			for _, skips := range [][]worktree.SessionSkip{report.SessionSkips, report.MergeUnknownSkips, report.LaneSkips} {
 				for _, s := range skips {
 					c.Printf("  - skipped: %s: %s\n", s.Path, s.Reason)
 				}
@@ -465,7 +498,7 @@ clean git status, confirmed merged PR, and minimum age.`,
 			for _, r := range report.Reaped {
 				c.Printf("  - reaped: %s (%s)\n", r.Path, r.Branch)
 			}
-			return nil
+			return reportSweepThreads(c.OutOrStdout(), report)
 		},
 	}
 
@@ -502,8 +535,9 @@ func resolveDoneTarget(args []string, worktreePath, repoDir string) (string, err
 // was given. A bare name is also a slug, naming any of worktree.SlugCandidates:
 // the legacy <repo>-wt-<slug> sibling, or the worktree under WORKTREE_ROOT. A
 // name that resolves to more than one directory is refused, naming each, rather
-// than guessed. When it names none, the error lists every path it tried and the
-// linked worktrees it knows (#3109).
+// than guessed. A name that is no directory is last read as a branch some linked
+// worktree has checked out (#3114). When it names none, the error lists every
+// path it tried and the linked worktrees it knows (#3109).
 func resolveDoneArg(arg, repoDir string) (string, error) {
 	asPath, err := filepath.Abs(arg)
 	if err != nil {
@@ -514,6 +548,9 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 			return worktreeAt(asPath)
 		}
 		if p := branchUnderRoot(arg, repoDir); p != "" && isDirectory(p) {
+			return worktreeAt(p)
+		}
+		if p := worktreeOfBranch(arg, repoDir); p != "" {
 			return worktreeAt(p)
 		}
 		return "", fmt.Errorf("no worktree at %s%s", asPath, knownWorktreesNote(repoDir))
@@ -535,6 +572,9 @@ func resolveDoneArg(arg, repoDir string) (string, error) {
 	}
 	switch len(found) {
 	case 0:
+		if p := worktreeOfBranch(arg, repoDir); p != "" {
+			return worktreeAt(p)
+		}
 		return "", fmt.Errorf("%w%s", doneNotFound(arg, tried, wtRoot), knownWorktreesNote(repoDir))
 	case 1:
 		return worktreeAt(found[0])
@@ -557,6 +597,32 @@ func branchUnderRoot(arg, repoDir string) string {
 	return worktree.ResolveWorktreePath(wtRoot, filepath.Base(filepath.Clean(root)), arg)
 }
 
+// worktreeOfBranch reads arg as the branch some linked worktree has checked out
+// and returns that worktree's path, or "" when none has it. A branch renamed
+// after add no longer shares a name with its directory, but git knows where it
+// is (#3114). The main checkout is never a candidate, so `done main` names no
+// worktree; a path or slug that exists always wins over this reading.
+func worktreeOfBranch(arg, repoDir string) string {
+	root, err := resolveCommandRepoRoot(repoDir)
+	if err != nil {
+		return ""
+	}
+	porcelain, err := listWorktrees(root)
+	if err != nil {
+		return ""
+	}
+	linked, err := worktree.LinkedWorktrees(porcelain)
+	if err != nil {
+		return ""
+	}
+	for _, w := range linked {
+		if w.Branch != "" && w.Branch == arg {
+			return w.Path
+		}
+	}
+	return ""
+}
+
 // doneNotFound names every path done tried, and says when the root itself was
 // not searched, so a missing env-contract.json reads as that and not as "the
 // worktree does not exist".
@@ -566,6 +632,12 @@ func doneNotFound(arg string, tried []string, wtRoot string) error {
 		msg += "; WORKTREE_ROOT could not be resolved, so the worktree root was not searched (run `dotf doctor`)"
 	}
 	return errors.New(msg)
+}
+
+// listWorktrees is the note's read of git's worktree list, a var so tests can
+// hand it a failure or a listing that does not parse (#3122).
+var listWorktrees = func(root string) (string, error) {
+	return (&worktree.RealGitRunner{}).WorktreeListPorcelain(root)
 }
 
 // knownWorktreesNote says what done takes and lists each linked worktree git
@@ -578,7 +650,7 @@ func knownWorktreesNote(repoDir string) string {
 	if err != nil {
 		return takes
 	}
-	porcelain, err := (&worktree.RealGitRunner{}).WorktreeListPorcelain(root)
+	porcelain, err := listWorktrees(root)
 	if err != nil {
 		return takes
 	}
@@ -684,6 +756,7 @@ is kept and the reason printed; after --force it may hold the only copy.`,
 				Sessions:            sessionStores(),
 				IgnoreRecentSession: ignoreRecentSession,
 				LandedHeads:         forgeLandedHeads,
+				VaultPath:           vault.ResolveVault(),
 			}
 
 			res, err := worktree.Done(opts)
@@ -698,7 +771,7 @@ is kept and the reason printed; after --force it may hold the only copy.`,
 			case res.KeptBranch != "":
 				c.Printf("Kept branch %s: %s\n", res.KeptBranch, res.KeptReason)
 			}
-			return nil
+			return reportParkThreads(c.ErrOrStderr(), target, res.Threads, res.ThreadsErr)
 		},
 	}
 

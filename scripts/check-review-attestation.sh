@@ -268,7 +268,12 @@ while IFS=$'\t' read -r login marker; do
         ATTESTED_MARKER="$marker"
         break
     fi
-done < <(jq -r '.reviewers[]? | . as $r | ($r.review_markers[]? | [$r.login, .] | @tsv)' "$CONFIG")
+# `tr -d '\r'`: jq on Windows terminates every output line with CRLF, and
+# `IFS=$'\t'` splits on the tab without stripping the CR, so it lands on the
+# LAST field of each record. Left in place, `marker` becomes `## PR Reviewer
+# Guide\r` and never matches a body, silently downgrading every comment-shaped
+# review to the exempt branch. Lossless: no declared marker holds a CR.
+done < <(jq -r '.reviewers[]? | . as $r | ($r.review_markers[]? | [$r.login, .] | @tsv)' "$CONFIG" | tr -d '\r')
 
 if [ -n "$ATTESTED_BY" ]; then
     say "[OK] attested — reviewed by: $ATTESTED_BY (comment-shaped review: \"$ATTESTED_MARKER\")"
@@ -363,7 +368,11 @@ while IFS=$'\t' read -r login marker advisory; do
         DECLINED_MARKER="$marker"
         break
     fi
-done < <(jq -r '.reviewers[]? | . as $r | ($r.declined_markers[]? | [$r.login, ., (($r.advisory // false) | tostring)] | @tsv)' "$CONFIG")
+# Same CR strip as the marker loop above, and for the same reason: here the CR
+# lands on `advisory`, so `[ "$advisory" = "true" ]` never matched and an
+# advisory decline was handled as a hard one — the distinction #1045 introduced
+# was lost on Windows.
+done < <(jq -r '.reviewers[]? | . as $r | ($r.declined_markers[]? | [$r.login, ., (($r.advisory // false) | tostring)] | @tsv)' "$CONFIG" | tr -d '\r')
 
 # --- the declared escape -------------------------------------------------------
 # BOTH halves, never one. A label alone is a click; a rationale alone is a note

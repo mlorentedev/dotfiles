@@ -81,3 +81,14 @@ func TestTrigger_PassesTheXDGHomesAsFlagsOnWindows(t *testing.T) {
 		t.Errorf("unset homes add no flags: %q", got)
 	}
 }
+
+// The daily update runs unattended, so it yields the machine to the user on
+// every OS (#3367). On Windows the task's schema default priority, 7, is
+// already below normal.
+func TestTrigger_RunsInTheBackground(t *testing.T) {
+	for _, goos := range []string{"darwin", "linux", "windows"} {
+		if !Trigger(goos, "/home/me", func(string) string { return "" }).Background {
+			t.Errorf("%s: the self-deploy job must be a background job", goos)
+		}
+	}
+}

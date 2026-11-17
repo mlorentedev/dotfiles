@@ -1,0 +1,30 @@
+[
+  {
+    "id": "MEMORY-020-one-archive-shape-f1",
+    "behavior": "--finished and a lane park both append the entry to archive/superseded-handoffs-<date>.md and move the thread file to archive/threads/<key>.md; no archive/<key>.md",
+    "verification": "cd cli && go test ./internal/mem ./internal/cmd ./internal/worktree -run 'TestArchiveParkedThreadUsesTheDatedArchive|TestHandoffWriteFinishedArchivesTheThread|TestHandoffWriteFinishedMovesALiveThreadFile|TestParkArchivesTheBranchThread|TestLaneParkInPlaceAndTipVerification' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-020-one-archive-shape-f2",
+    "behavior": "the archived entry is byte-identical to MEMORY.md's and its threads/<key>.md pointer resolves from the archive file",
+    "verification": "cd cli && go test ./internal/mem ./internal/cmd -run 'TestArchiveThreadDropsTheEntryAndReturnsTheBlockItWouldHavePlaced|TestHandoffWriteFinishedArchivesTheThread|TestArchiveParkedThreadUsesTheDatedArchive' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-020-one-archive-shape-f3",
+    "behavior": "a park archives the lane's forks and keeps, naming it, any block whose thread awaits Manu",
+    "verification": "cd cli && go test ./internal/mem ./internal/cmd ./internal/worktree -run 'TestArchiveParkedThreadUsesTheDatedArchive|TestReportParkThreadsNamesArchivedAndKept|TestSweepReportRecordsThreadArchives' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-020-one-archive-shape-f4",
+    "behavior": "a failed archive at park time still parks, and the command reports it in ERROR/WHY/FIX form and exits non-zero",
+    "verification": "cd cli && go test ./internal/worktree ./internal/cmd -run 'TestParkReportsAFailedArchiveAndStillParks|TestReportParkThreadsTurnsAFailedArchiveIntoTheError|TestReportSweepThreadsFailsOnAnArchiveFailure|TestSweepReportRecordsThreadArchives' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

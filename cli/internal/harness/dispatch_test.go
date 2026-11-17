@@ -265,3 +265,49 @@ func TestLoadDispatchedIsBoundedInMemory(t *testing.T) {
 		t.Errorf("read %d entries from an oversized file, want the bound to truncate it into an empty degrade", len(got))
 	}
 }
+
+// The sweep has to cover both temp patterns atomicWriteFile creates. A killed
+// gate strands whatever it was writing, and persona state goes through the
+// .atomic- pattern rather than the .dispatch- one, so sweeping only the latter
+// left the other half accumulating forever (HARNESS-186 review, Minor).
+func TestSweepStrandedDispatchTempsCoversBothTempPatterns(t *testing.T) {
+	dir := t.TempDir()
+	aged := time.Now().Add(-2 * dispatchTempTTL)
+
+	stranded := []string{".dispatch-abc.tmp", ".atomic-persona.json-123.tmp"}
+	for _, name := range stranded {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte("{}"), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+		if err := os.Chtimes(p, aged, aged); err != nil {
+			t.Fatalf("chtimes %s: %v", name, err)
+		}
+	}
+
+	// A temp file written moments ago may belong to a live writer, and a real
+	// file is not a temp at all: neither may be swept.
+	survivors := []string{".atomic-ledger.json-456.tmp", "persona.json"}
+	for _, name := range survivors {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte("{}"), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	if err := os.Chtimes(filepath.Join(dir, "persona.json"), aged, aged); err != nil {
+		t.Fatalf("chtimes persona.json: %v", err)
+	}
+
+	sweepStrandedDispatchTemps(dir)
+
+	for _, name := range stranded {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s survived the sweep (stat err=%v)", name, err)
+		}
+	}
+	for _, name := range survivors {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("%s was swept and should not have been: %v", name, err)
+		}
+	}
+}

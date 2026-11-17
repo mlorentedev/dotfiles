@@ -3,15 +3,19 @@ package worktree
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/mem"
 )
 
 type SweepRunner interface {
 	GitRunner
 	WorktreeRemove(repoRoot, worktreePath string) error
+	// WorktreeRemoveForce removes a worktree whose untracked content is known
+	// to be disposable: only a review worktree past its lease.
+	WorktreeRemoveForce(repoRoot, worktreePath string) error
 	BranchDelete(repoRoot, branch string) (string, error)
 	WorktreePrune(repoRoot string) error
 }
@@ -21,16 +25,24 @@ type RealSweepRunner struct {
 }
 
 func (r *RealSweepRunner) WorktreeRemove(repoRoot, worktreePath string) error {
-	cmd := exec.Command("git", "-C", repoRoot, "worktree", "remove", worktreePath)
+	cmd := gitIn(repoRoot, "worktree", "remove", worktreePath)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git worktree remove failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
+func (r *RealSweepRunner) WorktreeRemoveForce(repoRoot, worktreePath string) error {
+	cmd := gitIn(repoRoot, "worktree", "remove", "--force", worktreePath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git worktree remove --force failed (%w): %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 func (r *RealSweepRunner) BranchDelete(repoRoot, branch string) (string, error) {
 	// First resolve exact full SHA for instant recovery logging (AC5)
-	shaCmd := exec.Command("git", "-C", repoRoot, "rev-parse", branch)
+	shaCmd := gitIn(repoRoot, "rev-parse", branch)
 	shaOut, err := shaCmd.Output()
 	sha := strings.TrimSpace(string(shaOut))
 	if err != nil || sha == "" {
@@ -40,7 +52,7 @@ func (r *RealSweepRunner) BranchDelete(repoRoot, branch string) (string, error) 
 	// Log before deletion for instant undoability (AC5)
 	_, _ = fmt.Fprintf(os.Stderr, "Deleting branch %s (was %s)\n", branch, sha)
 
-	delCmd := exec.Command("git", "-C", repoRoot, "branch", "-D", branch)
+	delCmd := gitIn(repoRoot, "branch", "-D", branch)
 	if out, err := delCmd.CombinedOutput(); err != nil {
 		return sha, fmt.Errorf("git branch -D failed (%w): %s", err, strings.TrimSpace(string(out)))
 	}
@@ -48,14 +60,22 @@ func (r *RealSweepRunner) BranchDelete(repoRoot, branch string) (string, error) 
 }
 
 func (r *RealSweepRunner) WorktreePrune(repoRoot string) error {
-	cmd := exec.Command("git", "-C", repoRoot, "worktree", "prune")
+	cmd := gitIn(repoRoot, "worktree", "prune")
 	return cmd.Run()
 }
 
 type MockSweepRunner struct {
 	MockGitRunner
-	OnWorktreeRemove func(repoRoot, worktreePath string) error
-	OnBranchDelete   func(repoRoot, branch string) (string, error)
+	OnWorktreeRemove      func(repoRoot, worktreePath string) error
+	OnWorktreeRemoveForce func(repoRoot, worktreePath string) error
+	OnBranchDelete        func(repoRoot, branch string) (string, error)
+}
+
+func (m *MockSweepRunner) WorktreeRemoveForce(repoRoot, worktreePath string) error {
+	if m.OnWorktreeRemoveForce != nil {
+		return m.OnWorktreeRemoveForce(repoRoot, worktreePath)
+	}
+	return nil
 }
 
 func (m *MockSweepRunner) WorktreeRemove(repoRoot, worktreePath string) error {
@@ -87,6 +107,9 @@ type SweepOptions struct {
 	// LandedHeads answers which merged pull requests had a branch as their
 	// head (#2818). Nil asks GitHub through gh.
 	LandedHeads LandedHeads
+	// VaultPath is the knowledge vault a park archives the lane's handoff
+	// threads in. Empty archives nothing.
+	VaultPath string
 }
 
 // SessionSkip is a worktree sweep left alone for a harness session, with
@@ -106,7 +129,19 @@ type SweepReport struct {
 	// MergeUnknownSkips names each worktree kept only because the forge could
 	// not say whether its branch landed (#2873).
 	MergeUnknownSkips []SessionSkip `json:"merge_unknown_skips,omitempty"`
-	DryRun            bool          `json:"dry_run"`
+	// LaneSkips names each named lane counted in SkippedCount that sweep did
+	// not park, with the reason: a dirty tree, a landing it could not confirm,
+	// or a detach git refused (#3263).
+	LaneSkips []SessionSkip `json:"lane_skips,omitempty"`
+	// ArchivedThreads are the handoff threads the parks archived, KeptThreads
+	// the ones they left because they still await Manu, and ArchiveFailures
+	// the parked lanes whose threads could not be archived (MEMORY-020).
+	ArchivedThreads []string `json:"archived_threads,omitempty"`
+	KeptThreads     []string `json:"kept_threads,omitempty"`
+	// SharedThreads are archived threads whose file another thread holds.
+	SharedThreads   []string      `json:"shared_threads,omitempty"`
+	ArchiveFailures []SessionSkip `json:"archive_failures,omitempty"`
+	DryRun          bool          `json:"dry_run"`
 	// ProcessDiscovery is false when Gate f has no implementation on this
 	// platform and is therefore refusing everything. Reported because an inert
 	// sweep prints "reaped 0" exactly like a machine with nothing to clean up,
@@ -190,6 +225,20 @@ func isDirty(path string, runner SweepRunner) bool {
 	return err != nil || dirt.Any()
 }
 
+// laneHeldByDirt reports whether a named lane is dirty and would otherwise
+// have reached the park decision: Classify answers StateDirty before it looks
+// at the lease, so a lane in use with a live lease, a lane younger than the
+// park age or a parked lane is dirty too, and none of those is a lane sweep
+// declined to park (#3372).
+func laneHeldByDirt(info Info, now time.Time) bool {
+	if info.State != StateDirty || info.Metadata == nil || info.Metadata.Lane == "" {
+		return false
+	}
+	return !strings.EqualFold(info.Metadata.State, string(StateParked)) &&
+		!info.Metadata.LeaseExpiresAt.After(now) &&
+		now.Sub(info.Metadata.CreatedAt) >= 15*time.Minute
+}
+
 func isMerged(repoRoot, branch string, runner SweepRunner) bool {
 	merged, err := runner.IsPRMerged(repoRoot, branch)
 	return err == nil && merged
@@ -238,6 +287,11 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 	if err != nil || pathWithin(resolvedPath(absCwd), resolvedPath(absWT)) {
 		return false
 	}
+	// Re-read under the lock, like the lease below: the kind decides which
+	// gates apply, so it is not taken from the listing.
+	if meta, err := LoadMetadata(info.Path); err == nil && meta != nil && meta.Kind == KindReview {
+		return reapReviewWorktree(repoRoot, info, meta, absWT, runner, now)
+	}
 	if isDirty(info.Path, runner) {
 		return false
 	}
@@ -252,6 +306,40 @@ func reapSingleWorktree(repoRoot string, info Info, runner SweepRunner, now time
 		return false
 	}
 	return executeWorktreeReap(repoRoot, info, runner)
+}
+
+// reapReviewWorktree removes a review worktree once its lease has passed
+// (HARNESS-142). It skips the merged gate, since the worktree has no branch,
+// but not the clean gate's purpose: uncommitted content is removed only when
+// `spec deadline` recorded that it copied the review's output back
+// (OutputSaved), so what --force discards is what else the reviewer left. A
+// review whose output was never copied back is kept, and so is a tree whose
+// state cannot be read. Gate f stays last: a reviewer still running past its
+// lease is the one case the lease cannot see.
+func reapReviewWorktree(repoRoot string, info Info, meta *Metadata, absWT string, runner SweepRunner, now time.Time) bool {
+	if !isLeaseExpired(info.Path, now) {
+		return false
+	}
+	dirt, err := runner.Dirt(info.Path)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: keeping review worktree %s: its state cannot be read: %v\n", info.Path, err)
+		return false
+	}
+	if dirt.Any() && !meta.OutputSaved {
+		return false
+	}
+	if hostProcessInside(absWT).Inside {
+		return false
+	}
+	if dirt.Any() {
+		_, _ = fmt.Fprintf(os.Stderr, "Removing review worktree %s: its output was copied back, and what else the reviewer left in it is discarded\n", info.Path)
+	}
+	if err := runner.WorktreeRemoveForce(repoRoot, info.Path); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "warning: removing review worktree %s: %v\n", info.Path, err)
+		return false
+	}
+	_ = runner.WorktreePrune(repoRoot)
+	return true
 }
 
 func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*SweepReport, error) {
@@ -280,38 +368,151 @@ func SweepWithRunner(opts SweepOptions, runner SweepRunner, now time.Time) (*Swe
 	absCwd, _ := filepath.Abs(cwd)
 
 	for _, info := range infos {
-		reading, candidate := gateF(info, absCwd)
-		if reading.Uninspectable > report.UninspectableProcesses {
-			report.UninspectableProcesses = reading.Uninspectable
-		}
-		if !candidate {
-			report.SkippedCount++
-			if info.PRMergedUnknown != "" && (info.State == StateUnmerged || info.State == StateOrphan) {
-				report.MergeUnknownSkips = append(report.MergeUnknownSkips, SessionSkip{Path: info.Path, Reason: info.StateReason})
-			}
-			continue
-		}
-		// After gate f, so only a worktree sweep would otherwise reap is
-		// reported: the main checkout's key prefixes every legacy sibling's.
-		if reason := sessionSkipReason(opts.Sessions, info.Path, now); reason != "" {
-			report.SkippedCount++
-			report.SessionSkips = append(report.SessionSkips, SessionSkip{Path: info.Path, Reason: reason})
-			continue
-		}
-
-		if opts.DryRun {
-			report.Reaped = append(report.Reaped, info)
-			continue
-		}
-
-		if reapSingleWorktree(opts.RepoRoot, info, runner, now, absCwd) {
-			report.Reaped = append(report.Reaped, info)
-		} else {
-			report.SkippedCount++
-		}
+		report.record(info, sweepOne(opts, info, runner, now, absCwd))
 	}
 
 	return report, nil
+}
+
+// sweepOutcome is what one worktree contributes to the report: reaped (or
+// listed as such under --dry-run), or skipped with the list that names why.
+// A skip with no list is counted and not named, as before.
+type sweepOutcome struct {
+	reaped        bool
+	session       string // a session holds it
+	lane          string // a named lane sweep did not park, or held by dirt
+	mergeUnknown  string // the forge could not say whether its branch landed
+	uninspectable int
+	threads       mem.ParkArchive // what a park did to the lane's handoff threads
+	threadsErr    error           // why it could not
+}
+
+// record folds one worktree's outcome into the report.
+func (r *SweepReport) record(info Info, out sweepOutcome) {
+	if out.uninspectable > r.UninspectableProcesses {
+		r.UninspectableProcesses = out.uninspectable
+	}
+	r.ArchivedThreads = append(r.ArchivedThreads, out.threads.Archived...)
+	r.KeptThreads = append(r.KeptThreads, out.threads.Kept...)
+	r.SharedThreads = append(r.SharedThreads, out.threads.Shared...)
+	if out.threadsErr != nil {
+		r.ArchiveFailures = append(r.ArchiveFailures, SessionSkip{Path: info.Path, Reason: out.threadsErr.Error()})
+	}
+	if out.reaped {
+		r.Reaped = append(r.Reaped, info)
+		return
+	}
+	r.SkippedCount++
+	if out.session != "" {
+		r.SessionSkips = append(r.SessionSkips, SessionSkip{Path: info.Path, Reason: out.session})
+	}
+	if out.lane != "" {
+		r.LaneSkips = append(r.LaneSkips, SessionSkip{Path: info.Path, Reason: out.lane})
+	}
+	if out.mergeUnknown != "" {
+		r.MergeUnknownSkips = append(r.MergeUnknownSkips, SessionSkip{Path: info.Path, Reason: out.mergeUnknown})
+	}
+}
+
+// sweepOne decides one worktree: a parkable named lane is parked, anything
+// else passes gate f and the session check before it is reaped.
+func sweepOne(opts SweepOptions, info Info, runner SweepRunner, now time.Time, absCwd string) sweepOutcome {
+	if info.State == StateParkable {
+		return sweepLane(opts, info, runner, now)
+	}
+	reading, candidate := gateF(info, absCwd)
+	out := sweepOutcome{uninspectable: reading.Uninspectable}
+	if !candidate {
+		if laneHeldByDirt(info, now) {
+			out.lane = info.StateReason
+		}
+		if info.PRMergedUnknown != "" && (info.State == StateUnmerged || info.State == StateOrphan) {
+			out.mergeUnknown = info.StateReason
+		}
+		return out
+	}
+	// After gate f, so only a worktree sweep would otherwise reap is
+	// reported: the main checkout's key prefixes every legacy sibling's.
+	if out.session = sessionSkipReason(opts.Sessions, info.Path, now); out.session != "" {
+		return out
+	}
+	out.reaped = opts.DryRun || reapSingleWorktree(opts.RepoRoot, info, runner, now, absCwd)
+	return out
+}
+
+// sweepLane decides a parkable named lane: held by a session, listed under
+// --dry-run, or parked, with the reason when the park did not happen.
+func sweepLane(opts SweepOptions, info Info, runner SweepRunner, now time.Time) sweepOutcome {
+	var out sweepOutcome
+	if out.session = sessionSkipReason(opts.Sessions, info.Path, now); out.session != "" {
+		return out
+	}
+	if opts.DryRun {
+		out.reaped = true
+		return out
+	}
+	parked, why := parkSingleNamedLane(opts.RepoRoot, info, runner, opts.LandedHeads)
+	out.reaped, out.lane = parked, why
+	if parked {
+		out.threads, out.threadsErr = archiveBranchThreads(opts.VaultPath, opts.RepoRoot, info.Branch)
+	}
+	return out
+}
+
+func parkSingleNamedLane(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (parked bool, why string) {
+	if dirt, err := runner.Dirt(info.Path); err != nil {
+		return false, "its state could not be read: " + err.Error()
+	} else if dirt.Any() {
+		return false, "has uncommitted changes or untracked files"
+	}
+	if landed, why := laneLanded(repoRoot, info, runner, landedHeads); !landed {
+		return false, why
+	}
+	// Write State="PARKED" before checkout --detach / branch delete (M-CODE-2).
+	parkedMeta, issueNum := parkedLease(info.Path, info.Metadata)
+	if err := SaveMetadata(info.Path, parkedMeta); err != nil {
+		return false, "its lease could not be written: " + err.Error()
+	}
+	if _, out, err := detachAtBase(repoRoot, info.Path, false, info.Metadata); err != nil {
+		return false, "git refused to detach it: " + gitFailure(out, err)
+	}
+	releaseParkedLane(info.Path, repoRoot, issueNum)
+	deleteBranchIfSafe(repoRoot, info.Branch, info.IsMain, runner)
+	return true, ""
+}
+
+// gitFailure is the first line git said when it refused, or its exit status
+// when it said nothing: the report prints one line per lane.
+func gitFailure(out []byte, err error) string {
+	if msg, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n"); msg != "" {
+		return msg
+	}
+	return err.Error()
+}
+
+// laneLanded is the landing decision parkSingleNamedLane acts on, kept apart
+// from the parking itself. Ancestry alone cannot see a squash merge, so a
+// branch git does not call merged is asked of the forge (the caller's
+// LandedHeads, or gh); a landing nobody could confirm is reported as such,
+// never resolved to "not landed".
+func laneLanded(repoRoot string, info Info, runner SweepRunner, landedHeads LandedHeads) (bool, string) {
+	merged := isMerged(repoRoot, info.Branch, runner)
+	heads := landedHeads
+	if !merged && heads == nil {
+		heads = mergedPRHeads
+	}
+	if heads == nil {
+		if merged {
+			return true, ""
+		}
+		// No reader at all: nothing can say the work landed, so it did not.
+		return false, "its landing could not be decided"
+	}
+	_, _, landed, why := branchLanding(repoRoot, info.Path, heads)
+	if !landed && why == "" {
+		why = "its landing could not be decided"
+	}
+	return landed, why
 }
 
 func Sweep(opts SweepOptions) (*SweepReport, error) {

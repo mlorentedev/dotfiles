@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request supersedes the running check; a push
+# to main always finishes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   hygiene:
     runs-on: ubuntu-latest

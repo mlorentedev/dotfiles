@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/gitenv"
 )
 
 // checkRepoDirResolves verifies the DOTFILES_REPO_DIR *cascade* (env ->
@@ -52,7 +53,7 @@ func gitCheckoutRoot(sys *System, path string) string {
 		err error
 	)
 	if sys.CommandOutputEnv != nil {
-		out, err = sys.CommandOutputEnv(cleanGitRepositoryEnv(os.Environ()),
+		out, err = sys.CommandOutputEnv(gitenv.WithoutRepository(os.Environ()),
 			"git", "-C", path, "rev-parse", "--show-toplevel")
 	} else if sys.CommandOutput != nil {
 		out, err = sys.CommandOutput("git", "-C", path, "rev-parse", "--show-toplevel")
@@ -63,32 +64,6 @@ func gitCheckoutRoot(sys *System, path string) string {
 		return ""
 	}
 	return filepath.Clean(strings.TrimSpace(out))
-}
-
-func cleanGitRepositoryEnv(environ []string) []string {
-	repositoryLocal := map[string]bool{
-		"GIT_ALTERNATE_OBJECT_DIRECTORIES": true,
-		"GIT_COMMON_DIR":                   true,
-		"GIT_DIR":                          true,
-		"GIT_GRAFT_FILE":                   true,
-		"GIT_IMPLICIT_WORK_TREE":           true,
-		"GIT_INDEX_FILE":                   true,
-		"GIT_INTERNAL_SUPER_PREFIX":        true,
-		"GIT_NO_REPLACE_OBJECTS":           true,
-		"GIT_OBJECT_DIRECTORY":             true,
-		"GIT_PREFIX":                       true,
-		"GIT_REPLACE_REF_BASE":             true,
-		"GIT_SHALLOW_FILE":                 true,
-		"GIT_WORK_TREE":                    true,
-	}
-	clean := make([]string, 0, len(environ))
-	for _, entry := range environ {
-		key, _, _ := strings.Cut(entry, "=")
-		if !repositoryLocal[strings.ToUpper(key)] {
-			clean = append(clean, entry)
-		}
-	}
-	return clean
 }
 
 // sameCheckoutRoot reports whether the configured repo dir is the checkout

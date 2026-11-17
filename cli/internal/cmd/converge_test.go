@@ -51,6 +51,7 @@ func convergeFixture(t *testing.T) (repo, home string) {
 	stubIdentity(t, identity.Facts{}, nil)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("DOTFILES_DIR", "")
 	// converge puts its own directory on PATH for its children (#2688);
 	// registering PATH here restores it after every fixture test.
@@ -95,6 +96,23 @@ func TestConverge_AppliesThenASecondRunChangesNothing(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "0 changed") || !strings.Contains(stdout, "[ OK ]") {
 		t.Errorf("second run should change nothing:\n%s", stdout)
+	}
+}
+
+func TestConverge_TsBridgeClientSecondRunIsZero(t *testing.T) {
+	repo, home := convergeFixture(t)
+	if _, err := env.SetMachineRole(env.MachinePath(home), env.RoleTSBridgeClient, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := execute(t, "converge", "--only", "ts-bridge-client", "--repo", repo); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, err := execute(t, "converge", "--only", "ts-bridge-client", "--repo", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "0 changed") || !strings.Contains(stdout, "Gitea Git proxy drop-in is current") {
+		t.Fatalf("second bridge converge is not zero:\n%s", stdout)
 	}
 }
 

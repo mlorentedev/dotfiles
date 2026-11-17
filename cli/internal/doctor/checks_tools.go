@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
 // coreTools is healthcheck.sh section 1's PATH expectation set.
@@ -28,6 +29,7 @@ var posixOnlyTools = map[string]bool{"zsh": true, "direnv": true, "wget": true}
 // to avoid double-reporting — the consolidation the two twins never did.
 func checkCoreTools(sys *System, c *Contract, rep *Report) {
 	rep.Section("Core tools in PATH")
+	checkCmdPathLength(sys, rep)
 	covered := contractBinaryNames(c)
 	win := sys.GOOS == "windows"
 	for _, tool := range coreTools {
@@ -38,12 +40,35 @@ func checkCoreTools(sys *System, c *Contract, rep *Report) {
 			rep.Skip(tool + " (POSIX-only; not expected on Windows)")
 			continue
 		}
+		if win && tool == "bash" {
+			checkGitBash(sys, rep)
+			continue
+		}
 		if sys.has(tool) {
 			rep.Pass(tool + " found")
 		} else {
 			rep.Fail(tool + " not in PATH" + coreToolRemedy(tool, sys.GOOS))
 		}
 	}
+}
+
+// checkGitBash is the Windows form of the bash check: the Git Bash dotf runs,
+// found from `git --exec-path` as tools.HomeRunners finds it. The PATH is not
+// consulted, so a WSL bash there neither passes nor fails it (#3214).
+func checkGitBash(sys *System, rep *Report) {
+	// Stdout alone: the answer is a path, and a stderr line merged into it
+	// would make the root it names garbage.
+	out, err := sys.CommandStdoutDir("", "git", "--exec-path")
+	if err != nil {
+		rep.Fail("Git Bash not found: `git --exec-path` failed (install Git for Windows)")
+		return
+	}
+	bash, ok := tools.GitBash(out)
+	if !ok {
+		rep.Fail("Git Bash not found under " + filepath.Dir(filepath.Dir(bash)) + " (reinstall Git for Windows)")
+		return
+	}
+	rep.Pass("bash found (Git Bash: " + bash + ")")
 }
 
 // coreToolRemedy names the command that provisions a missing core tool, only
@@ -182,14 +207,15 @@ func checkVersionMatch(sys *System, cfg *Config, rep *Report) {
 		}
 	}
 
-	// yarn is npm-global (cross-platform) — always checked. Its pin lives in
-	// packages.json since OPS-042 (#1336), where `dotf tools install` reads it;
-	// versions.conf no longer carries YARN_VERSION.
+	// yarn is npm-global (cross-platform) — always checked. Its pin moved from
+	// versions.conf to packages.json with OPS-042 (#1336) and back to versions.conf
+	// when mise took it over through its npm backend (#2438); catalogPin reads
+	// whichever holds it.
 	if !sys.has("yarn") {
 		rep.Skip("yarn not installed (run `dotf tools install yarn`; needs Node.js on PATH)")
 	} else {
 		got, _ := sys.versionLine("yarn")
-		matchPinFloorFrom(rep, "yarn", got, catalogPin(sys, cfg, "yarn"), "packages.json")
+		matchPinFloorFrom(rep, "yarn", got, catalogPin(sys, cfg, "yarn"), pinSource(sys, cfg, "yarn"))
 	}
 
 	checkGitWindowsFloor(sys, cfg, rep)
@@ -384,7 +410,7 @@ func checkDotfVersion(sys *System, cfg *Config, rep *Report) {
 			// merged into doctor since it was built is not running at all on this
 			// machine — a categorically worse gap than an ordinary tool being one
 			// version behind, where the check itself still runs.
-			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run `dotf update`, which installs the pin and converges with it once the checkout is clean and level with its upstream; otherwise ./install.sh from the checkout)", got, pin))
+			rep.Fail(fmt.Sprintf("dotf version drift: installed=%s pinned=%s (run `dotf update`: it installs the pin from any checkout it can fetch)", got, pin))
 		}
 	}
 }

@@ -1,0 +1,139 @@
+---
+tags: [spec, tasks, templates]
+created: "2026-11-13"
+id: "HARNESS-195-lanes-default"
+type: spec-tasks
+status: active
+owner: manu
+---
+
+# Tasks - HARNESS-195-lanes-default
+
+> TDD order. One task = one focused commit. Tick as you go. Reorder freely while spec is in `draft` state; freeze once you start `implementing`.
+>
+> **Inline markers** (optional, additive — borrowed from `github/spec-kit`, adapt-not-adopt per #141):
+> - `[P]` — this task has **no dependency on another unchecked task**, so it is safe to run in parallel (fan out to a `Workflow`, or just batch). TDD chains (test → implement → refactor of the *same* behavior) are sequential and must NOT carry `[P]`; independent behaviors can.
+> - `[AC<n>]` — this task helps satisfy **acceptance criterion #`<n>`** from `proposal.md`. Lets `/spec check` map coverage deterministically; omit it and the check falls back to semantic judgment.
+
+## Setup
+
+- [ ] Branch created from main: `feat/lanes-default` (`dotf worktree add feat-lanes-default`, #3432)
+- [ ] `proposal.md` is complete and acceptance criteria are testable
+- [ ] No open questions left in `proposal.md` "Risks / open questions"
+
+## Implementation
+
+> One PR per slice, each at most 300 executable lines. A, D1 and F are independent of each other (`[P]`). B and C depend on A, because both read the activation record A writes. D2 depends on C, because it calls `lane.Where`. E waits on observed launches, and G depends on all of them.
+
+### Slice A: activation through converge (AC1)
+- [x] [P] [AC1] Failing test: `lane.Activate` reads `.dotf/lanes.json` from the default branch's committed tree (`git show <remote>/<base>:…`), not from the working tree. A working-tree-only marker yields "not active".
+- [x] [AC1] Implement `Activate`: create the missing lanes (reusing `lane init`'s lane creation), and write the activation record under the git common dir. Idempotent.
+- [x] [AC1] Failing test, then implementation: the `lanes` converge step (`cli/internal/converge/lanes.go`) reports changed, then ok, on a second run. A test proves the step never activates `DeployDir`, including when `RepoRoot` and `DeployDir` resolve to the same physical path.
+- [x] [AC1] Remove the marker write from `dotf lane init`'s default path; `init` never writes the activation record. A test proves that a hand-run `init` leaves no record, both with an uncommitted marker and with a committed one.
+
+> Slice A as built (for the slices that follow):
+> - `lane init` keeps `--write-marker`, which writes `.dotf/lanes.json` for the commit that declares a repository. Without the flag, init writes neither the marker nor the record.
+> - Plan and apply agree, including for a lane that lacks a lease or its identity record; a lane path another repository occupies is a converge skip carrying the repair, not a failure.
+
+### Slice B: the guard arms from the activation record (AC2, #3437, #3438)
+- [x] [AC2] Failing `TestPreCommitLaneGuard` cases:
+  - no record → no block;
+  - a record on main in the main checkout → block;
+  - a branch worktree → pass;
+  - the deploy clone → pass.
+- [x] [AC2] Implement in `git-hooks/lib/lane-guard.sh`: read the record from the git common dir, and drop both marker lookups (`$top/.dotf/lanes.json` and `$main_root/.dotf/lanes.json`).
+- [x] [AC2] An expired lease on a detached HEAD warns on stderr and does not block (#3438). Test first.
+- [x] [AC2] `lane doctor` gates on the activation record, not the marker, so doctor and guard agree. Test first.
+- [x] [AC2] `lane doctor` warns about a branch worktree with no lease, with its FIX (the guard still lets it pass). Test first (#3438).
+
+> Slice B as built (for the slices that follow):
+> - The record's content is now the committed marker, copied by `Activate` as the default branch carries it; its existence still means active. The guard reads `third_party_roots` from it, so no marker lookup remains. A marker edited on the default branch refreshes the record on the next converge (one change, then `changed=0`).
+> - An expired lease warns on stderr for any worktree that carries one, detached or on a branch, and never blocks. A branch worktree with no lease still passes, as AC2 says.
+> - `lane doctor` is silent about a marker it is not armed by: no record means "not lane-managed on this machine", with no audit. An active repository whose main checkout lacks the marker warns that nothing was compared.
+> - `lane doctor` also warns about a branch worktree with no lease (`dotf worktree adopt`); the guard still lets it pass.
+
+### Slice C: tell the session where it stands (AC3)
+- [x] [AC3] Failing test: `lane.Where(cwd)` returns in-lane, out-of-lane-in-active-repo, or inactive.
+- [x] [AC3] Print the line from `dotf mem resume` and `dotf mem session-start`. Golden tests for all three states.
+- [x] [AC3] Failing test: every manifest entry with a session-start presence has a deployed carrier. It fails today for pi, opencode and agy.
+> Slice C1 as built (for C2 and D2):
+> - `lane.Where(cwd)` returns a `Position`; `Position.Line()` is the line, or "" when inactive. Active means the record `Activate` writes exists in the git common dir, so a lane with no record behind it is inactive. A lane nobody holds, with a lease state PARKED or a detached HEAD, is `ParkedLane` and prints ``lane `<name>` is PARKED: start with `dotf lane switch <branch>` ``, never ACTIVE.
+> - `mem` cannot import `lane` (lane imports mem), so the command layer resolves the line (`laneLine` in `cli/internal/cmd/mem_lane_line.go`) and hands it to `mem.BriefOptions.LaneLine` and `mem.ClaudeContextInput.LaneLine`. `mem resume` prints it as its first line. An unreadable directory reports on stderr and prints no line; it never fails the command.
+> - `TestEveryPresenceTargetHasADeployedCarrier` reads each manifest target's `events.presence`. A target has a carrier when it emits a hook on that event running `mem session-start` or `mem resume`, or, for an `emit: false` extension, when an `ai/deploy.json` entry writes a file with the same last two path elements. Its `carrierGaps` table lists pi, opencode and agy and is asserted exact, so C2 deletes each row as it adds the carrier, and adapts the agy hook's command to one of the two prefixes.
+
+- [x] [AC3] pi extension (`session_start`) and opencode plugin (`chat.system.transform`): run `dotf mem session-start` and inject its output into the session context. Keep them small and deploy them through dotf's existing deploy path, not bind (the manifest says `emit: false`).
+- [x] [AC3] agy: bind a `PreInvocation` hook in `bind_named` that prints the line on a session's first invocation only.
+
+> Slice C2 as built:
+> - pi and opencode: `ai/pi/extensions/dotfiles-gate.ts` and `ai/opencode/plugins/dotfiles-gate.ts`, deployed by the `pi-gate` and `opencode-gate` entries of `ai/deploy.json`. Each runs `dotf mem session-start --format stdout` and fails silent-but-logged when dotf is missing. pi sends it once per session start (not on a reload) for the next turn; opencode adds it to the system prompt, one brief per session. The manifest's opencode `file` now says `plugins/`, the directory opencode reads (the herdr plugin sits there).
+> - agy: `dotf mem session-start --format agy-hook` answers agy's `{"injectSteps":[{"systemMessage":{"systemMessage":...}}]}` on the first invocation of a `conversationId` and `{}` after, keyed by an O_EXCL marker under the OS temp dir (pruned after seven days). It never fails the turn. The flag ships in C2, but its `PreInvocation` entry in `bind_named` does not: it lands in `feat/lane-line-agy-carrier` after a release carries the flag, because the manifest is mirrored on merge and a pinned binary without the flag would fail the hook on every agy turn. This is that branch: `carrierGaps` is empty again. It must not merge before a release carries `--format agy-hook`.
+> - The deploy entries are `pi-gate` and `opencode-gate` because `deployNameWidth` (16) caps a manifest name; `deploy` twice into a temporary home reports `deployed`, then `in sync`.
+> - Observed: `pi -e <extension> -p` and `opencode run` (with `OPENCODE_CONFIG_DIR` holding the plugin) each echoed a line a stand-in `dotf` printed. agy was not launched: whether it shows the hook's `systemMessage` to the model is AC9's observation.
+> - Every carrier carries the whole session-start brief, which includes the lane line, not the line alone.
+> - `carrierGaps` is empty: this branch deleted the agy row. `TestSessionLineCarriersInjectTheBriefAndSurviveAMissingDotf` runs both TypeScript sources under node with a stand-in dotf.
+
+### Slice D1: `lane next` without herdr (AC5)
+- [x] [P] [AC5] Failing golden test: `manualCommands` in a repository with lanes ends inside the lane before `exec`. Today it prints `lane switch` and then `exec` with no `cd`. Then implement it for the zsh, bash and PowerShell forms. It uses the existing `HasNamedLanes`, so it does not wait for A.
+
+### Slice D2: the `worktree add` hint (AC4)
+- [x] [AC4] Failing test, then implementation: the hint in `cli/internal/worktree/add.go`, through `lane.Where` (Slice C). No hint from `AddDetached`.
+> Slice D2 as built: the hint lives in the command layer, not in `cli/internal/worktree/add.go`: `lane` imports `worktree`, so `worktree` cannot call `lane.Where`. `laneHint` (`cli/internal/cmd/worktree_lane_hint.go`) runs after `worktree.Add` succeeds and prints one line to stderr for every active standing (in-lane, parked, out-of-lane). `AddDetached` is not on that path, so `spec review` prints nothing; a test pins it.
+
+### Slice E: launchers (AC6, #3440, #3430)
+- [x] [AC6] Fix #3440: `dotf secrets run` refuses an npm `.cmd` or `.bat` child on Windows, using the same function as `lane exec` (`refuseBatchShim`). Test first.
+- [x] [AC6] Observed launch of copilot (`copilot -i <p>`) and opencode (`opencode --prompt <p>` under `dotf secrets run`). Record `LANE-READY` evidence in `verification.md`, then add the entries.
+- [x] [AC6] codex and gemini: add each when it is installed and observed. Otherwise record "not installed" with the date.
+- [x] [AC6] #3430: check whether a lane-launched pane carries `HERDR_AGENT`. Set it in `Exec`'s environment if it does not.
+
+> Slice E as built:
+> - `lane.RefuseBatchShim` is exported and returns an error with no command prefix; `lane exec` wraps it as `lane:`, `dotf secrets run` as `secrets run:`. The secrets check runs in `assertSafeChildCommand`, so every entry point (the command, `runChild`, `runChildPTY`) has it, and only where `batchShimsRunViaCmdExe` is true (Windows).
+> - `lane.LaunchEnv(argv)` names the agent in `HERDR_AGENT` for a launch through `dotf secrets run`, read from the command after `--`, so a later wrapped entry needs no second list. `Exec` hands it to the image it starts with (it replaces an inherited value).
+> - Launchers added: `copilot -i <p>`, and `dotf secrets run --only NAN_API_KEY -- opencode --prompt <p>` (it submits the prompt, observed). codex and gemini are not installed here: no entry.
+
+### Slice F: doctor (AC7, #3327)
+- [x] [P] [AC7] Apply the patch preserved on #3327 (detached worktree with no lease) with its tests.
+- [x] [AC7] Expired lease and deployed-guard drift: failing tests, then implementation.
+
+### Slice G: doctrine and activation (AC8, AC9)
+- [x] Prerequisite: #3456 (harness re-rendered from the vault) merged, so the doctrine PR renders only its own change.
+- [x] [AC8] Rename the tiers in AGENTS.md and in `cli/internal/initrepo/templates/agents-spec-section.md` (the Lane Decisor rule becomes a tier rule). First check whether AGENTS.md is rendered from a vault source; if it is, edit the source. Update `using-git-worktrees`, `handoff` and `autopilot` in the vault source, then re-render. Add a test that fails if AGENTS.md calls a tier a "lane".
+- [x] [AC8] Runbook `docs/runbooks/guide-persistent-named-lanes.md`: activation through converge, what the guard blocks, and recovery.
+  As built: section 5.1 (session-start line to entrance, recovery by symptom); activation (section 6) and the blocked set (section 3) were already there from the earlier slices and are linked, not copied.
+- [x] [AC8] The autopilot skill (`harness/skills/autopilot/SKILL.md`, vault-rendered) and `tests/guard-autopilot-lane-marker.bats` still decide by the marker (`if [ -f .dotf/lanes.json ]`); switch both to the activation record.
+  As built (AC8): the vault source (commit 562d316b on vault master) carries the tier rename, the "Where work starts" paragraph and the three skill changes; `tests/guard-autopilot-lane-marker.bats` is renamed `tests/guard-autopilot-lane-record.bats` and reads `ActivationFile` from `cli/internal/lane/activate.go`. `TestNoTierIsCalledALane` (`cli/internal/initrepo/tier_naming_test.go`) fails when a paragraph naming a tier says "lane", in AGENTS.md and in the embedded template, and is non-vacuous (each document must contain such a paragraph). "Fast Lane" (the cognitive-load mode) is a different term and stays.
+- [ ] [AC9] PR adding `.dotf/lanes.json` to dotfiles (the switch). Then `dotf converge` on the Mac and each guest, and sweep the merged worktrees.
+- [ ] [AC9] Run a real session of each launchable agent per machine, and record the AC3 line in `verification.md`.
+
+### Slice H: the launch names its model (AC10, #3485)
+- [x] [AC10] Failing tests, then implementation: `herdr.LaunchOptions.Model` appended to `agent start` as `-- --model <id>`; `lane.LaunchArgv(agent, prompt, model)` inserts `--model <id>` after the agent executable (after the `--` of a `dotf secrets run` launch); `--model` on `worktree add` (refused without `--agent`, or blank or flag-shaped, before the worktree exists), `lane exec` and `lane next` (typed on the exec line, refused when not a plain shell word; the line without a model is byte-identical to before). `lane apply` passes no model.
+- [x] [AC10] Observe each launchable agent accepting `--model <id>` in a one-shot run: claude `--model sonnet`, pi `--model nan/qwen3.6`, opencode `run --model nan/qwen3.6`, copilot `--model auto` (`gpt-5.4` is parsed and reported unavailable on this account), agy `--model "Gemini 4 Hydrogen (High)"`, each exit 0 answering `ok`. A real `dotf worktree add probe-3485-model --agent claude --model sonnet` started claude in herdr on `Sonnet 5.5` (pane read), then `worktree done`. The table's own shape was run too: `dotf lane exec --agent opencode --model nan/qwen3.6 --prompt-file p.md` in a tmux pane ran `dotf secrets run --only NAN_API_KEY -- opencode --model nan/qwen3.6 --prompt <p>` (process list), the TUI showed `Build · Qwen 3.6` and answered `ok`.
+
+## Closing
+
+- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [ ] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
+- [ ] Type checks pass
+- [ ] Lint passes
+- [ ] No unrelated changes in the diff (no scope creep)
+- [ ] `verification.md` filled in
+- [ ] PR opened referencing this spec folder
+
+## Machine-readable features
+
+This spec emits a sibling `features.json` (alongside this file) following [[pattern-feature-list-as-primitive]]. The JSON is the harness-facing contract: each acceptance criterion maps to ≥1 feature with `id`, `behavior`, `verification` (executable command), `state` (lifecycle), and `evidence` (harness-captured output).
+
+**Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
+
+Minimal `features.json` skeleton (drop into `<repo>/specs/HARNESS-195-lanes-default/features.json`):
+
+```json
+[
+  {
+    "id": "HARNESS-195-lanes-default-f1",
+    "behavior": "<one-line copy of an acceptance criterion>",
+    "verification": "<single shell command; exit 0 means pass>",
+    "state": "pending",
+    "evidence": ""
+  }
+]
+```

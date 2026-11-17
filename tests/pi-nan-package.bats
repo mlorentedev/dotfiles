@@ -14,9 +14,12 @@
 #
 #   PI_BIN=~/.local/bin/pi bats tests/pi-nan-package.bats
 #
-# The key is a dummy: pi hides a provider without usable auth, and NaN answers a
-# dummy key with 401, after which the package keeps its build-time snapshot.
-# The listing is therefore the snapshot, deterministic, and costs no quota.
+# The key is a dummy: pi hides a provider without usable auth. It never reaches
+# NaN: pi 1.2.0 builds the model runtime without network refresh for
+# --list-models, so the package's catalog fetch is not called on this path and
+# the listing is the build-time snapshot (measured for #1810 with a preload
+# that records every fetch and socket connect: zero attempts). Deterministic,
+# and it costs no quota.
 
 setup_file() {
     REPO="$BATS_TEST_DIRNAME/.."
@@ -68,6 +71,30 @@ setup() {
 @test "pi-nan-package: the package alone registers NaN models, so no check below is vacuous" {
     [ "$(grep -c . "$LISTED")" -ge 1 ]
     jq -e 'length >= 1' "$SNAPSHOT" >/dev/null
+}
+
+# AI-048 (#1810): AI-046 AC5, re-runnable. The network is cut inside pi's own
+# process by tests/fixtures/pi-network-cut.mjs, which throws on every fetch and
+# socket connect, the way the one-off 2026-09-26 measurement did. A dead
+# HTTPS_PROXY would prove nothing: Node's fetch ignores proxy variables unless
+# the caller opts in, and the package does not. The marker check is the
+# positive control: without it a dropped NODE_OPTIONS leaves pi online.
+#
+# Scope: this is the start path. The package's fetch-failure fallback on the
+# session path (where pi refreshes with the network) is not exercised here.
+@test "pi-nan-package: with the network cut, pi starts and lists the package snapshot (AI-046 AC5)" {
+    marker="$BATS_TEST_TMPDIR/network-cut"
+    PI_NETWORK_CUT_MARKER="$marker" NODE_OPTIONS="--import=$REPO/tests/fixtures/pi-network-cut.mjs" \
+        NAN_API_KEY=dummy PI_CODING_AGENT_DIR="$AGENT" "$PI_BIN" --list-models nan \
+        >"$BATS_TEST_TMPDIR/offline.txt" 2>"$BATS_TEST_TMPDIR/offline.err" \
+        || { echo "pi failed to start with the network cut:"; cat "$BATS_TEST_TMPDIR/offline.err"; cat "$marker" 2>/dev/null; false; }
+    grep -q '^loaded ' "$marker" || { echo "the network-cut preload never loaded (NODE_OPTIONS dropped?)"; false; }
+
+    awk '$1 == "nan" { print $2 }' "$BATS_TEST_TMPDIR/offline.txt" | LC_ALL=C sort -u >"$BATS_TEST_TMPDIR/offline-listed"
+    jq -r '.[].id' "$SNAPSHOT" | LC_ALL=C sort -u >"$BATS_TEST_TMPDIR/snapshot-ids"
+    [ -s "$BATS_TEST_TMPDIR/snapshot-ids" ] || { echo "the package snapshot is empty"; false; }
+    diff "$BATS_TEST_TMPDIR/snapshot-ids" "$BATS_TEST_TMPDIR/offline-listed" \
+        || { echo "offline listing (>) differs from the package snapshot (<)"; false; }
 }
 
 @test "pi-nan-package: every nan/* id in enabledModels is registered by the package alone (AC2)" {

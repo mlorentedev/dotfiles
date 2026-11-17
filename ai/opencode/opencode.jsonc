@@ -6,18 +6,21 @@
 // Spec: specs/SDD-007-ai-tooling-consolidation/ (NaN default + drop Go + drop legacy gemini-cli + drop aider).
 // Historical context: specs/archive/AI-011-opencode-bootstrap/ (initial bootstrap, 2026-05-17).
 //
-// Model Tier (per AGENTS.md "Model Selection"), re-routed 2026-09-26 (AI-044, #1762):
-//   Default + plan: nan/glm5.3-flash  — 1M, NaN's recommendation for coding agents,
-//                                       2B/month quota of its own.
-//   Titles (small_model): nan/qwen3.6 — 262K, no monthly quota; titles are the
+// Model Tier (per AGENTS.md "Model Selection"). Since 2026-11 NaN bills every
+// chat model from one pool of credits per billing period, priced per model and
+// token type (ai/nan/README.md); qwen3.6 and gemma4 draw no credits at all.
+//   Default + plan: nan/glm5.3-flash  — 1M, NaN's recommendation for coding agents.
+//   Titles (small_model): nan/qwen3.6 — 262K, draws no credits; titles are the
 //                                       highest-volume, lowest-value calls.
-//   Long-context / general: nan/deepseek-v4-flash (via `qf`) — 1M, 3B/month.
-//   Picker only: nan/qwen3.8-flash (1M served, 500M/month: it reached 83% on
-//                2026-09-26 as the default, which is why it no longer is),
-//                nan/gemma4, nan/mimo-v2.6-flash (successor of mimo-v2.5,
+//   Long-context / general: nan/deepseek-v4-flash (via `qf`) — 1M.
+//   Picker only: nan/qwen3.8-flash (the priciest flash per token), nan/gemma4,
+//                nan/mimo-v2.6-flash (the cheapest; successor of mimo-v2.5,
 //                retired by NaN 2026-09-30; AI-045).
-//   Quotas and windows: https://nan.builders/docs/models. A spent quota answers
-//   402 until the month resets.
+//   Picker only, larger models (5-20x the flash credit rate, pick by hand):
+//                nan/kimi-k3.1-pro, nan/qwen3.8-max, nan/deepseek-v4-pro, nan/hy4.
+//                kimi-k3.1-pro and deepseek-v4-pro reason always: NaN maps no
+//                disable alias for them, so they carry no `fast` variant.
+//   Out of credits answers 402; glm5.3's 400M-per-4h window answers 429.
 //   Embeddings / Audio: qwen3-embedding, kokoro (TTS), whisper (STT) — not
 //                       chat-routable (use curl / OpenAI SDK directly).
 //   Frontier on-demand: openrouter/* (PAYG) — Opus / Sonnet / GPT.
@@ -31,7 +34,7 @@
   "snapshot": false,
   "instructions": ["{env:HOME}/.config/opencode/AGENTS.md"],
   // Explicit fast model for title generation — avoids fallback delay. qwen3.6
-  // has no monthly quota, so the most frequent calls spend none.
+  // draws no NaN credits, so the most frequent calls spend none.
   "small_model": "nan/qwen3.6",
   // Default = NaN's coding model (matches the tier comment above). deepseek-v4-flash
   // stays the long-context option via the `qf` wrapper.
@@ -153,7 +156,57 @@
               "reasoning_effort": "high"
             }
           }
+        },
+        "kimi-k3.1-pro": {
+          "name": "Kimi K3.1 Pro (Moonshot - 1M, larger)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 1000000,
+            "output": 131072
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "qwen3.8-max": {
+          "name": "Qwen 3.8 Max (Alibaba - 1M, larger)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 1000000,
+            "output": 131072
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro (DeepSeek - 1M, larger, text only)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 1000000,
+            "output": 131072
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
+        },
+        "hy4": {
+          "name": "Hy4 (Tencent - 1M, larger)",
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 1000000,
+            "output": 65536
+          },
+          "modalities": {
+            "input": ["text"],
+            "output": ["text"]
+          }
         }
+        // Larger models' output is capped below what NaN serves (kimi 1M,
+        // deepseek-v4-pro 393K): their output costs 125-500 credits per 1M tokens.
         // Non-chat NaN models (qwen3-embedding, kokoro TTS, whisper STT) are
         // intentionally NOT listed here: opencode's modality schema only allows
         // {text, audio, image, video, pdf} as output values; "embedding" is

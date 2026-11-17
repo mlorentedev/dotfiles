@@ -28,8 +28,21 @@ func ensureLease(o Options, path string, issue int, agent string) error {
 		return err
 	}
 	meta, err := worktree.LoadMetadata(path)
-	if err != nil || meta != nil {
+	if err != nil {
 		return err
+	}
+	if meta != nil {
+		if meta.Lane != "" {
+			now := o.now()
+			meta.Creator = agent
+			meta.Issue = issue
+			meta.State = string(worktree.StateActive)
+			meta.CreatedAt = now
+			meta.LeaseExpiresAt = now.Add(leaseTTL)
+			meta.ReapOK = false
+			return worktree.SaveMetadata(path, *meta)
+		}
+		return nil
 	}
 	now := o.now()
 	lease := worktree.Metadata{Creator: agent, Issue: issue, CreatedAt: now, LeaseExpiresAt: now.Add(leaseTTL), ReapOK: true}

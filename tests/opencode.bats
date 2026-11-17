@@ -4,6 +4,7 @@
 # not just presence.
 
 load 'lib/refute'
+load 'lib/mise-owned'
 
 setup() {
     export DOTFILES_DIR="$BATS_TEST_DIRNAME/.."
@@ -19,8 +20,8 @@ setup() {
     grep -q "OpenCode (secondary AI coding agent" "$SETUP_SCRIPT"
 }
 
-@test "opencode is a packages.json catalog tool (npm) and setup-linux.sh carries no install block (AI-034, ADR-036)" {
-    jq -e '.tools[] | select(.name=="opencode" and .source.type=="npm" and .source.package=="opencode-ai")' "$DOTFILES_DIR/packages.json" >/dev/null
+@test "opencode is a mise npm-backend CLI and setup-linux.sh carries no install block (AI-034, ADR-036, #2438)" {
+    assert_mise_npm_cli opencode opencode-ai
     refute_grep_fixed 'opencode.ai/install' "$SETUP_SCRIPT"
     refute_grep_fixed 'OPENCODE_BIN_DIR=' "$SETUP_SCRIPT"
     refute_grep_fixed 'OPENCODE_VERSION' "$SETUP_SCRIPT"
@@ -52,9 +53,9 @@ setup() {
     refute_grep_fixed '.opencode/bin' "$DOTFILES_DIR/.bashrc"
 }
 
-@test "packages.json is the only opencode pin (versions.conf carries none, ADR-036)" {
-    refute_grep '^OPENCODE_VERSION=' "$DOTFILES_DIR/versions.conf"
-    [ "$(jq -r '.tools[] | select(.name=="opencode") | .version' "$DOTFILES_DIR/packages.json")" != "" ]
+@test "versions.conf is the only opencode pin (packages.json carries none, ADR-036, #2438)" {
+    grep -q '^OPENCODE_VERSION=' "$DOTFILES_DIR/versions.conf"
+    [ -z "$(jq -r '.tools[] | select(.name=="opencode") | .version' "$DOTFILES_DIR/packages.json")" ]
 }
 
 # CLI-018: version-drift-is-WARN (yarn/opencode/pi) was asserted against
@@ -202,7 +203,8 @@ for model, variants in want.items():
            for name, value in models[model].get("variants", {}).items()}
     if got != variants:
         bad.append(f"{model}: variants {got}, want {variants}")
-for model in ("deepseek-v4-flash", "qwen3.8-flash", "mimo-v2.6-flash"):
+# kimi-k3.1-pro and deepseek-v4-pro reason always: NaN maps no disable alias.
+for model in ("deepseek-v4-flash", "qwen3.8-flash", "mimo-v2.6-flash", "kimi-k3.1-pro", "deepseek-v4-pro"):
     if "variants" in models[model]:
         bad.append(f"{model}: reasoning depth is not adjustable, but variants remain")
 print("\n".join(bad))
@@ -214,7 +216,7 @@ PY
 @test "NaN README records the published catalog and reasoning limits (AI-045 AC5)" {
     readme="$DOTFILES_DIR/ai/nan/README.md"
     grep -qF '`GET /v1/models` lists what the cluster runs, not what this key can call.' "$readme"
-    grep -qF '`glm5.3` requires the premium membership tier.' "$readme"
+    grep -qF 'One pool for every chat model, refilled each billing period' "$readme"
     grep -qF '`max_tokens` below 16,384 is raised to 16,384' "$readme"
     grep -qF '60,000 reasoning characters or 420 seconds' "$readme"
     grep -qF 'The closed reasoning-only turn is not billed.' "$readme"
@@ -317,11 +319,15 @@ PY
 
 # --- DX-004: reasoning visibility (interleaved) + TUI config (tui.json) ---
 
-@test "opencode.jsonc maps NaN reasoning_content via interleaved on all 6 chat models (DX-004 AC1)" {
+@test "opencode.jsonc maps NaN reasoning_content via interleaved on every NaN chat model (DX-004 AC1)" {
     # opencode only renders NaN's reasoning chain if reasoning_content is mapped
-    # to a reasoning part. All six chat models must carry the mapping.
+    # to a reasoning part. Every NaN chat model must carry the mapping; only NaN
+    # models declare a "limit" block, so that count is the model count, and a
+    # model added without the mapping makes the two differ.
     count=$(grep -cE '"interleaved":[[:space:]]*\{[[:space:]]*"field":[[:space:]]*"reasoning_content"[[:space:]]*\}' "$OPENCODE_CFG")
-    [ "$count" -eq 6 ] || { echo "expected 6 interleaved blocks, got $count" >&2; false; }
+    models=$(grep -cE '"limit":[[:space:]]*\{' "$OPENCODE_CFG")
+    [ "$models" -ge 10 ] || { echo "expected at least 10 NaN chat models, got $models" >&2; false; }
+    [ "$count" -eq "$models" ] || { echo "expected $models interleaved blocks, got $count" >&2; false; }
 }
 
 @test "opencode.jsonc reasoning comment updated off the stale 1.15.10 'renders neither' note (DX-004 AC5)" {

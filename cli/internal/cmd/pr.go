@@ -63,6 +63,13 @@ It LISTS. It never applies, comments, or merges. The judgement belongs to the
 pr-review-triage skill, which disposes of each item under explicit human
 confirmation; nothing here may erode that.
 
+A pull request with nothing to triage is listed too when no review covers its
+head: the newest review check on the head commit (named review, or
+<caller> / review when the job comes from a reusable workflow) failed, was
+skipped or cancelled, is still running, or is absent. Nothing to triage is not
+a review that found nothing. A draft, or a diff that is an exempt signature, is
+not listed for it.
+
 Exit status is 0 when the queue is empty and 1 otherwise — including when the
 question could not be answered, which is deliberate: a queue that cannot be
 computed must not read as an empty one. The message says which.
@@ -92,14 +99,17 @@ cannot be read or is not open.`,
 			}
 			_, _ = fmt.Fprintf(c.OutOrStdout(), "%d pull request(s) awaiting a disposition:\n\n", len(pending))
 			for _, st := range pending {
-				_, _ = fmt.Fprintf(c.OutOrStdout(), "  #%-5d %s\n         %s, %s\n         %s\n",
-					st.PR.Number, st.PR.Title, st.Reason,
-					st.At.Local().Format("2006-01-02 15:04"), st.PR.URL)
+				reason := st.Reason
+				if !st.At.IsZero() {
+					reason += ", " + st.At.Local().Format("2006-01-02 15:04")
+				}
+				_, _ = fmt.Fprintf(c.OutOrStdout(), "  #%-5d %s\n         %s\n         %s\n",
+					st.PR.Number, st.PR.Title, reason, st.PR.URL)
 				if line := findingsLine(st); line != "" {
 					_, _ = fmt.Fprintf(c.OutOrStdout(), "         %s\n", line)
 				}
 				for _, u := range st.Unreproduced {
-					_, _ = fmt.Fprintf(c.OutOrStdout(), "         REAL %s:%d: %s\n", u.Finding.Path, u.Finding.Line, u.Problem)
+					_, _ = fmt.Fprintf(c.OutOrStdout(), "         REAL %s: %s\n", u.Finding.Where(), u.Problem)
 				}
 			}
 			if len(reg.Classification.Reviewers) == 0 {
@@ -134,11 +144,7 @@ func findingsLine(st prtriage.Status) string {
 			where = append(where, fmt.Sprintf("and %d more", len(st.Unclassified)-shown))
 			break
 		}
-		if f.Line > 0 {
-			where = append(where, fmt.Sprintf("%s:%d", f.Path, f.Line))
-		} else {
-			where = append(where, f.Path)
-		}
+		where = append(where, f.Where())
 	}
 	return fmt.Sprintf("%d finding(s) without a declared class: %s", len(st.Unclassified), strings.Join(where, ", "))
 }

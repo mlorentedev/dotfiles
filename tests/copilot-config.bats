@@ -87,8 +87,10 @@ load 'lib/refute'
     refute_grep_fixed 'copilot-instructions.md" -Force' "$DOTFILES_DIR/setup-windows.ps1"
 }
 
-@test "copilot is a packages.json catalog tool (npm) and neither setup carries an install block (AI-038, ADR-036)" {
-    jq -e '.tools[] | select(.name == "copilot" and .source.type == "npm")' "$DOTFILES_DIR/packages.json" >/dev/null
+@test "copilot is a mise-pinned tool (versions.conf) and neither setup carries an install block (AI-038, ADR-036, #2438)" {
+    # Marked for mise, so the sync owns it; a catalog entry too would be a second owner.
+    awk '/^# mise: (cli|latest)$/{m=1;next} m && /^COPILOT_VERSION=/{found=1} {m=0} END{exit !found}' "$DOTFILES_DIR/versions.conf"
+    [ -z "$(jq -r '.tools[] | select(.name == "copilot") | .name' "$DOTFILES_DIR/packages.json")" ]
     refute_grep 'Id = "GitHub\.Copilot"' "$DOTFILES_DIR/setup-windows.ps1"
     refute_grep '(apt|snap|curl)[^\n]*copilot' "$DOTFILES_DIR/setup-linux.sh"
 }

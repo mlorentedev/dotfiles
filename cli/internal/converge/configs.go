@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/copilotsettings"
 	"github.com/mlorentedev/dotfiles/cli/internal/deploy"
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
@@ -55,6 +56,7 @@ func (r configsDeploy) run(env Env, dryRun bool) (deploy.RunResult, error) {
 		Available: r.has,
 		DryRun:    dryRun,
 		Records:   records,
+		Repair:    copilotsettings.RepairConfig,
 	})
 }
 

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "BUG-171-lessons-stray-names-f1",
+    "behavior": "fmt --check exits non-zero and names a markdown file in no lesson-NNN-<slug>.md form, at the root or in a category directory",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestLessonsFmt_CheckNamesAFileInAnotherNamingScheme'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-171-lessons-stray-names-f2",
+    "behavior": "_format.md, README.md and non-markdown files are not named, and this repository's lessons pass",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestLessonsFmt' && go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-171-lessons-stray-names-f3",
+    "behavior": "fmt without --check leaves the stray file in place and names it",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestLessonsFmt_CheckNamesAFileInAnotherNamingScheme'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

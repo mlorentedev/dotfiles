@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/dispose-proposals/SKILL.md
-generated_sha: f2704257cea313b5
+generated_sha: 1f00ca4898a70a6c
 id: dispose-proposals-skill
 type: skill
 status: active
@@ -78,8 +78,12 @@ board runbook — and write back into the draft: `status: disposed`, `issue: <N>
 
 ### Step 4b — On merge / keep / wontfix
 Update the draft frontmatter: `status: disposed` (or `rejected` for wontfix), `disposed_as: <decision>`.
-For **wontfix**, record the one-line reason in the rejected-mechanisms / WONTFIX ledger (HARNESS-005)
-so the same false cluster is not re-litigated next week.
+For **wontfix**, record the one-line reason in [[00_meta/agents/rejected-mechanisms|`00_meta/agents/rejected-mechanisms.md`]]
+(the WONTFIX ledger, HARNESS-005). Grep that ledger *before* dispositioning: the analyzer's
+dedup key is the candidate's evidence set, so a rejected cluster returns under a new
+`candidate_id` as soon as one more source joins it, and the ledger is the only thing that
+travels with the cluster rather than the file, so the same false cluster is not re-litigated
+next week.
 
 ### Step 5 — Close out
 The drafts live in the vault → obsidian-git auto-commits the disposition edits (do not manual-commit).

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "TOOL-034-manage-ts-bridge-client-routing-f1",
+    "behavior": "A checksummed github-archive source extracts one exact declared regular-file member from zip and tar.gz assets.",
+    "verification": "cd cli && go test ./internal/tools -run 'Test.*(GitHubArchive|ArchiveMember)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-034-manage-ts-bridge-client-routing-f2",
+    "behavior": "Invalid, missing, duplicate, directory, symlink or unsupported archive members fail without replacing the installed binary.",
+    "verification": "cd cli && go test ./internal/tools -run 'Test.*GitHubArchive.*(Reject|Missing|Duplicate|Directory|Symlink|Unsupported|Keeps)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-034-manage-ts-bridge-client-routing-f3",
+    "behavior": "A ts-bridge-client role selects the pinned ts-bridge tool while non-role machines plan no bridge install.",
+    "verification": "cd cli && go test ./internal/env ./internal/tools ./internal/cmd ./internal/converge -run 'Test(KnownRolesIncludesTsBridgeClient|ToolAppliesToRoles|TheRepoCatalogDeclaresTsBridgeForTheClientRole|SelectToolsForRoles|LoadCatalogFiltersToolsByMachineRole)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-034-manage-ts-bridge-client-routing-f4",
+    "behavior": "The role owns a Gitea-only Git proxy drop-in and removes it when the role is removed; GitHub remains direct.",
+    "verification": "cd cli && go test ./internal/gitconfig ./internal/converge -run 'Test.*TsBridge.*(Proxy|DropIn|Role)'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-034-manage-ts-bridge-client-routing-f5",
+    "behavior": "Doctor distinguishes version drift, listener readiness and TLS-valid destination reachability without credential output.",
+    "verification": "cd cli && go test ./internal/doctor -run 'TestCheckTsBridge'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-034-manage-ts-bridge-client-routing-f6",
+    "behavior": "A second install and converge report zero changes, and bridge-down behavior is explicit.",
+    "verification": "cd cli && go test ./internal/tools -run '^TestInstallGitHubArchiveSecondRunSkipsWithoutFetch$' -v | grep -q -- '--- PASS: TestInstallGitHubArchiveSecondRunSkipsWithoutFetch' && go test ./internal/cmd -run '^TestConverge_TsBridgeClientSecondRunIsZero$' -v | grep -q -- '--- PASS: TestConverge_TsBridgeClientSecondRunIsZero' && go test ./internal/doctor -run '^TestCheckTsBridgeListenerDownIsExplicit$' -v | grep -q -- '--- PASS: TestCheckTsBridgeListenerDownIsExplicit'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-034-manage-ts-bridge-client-routing-f7",
+    "behavior": "Older dotf binaries explicitly skip the unknown archive source without blocking unrelated tools.",
+    "verification": "cd cli && go test ./internal/tools ./internal/cmd ./internal/converge -run 'Test.*(UnknownSource|UnknownType|GitHubArchiveRollout)'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

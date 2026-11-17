@@ -94,6 +94,7 @@ func CheckDrift(repoRoot string) ([]CheckLine, error) {
 	for _, t := range m.Targets {
 		out = append(out, checkTarget(repoRoot, t.File, t.Inject))
 	}
+	out = append(out, checkReviewBudget(repoRoot)...)
 	if m.Skills != nil {
 		out = append(out, checkRecords(repoRoot, "SKILL.md", m.Skills.RecordDir,
 			orDefault(m.Skills.Schema, "harness/skill-frontmatter.schema.json"), "skill", "record")...)

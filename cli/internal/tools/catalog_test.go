@@ -138,6 +138,55 @@ func TestLoad_Platforms(t *testing.T) {
 	}
 }
 
+func TestToolAppliesToRoles(t *testing.T) {
+	common := Tool{Name: "common"}
+	bridge := Tool{Name: "ts-bridge", Roles: []string{"ts-bridge-client"}}
+	if !common.AppliesToRoles(nil) || !common.AppliesToRoles([]string{"other"}) {
+		t.Fatal("a tool with no roles must apply everywhere")
+	}
+	if bridge.AppliesToRoles(nil) || bridge.AppliesToRoles([]string{"other"}) ||
+		!bridge.AppliesToRoles([]string{"ts-bridge-client"}) {
+		t.Fatal("a role-bound tool did not require a matching role")
+	}
+}
+
+func TestLoad_RejectsUnknownToolRole(t *testing.T) {
+	body := `{"tools":[{"name":"tool","roles":["ts-bridge-clinet"],"source":{"type":"system","apt":"tool"}}]}`
+	if _, err := Load(writeCatalog(t, body)); err == nil || !strings.Contains(err.Error(), "ts-bridge-clinet") {
+		t.Fatalf("Load() error = %v", err)
+	}
+}
+
+func TestTheRepoCatalogDeclaresTsBridgeForTheClientRole(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range c.Tools {
+		if tool.Name != "ts-bridge" {
+			continue
+		}
+		if tool.Version != "1.20.0" || tool.Source.Type != "github-archive" ||
+			!slices.Equal(tool.Roles, []string{"ts-bridge-client"}) {
+			t.Fatalf("ts-bridge tool = %+v", tool)
+		}
+		for platform, want := range map[[2]string]string{
+			{"linux", "amd64"}:   "ts-bridge-linux-amd64/ts-bridge",
+			{"linux", "arm64"}:   "ts-bridge-linux-arm64/ts-bridge",
+			{"darwin", "amd64"}:  "ts-bridge-darwin-amd64/ts-bridge",
+			{"darwin", "arm64"}:  "ts-bridge-darwin-arm64/ts-bridge",
+			{"windows", "amd64"}: "ts-bridge-windows-amd64/ts-bridge.exe",
+			{"windows", "arm64"}: "ts-bridge-windows-arm64/ts-bridge.exe",
+		} {
+			if got := tool.MemberName(platform[0], platform[1]); got != want {
+				t.Errorf("ts-bridge member for %s/%s = %q, want %q", platform[0], platform[1], got, want)
+			}
+		}
+		return
+	}
+	t.Fatal("packages.json declares no ts-bridge")
+}
+
 // The shipped catalog declares hive as a uv tool on every OS, which hive
 // installs itself on Windows: there hive owns its install layout (hive
 // ADR-019), so the catalog must never put a uv copy there. A misspelt
@@ -217,6 +266,43 @@ func TestLoad_RejectsAReleaseToolWithNoAsset(t *testing.T) {
 	}
 }
 
+func TestLoad_AcceptsGitHubArchiveAndResolvesMember(t *testing.T) {
+	body := `{"tools":[{"name":"ts-bridge","version":"1.20.0","profile":"full","source":{
+		"type":"github-archive","repo":"mlorentedev/ts-bridge",
+		"asset":{"windows":"ts-bridge-v{version}-windows-{goarch}.zip"},
+		"checksums":"checksums.txt",
+		"member":{"windows":"ts-bridge.exe"}
+	}}]}`
+	c, err := Load(writeCatalog(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool := c.Tools[0]
+	if got := tool.MemberName("windows", "amd64"); got != "ts-bridge.exe" {
+		t.Fatalf("MemberName() = %q", got)
+	}
+}
+
+func TestLoad_RejectsMalformedGitHubArchive(t *testing.T) {
+	cases := []struct {
+		name, source, want string
+	}{
+		{"missing member", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s"}`, "member"},
+		{"unknown member key", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"macos":"tool"}}`, "macos"},
+		{"asset member mismatch", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"linux":"tool"}}`, "same platforms"},
+		{"parent escape", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"windows":"../tool.exe"}}`, "safe relative"},
+		{"absolute member", `{"type":"github-archive","repo":"o/r","asset":{"windows":"a.zip"},"checksums":"s","member":{"windows":"C:/tool.exe"}}`, "safe relative"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `{"tools":[{"name":"tool","version":"1.0.0","source":` + tc.source + `}]}`
+			if _, err := Load(writeCatalog(t, body)); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Load() error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 // A system entry names its package per OS manager. One that names none can never
 // install anywhere, one that names an unknown manager (pacman, dnf) is a typo the
 // decoder would drop in silence, and one that carries a version asks for a pin a
@@ -241,6 +327,10 @@ func TestLoad_RejectsMalformedSystemEntries(t *testing.T) {
 		{"a command with a pipe", `{"type":"system","apt":"gh","command":"gh|id"}`, "", "command"},
 		{"a formula and a cask for one OS", `{"type":"system","brew":"gh","cask":"gh"}`, "", "both a brew formula and a cask"},
 		{"needs_sudo on an entry with no cask", `{"type":"system","apt":"gh","brew":"gh","needs_sudo":true}`, "", "needs_sudo"},
+		{"a winget id and a per-arch map", `{"type":"system","winget":"x","winget_arch":{"amd64":"x.x64","arm64":"x.arm64"}}`, "", "both winget and winget_arch"},
+		{"a per-arch map missing an arch", `{"type":"system","winget_arch":{"arm64":"x.arm64"}}`, "", "amd64"},
+		{"a per-arch map with an arch Windows does not ship", `{"type":"system","winget_arch":{"amd64":"x.x64","arm64":"x.arm64","386":"x.x86"}}`, "", `"386"`},
+		{"a per-arch winget id that is a flag", `{"type":"system","winget_arch":{"amd64":"--force","arm64":"x.arm64"}}`, "", "winget_arch"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -271,7 +361,7 @@ func TestLoad_AcceptsACaskEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a cask-only system entry must load: %v", err)
 	}
-	if m, pkg := c.Tools[0].Source.SystemPackage("darwin"); m != "brew-cask" || pkg != "obsidian" {
+	if m, pkg := c.Tools[0].Source.SystemPackage("darwin", ""); m != "brew-cask" || pkg != "obsidian" {
 		t.Errorf("SystemPackage(darwin) = %s, %s; want brew-cask, obsidian", m, pkg)
 	}
 	if c.Tools[0].SupportsOS("linux") || c.Tools[0].SupportsOS("windows") || !c.Tools[0].SupportsOS("darwin") {
@@ -289,6 +379,30 @@ func TestLoad_AcceptsACaskEntry(t *testing.T) {
 	withPlatforms := `{"tools":[{"name":"obsidian","source":{"type":"system","cask":"obsidian","platforms":["darwin"]}}]}`
 	if _, err := Load(writeCatalog(t, withPlatforms)); err != nil {
 		t.Errorf("a cask entry with platforms [darwin] must load: %v", err)
+	}
+}
+
+// winget_arch names one winget id per Windows arch, for a package winget
+// publishes per arch (the VC++ runtime, PLAT-001c blocker 1): installing the
+// x64 id on Arm64 leaves the arm64 runtime absent, so no single id is right.
+func TestLoad_AcceptsAPerArchWingetEntry(t *testing.T) {
+	body := `{"tools":[{"name":"vcredist","source":{"type":"system","winget_arch":{"amd64":"Microsoft.VCRedist.2015+.x64","arm64":"Microsoft.VCRedist.2015+.arm64"},"platforms":["windows"]}}]}`
+	c, err := Load(writeCatalog(t, body))
+	if err != nil {
+		t.Fatalf("a per-arch winget entry must load: %v", err)
+	}
+	vc := c.Tools[0]
+	for goarch, want := range map[string]string{"amd64": "Microsoft.VCRedist.2015+.x64", "arm64": "Microsoft.VCRedist.2015+.arm64", "386": ""} {
+		if m, pkg := vc.Source.SystemPackage("windows", goarch); pkg != want || (want != "" && m != "winget") {
+			t.Errorf("SystemPackage(windows, %s) = %s, %s; want winget, %q", goarch, m, pkg, want)
+		}
+	}
+	if !vc.SupportsOS("windows") || vc.SupportsOS("linux") || vc.SupportsOS("darwin") {
+		t.Error("a per-arch winget entry installs on windows only")
+	}
+	gh := Source{Type: "system", Winget: "GitHub.cli"}
+	if _, pkg := gh.SystemPackage("windows", "arm64"); pkg != "GitHub.cli" {
+		t.Errorf("a single winget id serves every arch, got %q", pkg)
 	}
 }
 

@@ -39,7 +39,17 @@ var forgeRun forge.Runner = func(args ...string) (string, string, error) {
 	c := exec.CommandContext(ctx, "gh", args...)
 	c.Stdout, c.Stderr = &out, &errOut
 	err := c.Run()
-	return out.String(), errOut.String(), err
+	return out.String(), errOut.String(), deadlineErr(ctx, forgeTimeout, err)
+}
+
+// deadlineErr names a deadline that killed a gh call. exec.CommandContext
+// kills the process when ctx expires, and the error it returns reads "signal:
+// killed": it names neither the deadline nor that one was hit (#3434).
+func deadlineErr(ctx context.Context, limit time.Duration, err error) error {
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("timed out after %s: %w", limit, err)
+	}
+	return err
 }
 
 // forgeFresh confirms the declaration is the one origin's default branch

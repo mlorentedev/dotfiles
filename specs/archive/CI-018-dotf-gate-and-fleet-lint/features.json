@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f1",
+    "behavior": "dotf gate knowledge passes every case of tests/check-knowledge-gate.bats through the event shim",
+    "verification": "bats tests/check-knowledge-gate.bats",
+    "state": "passing",
+    "evidence": "2026-11-12: 1..45, no failures (#3319)"
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f2",
+    "behavior": "dotf gate spec passes every case of the spec-gate suites through the event shim",
+    "verification": "bats tests/check-spec-gate.bats tests/spec-gate-archive.bats tests/spec-gate-adjacency.bats",
+    "state": "passing",
+    "evidence": "2026-11-12: 1..30, 1..35, 1..15, no failures; each case runs dotf gate spec through tests/lib/spec-gate-parity.bash (#3323, #3330, #3332)"
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f3",
+    "behavior": "The gates make no network call: no token, and a PATH holding git alone",
+    "verification": "bats tests/check-knowledge-gate.bats tests/check-spec-gate.bats",
+    "state": "passing",
+    "evidence": "2026-11-12: both pass; the dotf leg runs with GH_TOKEN and GITHUB_TOKEN unset and a PATH holding git alone"
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f4",
+    "behavior": "Each fleet rule has a stable id, good and bad fixtures, and exceptions scoped to rule and path with reason and issue",
+    "verification": "cd cli && go test ./internal/fleetlint/",
+    "state": "passing",
+    "evidence": "2026-11-12: ok, 18 tests (TestRuleFixtures walks every rule's good and bad fixture; TestExceptionSilencesOnlyItsRuleAndPath, TestIncompleteExceptionIsAFindingAndSilencesNothing) (#3334, #3350)"
+  },
+  {
+    "id": "CI-018-dotf-gate-and-fleet-lint-f5",
+    "behavior": "dotf lint fleet --fleet lists findings per repository; rules documented in one runbook section",
+    "verification": "cd cli && go test ./internal/cmd/ -run LintFleet && grep -q '^## The rules' ../docs/runbooks/guide-fleet-lint.md",
+    "state": "passing",
+    "evidence": "2026-11-12: ok, 7 LintFleet tests; the runbook's rules section is linked from mlorentedev/ci-workflows ADR-001 decision 5 (ci-workflows#99, merged 06fa706b) (#3351)"
+  }
+]

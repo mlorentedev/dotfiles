@@ -71,3 +71,28 @@ teardown() { rm -rf "$TMP"; }
     [ "$status" -eq 2 ]
     [[ "$output" == *"grep failed"* ]] || false
 }
+
+# The pre-commit hook checks only the staged .bats files (#3266), so CI's lint
+# job is the only thing that still scans the whole tree. Nothing else notices if
+# that invocation is dropped, renamed, or narrowed: the hook would skip every
+# file a commit does not touch and no gate would say the tree went unscanned.
+@test "check-bats-names: CI lints the whole tests/ tree" {
+    CI="$BATS_TEST_DIRNAME/../.github/workflows/ci.yml"
+    run grep -cE '^[[:space:]]*\./scripts/check-bats-names\.sh tests/$' "$CI"
+    [ "$status" -eq 0 ]
+    [ "$output" -ge 1 ]
+    # A line is not a run. The step carrying it must be gated on the `code` path
+    # filter, which is where `tests/**` lives (tests/ci-path-filtering.bats
+    # keeps it there); a step under a disabled job, or one gated on a filter
+    # `tests/` is not in, satisfies the grep above and scans nothing.
+    python3 - "$CI" <<'PY'
+import sys, yaml
+wf = yaml.safe_load(open(sys.argv[1]))
+want = "./scripts/check-bats-names.sh tests/"
+steps = [s for j in wf["jobs"].values() for s in j.get("steps", [])
+         if want in (s.get("run") or "")]
+assert steps, "no step runs check-bats-names over tests/"
+assert any("needs.changes.outputs.code" in (s.get("if") or "") for s in steps), \
+    "the step is not gated on the code path filter, so a tests/ change may skip it"
+PY
+}

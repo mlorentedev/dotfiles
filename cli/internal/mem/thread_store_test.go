@@ -278,8 +278,8 @@ func TestTheBudgetRefusalSuggestsOnlyDatedThreadsAndHowToArchiveEach(t *testing.
 	}
 	msg := err.Error()
 	for _, want := range []string{
-		"\n  by-journal (2026-08-02): move its block from MEMORY.md to archive/",
-		"\n  stored (2026-09-01): move threads/stored.md to archive/ and delete its entry from MEMORY.md",
+		"\n  by-journal (2026-08-02): move its block from MEMORY.md to archive/superseded-handoffs-<date>.md",
+		"\n  stored (2026-09-01): its writer runs `dotf mem handoff-write --finished`; by hand, move its entry to archive/superseded-handoffs-<date>.md and threads/stored.md to archive/threads/",
 		"\nUndated, so not suggested: legacy-undated",
 	} {
 		if !strings.Contains(msg, want) {
@@ -293,5 +293,84 @@ func TestTheBudgetRefusalSuggestsOnlyDatedThreadsAndHowToArchiveEach(t *testing.
 	none := "## Session Handoff\n\n### thread: a\n\nx\n" + strings.Repeat("y", MemoryByteBudget)
 	if err := CheckMemoryBudget("", none); err == nil || !strings.Contains(err.Error(), "No thread carries a date") {
 		t.Errorf("with no dated thread the refusal must say so and suggest none: %v", err)
+	}
+}
+
+// lineBudgetMemory is a handoff section with two dated threads, padded with
+// short lines to n lines in all: far under the byte budget, so only the line
+// budget can refuse it (#3227).
+func lineBudgetMemory(n int) string {
+	head := "## Session Handoff\n\n### thread: new\n\n> Updated: 2026-11-10<br>\n\n### thread: old\n\n> Updated: 2026-09-01<br>\n"
+	have := strings.Count(head, "\n")
+	return head + strings.Repeat("-\n", n-have)
+}
+
+func TestCheckMemoryBudgetRefusesAWritePastTheLineCap(t *testing.T) {
+	over := lineBudgetMemory(MemoryLineBudget + 1)
+	if len(over) >= MemoryByteBudget {
+		t.Fatalf("the fixture is %d bytes, so the byte budget could be the one refusing", len(over))
+	}
+	err := CheckMemoryBudget(lineBudgetMemory(MemoryLineBudget), over)
+	if err == nil {
+		t.Fatal("a write past the line cap passed")
+	}
+	msg := err.Error()
+	for _, want := range []string{
+		fmt.Sprintf("%d lines", MemoryLineBudget+1),
+		fmt.Sprintf("the %d a session start loads", MemoryLineBudget),
+		"  old (2026-09-01): move its block from MEMORY.md to archive/superseded-handoffs-<date>.md",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("the refusal lacks %q:\n%s", want, msg)
+		}
+	}
+	if o, n := strings.Index(msg, "  old ("), strings.Index(msg, "  new ("); o < 0 || n < 0 || o > n {
+		t.Errorf("the refusal does not name the dated threads oldest first:\n%s", msg)
+	}
+}
+
+func TestCheckMemoryBudgetLetsAFilePastTheLineCapShrink(t *testing.T) {
+	past := lineBudgetMemory(MemoryLineBudget + 20)
+	if err := CheckMemoryBudget(past, lineBudgetMemory(MemoryLineBudget+19)); err != nil {
+		t.Errorf("a write that lowers the line count was refused: %v", err)
+	}
+	// Same line count, more bytes: an entry rewritten in place must pass.
+	if err := CheckMemoryBudget(past, strings.Replace(past, "> Updated: 2026-11-10", "> Updated: 2026-11-12 and later", 1)); err != nil {
+		t.Errorf("a write that holds the line count was refused: %v", err)
+	}
+	if err := CheckMemoryBudget(past, past+"-\n"); err == nil {
+		t.Error("a write that grows a file already past the line cap passed")
+	}
+}
+
+func TestCheckMemoryBudgetPassesAFileAtTheLineCap(t *testing.T) {
+	if err := CheckMemoryBudget("", lineBudgetMemory(MemoryLineBudget)); err != nil {
+		t.Errorf("a file of exactly %d lines was refused: %v", MemoryLineBudget, err)
+	}
+	// A last line without a newline is still a line a 200-line read sees.
+	unterminated := strings.TrimSuffix(lineBudgetMemory(MemoryLineBudget), "\n") + "\nlast"
+	if err := CheckMemoryBudget("", unterminated); err == nil {
+		t.Errorf("%d lines and an unterminated one passed", MemoryLineBudget)
+	}
+}
+
+func TestCheckMemoryBudgetStillRefusesPastTheByteBudget(t *testing.T) {
+	short := "## Session Handoff\n\n### thread: old\n\n> Updated: 2026-09-01<br>\n" + strings.Repeat("y", MemoryByteBudget)
+	err := CheckMemoryBudget("", short)
+	if err == nil {
+		t.Fatal("a short write past the byte budget passed")
+	}
+	if !strings.Contains(err.Error(), "bytes, past the 25000 a session start reads") {
+		t.Errorf("the byte refusal changed:\n%s", err)
+	}
+}
+
+// A write past both budgets gets the byte message: the byte check runs first,
+// as verification.md records (MEMORY-018 review, finding 3).
+func TestCheckMemoryBudgetNamesTheByteBudgetWhenBothAreCrossed(t *testing.T) {
+	both := lineBudgetMemory(MemoryLineBudget+1) + strings.Repeat("y", MemoryByteBudget)
+	err := CheckMemoryBudget("", both)
+	if err == nil || !strings.Contains(err.Error(), "bytes, past the 25000") || strings.Contains(err.Error(), "lines, past") {
+		t.Errorf("a write past both budgets must get the byte message, got: %v", err)
 	}
 }

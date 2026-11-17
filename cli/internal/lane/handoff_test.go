@@ -3,11 +3,15 @@ package lane
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/gittest"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
@@ -30,7 +34,7 @@ type fakeBackend struct {
 
 func newFake(t *testing.T, agent string) *fakeBackend {
 	t.Helper()
-	return &fakeBackend{agent: agent, created: t.TempDir()}
+	return &fakeBackend{agent: agent, created: linkedTempDir(t)}
 }
 
 // IdlePane answers for the one pane the tests use: f.idle says whether nothing
@@ -130,7 +134,7 @@ func TestNext_FromALinkedWorktreeCreatesThroughTheParentAndLeavesTheCallerAlone(
 // Twice is once: after the first run a workspace shows the branch, so the
 // second finds it open and starts nothing.
 func TestNext_RunTwiceStartsOneAgent(t *testing.T) {
-	shown := t.TempDir()
+	shown := linkedTempDir(t)
 	b := &fakeBackend{agent: "claude", existing: map[string]Worktree{"fix/first-thing": {Path: shown, Branch: "fix/first-thing", Open: true}}}
 	out, err := Handoff(opts(t), b, queue)
 	if err != nil || out.Started || !strings.Contains(out.Note, "no second agent") {
@@ -145,7 +149,7 @@ func TestNext_RunTwiceStartsOneAgent(t *testing.T) {
 
 // A worktree that exists but that no workspace shows is opened, not recreated.
 func TestNext_ReusesAWorktreeNothingShows(t *testing.T) {
-	idle := t.TempDir()
+	idle := linkedTempDir(t)
 	b := &fakeBackend{agent: "pi", existing: map[string]Worktree{"fix/first-thing": {Path: idle, Branch: "fix/first-thing"}}}
 	out, err := Handoff(opts(t), b, queue)
 	if err != nil || !out.Started {
@@ -173,7 +177,7 @@ func TestNext_AgentDefaultsToTheCallingPaneAndUnknownIsRefused(t *testing.T) {
 	for _, agent := range []string{"codex", ""} {
 		bb := newFake(t, agent)
 		_, err = Handoff(opts(t), bb, queue)
-		if err == nil || !strings.Contains(err.Error(), "agy, claude, pi") {
+		if err == nil || !strings.Contains(err.Error(), "agy, claude, copilot, opencode, pi") {
 			t.Errorf("pane agent %q: want a refusal naming the known agents, got %v", agent, err)
 		}
 		if len(bb.calls) != 0 {
@@ -211,11 +215,11 @@ func TestNext_NoBackendAndNoAgentPrintsAPlaceholder(t *testing.T) {
 	if err != nil || out.Started {
 		t.Fatalf("Handoff = %+v, %v", out, err)
 	}
-	want := "dotf lane exec --agent <agy|claude|pi> --prompt-file "
+	want := "dotf lane exec --agent <agy|claude|copilot|opencode|pi> --prompt-file "
 	if len(out.Commands) != 4 || !strings.HasPrefix(out.Commands[3], want) {
 		t.Errorf("commands = %q, want the last to start %q", out.Commands, want)
 	}
-	if !strings.Contains(out.Note, "replace <agy|claude|pi> with the agent to start") {
+	if !strings.Contains(out.Note, "replace <agy|claude|copilot|opencode|pi> with the agent to start") {
 		t.Errorf("note = %q", out.Note)
 	}
 }
@@ -272,13 +276,13 @@ func TestNext_APathWithASpaceReachesNoPane(t *testing.T) {
 	spaced := filepath.Join(t.TempDir(), "Jane Doe")
 	b := newFake(t, "claude")
 	b.created = filepath.Join(spaced, "worktrees", "my repo", "fix-first-thing")
-	if err := os.MkdirAll(b.created, 0o755); err != nil {
+	if _, err := gittest.LinkWorktree(filepath.Join(spaced, "my repo"), b.created); err != nil {
 		t.Fatal(err)
 	}
 	o := opts(t)
 	o.Parent = filepath.Join(spaced, "my repo")
 	o.GitDir = filepath.Join(spaced, "my repo", ".git")
-	o.PromptDir = filepath.Join(o.GitDir, "dotf-lane")
+	o.PromptDir = filepath.Join(o.GitDir, PromptDirName)
 	out, err := Handoff(o, b, queue)
 	if err != nil || !out.Started {
 		t.Fatalf("Handoff = %+v, %v", out, err)
@@ -308,7 +312,7 @@ func TestNext_NoBackendQuotesAPathWithASpace(t *testing.T) {
 	o.Agent, o.DryRun = "claude", true // nothing is written: the paths are not real
 	o.Parent = "/repos/my repo"
 	o.WorktreeRoot = "/srv/my wt"
-	o.PromptDir = "/repos/my repo/.git/dotf-lane"
+	o.PromptDir = "/repos/my repo/.git/" + PromptDirName
 	out, err := Handoff(o, nil, queue)
 	if err != nil {
 		t.Fatal(err)
@@ -404,7 +408,7 @@ func TestNext_ABranchLeasedToAnotherIssueIsARefusalNotASilentSkip(t *testing.T) 
 		"no lease":                 {open: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := linkedTempDir(t)
 			if tc.leased != 0 {
 				if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: tc.leased}); err != nil {
 					t.Fatal(err)
@@ -455,7 +459,7 @@ func TestNext_AShownWorkspaceWithNoAgentInItIsStartedAgain(t *testing.T) {
 		"the backend cannot tell":          {leased: 7, created: old, idleErr: errors.New("socket closed"), refuse: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := linkedTempDir(t)
 			if tc.leased != 0 {
 				if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: tc.leased, CreatedAt: tc.created}); err != nil {
 					t.Fatal(err)
@@ -491,7 +495,7 @@ func TestNext_AShownWorkspaceWithNoAgentInItIsStartedAgain(t *testing.T) {
 
 // A dry run reports the restart and types nothing.
 func TestNext_ADryRunReportsTheRestartOfAnIdleWorkspace(t *testing.T) {
-	dir := t.TempDir()
+	dir := linkedTempDir(t)
 	if err := worktree.SaveMetadata(dir, worktree.Metadata{Issue: 7, CreatedAt: leaseNow.Add(-time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
@@ -501,5 +505,134 @@ func TestNext_ADryRunReportsTheRestartOfAnIdleWorkspace(t *testing.T) {
 	out, err := Handoff(o, b, queue)
 	if err != nil || out.Started || len(out.Commands) != 1 || len(b.typed) != 0 {
 		t.Fatalf("out = %+v, typed = %v, err = %v", out, b.typed, err)
+	}
+}
+
+// With named lanes and no backend, `lane switch` claims a lane and checks the
+// branch out in it, but it cannot move the person's shell: the printed commands
+// must end inside that lane, or the agent starts in whatever directory the
+// person happened to be in (AC5). The switch is pinned to the lane the cd names,
+// so the two cannot disagree.
+func TestNext_NoBackendWithNamedLanesEntersTheLaneBeforeTheAgent(t *testing.T) {
+	repoDir, _ := setupLaneTestRepo(t)
+	// A space in the root: the cd line is quoted for a person's shell.
+	wtRoot := filepath.Join(t.TempDir(), "wt with space")
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes: %v", err)
+	}
+	o := opts(t)
+	o.Agent, o.DryRun = "claude", true
+	o.Parent, o.WorktreeRoot = repoDir, wtRoot
+	o.PromptDir = filepath.Join(t.TempDir(), "prompts")
+
+	out, err := Handoff(o, nil, queue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	laneDir := filepath.Join(wtRoot, filepath.Base(repoDir), LaneFastTrack) // fix/ routes to fast-track
+	parent, err := humanPath(repoDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Commands) != 4 {
+		t.Fatalf("commands = %q, want fetch, switch, cd, exec", out.Commands)
+	}
+	if want := "git -C " + parent + " fetch origin"; out.Commands[0] != want {
+		t.Errorf("commands[0] = %q, want %q", out.Commands[0], want)
+	}
+	if want := "dotf lane switch --lane " + LaneFastTrack + " fix/first-thing"; out.Commands[1] != want {
+		t.Errorf("commands[1] = %q, want %q", out.Commands[1], want)
+	}
+	if want := `cd "` + laneDir + `"`; out.Commands[2] != want {
+		t.Errorf("commands[2] = %q, want %q", out.Commands[2], want)
+	}
+	if !strings.HasPrefix(out.Commands[3], "dotf lane exec --agent claude --prompt-file ") {
+		t.Errorf("commands[3] = %q, want the agent command last", out.Commands[3])
+	}
+
+	// The effect, not the text: the line a person pastes must land in the lane in
+	// every shell the proposal names, not merely read well.
+	want, err := filepath.EvalSymlinks(laneDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cd := out.Commands[2]
+	shells := []struct{ name, pwd string }{
+		{"bash", "pwd -P"},
+		{"zsh", "pwd -P"},
+		{"pwsh", "(Get-Location).ProviderPath"},
+	}
+	for _, sh := range shells {
+		t.Run(sh.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && sh.name != "pwsh" {
+				// A POSIX shell there answers /c/... paths that do not compare to a
+				// Windows one; the PowerShell form is what a Windows person pastes.
+				t.Skipf("%s is not what a Windows session pastes into", sh.name)
+			}
+			bin, err := exec.LookPath(sh.name)
+			if err != nil {
+				t.Skipf("%s is not installed here", sh.name)
+			}
+			args := []string{"-c", cd + "; " + sh.pwd}
+			if sh.name == "pwsh" {
+				args = []string{"-NoProfile", "-Command", cd + "; " + sh.pwd}
+			}
+			got, err := exec.Command(bin, args...).Output()
+			if err != nil {
+				t.Fatalf("%s %q: %v", sh.name, args, err)
+			}
+			gotDir, err := filepath.EvalSymlinks(strings.TrimSpace(string(got)))
+			if err != nil || gotDir != want {
+				t.Errorf("%s ends in %q (%v), want %q", sh.name, strings.TrimSpace(string(got)), err, want)
+			}
+		})
+	}
+}
+
+// A lane that cannot be named at print time is not guessed: a cd into the
+// wrong lane is worse than no commands.
+func TestNext_NoBackendWithNamedLanesRefusesWhenEveryLaneIsActive(t *testing.T) {
+	repoDir, wtRoot := setupLaneTestRepo(t)
+	if _, err := InitLanes(repoDir, wtRoot); err != nil {
+		t.Fatalf("InitLanes: %v", err)
+	}
+	for _, b := range []string{"fix/101-a", "fix/102-b"} { // fix/ routes to fast-track and secondary
+		if _, _, err := SwitchLane(repoDir, wtRoot, b, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	o := opts(t)
+	o.Agent, o.DryRun = "claude", true
+	o.Parent, o.WorktreeRoot = repoDir, wtRoot
+	o.PromptDir = filepath.Join(t.TempDir(), "prompts")
+	if out, err := Handoff(o, nil, queue); err == nil || !strings.Contains(err.Error(), "WIP cap") {
+		t.Errorf("Handoff = %+v, %v; want the WIP cap refusal", out.Commands, err)
+	}
+}
+
+// A model named for the hand-off travels on the typed line, so the successor
+// starts on it; a model the shells would not read alike (brackets, spaces) is
+// refused before anything is created, since that line is typed into a shell.
+func TestNext_TypesTheModelOnTheExecLineAndRefusesOneTheShellsReadApart(t *testing.T) {
+	b := newFake(t, "claude")
+	o := opts(t)
+	o.Model = "nan/kimi-k3.1-pro"
+	if _, err := Handoff(o, b, queue); err != nil {
+		t.Fatal(err)
+	}
+	if cmd, want := b.typed["w1:p1"], "dotf lane exec --agent claude --model nan/kimi-k3.1-pro --prompt-file "+PromptFile; cmd != want {
+		t.Errorf("typed %q, want %q", cmd, want)
+	}
+	o = opts(t)
+	o.Model = "claude-opus-4-7[1m]"
+	if _, err := Handoff(o, newFake(t, "claude"), queue); err == nil || !strings.Contains(err.Error(), "model") {
+		t.Errorf("want a refusal naming the model, got %v", err)
+	}
+	// With no backend the agent is a placeholder and no launch argv is built, so
+	// the flag-shaped id has to be caught by the plan itself.
+	o = opts(t)
+	o.Model = "--help"
+	if _, err := Handoff(o, nil, queue); err == nil || !strings.Contains(err.Error(), "model") {
+		t.Errorf("no backend: want a refusal naming the model, got %v", err)
 	}
 }

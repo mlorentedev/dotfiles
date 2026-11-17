@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 )
 
 func runLane(t *testing.T, args ...string) error {
@@ -36,7 +38,7 @@ func TestLaneExec_HandsTheAgentTheFilePromptAsOneArgument(t *testing.T) {
 	if want := []string{"agy", "-i", "Bug \"2501\"\nsecond line $HOME"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("exec argv = %q, want %q", got, want)
 	}
-	if err := runLane(t, "exec", "--agent", "codex", "--prompt-file", f); err == nil || !strings.Contains(err.Error(), "agy, claude, pi") {
+	if err := runLane(t, "exec", "--agent", "codex", "--prompt-file", f); err == nil || !strings.Contains(err.Error(), "agy, claude, copilot, opencode, pi") {
 		t.Errorf("an unknown agent is refused naming the known ones, got %v", err)
 	}
 	if err := runLane(t, "exec", "--agent", "claude", "--prompt-file", filepath.Join(t.TempDir(), "missing")); err == nil {
@@ -147,8 +149,8 @@ func TestLane_RefusalsAreShownOnStderr(t *testing.T) {
 		args []string
 		want string
 	}{
-		"unknown agent":       {[]string{"exec", "--agent", "copilot", "--prompt-file", f}, `no launch command for agent "copilot"`},
-		"known agents listed": {[]string{"exec", "--agent", "copilot", "--prompt-file", f}, "agy, claude, pi"},
+		"unknown agent":       {[]string{"exec", "--agent", "codex", "--prompt-file", f}, `no launch command for agent "codex"`},
+		"known agents listed": {[]string{"exec", "--agent", "codex", "--prompt-file", f}, "agy, claude, copilot, opencode, pi"},
 		"missing prompt":      {[]string{"exec", "--agent", "claude", "--prompt-file", f + ".missing"}, "lane exec:"},
 	} {
 		root := New("test", "test")
@@ -197,5 +199,53 @@ func TestReadPrompt_FallsBackToTheWorktreeRoot(t *testing.T) {
 	}
 	if got, err := readPrompt("p.md"); err != nil || string(got) != "from the cwd" {
 		t.Errorf("a file in the cwd wins: %q, %v", got, err)
+	}
+}
+
+// A dry run changes nothing, the prompt directory's one-time move included
+// (#3400 review): with a legacy dotf-lane/ prompt directory in place,
+// `lane next --dry-run` must leave it where it is.
+func TestLaneNext_DryRunLeavesTheLegacyPromptDirectoryAlone(t *testing.T) {
+	top := t.TempDir()
+	legacy := filepath.Join(top, ".git", "dotf-lane")
+	if err := os.MkdirAll(legacy, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	laneNextDryRun(t, top)
+	if _, err := os.Stat(legacy); err != nil {
+		t.Errorf("a dry run moved the legacy prompt directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(top, ".git", lane.PromptDirName)); err == nil {
+		t.Error("a dry run created the new prompt directory")
+	}
+}
+
+// exec --model lands in the agent's argv right after its executable (#3485).
+func TestLaneExec_HandsTheAgentTheModel(t *testing.T) {
+	var got []string
+	prev := laneExec
+	laneExec = func(argv []string) error { got = argv; return nil }
+	t.Cleanup(func() { laneExec = prev })
+	f := filepath.Join(t.TempDir(), "p.md")
+	if err := os.WriteFile(f, []byte("go\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := runLane(t, "exec", "--agent", "copilot", "--model", "gpt-5.4", "--prompt-file", f); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"copilot", "--model", "gpt-5.4", "-i", "go"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("exec argv = %q, want %q", got, want)
+	}
+	// --model given empty is not --model omitted: the agent would start on its
+	// default and the launch would report success. Both commands refuse it
+	// before touching the prompt file or the repository.
+	for _, args := range [][]string{
+		{"exec", "--agent", "copilot", "--model", "", "--prompt-file", f},
+		{"exec", "--agent", "copilot", "--model", "  ", "--prompt-file", f},
+		{"next", "--model", "", "--dry-run"},
+	} {
+		if err := runLane(t, args...); err == nil || !strings.Contains(err.Error(), "--model") {
+			t.Errorf("%q: want a refusal naming --model, got %v", args, err)
+		}
 	}
 }

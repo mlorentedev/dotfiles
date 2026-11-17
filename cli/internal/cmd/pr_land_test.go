@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
+	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 )
 
 // grantContents is the contents API's answer for a grant that opts in.
@@ -38,7 +39,7 @@ func TestPrLand_ARefusalListsTheReasonsAndExitsNonZero(t *testing.T) {
 				if args[1] == "view" {
 					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"BEHIND"}`), nil
 				}
-				return []byte(`[{"name":"test","bucket":"pass"}]`), nil
+				return []byte(`[{"name":"test","bucket":"pass"},{"name":"review","bucket":"pass"}]`), nil
 			},
 			Untriaged: func(context.Context) ([]int, error) { return nil, nil },
 		}
@@ -101,7 +102,7 @@ func (q *queueFake) options(repo string, _ registryLoader) prland.Options {
 				}
 				return fmt.Appendf(nil, `{"state":"OPEN","isDraft":false,"headRefOid":"sha%s0000","headRefName":"feat/%s","baseRefName":"main","mergeStateStatus":%q}`, f[2], f[2], state), nil
 			case strings.HasPrefix(line, "pr checks"):
-				return []byte(`[{"name":"test","bucket":"pass"}]`), nil
+				return []byte(`[{"name":"test","bucket":"pass"},{"name":"review","bucket":"pass"}]`), nil
 			case strings.HasPrefix(line, "pr list"):
 				return []byte(`[]`), nil
 			case strings.HasPrefix(line, "pr merge"):
@@ -288,7 +289,7 @@ func TestPrLand_UnknownWaitBoundsTheWaitOnAnUncomputedMergeState(t *testing.T) {
 				if args[1] == "view" {
 					return []byte(`{"state":"OPEN","isDraft":false,"headRefOid":"abc1234567","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"UNKNOWN"}`), nil
 				}
-				return []byte(`[{"name":"test","bucket":"pass"}]`), nil
+				return []byte(`[{"name":"test","bucket":"pass"},{"name":"review","bucket":"pass"}]`), nil
 			},
 			Untriaged: func(context.Context) ([]int, error) { return nil, nil },
 			Sleep:     func(d time.Duration) { slept += d },
@@ -318,6 +319,43 @@ func TestWriteLandResult_ALandedMergePrintsItsWarning(t *testing.T) {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
+	}
+}
+
+// Landing no longer removes the worktree that holds the branch, so a canonical
+// lane keeps a branch that has landed. The output names the command that frees
+// it (#3531); a branch no lane holds prints nothing extra.
+func TestWriteLandResult_NamesTheLaneStillHoldingTheLandedBranch(t *testing.T) {
+	saved := landHoldingLane
+	t.Cleanup(func() { landHoldingLane = saved })
+	landHoldingLane = func(branch string) string {
+		if branch == "feat/held" {
+			return "feat-lane-primary"
+		}
+		return ""
+	}
+
+	var held, free bytes.Buffer
+	if err := writeLandResult(&held, prland.Result{Number: 30, Merged: true, HeadSHA: "abc1234def", HeadRef: "feat/held"}); err != nil {
+		t.Fatal(err)
+	}
+	if want := "FIX: dotf lane park feat-lane-primary"; !strings.Contains(held.String(), want) {
+		t.Errorf("output lacks %q:\n%s", want, held.String())
+	}
+	if err := writeLandResult(&free, prland.Result{Number: 31, Merged: true, HeadSHA: "abc1234def", HeadRef: "feat/other"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(free.String(), "FIX:") {
+		t.Errorf("a branch no lane holds got a fix line:\n%s", free.String())
+	}
+	// The lanes are the current repository's: a PR landed with --repo may be
+	// another repository's, whose branch merely shares the name.
+	var named bytes.Buffer
+	if err := writeLandResult(&named, prland.Result{Number: 32, Merged: true, HeadSHA: "abc1234def", HeadRef: "feat/held", Repo: "o/other"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(named.String(), "FIX:") {
+		t.Errorf("a PR of a named repository got a fix line about this repository's lane:\n%s", named.String())
 	}
 }
 
@@ -380,5 +418,26 @@ func TestPrLand_ARefusalPrintsTheManualMergeCommand(t *testing.T) {
 	}
 	if strings.Contains(queued, "gh pr merge 31 ") {
 		t.Errorf("a merged PR was offered a manual command:\n%s", queued)
+	}
+}
+
+// A PR held only because no review covers its head is not untriaged output:
+// Decide refuses it for the review in its own words (#3243).
+func TestPrLandOptions_UntriagedSkipsAHeadNoReviewRanOn(t *testing.T) {
+	prev := triageFetch
+	t.Cleanup(func() { triageFetch = prev })
+	triageFetch = func(context.Context, string, prtriage.Registry) ([]prtriage.Status, error) {
+		return []prtriage.Status{
+			{PR: prtriage.PR{Number: 7}, Pending: true, Reason: "github-actions reviewed, never triaged"},
+			{PR: prtriage.PR{Number: 8}, Pending: true, HeadUnreviewed: true, Reason: "no review covers the head"},
+		}, nil
+	}
+	o := prLandOptions("o/r", func(context.Context) (prtriage.Registry, error) { return prtriage.Registry{}, nil })
+	got, err := o.Untriaged(context.Background())
+	if err != nil {
+		t.Fatalf("Untriaged: %v", err)
+	}
+	if len(got) != 1 || got[0] != 7 {
+		t.Errorf("Untriaged = %v, want [7]", got)
 	}
 }

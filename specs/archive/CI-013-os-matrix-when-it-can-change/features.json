@@ -1,0 +1,23 @@
+[
+  {
+    "id": "CI-013-os-matrix-when-it-can-change-f1",
+    "behavior": "Windows/macOS jobs on a pull request are gated before a runner starts, except required checks; cli and cli-smoke take their OS list from a changes output with both OSes on push",
+    "verification": "bats tests/ci-os-matrix.bats",
+    "state": "passing",
+    "evidence": "1..6 ok; mutations turn tests 1-3 red"
+  },
+  {
+    "id": "CI-013-os-matrix-when-it-can-change-f2",
+    "behavior": "The docs-only set is one file read by the workflows and by the top-level-entry test",
+    "verification": "bats tests/ci-path-filtering.bats tests/ci-os-matrix.bats",
+    "state": "passing",
+    "evidence": "ci-path-filtering 4/4 ok; ci-os-matrix test 5 red on an overlapping exclusion"
+  },
+  {
+    "id": "CI-013-os-matrix-when-it-can-change-f3",
+    "behavior": "The integration container builds with buildx and a gha layer cache written on push",
+    "verification": "bats tests/ci-os-matrix.bats tests/integration-builds-dotf.bats",
+    "state": "passing",
+    "evidence": "ci-os-matrix test 6 ok; integration-builds-dotf ok"
+  }
+]

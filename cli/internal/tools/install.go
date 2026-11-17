@@ -1,8 +1,10 @@
 package tools
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -144,6 +146,10 @@ type Installer struct {
 	// HasCommand reports whether a package manager is on PATH. Nil means
 	// exec.LookPath; tests inject the answer.
 	HasCommand func(name string) bool
+	// RegisteredPath reads the PATH installers registered for the next process
+	// (env.RegisteredPath: the registry on Windows). A system entry's command
+	// there counts as present. Nil means none.
+	RegisteredPath func() ([]string, error)
 	// Query runs a package manager's read-only presence query for a "system"
 	// entry (dpkg-query, brew list, winget list). Nil means ExecRunner; tests
 	// inject the machine's answer, so no real manager is ever asked.
@@ -160,6 +166,9 @@ type Installer struct {
 	// aptIndexAsked records that this Installer has run `apt-get update`, which
 	// it does once, before its first apt install (refreshAptIndex).
 	aptIndexAsked bool
+	// wingetSourceAsked records that this Installer has run `winget source
+	// update`, which it does once, after an install hits 0x8a15000f.
+	wingetSourceAsked bool
 	// AppExists reports whether a macOS app bundle (a cask's `app` artifact) is
 	// in /Applications or ~/Applications. Nil means a stat of both; tests inject
 	// the answer.
@@ -215,11 +224,47 @@ func (in *Installer) defaults() {
 		in.IsRoot = func() bool { return os.Geteuid() == 0 }
 	}
 	if in.Run == nil {
-		in.Run = func(name string, args ...string) error {
-			cmd := exec.Command(name, args...)
-			cmd.Stdout, cmd.Stderr = in.Out, in.Out
-			return cmd.Run()
+		in.Run = boundedRun(in.Out, wingetCallTimeout)
+	}
+}
+
+// wingetCallTimeout bounds one winget call. A winget that hangs after it has
+// printed its error left the first converge of a clean Windows guest silent
+// for 2h, until the harness gave up (#3489); the longest honest call is Docker
+// Desktop's installer, which takes minutes.
+const wingetCallTimeout = 30 * time.Minute
+
+// wingetKillGrace is how long a killed winget gets to release its output
+// pipes: a grandchild installer that holds them would otherwise keep Wait
+// blocked after the kill.
+const wingetKillGrace = 10 * time.Second
+
+// isWinget reports whether name is the winget executable, by its bare name or
+// a path to it.
+func isWinget(name string) bool {
+	base := strings.ToLower(name[strings.LastIndexAny(name, `/\`)+1:])
+	return base == "winget" || base == "winget.exe"
+}
+
+// boundedRun streams name's output to out like a plain exec, and ends a winget
+// call that outlives limit with an error that says so. Other commands are not
+// bounded: an npm or package-manager install has no cap worth guessing.
+func boundedRun(out io.Writer, limit time.Duration) func(name string, args ...string) error {
+	return func(name string, args ...string) error {
+		ctx := context.Background()
+		if isWinget(name) {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, limit)
+			defer cancel()
 		}
+		cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // a package manager the catalog names
+		cmd.Stdout, cmd.Stderr = out, out
+		cmd.WaitDelay = wingetKillGrace
+		err := cmd.Run()
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("%s did not finish in %s and was stopped: %w", name, limit, err)
+		}
+		return err
 	}
 }
 
@@ -242,20 +287,35 @@ func (in *Installer) current(t Tool) string {
 	return in.installedVersion(t.Name)
 }
 
+// unsupportedOn names the platform the catalog does not install t on, "" when
+// it does. SupportsOS answers by OS; a winget_arch entry also needs an id for
+// this arch, which Load guarantees only for the arches dotf ships.
+func (in *Installer) unsupportedOn(t Tool) string {
+	if !t.SupportsOS(in.GOOS) {
+		return in.GOOS
+	}
+	if t.Source.Type == "system" {
+		if _, pkg := t.Source.SystemPackage(in.GOOS, in.GOARCH); pkg == "" {
+			return in.GOOS + "/" + in.GOARCH
+		}
+	}
+	return ""
+}
+
 // Install converges the tool to its pinned version, dispatching on source type.
 // The pinned backends share the reconcile policy (decideAction): a no-op when already
 // at or above the pin, never a downgrade.
 func (in *Installer) Install(t Tool) (Result, error) {
 	in.defaults()
-	if !t.SupportsOS(in.GOOS) {
-		_, _ = fmt.Fprintf(in.Out, "%s is not installed on %s by this catalog; skipping\n", t.Name, in.GOOS)
+	if where := in.unsupportedOn(t); where != "" {
+		_, _ = fmt.Fprintf(in.Out, "%s is not installed on %s by this catalog; skipping\n", t.Name, where)
 		return Skipped, nil
 	}
 	if reason := in.refusal(t); reason != "" {
 		return Skipped, fmt.Errorf("%s: %s", t.Name, reason)
 	}
 	switch t.Source.Type {
-	case "github-release":
+	case "github-release", "github-archive":
 		return in.installRelease(t)
 	case "npm":
 		return in.installNpm(t)
@@ -319,9 +379,17 @@ func unknownTypeNote(t Tool) string {
 // refusal, so it is not asked about its checksums.
 func (in *Installer) refusal(t Tool) string {
 	switch t.Source.Type {
-	case "github-release":
+	case "github-release", "github-archive":
 		if t.AssetName(in.GOOS, in.GOARCH) != "" && t.ChecksumsName(in.GOARCH) == "" {
 			return "no checksums file declared — refusing to install unverified"
+		}
+		if asset := t.AssetName(in.GOOS, in.GOARCH); t.Source.Type == "github-archive" &&
+			asset != "" && !supportedArchive(asset) {
+			return "unsupported archive type"
+		}
+		if t.Source.Type == "github-archive" && t.AssetName(in.GOOS, in.GOARCH) != "" &&
+			t.MemberName(in.GOOS, in.GOARCH) == "" {
+			return "no archive member declared for this platform"
 		}
 	case "npm", "uv-tool":
 		if t.Source.Package == "" {
@@ -341,9 +409,9 @@ func (in *Installer) Plan(t Tool) Plan {
 	// reads as absent: no build for this platform is unsupported, an entry
 	// Install refuses is refused with Install's own reason, and an unknown
 	// source type is the skip Install makes.
-	if !t.SupportsOS(in.GOOS) {
+	if where := in.unsupportedOn(t); where != "" {
 		p.Action = PlanUnsupported
-		p.Note = "not installed on " + in.GOOS + " by this catalog"
+		p.Note = "not installed on " + where + " by this catalog"
 		return p
 	}
 	if reason := in.refusal(t); reason != "" {
@@ -351,7 +419,7 @@ func (in *Installer) Plan(t Tool) Plan {
 		return p
 	}
 	switch t.Source.Type {
-	case "github-release":
+	case "github-release", "github-archive":
 		if t.AssetName(in.GOOS, in.GOARCH) == "" {
 			p.Action = PlanUnsupported
 			p.Note = "no release asset for " + in.GOOS + "/" + in.GOARCH
@@ -592,6 +660,13 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 	if err := verifyChecksum(assetPath, sumsPath, asset); err != nil {
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}
+	payloadPath := assetPath
+	if t.Source.Type == "github-archive" {
+		payloadPath, err = extractArchiveMember(assetPath, asset, t.MemberName(in.GOOS, in.GOARCH), tmp)
+		if err != nil {
+			return Skipped, fmt.Errorf("%s: %w", t.Name, err)
+		}
+	}
 
 	// Execute the staged copy before placing it (PLAT-001a W1). A checksum proves
 	// the bytes are the release's, not that they run here: a linux-amd64 asset on
@@ -610,7 +685,7 @@ func (in *Installer) fetchVerifyPlace(t Tool, asset, sumsName string, res Result
 	}
 	defer func() { _ = os.RemoveAll(stageDir) }()
 	staged := filepath.Join(stageDir, binFilename(t.Name, in.GOOS))
-	if err := placeBinary(assetPath, staged); err != nil {
+	if err := placeBinary(payloadPath, staged); err != nil {
 		return Skipped, fmt.Errorf("%s: %w", t.Name, err)
 	}
 	if err := checkProbed(t, ProbeVersion(staged, in.Probe), "the downloaded "+asset+" does not run on "+in.GOOS+"/"+in.GOARCH); err != nil {
@@ -703,11 +778,131 @@ func placeBinary(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	data, err := os.ReadFile(src)
+	input, err := os.Open(src) //nolint:gosec // checksum-verified staged payload
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0o755)
+	defer func() { _ = input.Close() }()
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".dotf-tool-*")
+	if err != nil {
+		return err
+	}
+	staged := tmp.Name()
+	defer func() { _ = os.Remove(staged) }() // no-op after rename
+	if _, err := io.Copy(tmp, input); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := replaceFile(staged, dst); err != nil {
+		return err
+	}
+	return os.Chmod(dst, 0o755)
+}
+
+// renameFile and removeFile are os.Rename and os.Remove; tests replace them to
+// fail the final rename, or to hold <dst>.old the way a running process holds
+// it on Windows.
+var (
+	renameFile = os.Rename
+	removeFile = os.Remove
+)
+
+// renameBackoff is the wait before each retry of a rename in replaceFile, about
+// 0.6s in all. Windows can refuse to rename an executable for a few
+// milliseconds after it is written or started, while the image loader or an
+// antivirus scan holds it without sharing delete (ERROR_SHARING_VIOLATION,
+// #3465). Tests set it to zero waits.
+var renameBackoff = []time.Duration{
+	10 * time.Millisecond, 20 * time.Millisecond, 40 * time.Millisecond,
+	80 * time.Millisecond, 160 * time.Millisecond, 320 * time.Millisecond,
+}
+
+// renameSettled is renameFile retried through renameBackoff. A missing source
+// is an answer, not a lock, and returns at once.
+func renameSettled(from, to string) error {
+	err := renameFile(from, to)
+	for _, wait := range renameBackoff {
+		if err == nil || errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		time.Sleep(wait)
+		err = renameFile(from, to)
+	}
+	return err
+}
+
+// replaceFile moves staged onto dst so that dst can be a running executable.
+// Windows refuses to rename over, or delete, a running .exe but lets it be
+// renamed aside, so dst is set aside first and staged takes its name; the same
+// sequence runs on every OS (CLI-133). A failed second rename puts the old file
+// back, so a failed update never leaves the path empty.
+//
+// The aside name is <dst>.old, or a unique <dst>.old.<n> while an earlier
+// <dst>.old is still running: on Windows a long-lived process (a `dotf secrets
+// run` wrapper) keeps it undeletable for days, and that must not fail the next
+// update. Every copy set aside is removed best-effort once the new file is in.
+func replaceFile(staged, dst string) error {
+	aside := dst + ".old"
+	if err := removeFile(aside); err != nil && !errors.Is(err, os.ErrNotExist) {
+		aside = fmt.Sprintf("%s.old.%d", dst, time.Now().UnixNano())
+	}
+	if err := renameSettled(dst, aside); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return renameSettled(staged, dst) // nothing to set aside
+	}
+	if err := renameSettled(staged, dst); err != nil {
+		if rerr := renameSettled(aside, dst); rerr != nil {
+			return fmt.Errorf("%w; restoring the previous %s also failed: %v", err, filepath.Base(dst), rerr)
+		}
+		return err
+	}
+	removeAside(dst)
+	return nil
+}
+
+// removeAside removes, best-effort, every copy replaceFile set aside for dst.
+// One still running stays, and a later replacement removes it.
+func removeAside(dst string) {
+	entries, err := os.ReadDir(filepath.Dir(dst))
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if isAside(filepath.Base(dst), e.Name()) {
+			_ = os.Remove(filepath.Join(filepath.Dir(dst), e.Name()))
+		}
+	}
+}
+
+// isAside reports whether name is a copy replaceFile set aside for base:
+// exactly <base>.old or <base>.old.<digits>. A sibling such as <base>.older or
+// <base>.old-backup is someone else's file.
+func isAside(base, name string) bool {
+	rest, ok := strings.CutPrefix(name, base+".old")
+	if !ok {
+		return false
+	}
+	if rest == "" {
+		return true
+	}
+	digits, ok := strings.CutPrefix(rest, ".")
+	if !ok || digits == "" {
+		return false
+	}
+	return strings.Trim(digits, "0123456789") == ""
 }
 
 // verifyChecksum confirms assetPath's sha256 matches the entry for assetName in

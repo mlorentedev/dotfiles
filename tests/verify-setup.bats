@@ -335,23 +335,29 @@ setup() {
 # Section 10: Graceful skips (optional tools not present)
 # =============================================================================
 
-@test "the npm catalog installs into ~/.local as the user, never into npm's root-owned prefix [#2251]" {
-    # The apt npm's default prefix is root-owned; mise's Node now comes first
-    # on PATH and has a different, user-owned prefix.
+@test "mise installs the npm-package CLIs as the user, never into npm's root-owned prefix [#2251, #2438]" {
+    # The apt npm's default prefix is root-owned. bw, yarn, opencode and copilot
+    # moved from the catalog's `npm install -g` to mise's npm backend, which
+    # installs under the user's mise data directory. Asked of mise from $HOME,
+    # like pi above: a bats process has no `mise activate`.
     command -v npm >/dev/null 2>&1
     [ -x /usr/bin/npm ]
     prefix=$(PATH=/usr/bin:/bin /usr/bin/npm config get prefix)
     [ ! -w "$prefix/lib" ]
+    local mise bin
+    mise="$(command -v mise || printf '%s' "$HOME/.local/bin/mise")"
     for tool in bw yarn opencode copilot; do
-        [ -x "$HOME/.local/bin/$tool" ] || { echo "missing: ~/.local/bin/$tool"; return 1; }
-        [ "$(stat -c %U "$HOME/.local/bin/$tool")" = testuser ]
+        bin="$(bash -c 'cd "$HOME" && "$1" which "$2"' _ "$mise" "$tool" 2>/dev/null)" ||
+            { echo "mise did not install $tool"; return 1; }
+        case "$bin" in "$HOME"/*) ;; *) echo "$tool outside \$HOME: $bin"; return 1 ;; esac
+        [ "$(stat -c %U "$bin")" = testuser ] || { echo "$tool not owned by testuser: $bin"; return 1; }
     done
     # A converged box re-runs clean: setup's `|| log_warning` would hide a failure.
     run dotf tools install
     [ "$status" -eq 0 ] || { echo "$output"; return 1; }
 }
 
-@test "copilot config is deployed now that the npm catalog put copilot on PATH (#1312)" {
+@test "copilot config is deployed now that mise put copilot on PATH (#1312)" {
     # The inverse, an entry skipped while its required command is absent, is
     # pinned by TestDeployCmd_SkipsAnEntryWhoseRequiredCommandIsAbsent; the
     # container now carries copilot, so this asserts the present side.

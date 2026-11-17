@@ -1,0 +1,23 @@
+[
+  {
+    "id": "TOOL-041-cache-gc-mise-prune-f1",
+    "behavior": "an apply with mise on PATH lists the installed tools and prunes every one but python, sorted",
+    "verification": "cd cli && go test ./internal/converge -run 'TestCacheGC_ApplyRunsEveryPresentPrunerInOrderAndWritesTheStamp|TestCacheGC_MisePruneLeavesPythonAlone' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-041-cache-gc-mise-prune-f2",
+    "behavior": "no prune runs when only python is installed, and a failed listing fails the step without pruning",
+    "verification": "cd cli && go test ./internal/converge -run 'TestCacheGC_MisePruneRunsNothingWhenOnlyPythonIsInstalled|TestCacheGC_MiseListFailureFailsTheStepAndKeepsItDue' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-041-cache-gc-mise-prune-f3",
+    "behavior": "the runbook and ADR-036 name the mise pruner and the python hold",
+    "verification": "grep -q 'every installed tool but python' docs/runbooks/guide-self-deploy-timer.md && grep -q 'Python excepted' docs/adr/adr-036-install-channels.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]

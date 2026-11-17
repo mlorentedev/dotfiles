@@ -196,3 +196,17 @@ func TestEveryHarnessIsAKind(t *testing.T) {
 		}
 	}
 }
+
+// A model is forwarded to the agent through herdr's trailing agent arguments,
+// after `--`, so herdr keeps its own flags and the agent gets `--model <id>`.
+// Without one the start line stays as it was: nothing after the pane.
+func TestLaunchForwardsTheModelToTheAgentAfterADoubleDash(t *testing.T) {
+	f := healthy()
+	if err := Launch(f.run, LaunchOptions{Repo: "/r", Worktree: "/w", Harness: "pi", Name: "n", Model: "nan/kimi-k3.1-pro"}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"herdr", "agent", "start", "n", "--kind", "pi", "--pane", "w2:p1", "--", "--model", "nan/kimi-k3.1-pro"}
+	if len(f.calls) < 2 || !slices.Equal(f.calls[1], want) {
+		t.Errorf("start = %q, want %q", f.calls, want)
+	}
+}

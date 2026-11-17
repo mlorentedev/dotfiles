@@ -41,7 +41,7 @@ func TestParseMisePins_RejectsAFileToolThatTracksLatest(t *testing.T) {
 }
 
 func TestRenderMiseConfig_PinsAFileToolByUrlAndDigest(t *testing.T) {
-	got := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"zsh-autosuggestions", "0.7.1"}}, ""))
+	got := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"zsh-autosuggestions", "0.7.1"}}, nil))
 	want := `"http:zsh-autosuggestions" = { version = "0.7.1", url = "https://github.com/zsh-users/zsh-autosuggestions/archive/refs/tags/v0.7.1.tar.gz", checksum = "sha256:0df7affff21cd87ed298e6a3970ed08a1dd66a6efa676454ee5b091ad503badf" }`
 	if runtime.GOOS == "windows" {
 		if strings.Contains(got, "zsh-autosuggestions") {

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -55,7 +56,7 @@ func TestParseMiseTools_RejectsAMarkerThatMarksNoPin(t *testing.T) {
 }
 
 func TestRenderMiseConfig_IsSortedPinnedAndNamesItsSource(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"golangci-lint", "2.12.2"}}, ""))
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"golangci-lint", "2.12.2"}}, nil))
 	for _, want := range []string{"dotf tools sync", "versions.conf", "[tools]\n", "age = \"1.3.1\"\n", "golangci-lint = \"2.12.2\"\n"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered config lacks %q:\n%s", want, out)
@@ -67,7 +68,7 @@ func TestRenderMiseConfig_WindowsBatsUsesRunnableNpmBackend(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("the Windows backend is exercised on the Windows runner")
 	}
-	out := string(RenderMiseConfig([]MiseTool{{"bats", "1.13.0"}, {"jq", "1.8.2"}}, ""))
+	out := string(RenderMiseConfig([]MiseTool{{"bats", "1.13.0"}, {"jq", "1.8.2"}}, nil))
 	for _, want := range []string{`"npm:bats" = "1.13.0"`, `jq = "1.8.2"`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Windows mise config lacks %q:\n%s", want, out)
@@ -85,7 +86,7 @@ func TestRenderMiseConfig_WindowsDirenvNamesTheReleaseBinaryAsExe(t *testing.T) 
 	if runtime.GOOS != "windows" {
 		t.Skip("the Windows direnv release lacks an .exe suffix")
 	}
-	out := string(RenderMiseConfig([]MiseTool{{"direnv", "2.37.1"}, {"jq", "1.8.2"}}, ""))
+	out := string(RenderMiseConfig([]MiseTool{{"direnv", "2.37.1"}, {"jq", "1.8.2"}}, nil))
 	if !strings.Contains(out, `"github:direnv/direnv" = { version = "2.37.1", bin = "direnv.exe" }`) {
 		t.Errorf("Windows mise config does not name the runnable direnv binary:\n%s", out)
 	}
@@ -97,6 +98,97 @@ func TestRenderMiseConfig_WindowsDirenvNamesTheReleaseBinaryAsExe(t *testing.T) 
 	}
 }
 
+// #2438: a catalog npm CLI moves under mise, so one owner holds it on every OS.
+// Aqua has no recipe for these four, so each short name is aliased to mise's npm
+// backend, and every other reader (mise which, ls, bin-paths, the doctor) keeps
+// asking for copilot. Scoped packages (@github/copilot) and a name that is not
+// the package (opencode-ai) are why this is a table and not a rule.
+func TestRenderMiseConfig_RoutesNpmCLIsToTheNpmBackend(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{
+		{"bw", "2026.5.0"}, {"copilot", "1.0.81"}, {"jq", "1.8.2"}, {"opencode", "1.16.2"}, {"yarn", "1.22.22"},
+	}, nil))
+	for _, want := range []string{
+		"bw = \"2026.5.0\"\n", "copilot = \"1.0.81\"\n", "yarn = \"1.22.22\"\n",
+		"bw = \"npm:@bitwarden/cli\"\n", "copilot = \"npm:@github/copilot\"\n",
+		"opencode = \"npm:opencode-ai\"\n", "yarn = \"npm:yarn\"\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("want %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "jq = \"npm:") || strings.Count(out, "[tool_alias]") != 1 {
+		t.Errorf("only the npm CLIs are aliased, under one section:\n%s", out)
+	}
+	if out := string(RenderMiseConfig([]MiseTool{{"jq", "1.8.2"}}, nil)); strings.Contains(out, "npm:") {
+		t.Errorf("no npm alias without an npm CLI:\n%s", out)
+	}
+}
+
+// opencode-ai ships a placeholder binary that its postinstall replaces, and
+// mise's npm backend skips install scripts: only that package may run its own,
+// and no other tool is opened (#3329).
+func TestRenderMiseConfig_LetsOpencodeRunItsInstallScript(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"opencode", "1.16.2"}, {"copilot", "1.0.81"}}, nil))
+	if !strings.Contains(out, `opencode = { version = "1.16.2", allow_builds = ["opencode-ai"] }`+"\n") {
+		t.Errorf("opencode lacks its build allowance:\n%s", out)
+	}
+	if !strings.Contains(out, "copilot = \"1.0.81\"\n") || strings.Count(out, "allow_builds") != 1 {
+		t.Errorf("only opencode may run an install script:\n%s", out)
+	}
+	if latest := string(RenderMiseConfig([]MiseTool{{"opencode", "1.16.2"}}, nil, "opencode")); !strings.Contains(latest, `version = "latest", allow_builds`) {
+		t.Errorf("a latest-tracked opencode keeps the allowance:\n%s", latest)
+	}
+}
+
+// An alias section holds both kinds: herdr's attested backend and the npm CLIs.
+func TestRenderMiseConfig_NpmAliasesShareTheSectionWithHerdr(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no herdr alias on Windows")
+	}
+	out := string(RenderMiseConfig([]MiseTool{{"herdr", "0.9.3"}, {"yarn", "1.22.22"}}, nil))
+	if strings.Count(out, "[tool_alias]") != 1 || !strings.Contains(out, "herdr = \"github:herdrdev/herdr\"") || !strings.Contains(out, "yarn = \"npm:yarn\"") {
+		t.Errorf("one [tool_alias] with both:\n%s", out)
+	}
+}
+
+// The npm backend runs the package on Node, and mise does not order Node for a
+// tool whose pin it cannot see: refuse before writing a config nothing can fill.
+func TestSync_RefusesAnNpmCLIWithoutPinnedNode(t *testing.T) {
+	s := MiseSync{ConfigDir: t.TempDir(), Run: func(string, ...string) ([]byte, error) {
+		return nil, errors.New("not installed")
+	}}
+	_, err := s.Apply([]MiseTool{{"copilot", "1.0.81"}})
+	if err == nil || !strings.Contains(err.Error(), "node") || !strings.Contains(err.Error(), "copilot") {
+		t.Fatalf("want the missing Node pin and the tool named, got %v", err)
+	}
+	if _, err := os.Stat(s.ConfigPath()); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a refused sync must not write an unfulfillable config: %v", err)
+	}
+}
+
+func TestNpmInstallTarget(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"install", "--force", "npm:bats"}, "bats"},
+		{[]string{"install", "--force", "copilot"}, "copilot"},
+		{[]string{"install", "--force", "yarn"}, "yarn"},
+		{[]string{"install", "--force", "jq"}, ""},
+		{[]string{"install", "--force", "npm:prettier"}, ""},
+		{[]string{"install", "node"}, ""},
+		{[]string{"install"}, ""},
+		{[]string{"which", "copilot"}, ""},
+	} {
+		if got := npmInstallTarget("mise", tc.args...); got != tc.want {
+			t.Errorf("npmInstallTarget(%q) = %q, want %q", tc.args, got, tc.want)
+		}
+	}
+	if got := npmInstallTarget("jq", "install", "--force", "yarn"); got != "" {
+		t.Errorf("only mise installs: %q", got)
+	}
+}
+
 // #2013 H3: aqua's registry entry for herdr checks the release digest only,
 // while mise's github backend checks it and the GitHub artifact attestations
 // upstream publishes for the linux and macOS assets. A [tool_alias] routes
@@ -105,7 +197,7 @@ func TestRenderMiseConfig_WindowsDirenvNamesTheReleaseBinaryAsExe(t *testing.T) 
 // carries no attestation, and mise refuses an asset without one, so Windows
 // renders no alias.
 func TestRenderMiseConfig_RoutesHerdrToTheBackendThatVerifiesAttestations(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"herdr", "0.9.3"}, {"jq", "1.8.2"}}, ""))
+	out := string(RenderMiseConfig([]MiseTool{{"herdr", "0.9.3"}, {"jq", "1.8.2"}}, nil))
 	alias := "\n[tool_alias]\nherdr = \"github:herdrdev/herdr\"\n"
 	if runtime.GOOS == "windows" {
 		if strings.Contains(out, "[tool_alias]") {
@@ -119,7 +211,7 @@ func TestRenderMiseConfig_RoutesHerdrToTheBackendThatVerifiesAttestations(t *tes
 	if strings.Count(out, "[tool_alias]") != 1 || strings.Contains(out, "jq = \"github:") {
 		t.Errorf("only herdr is aliased:\n%s", out)
 	}
-	if out := string(RenderMiseConfig([]MiseTool{{"jq", "1.8.2"}}, "")); strings.Contains(out, "[tool_alias]") {
+	if out := string(RenderMiseConfig([]MiseTool{{"jq", "1.8.2"}}, nil)); strings.Contains(out, "[tool_alias]") {
 		t.Errorf("no alias section without herdr:\n%s", out)
 	}
 }
@@ -128,7 +220,7 @@ func TestRenderMiseConfig_RoutesHerdrToTheBackendThatVerifiesAttestations(t *tes
 // Its own update notice tells the user to run `mise self-update`, which would
 // move it past that pin, so the rendered config turns the notice off.
 func TestRenderMiseConfig_TurnsOffMiseOwnUpdateNotice(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, ""))
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, nil))
 	if !strings.Contains(out, "\n[settings]\ndisable_update_warning = true\n") {
 		t.Errorf("want disable_update_warning = true under [settings]:\n%s", out)
 	}
@@ -138,19 +230,36 @@ func TestRenderMiseConfig_TurnsOffMiseOwnUpdateNotice(t *testing.T) {
 	}
 }
 
+// mise's default 30m budget for one download failed a from-zero converge on
+// argocd, the largest pinned asset, over a slow link (#3181).
+func TestRenderMiseConfig_SizesTheDownloadBudgetToTheLargestAsset(t *testing.T) {
+	for _, py := range [][]MiseTool{nil, {{"pyyaml", "6.0.3"}}} {
+		out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, py))
+		var settings struct {
+			Settings map[string]any `toml:"settings"`
+		}
+		if err := toml.Unmarshal([]byte(out), &settings); err != nil {
+			t.Fatalf("rendered config does not parse: %v\n%s", err, out)
+		}
+		if got := settings.Settings["http_download_timeout"]; got != "2h" {
+			t.Errorf("http_download_timeout = %v, want \"2h\":\n%s", got, out)
+		}
+	}
+}
+
 // A tool mise keeps current must not also update itself: Claude Code's own
 // updater would replace the binary mise installed, outside the pin's floor and
 // outside converge's report (#2013 D9). The env lives in the config mise owns,
 // so it reaches every claude mise runs (activate and shims alike) and no other.
 func TestRenderMiseConfig_TurnsOffTheOwnUpdaterOfAToolMiseManages(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"claude", "2.1.296"}}, "", "claude"))
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"claude", "2.1.296"}}, nil, "claude"))
 	if !strings.Contains(out, "\n[env]\nDISABLE_AUTOUPDATER = \"1\"\n") {
 		t.Errorf("want DISABLE_AUTOUPDATER = \"1\" under [env] when mise manages claude:\n%s", out)
 	}
 	if strings.Index(out, "claude = ") > strings.Index(out, "[env]") {
 		t.Errorf("the pins must come before [env]:\n%s", out)
 	}
-	without := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, ""))
+	without := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, nil))
 	if strings.Contains(without, "[env]") || strings.Contains(without, "DISABLE_AUTOUPDATER") {
 		t.Errorf("a config that does not manage claude must leave its updater alone:\n%s", without)
 	}
@@ -160,7 +269,7 @@ func TestRenderMiseConfig_TurnsOffTheOwnUpdaterOfAToolMiseManages(t *testing.T) 
 // `pi update`, which would install a second pi outside mise. The check is off
 // wherever mise manages pi, and both settings land in one [env] table.
 func TestRenderMiseConfig_SilencesPisUpdateCheck(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"claude", "2.1.296"}, {"pi", "1.2.0"}}, "", "claude", "pi"))
+	out := string(RenderMiseConfig([]MiseTool{{"claude", "2.1.296"}, {"pi", "1.2.0"}}, nil, "claude", "pi"))
 	if !strings.Contains(out, "\n[env]\nDISABLE_AUTOUPDATER = \"1\"\nPI_SKIP_VERSION_CHECK = \"1\"\n") {
 		t.Errorf("want both settings under one [env]:\n%s", out)
 	}
@@ -169,7 +278,7 @@ func TestRenderMiseConfig_SilencesPisUpdateCheck(t *testing.T) {
 // gh has no updater either, but its notice names the channel that installed
 // it before mise did (`brew upgrade gh`), a second gh outside the pin (#2136).
 func TestRenderMiseConfig_SilencesGhsUpdateNotice(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"gh", "2.102.0"}}, ""))
+	out := string(RenderMiseConfig([]MiseTool{{"gh", "2.102.0"}}, nil))
 	if !strings.Contains(out, "\n[env]\nGH_NO_UPDATE_NOTIFIER = \"1\"\n") {
 		t.Errorf("want GH_NO_UPDATE_NOTIFIER = \"1\" under [env] when mise manages gh:\n%s", out)
 	}
@@ -404,6 +513,59 @@ func TestSync_WindowsInstallsBatsWithNodeBeforeTheRest(t *testing.T) {
 	}
 }
 
+// #2438: the npm CLIs get the same treatment as bats on Windows: Node first,
+// then each through the npm installer, then the bare install for the rest.
+func TestSync_WindowsInstallsNpmCLIsWithNodeFirst(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows needs npm to create the .cmd launchers")
+	}
+	pins := []MiseTool{{"copilot", "1.0.81"}, {"jq", "1.8.2"}, {"node", "24.11.1"}, {"yarn", "1.22.22"}}
+	installed := map[string]bool{}
+	var calls []string
+	run := func(name string, args ...string) ([]byte, error) {
+		if name == "mise" {
+			switch {
+			case len(args) == 2 && args[0] == "which":
+				if installed[args[1]] {
+					return []byte(args[1]), nil
+				}
+				return nil, errors.New("not installed")
+			case len(args) >= 1 && args[0] == "install":
+				calls = append(calls, strings.Join(args, " "))
+				switch {
+				case len(args) == 2 && args[1] == "node":
+					installed["node"] = true
+				case len(args) == 3 && args[1] == "--force" && (args[2] == "copilot" || args[2] == "yarn"):
+					if !installed["node"] {
+						return nil, errors.New(args[2] + " installed before node")
+					}
+					installed[args[2]] = true
+				case len(args) == 1:
+					installed["jq"] = true
+				default:
+					return nil, errors.New("unexpected install")
+				}
+				return nil, nil
+			}
+		}
+		if installed[name] && len(args) == 1 && args[0] == "--version" {
+			for _, pin := range pins {
+				if pin.Name == name {
+					return []byte(pin.Version), nil
+				}
+			}
+		}
+		return nil, errors.New("unexpected command")
+	}
+	s := MiseSync{ConfigDir: t.TempDir(), Run: run}
+	if _, err := s.Apply(pins); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(calls, ", "); got != "install node, install --force copilot, install --force yarn, install" {
+		t.Errorf("install sequence = %q", got)
+	}
+}
+
 func TestSync_WindowsRepairsAnAubeBatsWithoutLauncher(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("mise's aube reports bats installed but creates no Windows launcher")
@@ -457,6 +619,9 @@ func TestHomeRunners_WindowsScopesNpmToBatsInstall(t *testing.T) {
 	}
 	if got := miseInstallEnv("mise", "install", "--force", "npm:bats"); got != "MISE_NPM_PACKAGE_MANAGER=npm" {
 		t.Errorf("bats install env = %q", got)
+	}
+	if got := miseInstallEnv("mise", "install", "--force", "copilot"); got != "MISE_NPM_PACKAGE_MANAGER=npm" {
+		t.Errorf("copilot install env = %q", got)
 	}
 	for _, args := range [][]string{{"mise", "install"}, {"mise", "install", "node"}, {"mise", "which", "bats.cmd"}, {"mise", "install", "npm:prettier"}} {
 		if got := miseInstallEnv(args[0], args[1:]...); got != "" {
@@ -656,22 +821,36 @@ func TestParseMisePins_NearMissNamesBothMarkers(t *testing.T) {
 	}
 }
 
-func TestRenderMiseConfig_NamesThePackagesFileOnlyWhenThereIsOne(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"python", "3.12.6"}}, "/cfg/conf.d/dotfiles-python-packages.txt"))
-	if !strings.Contains(out, "\n[settings]\ndisable_update_warning = true\npython.default_packages_file = \"/cfg/conf.d/dotfiles-python-packages.txt\"\n") {
-		t.Errorf("want python.default_packages_file under [settings]:\n%s", out)
+// mise 2026.11 deprecates python.default_packages_file and warns on every
+// invocation (#3363). The packages ride the python tool's postinstall hook,
+// which mise runs with that Python first on PATH.
+func TestRenderMiseConfig_InstallsPythonPackagesFromThePythonPostinstall(t *testing.T) {
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"python", "3.12.6"}}, []MiseTool{{"pyyaml", "6.0.3"}, {"requests", "2.32.3"}}))
+	var cfg struct {
+		Tools    map[string]any `toml:"tools"`
+		Settings map[string]any `toml:"settings"`
 	}
-	if strings.Contains(string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}}, "")), "default_packages_file") {
-		t.Error("a config with no python packages must not name a packages file")
+	if err := toml.Unmarshal([]byte(out), &cfg); err != nil {
+		t.Fatalf("rendered config does not parse: %v\n%s", err, out)
+	}
+	py, ok := cfg.Tools["python"].(map[string]any)
+	if !ok || py["version"] != "3.12.6" || py["postinstall"] != "python -m pip install --quiet --disable-pip-version-check pyyaml==6.0.3 requests==2.32.3" {
+		t.Errorf("want python with its version and a pip postinstall, got %#v:\n%s", cfg.Tools["python"], out)
+	}
+	if strings.Contains(out, "default_packages_file") {
+		t.Errorf("the deprecated setting must not be rendered:\n%s", out)
+	}
+	if plain := string(RenderMiseConfig([]MiseTool{{"python", "3.12.6"}}, nil)); !strings.Contains(plain, "python = \"3.12.6\"\n") {
+		t.Errorf("with no packages, python stays a plain pin:\n%s", plain)
 	}
 }
 
 // fakePython extends fakeMise with a python that answers the distribution
-// probe and `-m pip install`. When mise installs python, it installs the
-// packages the packages file lists at that moment, as mise does.
+// probe and `-m pip install`. When mise installs python, it runs the python
+// tool's postinstall from the config at that moment, as mise does.
 type fakePython struct {
 	fakeMise
-	pkgFile  string
+	cfg      string
 	dists    map[string]string // distribution -> installed version
 	pips     [][]string
 	pipFails bool
@@ -685,10 +864,17 @@ func (f *fakePython) run(name string, args ...string) ([]byte, error) {
 		_, had := f.installed["python"]
 		out, err := f.fakeMise.run(name, args...)
 		if _, has := f.installed["python"]; has && !had {
-			body, _ := os.ReadFile(f.pkgFile)
-			for _, l := range strings.Split(string(body), "\n") {
-				if n, v, ok := strings.Cut(l, "=="); ok && !strings.HasPrefix(l, "#") {
-					f.dists[n] = v
+			body, _ := os.ReadFile(f.cfg)
+			var cfg struct {
+				Tools map[string]any `toml:"tools"`
+			}
+			_ = toml.Unmarshal(body, &cfg)
+			if py, ok := cfg.Tools["python"].(map[string]any); ok {
+				hook, _ := py["postinstall"].(string)
+				for _, a := range strings.Fields(hook) {
+					if n, v, ok := strings.Cut(a, "=="); ok {
+						f.dists[n] = v
+					}
 				}
 			}
 		}
@@ -720,13 +906,13 @@ func newFakePython(t *testing.T, installed map[string]string) (*fakePython, Mise
 	tools := []MiseTool{{"python", "3.12.6"}}
 	f := &fakePython{fakeMise: fakeMise{installed: installed, pending: tools}, dists: map[string]string{}}
 	s := MiseSync{ConfigDir: t.TempDir(), Run: f.run, PythonPackages: []MiseTool{{"pyyaml", "6.0.3"}}}
-	f.pkgFile = s.PythonPackagesPath()
+	f.cfg = s.ConfigPath()
 	return f, s, tools
 }
 
-// A fresh machine: the packages file exists before `mise install`, so mise
-// installs the packages with the Python and no pip run is needed.
-func TestSync_WritesThePackagesFileBeforeMiseInstallsPython(t *testing.T) {
+// A fresh machine: the config carries the postinstall before `mise install`,
+// so mise installs the packages with the Python and no pip run is needed.
+func TestSync_WritesThePostinstallBeforeMiseInstallsPython(t *testing.T) {
 	f, s, tools := newFakePython(t, map[string]string{})
 	plan, err := s.Apply(tools)
 	if err != nil {
@@ -736,8 +922,8 @@ func TestSync_WritesThePackagesFileBeforeMiseInstallsPython(t *testing.T) {
 		t.Fatalf("want pyyaml installed by mise and no pip run, got plan %+v, dists %v, pips %v", plan, f.dists, f.pips)
 	}
 	cfg, err := os.ReadFile(s.ConfigPath())
-	if err != nil || !strings.Contains(string(cfg), "python.default_packages_file") {
-		t.Fatalf("config must name the packages file: %q, %v", cfg, err)
+	if err != nil || !strings.Contains(string(cfg), "postinstall") || strings.Contains(string(cfg), "default_packages_file") {
+		t.Fatalf("config must carry the postinstall, not the deprecated setting: %q, %v", cfg, err)
 	}
 }
 
@@ -777,7 +963,30 @@ func TestSync_FailsWhenThePackageStillDoesNotImport(t *testing.T) {
 	}
 }
 
-func TestHomeRunners_WindowsFindsGitBashForBatsWithoutShellPathWiring(t *testing.T) {
+// Only bats needs Git Bash, so only bats gets it: a sync that prepended Git's
+// bin to every child changed what mise and every other probe resolved (#2346).
+func TestGitBashScope_OnlyTheBatsInstallAndProbe(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"mise", []string{"install", "--force", "npm:bats"}, true},
+		{`C:\Users\m\AppData\Local\mise\installs\npm-bats\1.13.0\bats.cmd`, []string{"--version"}, true},
+		{"BATS.CMD", []string{"--version"}, true},
+		{"mise", []string{"install"}, false},
+		{"mise", []string{"install", "node"}, false},
+		{"mise", []string{"which", "bats.cmd"}, false},
+		{"mise", []string{"install", "--force", "npm:prettier"}, false},
+		{`C:\tools\jq.exe`, []string{"--version"}, false},
+	} {
+		if got := gitBashScope(tc.name, tc.args...); got != tc.want {
+			t.Errorf("gitBashScope(%q, %q) = %v, want %v", tc.name, tc.args, got, tc.want)
+		}
+	}
+}
+
+func TestHomeRunners_WindowsGivesGitBashToBatsAlone(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Git Bash is the Windows bats runtime")
 	}
@@ -796,23 +1005,30 @@ func TestHomeRunners_WindowsFindsGitBashForBatsWithoutShellPathWiring(t *testing
 	if err := os.WriteFile(bash, []byte("test fixture"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// A stand-in for mise's bats.cmd: it reports the first bash it can see.
+	batsCmd := filepath.Join(t.TempDir(), "bats.cmd")
+	if err := os.WriteFile(batsCmd, []byte("@where bash\r\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("PATH", filepath.Dir(gitCmd)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	run, _ := HomeRunners(t.TempDir())
-	out, err := run("where", "bash")
-	if err != nil {
-		t.Fatal(err)
+	firstBash := func(name string) string {
+		out, _ := run(name, "bash")
+		return strings.Split(strings.TrimSpace(string(out)), "\r\n")[0]
 	}
-	got := strings.Split(strings.TrimSpace(string(out)), "\r\n")[0]
-	found, err := os.Stat(got)
-	if err != nil {
-		t.Fatal(err)
+	isFixture := func(p string) bool {
+		found, err := os.Stat(p)
+		if err != nil {
+			return false
+		}
+		want, err := os.Stat(bash)
+		return err == nil && os.SameFile(found, want)
 	}
-	want, err := os.Stat(bash)
-	if err != nil {
-		t.Fatal(err)
+	if got := firstBash(batsCmd); !isFixture(got) {
+		t.Errorf("first bash bats sees = %q, want %q", got, bash)
 	}
-	if !os.SameFile(found, want) {
-		t.Errorf("first bash on the sync runner's PATH = %q, want %q", got, bash)
+	if got := firstBash("where"); isFixture(got) {
+		t.Errorf("a non-bats child sees Git Bash first (%q): the PATH prepend leaked", got)
 	}
 }
 
@@ -880,7 +1096,7 @@ func TestParseMisePins_NearMissNamesTheLatestMarker(t *testing.T) {
 }
 
 func TestRenderMiseConfig_RendersATrackedToolAsLatest(t *testing.T) {
-	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"claude", "2.1.296"}}, "", "claude"))
+	out := string(RenderMiseConfig([]MiseTool{{"age", "1.3.1"}, {"claude", "2.1.296"}}, nil, "claude"))
 	if !strings.Contains(out, "age = \"1.3.1\"\nclaude = \"latest\"\n") {
 		t.Errorf("want age pinned and claude at latest:\n%s", out)
 	}
@@ -921,7 +1137,7 @@ func TestSync_UpgradesInTheRunThatTurnsAPinIntoLatest(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(f.cfg), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(f.cfg, RenderMiseConfig(tools, ""), 0o644); err != nil {
+	if err := os.WriteFile(f.cfg, RenderMiseConfig(tools, nil), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	p, err := s.Apply(tools)
@@ -1174,7 +1390,7 @@ func TestSync_PlanNamesTheToolsAConfigWriteDrops(t *testing.T) {
 		return s
 	}
 
-	deployed := RenderMiseConfig(append([]MiseTool{{"gh", "2.80.0"}}, kept...), "")
+	deployed := RenderMiseConfig(append([]MiseTool{{"gh", "2.80.0"}}, kept...), nil)
 	p, err := write(t, deployed).Plan(kept)
 	if err != nil || !p.ConfigChanged || strings.Join(p.Dropped, ",") != "gh" {
 		t.Errorf("a config that loses gh: want Dropped [gh], got %+v, %v", p, err)
@@ -1223,5 +1439,243 @@ func TestSync_RepairsADeployedConfigThatDoesNotParse(t *testing.T) {
 	}
 	if again, err := s.Plan(tools); err != nil || again.Pending() || again.UnparsableConfig != "" {
 		t.Errorf("the next plan must have nothing to do, got %+v, %v", again, err)
+	}
+}
+
+// A Windows sync whose bats never reaches its pin because Git Bash is missing
+// said only "not running at their pin: bats" (#2346). The error names the
+// missing runtime and why it was not found.
+func TestBatsRuntimeNote_NamesAMissingGitBash(t *testing.T) {
+	root := t.TempDir()
+	execPath := filepath.Join(root, "mingw64", "libexec", "git-core")
+	withBash := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(withBash, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(withBash, "bin", "bash.exe"), []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	found := func() ([]byte, error) {
+		return []byte(filepath.Join(withBash, "mingw64", "libexec", "git-core") + "\n"), nil
+	}
+	notUnder := func() ([]byte, error) { return []byte(execPath + "\n"), nil }
+	// The standard roots are the host's: on a Windows runner Git is really
+	// there, and the cases below mean "nowhere".
+	old := gitStandardRoots
+	gitStandardRoots = func() []string { return nil }
+	t.Cleanup(func() { gitStandardRoots = old })
+	noGit := func() ([]byte, error) { return nil, errors.New(`exec: "git": executable file not found in %PATH%`) }
+	for _, tc := range []struct {
+		name     string
+		goos     string
+		missing  []string
+		execPath func() ([]byte, error)
+		want     string // substring; "" means no note at all
+	}{
+		{"git cannot be run", "windows", []string{"bats"}, noGit, "Git Bash not found: `git --exec-path` failed"},
+		{"no bash under Git's root", "windows", []string{"jq", "bats"}, notUnder, "Git Bash not found under " + root},
+		{"Git Bash is there", "windows", []string{"bats"}, found, ""},
+		{"bats is not the missing tool", "windows", []string{"jq"}, noGit, ""},
+		{"not Windows", "linux", []string{"bats"}, noGit, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := batsRuntimeNote(tc.goos, tc.missing, tc.execPath)
+			if tc.want == "" && got != "" || !strings.Contains(got, tc.want) {
+				t.Errorf("batsRuntimeNote = %q, want it to contain %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// A from-zero converge installs git and syncs tools in one process, whose PATH
+// was captured before git existed: `git --exec-path` fails, yet Git Bash is at
+// its standard install root. The lookup finds it there and, when it is nowhere,
+// names every root it searched (#3328).
+func TestFindGitBash_FallsBackToTheStandardInstallRoots(t *testing.T) {
+	noGit := func() ([]byte, error) { return nil, errors.New(`exec: "git": executable file not found in %PATH%`) }
+	old := gitStandardRoots
+	t.Cleanup(func() { gitStandardRoots = old })
+
+	empty := t.TempDir()
+	installed := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(installed, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(installed, "bin", "bash.exe")
+	if err := os.WriteFile(want, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	gitStandardRoots = func() []string { return []string{empty, installed} }
+	if got, reason := findGitBash(noGit); reason != "" || got != want {
+		t.Errorf("findGitBash = (%q, %q), want (%q, \"\")", got, reason, want)
+	}
+
+	gitStandardRoots = func() []string { return []string{empty} }
+	_, reason := findGitBash(noGit)
+	for _, part := range []string{"`git --exec-path` failed", "also looked under " + empty} {
+		if !strings.Contains(reason, part) {
+			t.Errorf("reason %q lacks %q", reason, part)
+		}
+	}
+
+	// git on the PATH still wins over a root.
+	gitRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(gitRoot, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	onPath := filepath.Join(gitRoot, "bin", "bash.exe")
+	if err := os.WriteFile(onPath, []byte("fixture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitStandardRoots = func() []string { return []string{installed} }
+	viaGit := func() ([]byte, error) {
+		return []byte(filepath.Join(gitRoot, "mingw64", "libexec", "git-core") + "\n"), nil
+	}
+	if got, reason := findGitBash(viaGit); reason != "" || got != onPath {
+		t.Errorf("findGitBash via git = (%q, %q), want (%q, \"\")", got, reason, onPath)
+	}
+}
+
+func TestGitRootsFrom(t *testing.T) {
+	for _, tc := range []struct {
+		name, programFiles, localAppData string
+		want                             []string
+	}{
+		{"both set", "P", "L", []string{filepath.Join("P", "Git"), filepath.Join("L", "Programs", "Git")}},
+		{"only the machine root", "P", "", []string{filepath.Join("P", "Git")}},
+		{"only the user root", "", "L", []string{filepath.Join("L", "Programs", "Git")}},
+		{"neither", "", "", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := gitRootsFrom(tc.programFiles, tc.localAppData); !slices.Equal(got, tc.want) {
+				t.Errorf("gitRootsFrom(%q, %q) = %q, want %q", tc.programFiles, tc.localAppData, got, tc.want)
+			}
+		})
+	}
+}
+
+// A machine an older sync wrote the packages file for: the file is the sync's
+// own, nothing reads it any more, so the next sync removes it (#3363).
+func TestSync_RemovesThePackagesFileAnOlderSyncWrote(t *testing.T) {
+	_, s, tools := newFakePython(t, map[string]string{})
+	if _, err := s.Apply(tools); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(s.ConfigDir, "conf.d", "dotfiles-python-packages.txt")
+	if err := os.WriteFile(stale, []byte("pyyaml==6.0.3\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := s.Plan(tools)
+	if err != nil || !plan.ConfigChanged {
+		t.Fatalf("a stale packages file must read as a pending change, got %+v, %v", plan, err)
+	}
+	if _, err := s.Apply(tools); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the stale packages file must be removed, stat: %v", err)
+	}
+	if again, err := s.Plan(tools); err != nil || again.Pending() {
+		t.Fatalf("a second sync must have nothing to do, got %+v, %v", again, err)
+	}
+}
+
+// mise's Windows build imports vcruntime140.dll, which a clean Windows lacks, so
+// the tools step walks the catalog in file order and must place the runtime
+// before it downloads mise: with the entry after mise, or absent, mise "does not
+// run" and every tool it owns waits on a 45-minute failure (#3396, lesson 561).
+func TestShippedCatalog_PlacesTheVCRuntimeAheadOfMise(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "..", "packages.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	vc, mise := -1, -1
+	for i, tool := range c.Tools {
+		switch tool.Name {
+		case "vcredist":
+			vc = i
+		case "mise":
+			mise = i
+		}
+	}
+	if vc < 0 || mise < 0 || vc > mise {
+		t.Fatalf("vcredist must precede mise in packages.json, got vcredist=%d mise=%d", vc, mise)
+	}
+	got := c.Tools[vc].Source
+	if got.Type != "system" || len(got.Platforms) != 1 || got.Platforms[0] != "windows" {
+		t.Errorf("vcredist is a Windows-only system entry, got %+v", got)
+	}
+}
+
+// A converge builds its runners before the catalog installs git. Git Bash must
+// be looked up when bats runs, not when the runner is made, or bats.cmd resolves
+// WSL's bash.exe on a clean box (#3328, #2346).
+func TestHomeRunners_FindsGitBashInstalledAfterTheRunnerWasBuilt(t *testing.T) {
+	installed := false
+	bashDir := filepath.Join(t.TempDir(), "Git", "bin")
+	locate := func() (string, string) {
+		if !installed {
+			return "", "Git Bash not found"
+		}
+		return filepath.Join(bashDir, "bash.exe"), ""
+	}
+	// The last PATH entry wins in a child's environment, so that is the one read.
+	pathOf := func(env []string) string {
+		got := ""
+		for _, kv := range env {
+			if strings.HasPrefix(kv, "PATH=") {
+				got = strings.TrimPrefix(kv, "PATH=")
+			}
+		}
+		return got
+	}
+	command := homeCommand(t.TempDir(), "windows", locate)
+	if before := command("bats.cmd", "--version"); strings.HasPrefix(pathOf(before.Env), bashDir) {
+		t.Fatalf("Git Bash on PATH before git was installed: %q", pathOf(before.Env))
+	}
+	installed = true
+	after := command("bats.cmd", "--version")
+	if !strings.HasPrefix(pathOf(after.Env), bashDir+string(os.PathListSeparator)) {
+		t.Errorf("bats.cmd PATH after git was installed = %q, want Git Bash first", pathOf(after.Env))
+	}
+}
+
+func TestGitBashEnv_ScopesOnlyTheBatsCommandsOnWindows(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "bin", "bash.exe"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	found := func() ([]byte, error) { return []byte(filepath.Join(root, "mingw64", "libexec", "git-core")), nil }
+	missing := func() ([]byte, error) { return nil, errors.New("git: not found") }
+	t.Setenv("ProgramFiles", t.TempDir())
+	t.Setenv("LocalAppData", t.TempDir())
+
+	lastPath := func(env []string) string {
+		p := ""
+		for _, kv := range env {
+			if strings.HasPrefix(kv, "PATH=") {
+				p = strings.TrimPrefix(kv, "PATH=")
+			}
+		}
+		return p
+	}
+	if p := lastPath(GitBashEnv("windows", found, `C:\m\bats.cmd`, "--version")); !strings.HasPrefix(p, filepath.Join(root, "bin")+string(os.PathListSeparator)) {
+		t.Errorf("bats.cmd on Windows: PATH must start with Git Bash's bin, got %q", p)
+	}
+	if env := GitBashEnv("windows", found, "mise", "install", "--force", "npm:bats"); env == nil {
+		t.Error("the npm:bats install is scoped too")
+	}
+	for name, env := range map[string][]string{
+		"linux":         GitBashEnv("linux", found, "bats.cmd"),
+		"another tool":  GitBashEnv("windows", found, `C:\m\jq.exe`, "--version"),
+		"git not found": GitBashEnv("windows", missing, `C:\m\bats.cmd`, "--version"),
+	} {
+		if env != nil {
+			t.Errorf("%s: want the caller's environment (nil), got a scoped one", name)
+		}
 	}
 }

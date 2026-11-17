@@ -1,0 +1,23 @@
+[
+  {
+    "id": "MEMORY-018-handoff-line-budget-f1",
+    "behavior": "A write that takes MEMORY.md past 200 lines, under 25,000 bytes, is refused naming the count, the cap and the threads to archive",
+    "verification": "cd cli && go test ./internal/mem -run 'TestCheckMemoryBudgetRefusesAWritePastTheLineCap'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-018-handoff-line-budget-f2",
+    "behavior": "A write that does not grow the line count of a file past the cap passes, and one at or under 200 lines passes",
+    "verification": "cd cli && go test ./internal/mem -run 'TestCheckMemoryBudgetLetsAFilePastTheLineCapShrink|TestCheckMemoryBudgetPassesAFileAtTheLineCap'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "MEMORY-018-handoff-line-budget-f3",
+    "behavior": "The byte budget refuses on its own terms for a short file past 25,000 bytes",
+    "verification": "cd cli && go test ./internal/mem -run 'TestCheckMemoryBudgetStillRefusesPastTheByteBudget'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

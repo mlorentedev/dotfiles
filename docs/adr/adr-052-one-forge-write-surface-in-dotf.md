@@ -58,3 +58,27 @@ The Gitea half of `LandedHeads` above could not finish on a real repository. `pe
 Gitea now answers with `GET /repos/{owner}/{repo}/pulls/{base}/{head}` against the default branch: 1.2s, it resolves a deleted branch, and a 404 means no pull request. The price is that it returns the newest pull request against one base, so `LandedHeads` no longer returns every one on Gitea. A reused branch name or a pull request into another base can read "not landed". That is the safe side: `worktree done` refuses and the worktree stays, while the listing's failure left every branch `unknown`. GitHub is unchanged. The owner chose this on 2026-11-02.
 
 Clause 4 of the amendment above is out of date: `worktree list` and `sweep` already take this read through `forgeLandedHeads`, so on a Gitea origin they report landed branches too.
+
+## Amendment (2026-11-11, #3257): one host, one write token, whatever the owner
+
+Clause 4 keys `forge/hosts.json` by host, so two owners on one host share a write credential by design. On `gitea.kubelab.live`, `dotf forge` writes into `personal/` and into the client organization with the same `GITEA_KUBELAB_TOKEN`.
+
+The split between that token and the organization-scoped one is by scope, not by identity. The default is the narrower token, which has no `write:organization`. The broader one is kept for the operations that need its scope. Keying the map by owner would route routine issue writes to the broader token, so the map stays keyed by host. Clause 4's "the wrong forge's token" still holds between forges; within one forge, the scope a write needs decides the token.
+
+The forge cannot say which account a token belongs to, because no token holds `read:user`. The registry records what was measured instead.
+
+## Amendment (2026-11-11, #3316): an agent session writes as the agents' account where the owner has one
+
+The amendment above keeps one write token per host. That token is a PAT on the operator's account (kubelab#2578), so everything an agent opened through `dotf forge` was attributed to the operator. The operator decided on 2026-11-11 to route agents by owner, without adding a token.
+
+- A host may declare `agent_secrets`, a map from owner to a registry secret. In an agent session (the markers `dotf secrets` already reads), a write to a listed owner uses that owner's secret. Every other write, human or agent, uses the host's `secret`, as before.
+- `gitea.kubelab.live` (and its `forge` alias) maps `personal` to `GITEA_KUBELAB_AGENT_TOKEN`, the agents' account kubelab mints (ADR-062, 2026-11-03 amendment). That account is a collaborator only where a repository lists it under `writers:`, which today is every `personal/` repository. A new `personal/` repository needs that entry before agents can write to it; the forge answers 404, never a fallback to the operator's token.
+- The client organization has no entry: the agents' account has no access there, so agent writes on it stay on the operator's token. Moving them is a kubelab grant decision, not a routing one.
+- The previous amendment's point stands: no route ever selects the organization-scoped token. The map is still keyed by host first; the owner only refines it inside one host.
+
+## Amendment (2026-11-14, #3406): drafts on both forges, and one GraphQL call
+
+`pr create --draft` was GitHub-only, and nothing in `dotf forge` marked a draft ready, so agents fell back to `gh pr ready` on GitHub and dropped `--draft` on Gitea. The owner chose one verb for both forges (option A on #3406), specified in TOOL-039.
+
+- **Gitea drafts are a title prefix, verified on the answer.** Gitea has no draft field on create or edit and no API that reads an instance's `WORK_IN_PROGRESS_PREFIXES`. `--draft` opens the pull request with `WIP: ` and requires `draft: true` in the answer; `pr ready` removes `WIP:` or `[WIP]` and requires `draft: false`. When the instance does not agree, the command fails and names the pull request rather than reporting success.
+- **GitHub's ready call is GraphQL.** REST can create a draft but cannot clear the flag; `markPullRequestReadyForReview` is the only call that does, and the one `gh pr ready` sends. It goes through `gh api graphql`, the transport the backend already uses, so the "REST endpoint" in clause 1 now has this one exception. It is one call per pull request, the load `gh pr ready` already put on the GraphQL quota.

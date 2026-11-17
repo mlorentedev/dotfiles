@@ -54,6 +54,7 @@ flowchart LR
   A plain web login, banks and insurers included, stays unfoldered: search and autofill find it without a folder.
 - **Hidden, not text,** for every custom field whose name marks a secret: key, token, secret, password, recovery or backup code. Identifiers stay text: account ids, buckets, endpoints, IBAN.
 - **Reprompt on** for every item in `Homelab`, `Cards` and `Identity`, and for any item whose disclosure opens other accounts (the GitHub account, SSH keys). Reprompt is a gate in the Bitwarden apps. Whether `bw serve` reads through it has not been measured yet, so no registry-declared item gets reprompt until it is: after the first curate apply, `dotf secrets verify` must still resolve everything. A field's type does not matter to a read. `dotf secrets` resolves a hidden field exactly like a text one, and it writes new fields as hidden.
+- **`dotf secrets run` refuses a `.cmd` or `.bat` child on Windows** (#3440), as `dotf lane exec` does: npm installs an agent as such a shim, cmd.exe re-parses `% ^ & | < > "` in the arguments the child is handed, and a prompt is free text. Install a native executable ahead of it on PATH. The check runs before anything is decrypted; elsewhere a file with that name is an ordinary executable and nothing is refused.
 - **One authority per secret.** When another system owns a value (kubelab's SOPS, for example), the Bitwarden copy is removed once parity is measured equal.
 - The **registry** `secrets/registry.yaml` is the SSOT: `id → bw item/field → env|file → consumers → rotate`.
 - **Values never render into an unintended channel** — a log, a chat/AI conversation, a shared terminal, CI output; **never `bw export` to plaintext on disk** (always pipe `--raw` into `age`). `dotf secrets show`/`run` are the deliberate, interactive-terminal-only exceptions this convention doesn't forbid — the rule is against accidental exposure, not against the primitives that exist specifically to show or use a value.
@@ -93,6 +94,23 @@ When a new API key/token/credential enters the system:
 4. Wire consumers (env-var contract / file target).
 5. **Verify** it resolves without leaking: `dotf secrets run --only <id> -- printenv <VAR>` (never pipe the value anywhere shared).
 6. **Do NOT** add it to `sensitive/*.age` — that path is retiring; the DR escrow already covers it.
+
+## Protocol — CHECK the CI secrets each repository needs
+
+A repository's CI secrets come from the registry's `ci:<owner>/<repo>` consumers, written by hand. `dotf secrets ci-check` compares them with what the repository's workflows read:
+
+```bash
+dotf secrets ci-check                                   # every non-archived, non-fork repository you own
+dotf secrets ci-check --repo mlorentedev/kubelab        # one or more, repeatable
+```
+
+Per repository it prints names only, never values:
+
+- **missing**: a workflow reads the name and the registry does not declare it for the repository. For a reusable workflow called with `secrets: inherit`, the callee's `on.workflow_call.secrets` count too, read at the pinned ref. A callee secret marked `required: false` is still missing, shown `(optional in <callee>)`: the run does not fail without it, it degrades.
+- **excess**: declared, and no workflow reads it.
+- **unknown**: a read whose name cannot be known (`toJSON(secrets)`, `secrets[<expression>]`), with its file and expression. Neither a pass nor a failure.
+
+It exits non-zero when any repository has a missing or excess name. Fix a missing name by adding the repository to the secret's `consumers` (then `dotf secrets sync ci --repo <r> <VAR>`), or by removing the read. It never edits `registry.yaml`, and it does not say whether a declared secret was uploaded (#1596). `HIVE_WORKER_API_KEY` reads as excess wherever `NAN_API_KEY` is declared until #2306 lets a consumer name the var it holds.
 
 ## Protocol — CONVERGE the store's layout
 

@@ -6,14 +6,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/mlorentedev/dotfiles/cli/internal/converge"
 	"github.com/mlorentedev/dotfiles/cli/internal/doctor"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 	"github.com/mlorentedev/dotfiles/cli/internal/update"
 )
 
@@ -28,19 +29,30 @@ Task (Windows), which the 'dotf converge' step self-deploy installs on a machine
 that declares the role ('dotf env role add self-deploy'). It pulls the dotfiles
 repo and runs 'dotf converge' from it (which runs the setup script last on
 Linux and Windows) — but ONLY via a clean fast-forward, and ONLY when HEAD moved.
+On a day HEAD did not move it runs one step instead, 'dotf converge --only
+system-upgrade', which keeps the catalog's unpinned system packages current
+(brew, apt, winget); a full converge already includes that step. A step that
+skips (offline, apt without sudo -n) is recorded as upgrade-skipped with the
+reason and exits 0.
 
-The checkout's DOTF_VERSION pin is part of being up to date. When the running
-dotf is not that version (after a fast-forward, or when the checkout was
-already current), update runs the checkout's installer (install.sh, or
-install.ps1 under pwsh), which installs the pin and converges with the NEW
-binary; update does not converge a second time with the old one. A source
-build ("dev") is never replaced: the pin check is skipped and said so.
+The DOTF_VERSION pin is part of being up to date, and it is the upstream's:
+after the fetch, update reads versions.conf at the upstream branch (the
+checkout's own copy when there is no upstream). When the running dotf is not
+that version, update downloads the release, verifies it against the release
+checksums, and replaces the binary it is running from, the same way on every
+OS; install.sh and install.ps1 are not involved. It does this on any checkout
+it could fetch, including a dirty, ahead or diverged one. On a checkout that is
+current or fast-forwarded, the NEW binary then converges as a child process;
+update does not converge a second time with the old one. A source build ("dev")
+is never replaced: the pin check is skipped and said so.
 
-Anything non-actionable (not a git repo, dirty worktree, unreachable remote, no
-upstream, ahead of the upstream, diverged history, or already current with dotf
-at its pin) is logged and skipped with exit 0; a skip names a dotf that is off
-its pin.
-A real converge failure, or a pinned dotf that cannot be installed, is the ONLY
+Anything else that leaves the checkout undeployable (not a git repo, dirty
+worktree, unreachable remote, no upstream, ahead of the upstream, or diverged
+history) skips the converge, is logged, and exits 0; an offline machine or a
+missing checkout installs nothing either. Already current with dotf at its pin
+is not a skip: it runs the system-upgrade step described above.
+A real converge failure, a pinned dotf that cannot be installed, or a failed
+system-upgrade step on a quiet day (status upgrade-failed) is the ONLY
 non-zero exit, so the scheduler's last result (launchd's log, 'systemctl --user
 status dotfiles-selfupdate', the task's LastTaskResult) surfaces it. Every run,
 a skip included, records its outcome in <state dir>/update/last.json, which
@@ -66,10 +78,12 @@ Env:
 			}
 			repo := repoForUpdate()
 			out, err := update.Run(update.Config{Repo: repo, Version: dotfVersion}, update.Deps{
-				Git:      gitRunner(repo),
-				Converge: func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
-				Pin:      func() (string, error) { return pinnedDotfVersion(repo) },
-				Install:  func(pin string) error { return runInstaller(c, repo, pin) },
+				Git:          gitRunner(repo),
+				Converge:     func() error { return runConverge(c.OutOrStdout(), repo, false, nil) },
+				Pin:          func(ref string) (string, error) { return pinnedDotfVersion(repo, ref) },
+				Install:      func(pin string) (string, error) { return installDotf(c.OutOrStdout(), pin) },
+				ConvergeWith: func(exe string) error { return convergeWith(c, repo, exe) },
+				Upgrade:      func() (string, error) { return runSystemUpgrade(c.OutOrStdout(), repo) },
 			})
 			c.Println(out.Message)
 			if err != nil {
@@ -84,11 +98,36 @@ Env:
 	return cmd
 }
 
+// quietDaySteps are the converge steps a day the checkout did not move still
+// runs: the package upgrade, and the weekly cache-gc, which keeps its own
+// cadence and so has no trigger of its own (#3367).
+var quietDaySteps = []string{"system-upgrade", "cache-gc"}
+
+// runSystemUpgrade converges the quiet-day steps and returns the
+// system-upgrade step's skip reason, "" when the step ran. A converge whose
+// step skipped exits 0, so without the reason a quiet day that upgrades
+// nothing would read as one that did.
+func runSystemUpgrade(w io.Writer, repo string) (string, error) {
+	rep, err := runConvergeReport(w, repo, false, quietDaySteps)
+	return systemUpgradeSkip(rep), err
+}
+
+// systemUpgradeSkip is the system-upgrade entry's skip reason in rep, "" when
+// the step ran (or failed: the run's error carries that).
+func systemUpgradeSkip(rep converge.Report) string {
+	for _, e := range rep.Entries {
+		if e.Name == "system-upgrade" && e.Status == converge.StatusSkipped {
+			return e.Detail
+		}
+	}
+	return ""
+}
+
 // updateHomes are the XDG homes a scheduler hands `dotf update` as flags.
 type updateHomes struct{ config, state string }
 
 // apply exports each home given, before anything resolves machine.json or the
-// state dir, so the converge and the installer the run starts inherit it. A
+// state dir, so the converges the run starts, in process or in the new binary, inherit it. A
 // relative one is refused: env ignores a relative XDG_STATE_HOME, and the run
 // would quietly use another home.
 func (h updateHomes) apply() error {
@@ -119,46 +158,62 @@ func recordUpdate(w io.Writer, out update.Outcome, runErr error) {
 	}
 }
 
-// pinnedDotfVersion reads DOTF_VERSION from the checkout's versions.conf, the
-// file doctor compares the installed dotf against. "" means it is not pinned.
-func pinnedDotfVersion(repo string) (string, error) {
-	pins, err := doctor.ParseVersionsConf(filepath.Join(repo, env.CheckoutMarker))
+// pinnedDotfVersion reads DOTF_VERSION from versions.conf: at git ref (the
+// upstream, "@{u}") or, for "", from the checkout's working tree, the file
+// doctor compares the installed dotf against. "" means it is not pinned.
+func pinnedDotfVersion(repo, ref string) (string, error) {
+	if ref == "" {
+		pins, err := doctor.ParseVersionsConf(filepath.Join(repo, env.CheckoutMarker))
+		if err != nil {
+			return "", err
+		}
+		return pins["DOTF_VERSION"], nil
+	}
+	conf, err := gitRunner(repo)("show", ref+":"+env.CheckoutMarker)
+	if err != nil {
+		return "", fmt.Errorf("git show %s:%s: %w", ref, env.CheckoutMarker, err)
+	}
+	pins, err := doctor.ParseVersions(strings.NewReader(conf))
 	if err != nil {
 		return "", err
 	}
 	return pins["DOTF_VERSION"], nil
 }
 
-// installerInvocation is the command that runs the checkout's installer for
-// goos, handing it the checkout so its converge reads the one update just
-// moved rather than resolving another. Every argument install.{sh,ps1} gets
-// goes on to `dotf converge`.
-func installerInvocation(goos, repo string) (name string, args []string) {
-	if goos == "windows" {
-		return "pwsh", []string{"-NoProfile", "-File", filepath.Join(repo, "install.ps1"), "--repo", repo}
+// dotfExecutable is the running dotf, symlinks resolved: the file update
+// replaces. dotfReleaseBase is where releases are downloaded from. Both are
+// seams for the tests.
+var (
+	dotfExecutable = func() (string, error) {
+		exe, err := os.Executable()
+		if err != nil {
+			return "", err
+		}
+		return filepath.EvalSymlinks(exe)
 	}
-	return filepath.Join(repo, "install.sh"), []string{"--repo", repo}
+	dotfReleaseBase = "https://github.com"
+)
+
+// installDotf replaces the running dotf with release pin, verified against the
+// release checksums, in Go and the same way on every OS (CLI-133). It returns
+// the path it installed to, for the converge that follows.
+func installDotf(w io.Writer, pin string) (string, error) {
+	exe, err := dotfExecutable()
+	if err != nil {
+		return "", fmt.Errorf("locate the running dotf: %w", err)
+	}
+	in := &tools.Installer{BaseURL: dotfReleaseBase, Out: w}
+	return exe, in.InstallSelf(tools.DotfRelease(pin), exe)
 }
 
-// runInstaller installs the dotf release pin and converges with it, through the
-// checkout's own installer: it stages the binary beside the target and renames
-// it into place (install.ps1 parks a live dotf.exe first), so replacing the
-// binary of this very process is safe. DOTF_VERSION is set explicitly because
-// the installer prefers an exported one to the checkout's versions.conf, and a
-// shell that sourced a stale deploy copy exports the old pin.
-func runInstaller(c *cobra.Command, repo, pin string) error {
-	name, args := installerInvocation(runtime.GOOS, repo)
-	cmd := exec.Command(name, args...) //nolint:gosec // the checkout's own installer, at a path built from the resolved checkout
-	cmd.Dir = repo
-	cmd.Env = append(os.Environ(), "DOTF_VERSION="+pin)
-	// Stdin stays closed, as ExecSetup leaves it: update is the unattended
-	// scheduler path, so the identity epilogue of the installer's converge
-	// prints what is left instead of walking a restore.
-	cmd.Stdout, cmd.Stderr = c.OutOrStdout(), c.ErrOrStderr()
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s: %w", filepath.Base(name), err)
-	}
-	return nil
+// convergeWith runs `converge` with the dotf at exe, the one just installed, as
+// a child process told the checkout update moved. Not exec(2): Windows has
+// none, and update records the run after the converge returns.
+func convergeWith(c *cobra.Command, repo, exe string) error {
+	cmd := exec.Command(exe, "converge") //nolint:gosec // the dotf release update just verified and installed
+	cmd.Env = append(os.Environ(), "DOTFILES_REPO_DIR="+repo)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr()
+	return cmd.Run()
 }
 
 // repoForUpdate resolves the dotfiles checkout to fast-forward. The cascade

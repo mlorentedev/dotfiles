@@ -36,6 +36,9 @@ func SystemdUnits(job Job) (service, timer []byte) {
 	for _, v := range job.Env {
 		env.WriteString(`Environment="` + quote.Replace(v.Name+"="+v.Value) + "\"\n")
 	}
+	if job.Background {
+		env.WriteString("Nice=19\nIOSchedulingClass=idle\nCPUSchedulingPolicy=idle\n")
+	}
 	service = []byte(Marker + `
 [Unit]
 Description=` + description + `

@@ -4,6 +4,7 @@
 
 load 'lib/both-shells'
 load 'lib/fixture-template'
+load 'lib/dotf-bin'
 
 # Built once per file and copied per test (CI-012 N3).
 _seed_fixture() {
@@ -26,6 +27,7 @@ teardown_file() { fixture_template_release; }
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    dotf_bin_resolve "$BATS_FILE_TMPDIR/dotf" || return 1
     REPO_FIXTURE="$BATS_TEST_TMPDIR/repo"
     fixture_template_copy repo "$REPO_FIXTURE"
     cd "$REPO_FIXTURE" || exit 1
@@ -41,8 +43,41 @@ _commit() {
 # under both (.claude/CLAUDE.md), and bash-only constructs fail silently in zsh.
 _both() { run_both_shells "$SCRIPTS_DIR/check-knowledge-gate.sh" "$@"; }
 
+# Every judged case also runs `dotf gate knowledge`, the Go port (CI-018), on
+# an event file built from the same SDD_* environment, and requires the same
+# status and, short of a wiring error, the same output. The two exit-2 paths
+# word their cause differently (an unset variable, an event with no PR).
 _gate() {
-    _both --base-ref main --head-ref feature "$@"
+    _both --base-ref main --head-ref feature "$@" || return 1
+    local sh_status="$status" sh_output="$output"
+    _dotf_gate "$@"
+    if [ "$status" != "$sh_status" ] || { [ "$sh_status" != 2 ] && [ "$output" != "$sh_output" ]; }; then
+        printf 'shell (%s) and dotf gate knowledge (%s) disagree\n--- shell\n%s\n--- dotf\n%s\n' \
+            "$sh_status" "$status" "$sh_output" "$output"
+        return 1
+    fi
+}
+
+# The pull-request event the CI-008 composite hands the gate: body, labels and
+# author, or no pull_request at all when SDD_PR_BODY is unset.
+_dotf_gate() {
+    local event="$BATS_TEST_TMPDIR/event.json"
+    if [ -z "${SDD_PR_BODY+set}" ]; then
+        printf '{}' >"$event"
+    else
+        jq -n --arg body "$SDD_PR_BODY" --arg labels "${SDD_LABELS:-}" --arg author "${SDD_PR_AUTHOR:-}" \
+            '{pull_request: {number: 1, body: $body,
+              labels: ($labels | split(",") | map(select(. != "")) | map({name: .})),
+              user: {login: $author}}}' >"$event"
+    fi
+    # No network (AC3): no token, and a PATH holding git alone, so a gh call
+    # cannot succeed and would surface as a verdict that differs from the
+    # shell gate's. A link, not a stub: nothing stands in for a real tool.
+    local bin="$BATS_TEST_TMPDIR/git-only"
+    mkdir -p "$bin"
+    [ -e "$bin/git" ] || ln -s "$(command -v git)" "$bin/git"
+    run env -u GH_TOKEN -u GITHUB_TOKEN PATH="$bin" \
+        "$DOTF_BIN" gate knowledge --event "$event" --base main --head feature "$@"
 }
 
 # A body whose Lesson line is $1; ADR and Runbook are reasoned nones.
@@ -530,8 +565,12 @@ A \`\`span\` <!-- \`\`\` then
     }
     spec=$(_bots "$SCRIPTS_DIR/check-spec-gate.sh")
     knowledge=$(_bots "$SCRIPTS_DIR/check-knowledge-gate.sh")
+    # The Go port's list (CI-018), from its one declaration.
+    dotf=$(grep -E '^var dependencyBots' "$BATS_TEST_DIRNAME/../cli/internal/gate/event.go" |
+        grep -oE '"[^"]+\[bot\]"' | sort)
     [ -n "$spec" ]
     [ "$spec" = "$knowledge" ]
+    [ "$spec" = "$dotf" ]
 }
 
 @test "release-please footer: a release PR passes on the section its footer carries" {
@@ -553,4 +592,32 @@ $footer"
     export SDD_PR_BODY
     _gate
     [ "$status" -eq 0 ]
+}
+
+# Renovate opens its PRs with a personal token, so they are authored by the
+# token's owner and the bot skip never applies; the prBodyNotes renovate.json
+# gives minor and patch bumps is what answers the gate (#3284). The notes are
+# read from the committed config. A major gets none and must fail.
+_renovate_notes() {
+    python3 -c 'import json,sys
+rules = json.load(open(sys.argv[1]))["packageRules"]
+print("".join(n for r in rules if r.get("matchUpdateTypes") == ["minor", "patch"] for n in r.get("prBodyNotes", [])))' "$BATS_TEST_DIRNAME/../renovate.json"
+}
+
+@test "a Renovate minor or patch bump passes on the Knowledge section renovate.json writes" {
+    SDD_PR_BODY="$(_renovate_notes)"
+    [ -n "$SDD_PR_BODY" ] || { echo "renovate.json gives minor and patch bumps no prBodyNotes"; false; }
+    export SDD_PR_BODY SDD_PR_AUTHOR=mlorentedev SDD_LABELS=dependencies,renovate
+    echo "FD_VERSION=10.6.0" > versions.conf
+    _commit "fix(deps): update cli pins"
+    _gate
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "a Renovate major bump without a written Knowledge section fails" {
+    export SDD_PR_BODY="This PR updates helm from v3 to v4." SDD_PR_AUTHOR=mlorentedev SDD_LABELS=dependencies,renovate
+    echo "HELM_VERSION=4.0.0" > versions.conf
+    _commit "fix(deps): update helm to v4"
+    _gate
+    [ "$status" -eq 1 ] || { echo "$output"; false; }
 }

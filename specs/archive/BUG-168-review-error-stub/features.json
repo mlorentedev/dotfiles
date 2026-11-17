@@ -1,0 +1,16 @@
+[
+  {
+    "id": "BUG-168-review-error-stub-f1",
+    "behavior": "A review run that ends without writing its review file leaves one with verdict ERROR, the request's reviewer and commit, how it ended and the reviewer's last output; a file the run left is not replaced",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestDeadlineWritesAnErrorStub|TestDeadlineKeepsTheReviewersOwnFile' && go test ./internal/spec -run 'TestWriteErrorStub'",
+    "state": "passing",
+    "evidence": "go test ./... ok on the branch head"
+  },
+  {
+    "id": "BUG-168-review-error-stub-f2",
+    "behavior": "ParseReview refuses verdict ERROR by name, so spec archive and the foreground outcome refuse it and say to run the review again",
+    "verification": "cd cli && go test ./internal/spec -run 'TestParseReviewRefusesAnErrorVerdictByName|TestVerifyReviewProducedReportsAnErrorStub|TestStoppedRunRecordNamesAnErrorStub'",
+    "state": "passing",
+    "evidence": "go test ./... ok on the branch head"
+  }
+]

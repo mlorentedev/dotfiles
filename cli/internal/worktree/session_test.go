@@ -150,6 +150,7 @@ func TestSweepSkipsAWorktreeWithARecentSession(t *testing.T) {
 		_ = os.MkdirAll(wt, 0o755)
 	}
 	for _, wt := range []string{live, idle} {
+		linkFake(t, mainRepo, wt)
 		_ = SaveMetadata(wt, Metadata{ReapOK: true, CreatedAt: now.Add(-2 * time.Hour), LeaseExpiresAt: now.Add(-time.Hour)})
 	}
 	projects := t.TempDir()

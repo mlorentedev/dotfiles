@@ -128,3 +128,42 @@ func TestCheckPersistedEnv_ByStatus(t *testing.T) {
 		}
 	})
 }
+
+// W2b PR 2 (PLAT-001c blocker 2): a process with no profile finds dotf and the
+// pinned CLIs only through the user Path, so the section also reads whether
+// mise's shims and ~/.local/bin head it. Measured on a clean Arm64 guest: the
+// user Path held neither, and neither dotf nor mise resolved.
+func TestCheckPersistedEnv_UserPathHead(t *testing.T) {
+	home := t.TempDir()
+	mirror := filepath.Join(home, ".dotfiles")
+	writeFile(t, filepath.Join(mirror, "env-contract.json"), persistContract)
+	shims := filepath.Join(home, "AppData", "Local", "mise", "shims")
+	bin := filepath.Join(home, ".local", "bin")
+	cases := []struct {
+		name string
+		path string
+		err  error
+		want Status
+	}{
+		{"tool dirs at the head → PASS", shims + ";" + bin + `;C:\a`, nil, StatusPass},
+		{"tool dirs missing → WARN naming the converge step", `C:\a`, nil, StatusWarn},
+		{"tool dirs after a user entry → WARN", `C:\a;` + shims + ";" + bin, nil, StatusWarn},
+		{"Path unreadable → WARN", "", errors.New("access denied"), StatusWarn},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sys := newSys(map[string]string{"HOME": home, "USERPROFILE": home, "LOCALAPPDATA": filepath.Join(home, "AppData", "Local")}, nil, nil)
+			sys.GOOS = "windows"
+			sys.UserEnv = func(string) (string, bool, error) { return "", false, nil }
+			sys.UserPath = func() (string, error) { return tc.path, tc.err }
+			var buf bytes.Buffer
+			checkPersistedEnv(sys, &Config{DotfilesDir: mirror}, capture(&buf))
+			if got := statusOfLine(buf.String(), "user Path"); got != tc.want {
+				t.Fatalf("want %q, got %q\n%s", tagOf(tc.want), tagOf(got), buf.String())
+			}
+			if tc.want == StatusWarn && tc.err == nil && statusOfLine(buf.String(), "dotf converge --only env-persist") != StatusWarn {
+				t.Errorf("the WARN must name the converge step\n%s", buf.String())
+			}
+		})
+	}
+}

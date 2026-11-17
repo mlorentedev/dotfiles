@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,7 +34,8 @@ type RunOptions struct {
 	Machine  Machine
 	Source   string        // a zip of the ref to converge (git archive), copied into the guest
 	Dotf     string        // a dotf.exe source build to converge with; "" uses the release the ref pins
-	Keep     bool          // leave the guest running for inspection
+	Keep     bool          // leave the guest running for inspection, as a named session
+	Session  string        // the session Keep registers; "" names it windows-<unix time>
 	Agent    time.Duration // until the guest agent answers and the test user is logged on
 	Step     time.Duration // one converge
 	Poll     time.Duration
@@ -44,7 +46,9 @@ type RunOptions struct {
 // Run boots a throwaway overlay of clean-base, copies in the ref's archive,
 // runs install.ps1 from it as the test user, and converges again: the first
 // run must end with no failed step and the second must change nothing. The
-// overlay is removed at the end unless Keep, and clean-base never changes.
+// overlay is removed at the end unless Keep, and clean-base never changes. A
+// kept guest is registered as a session, so `exec` and `cp` can read its logs
+// and `down` ends it (#3404).
 func Run(h Host, o RunOptions) (err error) {
 	l := o.Machine.Layout
 	if running(h, l) {
@@ -57,16 +61,36 @@ func Run(h Host, o RunOptions) (err error) {
 	if !done {
 		return fmt.Errorf("no clean-base at %s: run `dotf vm windows build` first", l.BaseDisk())
 	}
+	sessions := WindowsSessions{Machine: o.Machine}
+	if o.Keep {
+		// A stale session would sort ahead of the one this run registers, and
+		// `down` acts only on the first.
+		holder, herr := sessions.holder()
+		if herr != nil {
+			return herr
+		}
+		if holder != "" {
+			return fmt.Errorf("session %s has no running guest: `dotf vm windows down --session %s` clears it", holder, holder)
+		}
+	}
 	defer func() {
 		if !o.Keep {
 			err = errors.Join(err, removeIfPresent(l.Disk()), removeIfPresent(l.Vars()))
 		}
 	}()
 	p, q, err := bootGuest(h, o)
+	kept := ""
+	if o.Keep && err == nil {
+		kept, err = registerKept(l, o.Session)
+	}
 	if p != nil {
 		defer func() {
 			if o.Keep {
-				step(o.Progress, "kept: the guest is still running; `dotf vm windows stop` stops it")
+				if kept != "" {
+					step(o.Progress, "kept as session %s: `dotf vm windows exec --session %s` reads it, `dotf vm windows down --session %s` ends it", kept, kept, kept)
+				} else {
+					step(o.Progress, "kept: the guest is still running; `dotf vm windows stop` stops it")
+				}
 				return
 			}
 			kill(p)
@@ -106,6 +130,18 @@ func Run(h Host, o RunOptions) (err error) {
 	}
 	step(o.Progress, "converged, and the second run changed nothing")
 	return nil
+}
+
+// registerKept records the guest a kept run leaves as a session: the empty
+// directory WindowsSessions reads, a name and nothing else.
+func registerKept(l Layout, name string) (string, error) {
+	if name == "" {
+		name = fmt.Sprintf("%s-%d", windowsOS, time.Now().Unix())
+	}
+	if err := ValidSessionName(name); err != nil {
+		return "", err
+	}
+	return name, os.MkdirAll(filepath.Join(l.Sessions(), name), 0o755)
 }
 
 // bootGuest boots a fresh overlay of clean-base and waits until the test user
@@ -256,6 +292,20 @@ func waitLogon(q *QGA, o RunOptions) error {
 	}
 }
 
+// stillRunning is the PowerShell that reports a step that has not ended: its
+// log so far, read with a shared read, then every process under the step's
+// guestrun.ps1, oldest first, as `pid command line`. Its own command line holds
+// the pattern it looks for, so the $PID filter leaves this process out, and the
+// walk stops at 500 so a reused PID cannot make it a cycle.
+func stillRunning(name string) string {
+	return `Get-Content -Raw -Encoding UTF8 -LiteralPath '` + guestWork + `\` + name + `.log' -ErrorAction SilentlyContinue
+$all = @(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID })
+$tree = @($all | Where-Object { $_.CommandLine -like '*guestrun.ps1 -Step ` + name + `*' })
+for ($i = 0; $i -lt $tree.Count -and $i -lt 500; $i++) { $tree += @($all | Where-Object { $_.ParentProcessId -eq $tree[$i].ProcessId }) }
+'--- still running:'
+$tree | Sort-Object CreationDate | ForEach-Object { '{0} {1}' -f $_.ProcessId, $_.CommandLine }`
+}
+
 // runStep runs guestrun.ps1 -Step name as the test user, through a scheduled
 // task: the agent runs commands as LocalSystem, whose profile is not the one
 // a person converges. It relays the step's output, then judges the step on
@@ -276,11 +326,19 @@ func runStep(q *QGA, o RunOptions, name, label string, check func(converge.RunRe
 	limit, cancel := context.WithTimeout(context.Background(), o.Step)
 	defer cancel()
 	code, werr := pollExit(limit, q, o.Poll, guestWork+`\`+name+".exit")
+	if werr != nil {
+		// The step still holds its log open, which the agent's own open
+		// cannot share: read it through PowerShell, and name what is left
+		// running, before a run without --keep discards the guest (#3208).
+		if r, err := q.Run("powershell.exe", []string{"-NoProfile", "-Command", stillRunning(name)}); err == nil {
+			_, _ = o.Out.Write(bytes.TrimPrefix(r.Stdout, []byte(utf8BOM)))
+		} else {
+			_, _ = fmt.Fprintf(o.Out, "--- could not read what %s left running: %v\n", name, err)
+		}
+		return fmt.Errorf("%s did not finish in %s: %w", label, o.Step, werr)
+	}
 	if out, err := q.ReadFile(guestWork + `\` + name + ".log"); err == nil {
 		_, _ = o.Out.Write(bytes.TrimPrefix(out, []byte(utf8BOM)))
-	}
-	if werr != nil {
-		return fmt.Errorf("%s did not finish in %s: %w", label, o.Step, werr)
 	}
 	var runErr error
 	if code != "0" {

@@ -11,6 +11,8 @@
 
 load 'lib/both-shells'
 load 'lib/fixture-template'
+load 'lib/dotf-bin'
+load 'lib/spec-gate-parity'
 
 # Built once per file and copied per test (CI-012 N3).
 _seed_fixture() {
@@ -32,6 +34,7 @@ teardown_file() { fixture_template_release; }
 
 setup() {
     SCRIPTS_DIR="$BATS_TEST_DIRNAME/../scripts"
+    dotf_bin_resolve "$BATS_FILE_TMPDIR/dotf" || return 1
     GATE="$SCRIPTS_DIR/check-spec-gate.sh"
     # mktemp picks the unique name; the copy needs it not to exist yet.
     REPO_FIXTURE="$(mktemp -d "/tmp/bats_archivegate_XXXXXX")"
@@ -40,7 +43,7 @@ setup() {
     cd "$REPO_FIXTURE" || exit 1
     # Every test starts with a clean env: a leaked label or body from the shell
     # would silently change which branch of the gate is exercised.
-    unset SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR
+    unset SDD_LABELS SDD_PR_BODY SDD_PR_AUTHOR SDD_PR_DRAFT
 }
 
 teardown() {
@@ -86,7 +89,7 @@ tiny_change() {
     git commit -q -m "tiny change"
 }
 
-run_gate() { run_both_shells "$GATE" --base-ref main --head-ref feature; }
+run_gate() { spec_gate_both --base-ref main --head-ref feature; }
 
 @test "AC1: closing an issue whose active spec is not archived fails the gate" {
     seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
@@ -99,6 +102,72 @@ run_gate() { run_both_shells "$GATE" --base-ref main --head-ref feature; }
     [[ "$output" == *"FOO-001-demo"* ]] || false
     # The message has to be actionable, not just a refusal.
     [[ "$output" == *"dotf spec archive"* ]] || false
+}
+
+@test "AC9: a draft PR at push time is warned, not refused, and CI keeps the refusal (#3364)" {
+    # The pre-push adapter hands SDD_PR_DRAFT=true for a draft PR: the spec
+    # must still archive in this PR, but the push that carries a review fix
+    # whose proof is a CI leg goes through, and CI's spec-gate (which never
+    # sets the flag) refuses the merge until it does.
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY="Closes #123"
+    export SDD_PR_DRAFT=true
+
+    run_gate
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[WARN] SDD archive-on-merge"* ]] || false
+    [[ "$output" == *"FOO-001-demo"* ]] || false
+    [[ "$output" == *"dotf spec archive FOO-001-demo"* ]] || false
+    [[ "$output" == *"spec-gate"* ]] || false
+}
+
+@test "AC9: a PR that is not a draft is refused as before, whatever the flag says" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY="Closes #123"
+    export SDD_PR_DRAFT=false
+
+    run_gate
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"[FAIL] SDD archive-on-merge violation"* ]] || false
+}
+
+@test "AC9: a draft does not waive a skip-archive label without its rationale" {
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    export SDD_PR_BODY="Closes #123"
+    export SDD_LABELS="skip-archive"
+    export SDD_PR_DRAFT=true
+
+    run_gate
+    [ "$status" -eq 1 ]
+}
+
+@test "AC9: dotf gate spec does not read the event's draft field, so a draft PR in CI is still refused" {
+    # The waiver rides on SDD_PR_DRAFT only. A pull_request event says
+    # draft:true for every draft, and a gate that honoured it would go green
+    # on a draft and stay green when the PR is marked ready without a push.
+    seed_active_spec FOO-001-demo '"mlorentedev/dotfiles#123"'
+    start_feature
+    tiny_change
+    jq -n '{pull_request: {number: 1, body: "Closes #123", draft: true, labels: [], user: {login: "mlorentedev"}}}' \
+        >"$BATS_TEST_TMPDIR/draft-event.json"
+    run env -u SDD_PR_DRAFT "$DOTF_BIN" gate spec --event "$BATS_TEST_TMPDIR/draft-event.json" --base main --head feature
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"[FAIL] SDD archive-on-merge violation"* ]] || false
+}
+
+@test "AC9: CI's adapter never hands the gate the draft flag, so the merge-time refusal stays" {
+    # The waiver is a push-time courtesy. If spec-gate-pr.sh ever exported
+    # SDD_PR_DRAFT, a draft PR could merge with its spec active. The pin
+    # matches an assignment or an export, not a mention, so a comment in that
+    # script saying it deliberately leaves the variable alone stays green.
+    run grep -cE 'SDD_PR_DRAFT=|export[[:space:]].*SDD_PR_DRAFT' "$SCRIPTS_DIR/spec-gate-pr.sh"
+    [ "$output" = "0" ]
 }
 
 @test "AC2: the same PR passes once the spec folder is archived" {
@@ -368,7 +437,7 @@ big_change() {
     archive_spec FOO-001-demo
     export SDD_PR_BODY="Closes #123"
 
-    run_both_shells "$GATE" --base-ref main --head-ref feature --explain
+    spec_gate_both --base-ref main --head-ref feature --explain
     [ "$status" -eq 0 ]
     [[ "$output" == *"Active-spec LOC (added+removed): 0"* ]] || false
     [[ "$output" == *"Specs archived for archive-on-merge"* ]] || false

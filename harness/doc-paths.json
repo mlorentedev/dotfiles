@@ -1,0 +1,46 @@
+{
+  "$comment": [
+    "Checkout-owned policy for `dotf lint doc-paths` (BUG-165, #3199).",
+    "Backticked repo paths in active instruction files are live claims and must resolve.",
+    "Historical docs, archived specs and generated harness records are intentionally excluded."
+  ],
+  "version": 1,
+  "governed_basenames": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "AGY.md",
+    "GEMINI.md",
+    "copilot-instructions.md",
+    "README.md"
+  ],
+  "exclude_prefixes": [
+    "harness/",
+    "specs/",
+    "docs/"
+  ],
+  "known_extensions": [
+    ".sh",
+    ".ps1",
+    ".zsh",
+    ".bats",
+    ".conf",
+    ".md",
+    ".json",
+    ".jsonc",
+    ".yaml",
+    ".yml",
+    ".toml"
+  ],
+  "required_members": [
+    "AGENTS.md",
+    "ai/agy/AGY.md",
+    ".claude/CLAUDE.md",
+    "ai/copilot/copilot-instructions.md",
+    "README.md"
+  ],
+  "source_extensions": [
+    ".conf",
+    ".sh",
+    ".zsh"
+  ]
+}

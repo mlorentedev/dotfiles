@@ -1,0 +1,11 @@
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: owner/setup-thing@0123456789abcdef0123456789abcdef01234567 # v4
+      - uses: ./.github/actions/local
+      - uses: docker://alpine:3.20
+  call:
+    uses: ./.github/workflows/local.yml

@@ -119,7 +119,9 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // install, so the path file is current before any agent lands (#2013 P6). The configs come
 // after the tools, which answer each entry's `requires`, and before git-config,
 // whose probe needs the dotfiles.gitconfig include target that a config entry
-// deploys. git-lfs follows git-config: both write the global config, and
+// deploys. ts-bridge-client follows git-config: it owns an optional file that
+// the deployed config includes. git-lfs follows both: it writes global config,
+// and
 // tools installs the git-lfs it runs (#2201). pi-settings sits between tools, which installs pi, and
 // configs-deploy, whose pi-compaction entry merges into the file it seeds
 // (#1948). shell-completions follows configs-deploy, which deploys the .zshrc
@@ -130,6 +132,11 @@ func (s *skipper) Probe(Env) error { s.probed = true; return nil }
 // installed (OPS-053). workstation-target follows: it reads the
 // deployed public key's source in the checkout and changes how the machine
 // faces the network, so it comes after everything a user session needs.
+// system-upgrade follows tools: tools installs what is absent, and it moves
+// what is already there (TOOL-036). cache-gc follows system-upgrade, the
+// other step a quiet day of `dotf update` runs (#3367).
+// lanes follows git-hooks: the record it writes arms the guard that step wires
+// (HARNESS-195).
 // agent-extensions comes after tools, whose PATH reaches the claude mise
 // installs, and last among the native steps, so a plugin that cannot install
 // stops nothing else (#2387). The setup script runs last, after every native
@@ -139,7 +146,7 @@ func TestRegistry_ToolsRunAfterRecords(t *testing.T) {
 	for _, r := range Registry(Options{}) {
 		names = append(names, r.Name())
 	}
-	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,pwsh-modules,pi-settings,configs-deploy,orca-hooks,shell-completions,records-bind,git-config,git-lfs,git-hooks,env-persist,self-deploy,hive-upgrade-retire,workstation-target,agent-extensions,legacy-setup" {
+	if got := strings.Join(names, ","); got != "checkout,records-mirror,env-generate,records-harness,tools,system-upgrade,cache-gc,pwsh-modules,pi-settings,configs-deploy,orca-hooks,shell-completions,records-bind,git-config,ts-bridge-client,git-lfs,git-hooks,lanes,env-persist,self-deploy,hive-upgrade-retire,workstation-target,agent-extensions,legacy-setup" {
 		t.Errorf("registry order: %s", got)
 	}
 }

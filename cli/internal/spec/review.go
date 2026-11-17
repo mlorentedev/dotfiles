@@ -42,6 +42,10 @@ const (
 	// (CLI-094) and the run was stopped before it signed. It is never a passing
 	// verdict and the gate refuses it by name.
 	VerdictPending Verdict = "PENDING"
+	// VerdictError marks a review file the launcher wrote because the run
+	// ended without one (BUG-168, #1511): nothing was reviewed. Like PENDING it
+	// is never a passing verdict and the gate refuses it by name.
+	VerdictError Verdict = "ERROR"
 )
 
 // Blocks reports whether this verdict must stop an archive. Anything that is
@@ -164,6 +168,14 @@ func normalizeVerdict(raw string) Verdict {
 	return Verdict(strings.ToUpper(verdictSeparators.ReplaceAllString(s, "-")))
 }
 
+// FrontmatterVerdict reads only the frontmatter's verdict, normalized as the
+// gate normalizes it, or "" when there is none. It checks nothing else: a
+// grader scoring an eval answer needs the verdict of a review that has no
+// commit to name, and must not treat that as the gate would (ADR-063).
+func FrontmatterVerdict(content string) Verdict {
+	return normalizeVerdict(frontmatterFields(content)["verdict"])
+}
+
 func ParseReview(content string) (Review, error) {
 	return parseReviewAs(content, ReviewFile)
 }
@@ -183,6 +195,9 @@ func parseReviewAs(content, name string) (Review, error) {
 	}
 	if r.Verdict == VerdictPending {
 		return r, fmt.Errorf("%s is a provisional, unsigned record (verdict: PENDING): the run that wrote it was stopped before it signed a verdict, so it cannot be archived; run the review again", name)
+	}
+	if r.Verdict == VerdictError {
+		return r, fmt.Errorf("%s records a review that ended without a verdict (verdict: ERROR): its body says how the run ended and what the reviewer wrote; run the review again", name)
 	}
 	if r.Verdict != VerdictPass && r.Verdict != VerdictPassWithGaps && r.Verdict != VerdictFail {
 		return r, fmt.Errorf("%s has an unrecognized verdict %q (want PASS, PASS-WITH-GAPS or FAIL)", name, r.Verdict)
@@ -393,10 +408,10 @@ func checkSignature(repoRoot, specID, specDir string, slot ReviewSlot, checker S
 	review, found, err := FindReviewIn(specDir, slot)
 	if !found {
 		if slot.Name == SecondSigner.Name {
-			return Review{}, fmt.Errorf("proposal.md declares `risk: high`, which needs a second signature from another vendor, and there is no %s\n"+
+			return Review{}, withTurnCapHint(fmt.Errorf("proposal.md declares `risk: high`, which needs a second signature from another vendor, and there is no %s\n"+
 				"run `dotf spec review %s --second` once the first review has passed\n"+
 				"to proceed without one, lower the declared risk in proposal.md, or declare `review: waived` with a `review_waived_reason:`",
-				slot.Review, specID)
+				slot.Review, specID), repoRoot, specID, specDir, slot)
 		}
 		return Review{}, withTurnCapHint(fmt.Errorf("no %s in the spec folder — run /adversarial-review before archiving\n"+
 			"to proceed without one, declare `review: waived` with a `review_waived_reason:` in proposal.md",
@@ -412,6 +427,9 @@ func checkSignature(repoRoot, specID, specDir string, slot ReviewSlot, checker S
 		return Review{}, fmt.Errorf("%s declares spec %q but lives in %q — the review describes a different change\n"+
 			"re-run /adversarial-review for this spec",
 			slot.Review, review.Spec, specID)
+	}
+	if err := refuseEvalRecord(specDir, slot, review); err != nil {
+		return Review{}, err
 	}
 	// Provenance before verdict, deliberately. Both later checks read the file's
 	// CLAIMS; this one asks whether the file is the answer to the question this

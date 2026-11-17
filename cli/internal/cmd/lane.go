@@ -13,6 +13,8 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/lane"
+	"github.com/mlorentedev/dotfiles/cli/internal/vault"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // laneExec starts the agent; a variable so a test records the argv instead of
@@ -29,12 +31,135 @@ func newLaneCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newLaneExecCmd(), newLaneNextCmd(), newLaneStatusCmd(), newLanePlanCmd(), newLaneApplyCmd(), newLaneClaimCmd(), newLaneReleaseCmd(), newLaneClaimsCmd())
+	c.AddCommand(
+		newLaneExecCmd(),
+		newLaneNextCmd(),
+		newLaneStatusCmd(),
+		newLanePlanCmd(),
+		newLaneApplyCmd(),
+		newLaneClaimCmd(),
+		newLaneReleaseCmd(),
+		newLaneClaimsCmd(),
+		newLaneInitCmd(),
+		newLaneSwitchCmd(),
+		newLaneParkCmd(),
+		newLaneDoctorCmd(),
+	)
+	return c
+}
+
+func newLaneInitCmd() *cobra.Command {
+	var writeMarker bool
+	c := &cobra.Command{
+		Use:   "init",
+		Short: "Idempotently create the 3 persistent named lanes for this repository",
+		Long: "Creates the lanes and nothing else: init never activates the repository. A machine\n" +
+			"activates through `dotf converge --only lanes`, from the " + lane.LanesMarkerFile + " committed on\n" +
+			"the default branch. --write-marker writes that file, for the one commit that declares\n" +
+			"the repository a lane repository.",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+			wtRoot := env.ResolvePath("WORKTREE_ROOT")
+			changed, err := lane.InitLanes(repoRoot, wtRoot)
+			if err != nil {
+				return err
+			}
+			out := c.OutOrStdout()
+			_, _ = fmt.Fprintf(out, "lane init: %s (changed=%d)\n", repoRoot, changed)
+			_, _ = fmt.Fprintf(out, "lane init: worktree root %s\n", wtRoot)
+			if !writeMarker {
+				return nil
+			}
+			if _, err := lane.WriteLanesMarker(repoRoot); err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(out, "lane init: wrote %s — commit it to the default branch; each machine then activates with `dotf converge --only lanes`\n", lane.LanesMarkerFile)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&writeMarker, "write-marker", false, "also write "+lane.LanesMarkerFile+" (to be committed)")
+	return c
+}
+
+func newLaneSwitchCmd() *cobra.Command {
+	var targetLane string
+	c := &cobra.Command{
+		Use:          "switch <branch>",
+		Short:        "Claim a PARKED persistent lane and check out <branch> in it",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+			wtRoot := env.ResolvePath("WORKTREE_ROOT")
+			laneName, lanePath, err := lane.SwitchLane(repoRoot, wtRoot, args[0], targetLane)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(c.OutOrStdout(), "lane switch: %s -> %s (%s)\n", args[0], laneName, lanePath)
+			return nil
+		},
+	}
+	c.Flags().StringVar(&targetLane, "lane", "", "explicit named lane to claim")
+	return c
+}
+
+func newLaneParkCmd() *cobra.Command {
+	var force bool
+	c := &cobra.Command{
+		Use:          "park [lane]",
+		Short:        "Park a persistent named lane in-place after its branch lands",
+		Args:         cobra.MaximumNArgs(1),
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+			if err != nil {
+				return err
+			}
+			var lanePath string
+			if len(args) == 1 {
+				wtRoot := env.ResolvePath("WORKTREE_ROOT")
+				lanePath = filepath.Join(wtRoot, filepath.Base(filepath.Clean(repoRoot)), args[0])
+			} else {
+				lanePath, err = worktree.ResolveWorktreeRoot(cwd)
+				if err != nil {
+					return err
+				}
+			}
+			vPath := vault.ResolveVault()
+			res, err := lane.ParkLane(repoRoot, lanePath, vPath, force)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(c.OutOrStdout(), "lane park: %s parked (deleted_branch=%s sha=%s)\n", lanePath, res.DeletedBranch, res.DeletedSHA)
+			return reportParkThreads(c.ErrOrStderr(), lanePath, res.Threads, res.ThreadsErr)
+		},
+	}
+	c.Flags().BoolVar(&force, "force", false, "force park even if uncommitted or unpushed")
 	return c
 }
 
 func newLaneExecCmd() *cobra.Command {
-	var agent, promptFile string
+	var agent, promptFile, model string
 	c := &cobra.Command{
 		Use:   "exec",
 		Short: "Start an agent on a prompt read from a file",
@@ -45,12 +170,15 @@ func newLaneExecCmd() *cobra.Command {
 		Example:      "  dotf lane exec --agent claude --prompt-file prompt.md",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(c *cobra.Command, _ []string) error {
+			if err := checkModelFlag(c, model); err != nil {
+				return fmt.Errorf("lane exec: %w", err)
+			}
 			b, err := readPrompt(promptFile)
 			if err != nil {
 				return fmt.Errorf("lane exec: %w", err)
 			}
-			argv, err := lane.LaunchArgv(agent, strings.TrimSpace(string(b)))
+			argv, err := lane.LaunchArgv(agent, strings.TrimSpace(string(b)), model)
 			if err != nil {
 				return err
 			}
@@ -59,9 +187,20 @@ func newLaneExecCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&agent, "agent", "", "agent to start ("+strings.Join(lane.Agents(), ", ")+")")
 	c.Flags().StringVar(&promptFile, "prompt-file", "", "file holding the prompt")
+	c.Flags().StringVar(&model, "model", "", "start the agent on this model id instead of its default")
 	_ = c.MarkFlagRequired("agent")
 	_ = c.MarkFlagRequired("prompt-file")
 	return c
+}
+
+// checkModelFlag refuses a --model given with nothing in it: LaunchArgv reads an
+// empty model as "none", which would start the agent on its default and report
+// success, the opposite of what the flag asked for. An omitted flag is fine.
+func checkModelFlag(c *cobra.Command, model string) error {
+	if c.Flags().Changed("model") && strings.TrimSpace(model) == "" {
+		return fmt.Errorf("--model must be a model id, not %q", model)
+	}
+	return nil
 }
 
 // readPrompt reads the prompt file. The line `lane next` types into a pane
@@ -81,7 +220,7 @@ func readPrompt(path string) ([]byte, error) {
 }
 
 func newLaneNextCmd() *cobra.Command {
-	var agent string
+	var agent, model string
 	var dryRun bool
 	c := &cobra.Command{
 		Use:   "next",
@@ -98,10 +237,14 @@ func newLaneNextCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runLaneNext(c, agent, dryRun)
+			if err := checkModelFlag(c, model); err != nil {
+				return fmt.Errorf("lane next: %w", err)
+			}
+			return runLaneNext(c, agent, model, dryRun)
 		},
 	}
 	c.Flags().StringVar(&agent, "agent", "", "agent to start (default: the calling pane's; "+strings.Join(lane.Agents(), ", ")+")")
+	c.Flags().StringVar(&model, "model", "", "start the successor on this model id instead of the agent's default")
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "decide and print, change nothing")
 	return c
 }
@@ -111,8 +254,8 @@ func gitOut(args ...string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
-func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
-	out, err := doLaneNext(c, agent, dryRun)
+func runLaneNext(c *cobra.Command, agent, model string, dryRun bool) error {
+	out, err := doLaneNext(c, agent, model, dryRun)
 	if err != nil {
 		return err
 	}
@@ -122,7 +265,7 @@ func runLaneNext(c *cobra.Command, agent string, dryRun bool) error {
 
 // doLaneNext hands off to the next queued item and returns what happened, so
 // apply can count a start without parsing what next prints.
-func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, error) {
+func doLaneNext(c *cobra.Command, agent, model string, dryRun bool) (lane.Outcome, error) {
 	top, err := gitOut("rev-parse", "--show-toplevel")
 	if err != nil {
 		return lane.Outcome{}, fmt.Errorf("lane next: not in a git checkout: %w", err)
@@ -140,9 +283,13 @@ func doLaneNext(c *cobra.Command, agent string, dryRun bool) (lane.Outcome, erro
 		return lane.Outcome{}, fmt.Errorf("lane next: prompt template: %w", err)
 	}
 	parent := filepath.Dir(common)
+	promptDir, err := lane.PromptDir(common, !dryRun)
+	if err != nil {
+		return lane.Outcome{}, fmt.Errorf("lane next: %w", err)
+	}
 	opts := lane.Options{
-		Agent: agent, DryRun: dryRun, Config: cfg, Template: string(tmpl),
-		Parent: parent, PromptDir: filepath.Join(common, "dotf-lane"), Dotf: selfBinary(c), GitDir: common,
+		Agent: agent, Model: model, DryRun: dryRun, Config: cfg, Template: string(tmpl),
+		Parent: parent, PromptDir: promptDir, Dotf: selfBinary(c), GitDir: common,
 		WorktreeRoot: env.ResolvePath("WORKTREE_ROOT"),
 		Claims:       laneClaimer(cfg, top, parent),
 		Fetch: func() error {

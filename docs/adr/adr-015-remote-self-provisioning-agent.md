@@ -15,7 +15,7 @@ created: "2026-05-31"
 
 ## Status
 
-Accepted
+Accepted. Retired 2026-11-05: the `hermes-nan` instance this provisioned was shut down on 2026-09-30, and `ai/hermes/setup.sh` and `ai/hermes/AGENTS.md` were deleted (#3184). The successor, `hermes-kubelab` on ace2, is provisioned by kubelab under its ADR-068 (kubelab#1933), not by a curled script from this repo. The decision below is kept as the record of how the old instance was built.
 
 ## Date
 

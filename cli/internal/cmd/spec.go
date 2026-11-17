@@ -76,10 +76,21 @@ var reviewerDraw = rand.IntN
 // the answer, and only a real repository proves the answer is right.
 var resolveReviewBase = spec.ResolveReviewBaseDetail
 var headSHAOf = spec.HeadSHA
+
+// ownCommitsOf lists the spec's own commits in base..head (HARNESS-158), with
+// widenedFrom the traced base when base was widened (BUG-166). A seam beside
+// resolveReviewBase and headSHAOf, which the launcher tests stub with SHAs no
+// repository holds.
+var ownCommitsOf = func(repoRoot, specDir, base, widenedFrom, head string, issue int) (spec.OwnCommitSet, error) {
+	return spec.OwnCommitsWidened(repoRoot, base, widenedFrom, head, spec.SpecFolderNames(repoRoot, specDir), issue)
+}
 var emptyTreeOf = spec.EmptyTree
 
 // requestIgnored is a seam over spec.RequestIgnored, for the same reason.
 var requestIgnored = spec.RequestIgnoredIn
+
+// callerDirt is a seam over spec.CallerDirt, for the same reason.
+var callerDirt = spec.CallerDirt
 
 // runForeground runs the reviewer in this terminal, streaming its output to both
 // the screen and the transcript.
@@ -134,6 +145,7 @@ func newSpecReviewCmd() *cobra.Command {
 		fallbackReason string
 		timeout        time.Duration
 		stallTimeout   time.Duration
+		allowDirty     bool
 	)
 
 	cmd := &cobra.Command{
@@ -160,6 +172,11 @@ foreground and says so. A machine-readable transcript is written beside the
 review, because the verdict records what a reviewer concluded and the transcript
 is the only record of how.
 
+The reviewer reads the reviewed commit, not the working tree, so the launch is
+refused while the tree has tracked changes or untracked files outside
+specs/<feature-id>/, naming them. Commit them first, or pass --allow-dirty to
+launch without them; the spec folder's own uncommitted content does not refuse.
+
 A spec whose proposal.md declares ` + "`risk: high`" + ` also needs a second signature, from
 a pool member of another vendor that declares ` + "`signs: second`" + `: --second launches it,
 after the first review, into review-second.md. A member that declares
@@ -172,7 +189,7 @@ such a spec from git's empty tree instead: the reviewer reads the two-dot
 ` + "`git diff <empty-tree> HEAD`" + `, which holds the root commit's implementation and
 every later correction, and the review request records the scope, the root
 commit and the tree. --initial is refused for any other spec.`,
-		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-3.8-flash-high\n" +
+		Example: "  dotf spec review FEAT-012-reviewer-pool\n  dotf spec review FEAT-001-dark-mode --reviewer agy/gemini-4-hydrogen-high\n" +
 			"  dotf spec review FEAT-012-reviewer-pool --second\n  dotf spec review FEAT-012-reviewer-pool --fallback-reason rate-limit\n" +
 			"  dotf spec review FEAT-002-first-commit --initial --dry-run",
 		Args:         cobra.ExactArgs(1),
@@ -198,10 +215,23 @@ commit and the tree. --initial is refused for any other spec.`,
 			if err != nil {
 				return err
 			}
+			if err := checkCallerDirt(cmd, specDir, id, allowDirty); err != nil {
+				return err
+			}
 
+			// The reviewer runs in a fresh worktree detached at HEAD (HARNESS-142),
+			// so nothing it writes reaches this tree. The transcript and its
+			// .stderr stay in the caller's spec folder: the transcript sink runs
+			// outside the deadline process and is still writing when the
+			// worktree is removed.
+			tree, err := planReviewTree(repoRoot, id, slot)
+			if err != nil {
+				return err
+			}
+			treeSpec := filepath.Join(tree.path, "specs", id)
 			transcript := spec.TranscriptPathIn(repoRoot, id, slot)
 			limits := spec.Limits{Deadline: timeout, StallTimeout: stallTimeout, Transcript: transcript}
-			argv, err := reviewerArgv(slot, chosen, id, repoRoot, skill, scope, limits, filepath.Join(specDir, slot.Review))
+			argv, err := reviewerArgv(slot, chosen, id, tree.path, skill, scope, limits, filepath.Join(treeSpec, slot.Review), headSHA, specDir)
 			if err != nil {
 				return err
 			}
@@ -212,10 +242,11 @@ commit and the tree. --initial is refused for any other spec.`,
 			cmd.Printf("Spec:       specs/%s\n", id)
 			cmd.Printf("Scope:      %s\n", describeScope(scope))
 			cmd.Printf("Transcript: %s\n", transcript)
+			cmd.Printf("Worktree:   %s (detached at %s)\n", tree.path, headSHA)
 
 			launch := argv
 			if useTmux {
-				launch = spec.TmuxWrap(session, repoRoot, argv, transcript, transcriptSink(transcript))
+				launch = spec.TmuxWrap(session, tree.path, argv, transcript, transcriptSink(transcript))
 			}
 
 			if dryRun {
@@ -245,12 +276,23 @@ commit and the tree. --initial is refused for any other spec.`,
 			// launched without one spends a review that can never archive.
 			// Refusing here costs nothing yet. So does an ignored request: it is
 			// written, and lost on every checkout but this one.
-			if err := recordReviewRequest(cmd, repoRoot, specDir, id, slot, headSHA, chosen.ID, scope, fallbackReason); err != nil {
+			if err := createReviewTree(tree, headSHA, reviewTTL(timeout)); err != nil {
 				return err
+			}
+			if err := recordReviewRequest(cmd, repoRoot, specDir, id, slot, headSHA, chosen.ID, scope, fallbackReason); err != nil {
+				return errors.Join(err, removeReviewTree(tree.path))
+			}
+			// The caller's spec folder, uncommitted rounds and the request just
+			// written included, is what the reviewer reads (AC6).
+			if err := mirrorSpecFolder(specDir, treeSpec); err != nil {
+				return errors.Join(fmt.Errorf("copying specs/%s/ into the review worktree: %w", id, err), removeReviewTree(tree.path))
 			}
 
 			if useTmux {
-				return launchDetached(cmd, repoRoot, launch, slot, session, transcript, id, chosen, entries)
+				finish := func() {
+					finishLeftoverReviewTree(cmd.ErrOrStderr(), filepath.Join(treeSpec, slot.Review), tree.path, specDir)
+				}
+				return launchDetached(cmd, tree.path, launch, slot, session, transcript, id, chosen, entries, finish)
 			}
 
 			cmd.Printf("\n")
@@ -258,7 +300,8 @@ commit and the tree. --initial is refused for any other spec.`,
 			// ENDED rather than only that it started, so the no-verdict case is
 			// reported here, with the transcript still in hand, instead of being left
 			// for whoever next tries to archive.
-			runErr := runForeground(repoRoot, launch, transcript)
+			runErr := runForeground(tree.path, launch, transcript)
+			finishLeftoverReviewTree(cmd.ErrOrStderr(), filepath.Join(treeSpec, slot.Review), tree.path, specDir)
 			return foregroundOutcome(slot, specDir, transcript, chosen.Runner, runErr)
 		},
 	}
@@ -271,11 +314,40 @@ commit and the tree. --initial is refused for any other spec.`,
 		"review a spec first added in the repository's root commit from git's empty tree; refused for any other spec")
 	cmd.Flags().StringVar(&fallbackReason, "fallback-reason", "",
 		"launch a `signs: fallback` member as the first signer, naming how the first signers failed: "+strings.Join(spec.FallbackReasons, ", "))
+	cmd.Flags().BoolVar(&allowDirty, "allow-dirty", false,
+		"launch although the tree has changes outside specs/<feature-id>/, which the reviewer will not see")
 	cmd.Flags().DurationVar(&timeout, "timeout", spec.DefaultReviewerTimeout,
 		"how long the reviewer may run before it and everything it started are stopped, on every runner; the reviewer is told to aim for two thirds of it")
 	cmd.Flags().DurationVar(&stallTimeout, "stall-timeout", spec.DefaultStallTimeout,
 		"stop the reviewer when its transcript has not changed for this long, instead of waiting for --timeout; 0 turns it off")
 	return cmd
+}
+
+// checkCallerDirt refuses a launch whose tree has tracked changes or untracked
+// files outside specs/<id>/ (HARNESS-142 AC5). The reviewer reads a fresh
+// worktree at the reviewed commit, so that work would be reviewed as if it did
+// not exist. --allow-dirty launches anyway and says what is left out. A tree
+// whose state cannot be read is refused too: it cannot be shown to be clean.
+func checkCallerDirt(cmd *cobra.Command, specDir, id string, allowDirty bool) error {
+	dirt, err := callerDirt(specDir)
+	if err != nil && !allowDirty {
+		return fmt.Errorf("cannot read the working tree's state, so it cannot be shown that the reviewer sees all the work: %w\n"+
+			"Fix the repository, or pass --allow-dirty to launch anyway", err)
+	}
+	if err != nil {
+		cmd.PrintErrf("warning: cannot read the working tree's state, so the reviewer may not see all the work: %v\n", err)
+		return nil
+	}
+	if len(dirt) == 0 {
+		return nil
+	}
+	list := "  " + strings.Join(dirt, "\n  ")
+	if !allowDirty {
+		return fmt.Errorf("the tree has changes outside specs/%s/, and the reviewer, which runs in a fresh worktree at the reviewed commit, would not see them:\n%s\n"+
+			"Commit them, or pass --allow-dirty to launch without them", id, list)
+	}
+	cmd.PrintErrf("warning: the reviewer runs in a fresh worktree at the reviewed commit and will not see these changes outside specs/%s/:\n%s\n", id, list)
+	return nil
 }
 
 // specRepoRoot validates a spec id and returns the root of the repository
@@ -326,7 +398,44 @@ func reviewRange(repoRoot, specDir, id string, initial bool) (scope spec.ReviewS
 		return spec.ReviewScope{}, "", fmt.Errorf("the review base and HEAD are the same commit (%s).\n"+
 			"There is nothing to review: the spec folder was added by HEAD itself", base.SHA[:min(12, len(base.SHA))])
 	}
-	return spec.ReviewScope{BaseSHA: base.SHA}, headSHA, nil
+	scope = spec.ReviewScope{BaseSHA: base.SHA, WidenedFrom: base.WidenedFrom}
+	scope.OwnIssue, scope.OwnFolderOnly = specIssueNumber(repoRoot, specDir)
+	scope.Own, err = ownCommitsOf(repoRoot, specDir, base.SHA, base.WidenedFrom, "HEAD", scope.OwnIssue)
+	if err != nil {
+		return spec.ReviewScope{}, "", fmt.Errorf("listing the spec's own commits in %s..HEAD: %w", base.SHA, err)
+	}
+	return scope, headSHA, nil
+}
+
+// specIssueNumber is the number of the spec's tracking issue when that issue
+// lives in this repository's own origin, else 0 and why not. Commit messages
+// here say #N for this repository's numbers, so an issue held elsewhere (a
+// kubelab spec gated on a knowledge issue) must not be matched by number: the
+// review then finds its own commits by the folder alone, and the launch line
+// says why, so a missing origin or an odd link form does not disable the issue
+// rule invisibly.
+func specIssueNumber(repoRoot, specDir string) (int, string) {
+	data, err := os.ReadFile(filepath.Join(specDir, "proposal.md"))
+	if err != nil {
+		return 0, "proposal.md is unreadable"
+	}
+	homes, err := resolveSpecHomes(repoRoot, "", "")
+	if err != nil {
+		return 0, "the issue home does not resolve: " + err.Error()
+	}
+	if homes.Archive == "" {
+		return 0, "origin is not a GitHub repository"
+	}
+	ref, source, err := spec.ResolveIssueLink(string(data), homes.Issues)
+	switch {
+	case err != nil:
+		return 0, "the issue link does not parse: " + err.Error()
+	case source == spec.LinkNone:
+		return 0, "proposal.md names no issue"
+	case !strings.EqualFold(ref.Repo, homes.Archive):
+		return 0, fmt.Sprintf("issue %s lives outside %s", ref, homes.Archive)
+	}
+	return ref.Number, ""
 }
 
 // noReviewBaseError is the default refusal. It names --initial only when the
@@ -378,7 +487,21 @@ func describeScope(scope spec.ReviewScope) string {
 	if scope.Initial() {
 		return fmt.Sprintf("initial review, git diff %s HEAD (spec first added in root commit %s)", scope.BaseTree, scope.RootSHA)
 	}
-	return fmt.Sprintf("git diff %s...HEAD", scope.BaseSHA)
+	var notes []string
+	if scope.Own.RangeSize > 0 {
+		notes = append(notes, fmt.Sprintf("%d of %d commits are the spec's own", len(scope.Own.Commits), scope.Own.RangeSize))
+		if scope.OwnFolderOnly != "" {
+			notes = append(notes, "folder rule only: "+scope.OwnFolderOnly)
+		}
+	}
+	if scope.WidenedFrom != "" {
+		notes = append(notes, fmt.Sprintf("base widened from %s to where the branch left the default branch", scope.WidenedFrom[:min(12, len(scope.WidenedFrom))]))
+	}
+	d := fmt.Sprintf("git diff %s...HEAD", scope.BaseSHA)
+	if len(notes) > 0 {
+		d += " (" + strings.Join(notes, "; ") + ")"
+	}
+	return d
 }
 
 // tmuxAvailable reports whether a detached session can be started. Its absence
@@ -425,14 +548,17 @@ func recordReviewRequest(cmd *cobra.Command, repoRoot, specDir, id string, slot 
 
 // launchDetached starts the review in its tmux session and confirms the
 // runner came up. A detached launch can only report that the runner STARTED;
-// how it ends is read later, from the slot's verdict.
-func launchDetached(cmd *cobra.Command, repoRoot string, launch []string, slot spec.ReviewSlot, session, transcript, id string,
-	chosen spec.ReviewerEntry, entries []spec.ReviewerEntry) error {
+// how it ends is read later, from the slot's verdict. A reviewer that dies on
+// startup never reached deadline, which removes the worktree, so finish does it
+// instead (#3223).
+func launchDetached(cmd *cobra.Command, treeRoot string, launch []string, slot spec.ReviewSlot, session, transcript, id string,
+	chosen spec.ReviewerEntry, entries []spec.ReviewerEntry, finish func()) error {
 	cmd.Printf("Session:    %s\n\n", session)
-	if err := runCommand(repoRoot, launch); err != nil {
-		return fmt.Errorf("starting the tmux session: %w", err)
+	if err := runCommand(treeRoot, launch); err != nil {
+		return errors.Join(fmt.Errorf("starting the tmux session: %w", err), removeReviewTree(treeRoot))
 	}
 	if err := confirmLaunched(slot, session, transcript, id, chosen, entries); err != nil {
+		finish()
 		return err
 	}
 	cmd.Printf("[OK] Review running detached. Watch it with:\n\n    tmux attach -t %s\n\n", session)
@@ -511,8 +637,9 @@ growing length.`,
 
 // reviewerArgv is the pooled runner's command with its prompt, the time budget
 // included, under the deadline every runner gets in both modes (HARNESS-152).
-// Only agy used to be bounded, through its own --print-timeout.
-func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot, skill string, scope spec.ReviewScope, limits spec.Limits, review string) ([]string, error) {
+// Only agy used to be bounded, through its own --print-timeout. treeRoot is the
+// review worktree, at headSHA; callerSpec is where its verdict is copied back.
+func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, treeRoot, skill string, scope spec.ReviewScope, limits spec.Limits, review, headSHA, callerSpec string) ([]string, error) {
 	if limits.StallTimeout < 0 {
 		return nil, fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", limits.StallTimeout)
 	}
@@ -521,13 +648,14 @@ func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot,
 		timeout = spec.DefaultReviewerTimeout
 	}
 	limits.Deadline = timeout
-	prompt := spec.ReviewPromptForScope(slot, id, repoRoot, chosen.ID, chosen.Runner, skill, scope) +
+	prompt := spec.ReviewPromptForScope(slot, id, treeRoot, chosen.ID, chosen.Runner, skill, scope) +
+		"\n" + spec.FreshWorktreeNote(headSHA) +
 		"\n" + spec.TimeBudget(time.Now(), timeout)
-	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, repoRoot)
+	argv, err := spec.ReviewerCommand(chosen, prompt, timeout, treeRoot)
 	if err != nil {
 		return nil, err
 	}
-	return deadlineWrap(limits, review, argv), nil
+	return deadlineWrap(limits, review, treeRoot, callerSpec, argv), nil
 }
 
 // newSpecDeadlineCmd is plumbing, like transcript-sink: `spec review` runs every
@@ -535,7 +663,7 @@ func reviewerArgv(slot spec.ReviewSlot, chosen spec.ReviewerEntry, id, repoRoot,
 // pool drew (HARNESS-152), and so does the stall detector (CLI-094).
 func newSpecDeadlineCmd() *cobra.Command {
 	var stall time.Duration
-	var transcript, review string
+	var transcript, review, tree, copyBack string
 	cmd := &cobra.Command{
 		Use:   "deadline <duration> [flags] -- <command> [args...]",
 		Short: "Internal: run a reviewer and stop it, with every process it started, at a deadline or when its transcript stalls",
@@ -545,13 +673,20 @@ not a verdict. Otherwise the command's own exit status passes through.
 
 With --stall-timeout and --transcript the run is also stopped when the
 transcript has not changed for that long. That run exits 125, and stderr names
-the last tool call the transcript recorded. With --review, a stopped run also
-says whether review.md holds a provisional record or was not rewritten.
+the last tool call the transcript recorded. With --review, a run that leaves
+no review file gets one with verdict ERROR, saying how the run ended and what
+the reviewer wrote; a stopped run also says what the review file holds.
 
 With --review, every path the run left changed outside the review's own spec
 folder is named on stderr, since a reviewer's only sanctioned output is
 review.md. A run that otherwise exited 0 then exits 4, so the leftovers are a
-failure someone reads rather than files a later "git add -A" commits.`,
+failure someone reads rather than files a later "git add -A" commits.
+
+With --worktree and --copy-back, the run is in a review worktree: deadline
+starts the command there, and refuses to run it when it cannot enter it. However
+it ends, the review file is copied back to the --copy-back folder, and the
+worktree is then marked as saved and removed. A worktree whose review could
+not be copied back is kept.`,
 		Hidden:        true,
 		Args:          cobra.MinimumNArgs(2),
 		SilenceUsage:  true,
@@ -565,6 +700,10 @@ failure someone reads rather than files a later "git add -A" commits.`,
 				return fmt.Errorf("--stall-timeout %s: want a positive duration, or 0 to turn the stall detector off", stall)
 			}
 			errw := cmd.ErrOrStderr()
+			if err := enterReviewTree(&tree, &review, &copyBack, &transcript); err != nil {
+				finishLeftoverReviewTree(errw, review, tree, copyBack)
+				return err
+			}
 			var before spec.TreeSnapshot
 			var snapErr error
 			if review != "" {
@@ -573,9 +712,13 @@ failure someone reads rather than files a later "git add -A" commits.`,
 			res, err := spec.RunWithLimits(spec.Limits{Deadline: limit, StallTimeout: stall, Transcript: transcript},
 				args[1:], cmd.InOrStdin(), cmd.OutOrStdout(), errw)
 			if err != nil {
+				writeErrorStub(errw, review, transcript, copyBack, "the reviewer could not be started: "+err.Error())
+				finishReviewTree(errw, review, tree, copyBack)
 				return err
 			}
 			stray := reportStrayWrites(errw, review, before, snapErr)
+			defer finishReviewTree(errw, review, tree, copyBack)
+			writeErrorStub(errw, review, transcript, copyBack, runEnding(res, limit, stall, review))
 			switch res.Stop {
 			case spec.StopDeadline:
 				_, _ = fmt.Fprintf(errw, "[review] stopped at the %s deadline: the time limit ended this run, not a verdict\n", limit)
@@ -602,7 +745,55 @@ failure someone reads rather than files a later "git add -A" commits.`,
 	cmd.Flags().DurationVar(&stall, "stall-timeout", 0, "stop the run when --transcript has not changed for this long (0: off)")
 	cmd.Flags().StringVar(&transcript, "transcript", "", "the transcript file the stall detector watches")
 	cmd.Flags().StringVar(&review, "review", "", "the review file a stopped run reports on")
+	cmd.Flags().StringVar(&tree, "worktree", "", "the review worktree the run is in, removed when it ends")
+	cmd.Flags().StringVar(&copyBack, "copy-back", "", "the caller's spec folder the review file is copied back to")
 	return cmd
+}
+
+// runEnding says how a review run ended, for the ERROR record a run that
+// signed nothing leaves (BUG-168).
+func runEnding(res spec.RunResult, limit, stall time.Duration, review string) string {
+	switch {
+	case res.Stop == spec.StopDeadline:
+		return fmt.Sprintf("stopped at the %s deadline", limit)
+	case res.Stop == spec.StopStall && res.LastCall != "":
+		return fmt.Sprintf("stopped: the transcript did not change for %s; the last tool call recorded was %s", stall, res.LastCall)
+	case res.Stop == spec.StopStall:
+		return fmt.Sprintf("stopped: the transcript did not change for %s", stall)
+	case res.Code != 0:
+		return fmt.Sprintf("the reviewer exited with status %d without writing %s", res.Code, filepath.Base(review))
+	default:
+		return "the reviewer exited 0 without writing " + filepath.Base(review)
+	}
+}
+
+// writeErrorStub leaves a review file with verdict ERROR when the run left
+// none (BUG-168, #1511), and says so on errw. The transcript is the one the
+// stall detector watched, else the slot's beside the caller's spec folder,
+// where the launcher writes it. A stub that cannot be written is reported:
+// the run then ends as it did before, with no review file.
+func writeErrorStub(errw io.Writer, review, transcript, callerSpec, ended string) {
+	if review == "" {
+		return
+	}
+	if transcript == "" {
+		dir := callerSpec
+		if dir == "" {
+			dir = filepath.Dir(review)
+		}
+		name := spec.FirstSigner.Transcript
+		if filepath.Base(review) == spec.SecondSigner.Review {
+			name = spec.SecondSigner.Transcript
+		}
+		transcript = filepath.Join(dir, name)
+	}
+	wrote, err := spec.WriteErrorStub(review, transcript, ended)
+	switch {
+	case err != nil:
+		_, _ = fmt.Fprintf(errw, "[review] the run left no %s, and recording that failed: %v\n", filepath.Base(review), err)
+	case wrote:
+		_, _ = fmt.Fprintf(errw, "[review] the run left no %s: wrote one with verdict ERROR, saying how it ended and what the reviewer wrote\n", filepath.Base(review))
+	}
 }
 
 // exitStrayWrites is the status of a review run that exited 0 but left files
@@ -634,7 +825,7 @@ func reportStrayWrites(errw io.Writer, review string, before spec.TreeSnapshot, 
 // deadlineWrap runs argv under this binary's `spec deadline`, resolved by
 // absolute path for the reason transcriptSink gives: the command runs detached,
 // and a `dotf` found on PATH may be a build without the subcommand.
-var deadlineWrap = func(limits spec.Limits, review string, argv []string) []string {
+var deadlineWrap = func(limits spec.Limits, review, tree, callerSpec string, argv []string) []string {
 	self, err := os.Executable()
 	if err != nil {
 		self = "dotf"
@@ -645,6 +836,9 @@ var deadlineWrap = func(limits spec.Limits, review string, argv []string) []stri
 	}
 	if review != "" {
 		wrap = append(wrap, "--review", review)
+	}
+	if tree != "" && callerSpec != "" {
+		wrap = append(wrap, "--worktree", tree, "--copy-back", callerSpec)
 	}
 	return append(append(wrap, "--"), argv...)
 }
@@ -698,7 +892,7 @@ func confirmLaunched(slot spec.ReviewSlot, session, transcript, specID string, c
 			}
 		}
 		return fmt.Errorf("the review died on startup — tmux session %q is already gone.\n%s\n"+
-			"Nothing was reviewed and %s was not written; re-run with --foreground to watch it fail live.%s",
+			"Check %s: a verdict it holds is the reviewer's own; when the run left none, it records verdict ERROR. Re-run with --foreground to watch it fail live.%s",
 			session, reviewerLastWords(transcript), slot.Review, nextAdvice)
 	}
 	return nil
@@ -709,23 +903,8 @@ func confirmLaunched(slot spec.ReviewSlot, session, transcript, specID string, c
 // launching failed — the original defect discarded the reason entirely, which is
 // why nobody could tell a broken credential from a missing binary.
 func reviewerLastWords(transcript string) string {
-	for _, src := range []struct{ label, path string }{
-		{"stderr", spec.StderrPath(transcript)},
-		{"transcript", transcript},
-	} {
-		b, err := os.ReadFile(src.path)
-		if err != nil {
-			continue
-		}
-		out := strings.TrimSpace(string(b))
-		if out == "" {
-			continue
-		}
-		const max = 800
-		if len(out) > max {
-			out = out[:max] + fmt.Sprintf("\n… (truncated; full %s at %s)", src.label, src.path)
-		}
-		return "It wrote, on " + src.label + ":\n" + out
+	if words, ok := spec.ReviewerLastWords(transcript); ok {
+		return words
 	}
 	return "It wrote nothing to either the transcript or its stderr, so the failure happened before the reviewer produced output at all."
 }

@@ -144,6 +144,13 @@ func (g *fakeGuest) exec(a json.RawMessage) any {
 		if g.asked > 1 {
 			st["out-data"] = base64.StdEncoding.EncodeToString([]byte("DOTF-VM\\dotf\r\n"))
 		}
+	case e.Path == "powershell.exe" && strings.Contains(line, "Get-Content"):
+		// A shared read of a log, and the processes the step left running.
+		for p, b := range g.files {
+			if strings.HasSuffix(p, ".log") && strings.Contains(line, p) {
+				st["out-data"] = base64.StdEncoding.EncodeToString(append(b, []byte("4242 pwsh.exe -File claude-install.ps1\r\n")...))
+			}
+		}
 	case e.Path == "cmd.exe" && len(e.Arg) > 1 && e.Arg[1] == "del":
 		delete(g.files, e.Arg[len(e.Arg)-1])
 	case e.Path == "schtasks.exe" && e.Arg[0] == "/run":
@@ -192,6 +199,11 @@ func (g *fakeGuest) fopen(a json.RawMessage) any {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if o.Mode == "rb" {
+		// A step that has not ended still holds its log open through
+		// Out-File, and the agent's open cannot share it (#3208).
+		if g.hangs && strings.HasSuffix(o.Path, ".log") {
+			return agentError("Failed to open file '" + o.Path + "': The process cannot access the file because it is being used by another process.")
+		}
 		if _, ok := g.files[o.Path]; !ok {
 			return agentError("Failed to open file '" + o.Path + "'")
 		}
@@ -423,8 +435,12 @@ func TestRun_AStepThatNeverEndsTimesOut(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "did not finish") {
 		t.Fatalf("want a timeout, got %v", err)
 	}
-	if !strings.Contains(o.Out.(*bytes.Buffer).String(), "converge: ok") {
-		t.Error("a step that timed out did not show its output so far")
+	out := o.Out.(*bytes.Buffer).String()
+	if !strings.Contains(out, "converge: ok") {
+		t.Errorf("a step that timed out did not show its output so far:\n%s", out)
+	}
+	if !strings.Contains(out, "claude-install.ps1") {
+		t.Errorf("a step that timed out did not name what was still running:\n%s", out)
 	}
 }
 
@@ -441,8 +457,39 @@ func TestRun_KeepLeavesTheGuestRunning(t *testing.T) {
 	if _, err := os.Stat(o.Machine.Layout.Disk()); err != nil {
 		t.Errorf("--keep removed the overlay: %v", err)
 	}
-	if !strings.Contains(o.Progress.(*bytes.Buffer).String(), "dotf vm windows stop") {
-		t.Error("--keep does not say how to stop the guest")
+	if !strings.Contains(o.Progress.(*bytes.Buffer).String(), "down --session") {
+		t.Error("--keep does not say how to end the guest")
+	}
+	// The kept guest is a session, so exec and cp can address it and down ends it.
+	holder, err := WindowsSessions{Machine: o.Machine}.holder()
+	if err != nil || !strings.HasPrefix(holder, "windows-") {
+		t.Errorf("--keep registered no session: holder %q, err %v", holder, err)
+	}
+}
+
+func TestRun_KeepRefusesAStaleSession(t *testing.T) {
+	o := sealedBase(t)
+	o.Keep = true
+	if err := os.MkdirAll(filepath.Join(o.Machine.Layout.Sessions(), "old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g := newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err == nil || !strings.Contains(err.Error(), "down --session old") {
+		t.Fatalf("want the stale session named, got %v", err)
+	}
+	if len(g.starts)+len(g.imgs) != 0 {
+		t.Error("a kept run started over a stale session")
+	}
+}
+
+func TestRun_WithoutKeepRegistersNoSession(t *testing.T) {
+	o := sealedBase(t)
+	g := newFakeGuest(t, okStep, nothingStep)
+	if err := Run(g, o); err != nil {
+		t.Fatal(err)
+	}
+	if holder, _ := (WindowsSessions{Machine: o.Machine}).holder(); holder != "" {
+		t.Errorf("a throwaway run left session %q", holder)
 	}
 }
 

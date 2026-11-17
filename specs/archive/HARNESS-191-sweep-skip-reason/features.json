@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-191-sweep-skip-reason-f1",
+    "behavior": "AC1: a lane with uncommitted changes or untracked files is not parked, stays ACTIVE, and the reason names the dirty tree",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestParkSingleNamedLane_Outcomes/(a_lane_with_an_untracked|a_lane_whose_state)' -count=1",
+    "state": "verified",
+    "evidence": "PASS on 2ad5fbdb (ok internal/worktree, 2026-11-12, 2 subtests run under -v): the untracked-file lane is reported with 'uncommitted' in the reason and its state stays ACTIVE; a status the runner cannot read gives 'its state could not be read: ' plus the error, never the dirty-tree reason"
+  },
+  {
+    "id": "HARNESS-191-sweep-skip-reason-f2",
+    "behavior": "AC2: a lane whose landing the forge could not confirm is not parked and the reason carries the forge's error; a lane whose tip the landed heads name is parked; a lane with no landing reader at all, or whose lease cannot be written, is not parked and the reason says which",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestParkSingleNamedLane_Outcomes/(a_squash-merged|a_lane_whose_landing|a_lane_with_no_landing_reader|a_lane_whose_lease)' -count=1",
+    "state": "verified",
+    "evidence": "PASS on 2ad5fbdb (ok internal/worktree, 2026-11-12, 4 subtests run under -v): the forge error reaches the reason ('could not check for a merged pull request' and the stub's 'forge unreachable'); the squash-merged lane parks with an empty reason; with no reader the reason is 'its landing could not be decided'; a read-only lease file gives 'its lease could not be written: ' plus the OS error (skipped on Windows and as root)"
+  },
+  {
+    "id": "HARNESS-191-sweep-skip-reason-f3",
+    "behavior": "AC3: a lane git refuses to detach keeps its state and branch, and the reason starts 'git refused to detach it: ' followed by git's first line",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestParkSingleNamedLane_Outcomes/a_lane_git_refuses|TestSweepReportsALaneItDidNotPark' -count=1",
+    "state": "verified",
+    "evidence": "PASS on 2ad5fbdb (ok internal/worktree, 2026-11-11, 2 tests run under -v): the held index lock makes the detach fail, the lane stays ACTIVE on its branch, the reason names the refused detach and index.lock, both through parkSingleNamedLane and through SweepWithRunner"
+  },
+  {
+    "id": "HARNESS-191-sweep-skip-reason-f4",
+    "behavior": "AC4: SweepReport.LaneSkips lists each unparked lane with path and reason, and dotf worktree sweep prints one skipped line per entry",
+    "verification": "cd cli && go test ./internal/worktree/ -run 'TestSweepReportsALaneItDidNotPark|TestSweepReportNamesLaneSkipsOnTheWire' -count=1 && go test ./internal/cmd/ -run 'TestWorktreeSweepPrintsWhyALaneWasNotParked' -count=1",
+    "state": "verified",
+    "evidence": "PASS on 2ad5fbdb (ok internal/worktree and internal/cmd, 2026-11-12): LaneSkips carries the lane's physical path and reason and the skipped count is 2 (the main checkout and the lane); the JSON name is lane_skips and an empty report omits it; the real sweep command prints '  - skipped: <path>: git refused to detach it: <git line>' with slash paths on every OS and reports reaped 0"
+  }
+]

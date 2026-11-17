@@ -56,6 +56,62 @@ func TestLessonsFmt_CheckNamesACommittedIndexAndFmtLeavesItAlone(t *testing.T) {
 	}
 }
 
+// #3415: a markdown file under the lessons directory in no lesson-NNN-<slug>.md
+// form is a lesson nothing formats or indexes, so --check names it. The
+// directory's own documents stay accepted, in a category directory too.
+func TestLessonsFmt_CheckNamesAFileInAnotherNamingScheme(t *testing.T) {
+	dir := t.TempDir()
+	formatted := "---\nid: \"lesson-001-a\"\ntype: lesson\nstatus: active\ntitle: \"A\"\ncreated: \"2026-01-01\"\n---\n\n# A\n\nbody\n"
+	if err := os.MkdirAll(filepath.Join(dir, "ops"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"lesson-001-a.md":        formatted,
+		"_format.md":             "# Format\n",
+		"README.md":              "# Lessons\n",
+		"ops/README.md":          "# Ops\n",
+		"notes.txt":              "not markdown\n",
+		"2026-12-01-stray.md":    "# Stray\n",
+		"ops/2026-12-02-also.md": "# Also\n",
+		"ops/_index.md":          "# Index\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout, _, err := execute(t, "lessons", "fmt", "--check", "--dir", dir)
+	if err == nil {
+		t.Fatalf("check passed a tree holding stray lessons:\n%s", stdout)
+	}
+	for _, want := range []string{
+		"unrecognised name: " + filepath.Join(dir, "2026-12-01-stray.md"),
+		"unrecognised name: " + filepath.Join(dir, "ops", "2026-12-02-also.md"),
+		"lesson-NNN-<slug>.md",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("check output lacks %q:\n%s", want, stdout)
+		}
+	}
+	// A committed index is reported once, as an index: naming it a stray
+	// lesson too would print a second, wrong fix for the same file.
+	if !strings.Contains(stdout, "committed index: "+filepath.Join(dir, "ops", "_index.md")) {
+		t.Errorf("check did not name the committed index:\n%s", stdout)
+	}
+	for _, accepted := range []string{"_format.md", "README.md", "notes.txt", filepath.Join("ops", "_index.md")} {
+		if strings.Contains(stdout, "unrecognised name: "+filepath.Join(dir, accepted)) {
+			t.Errorf("check named an accepted file %s:\n%s", accepted, stdout)
+		}
+	}
+	stdout, _, err = execute(t, "lessons", "fmt", "--dir", dir)
+	if err != nil || !strings.Contains(stdout, "left alone: "+filepath.Join(dir, "2026-12-01-stray.md")) {
+		t.Fatalf("fmt must report the stray file and rename nothing: err %v\n%s", err, stdout)
+	}
+	if _, serr := os.Stat(filepath.Join(dir, "2026-12-01-stray.md")); serr != nil {
+		t.Errorf("fmt moved the stray file: %v", serr)
+	}
+}
+
 func TestLessonsIndex_PrintsTheTableAndWritesNothing(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "lesson-007-a.md"), []byte("# Lesson 007: Seven\n\n**Date:** 2026-01-07\n"), 0o644); err != nil {

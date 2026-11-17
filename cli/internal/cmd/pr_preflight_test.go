@@ -192,20 +192,20 @@ func TestPrPreflight_PoolYieldsTheDeclaredChainInOrder(t *testing.T) {
 		t.Fatalf("pr preflight --pool: %v\n%s", err, stderr)
 	}
 	got, _ := os.ReadFile(out)
-	want := "model=openai/mimo-v2.6-flash\nfallbacks=[\"openai/deepseek-v4-flash\",\"openai/glm5.3-flash\"]\n"
+	want := "model=openai/deepseek-v4-flash\nfallbacks=[\"openai/glm5.3-flash\",\"openai/mimo-v2.6-flash\"]\n"
 	if string(got) != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
 
 func TestPrPreflight_PoolWarnsAgainstTheDerivedPrimaryAndNamesThePool(t *testing.T) {
-	preflightEnv(t, map[string]int{"mimo-v2.6-flash": 401, "deepseek-v4-flash": 200, "glm5.3-flash": 200})
+	preflightEnv(t, map[string]int{"mimo-v2.6-flash": 200, "deepseek-v4-flash": 401, "glm5.3-flash": 200})
 
 	stdout, stderr, err := execute(t, "pr", "preflight", "--pool", "embedded")
 	if err != nil {
 		t.Fatalf("pr preflight --pool: %v\n%s", err, stderr)
 	}
-	if !strings.Contains(stdout, "not the declared primary openai/mimo-v2.6-flash") {
+	if !strings.Contains(stdout, "not the declared primary openai/deepseek-v4-flash") {
 		t.Errorf("the primary is not named: %s", stdout)
 	}
 	if !strings.Contains(stdout, "the pool embedded in this dotf") || strings.Contains(stdout, ".pr_agent.toml") {

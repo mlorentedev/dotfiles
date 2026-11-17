@@ -1,0 +1,9 @@
+on:
+  push:
+    branches: ["!wip/*", "release/**", main]
+  pull_request:
+    branches: "ma*"
+jobs: {}
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true

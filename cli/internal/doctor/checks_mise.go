@@ -73,6 +73,14 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		rep.Warn(s.ConfigPath() + " is not what versions.conf renders (run: dotf tools sync)")
 	}
 	if len(p.Missing) > 0 {
+		// A pin another config holds is not the sync's to fix: it would install
+		// dotfiles' version and lose to that file again (#3524). Only once the
+		// owned config is current: before that mise has not been told the pins,
+		// and the file that runs the tool may rank below it.
+		if cause, fix := shadowNote(s, p, pins); cause != "" {
+			rep.Fail("not running at their pin through mise: " + strings.Join(p.Missing, ", ") + "; " + cause + "\n    FIX: " + fix)
+			return
+		}
 		rep.Fail("not running at their pin through mise: " + strings.Join(p.Missing, ", ") + " (run: dotf tools sync)")
 		return
 	}
@@ -223,16 +231,35 @@ func miseSync(sys *System, pythonPackages []tools.MiseTool, latest []string) too
 	return tools.MiseSync{
 		ConfigDir: tools.MiseConfigDir(home, sys.Getenv),
 		Run: func(name string, args ...string) ([]byte, error) {
+			if env := gitBashEnv(sys, name, args...); env != nil {
+				out, err := sys.CommandOutputEnvDir(env, home, name, args...)
+				return []byte(out), err
+			}
 			out, err := sys.CommandOutputDir(home, name, args...)
 			return []byte(out), err
 		},
 		Stdout: func(name string, args ...string) ([]byte, error) {
+			if env := gitBashEnv(sys, name, args...); env != nil {
+				out, err := sys.CommandStdoutEnvDir(env, home, name, args...)
+				return []byte(out), err
+			}
 			out, err := sys.CommandStdoutDir(home, name, args...)
 			return []byte(out), err
 		},
 		PythonPackages: pythonPackages,
 		Latest:         latest,
 	}
+}
+
+// gitBashEnv scopes Git Bash to the commands that need it, as the sync's own
+// runners do (tools.HomeRunners): bats.cmd runs bash.exe from PATH, and without
+// Git Bash first that is WSL's, so the doctor would report bats off its pin on a
+// machine the sync just converged (#3507). It asks git on each call.
+func gitBashEnv(sys *System, name string, args ...string) []string {
+	return tools.GitBashEnv(sys.GOOS, func() ([]byte, error) {
+		out, err := sys.CommandStdoutDir("", "git", "--exec-path")
+		return []byte(out), err
+	}, name, args...)
 }
 
 // checkShadowingCopies finds the executables mise provides for the pins that
@@ -344,4 +371,13 @@ func replaceWithLink(dst, target string) error {
 		return err
 	}
 	return nil
+}
+
+// shadowNote is the sync's ShadowNote for a plan whose owned config is current,
+// and "" for one that is not.
+func shadowNote(s tools.MiseSync, p tools.SyncPlan, pins []tools.MiseTool) (cause, fix string) {
+	if p.ConfigChanged {
+		return "", ""
+	}
+	return s.ShadowNote(pins, p.Missing)
 }

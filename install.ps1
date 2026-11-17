@@ -113,6 +113,32 @@ function Set-DotfBinary {
     Remove-Item -LiteralPath $parked -Force -ErrorAction SilentlyContinue
 }
 
+# The name of the threat Microsoft Defender detected in a file under $Dir, or
+# $null. Defender removes a flagged dotf.exe from the extracted release, and the
+# install then fails as "not found" or "does not run": this names the real cause
+# (#3172). Best effort: no Defender cmdlets, or a query that fails, is $null.
+function Get-DotfQuarantine {
+    param([string]$Dir)
+    if (-not (Get-Command Get-MpThreatDetection -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+    try {
+        $prefix = 'file:_' + $Dir.TrimEnd('\') + '\'
+        $hit = @(Get-MpThreatDetection -ErrorAction Stop | Where-Object {
+                @($_.Resources | Where-Object { "$_".StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0
+            }) | Select-Object -First 1
+        if (-not $hit) {
+            return $null
+        }
+        $name = @(Get-MpThreat -ThreatID $hit.ThreatID -ErrorAction SilentlyContinue | ForEach-Object { $_.ThreatName }) |
+            Select-Object -First 1
+        if ($name) { return $name }
+        return "threat ID $($hit.ThreatID)"
+    } catch {
+        return $null
+    }
+}
+
 # Idempotently install the pinned dotf release. No-op when the pinned version is
 # already on PATH; converges on drift. Returns $true on success, $false on any
 # download/verify error (no binary left in Dest). Never throws - setup wires it
@@ -208,7 +234,13 @@ function Install-Dotf {
         $script:DotfBin = $target
         return $true
     } catch {
-        Write-Warning "install: $($_.Exception.Message)"
+        $threat = if ($work) { Get-DotfQuarantine -Dir $work } else { $null }
+        if ($threat) {
+            Write-Warning ("install: Microsoft Defender quarantined the downloaded dotf $Version as $threat, so it was not installed ($($_.Exception.Message)). " +
+                'If you trust this release, report a false positive at https://www.microsoft.com/wdsi/filesubmission')
+        } else {
+            Write-Warning "install: $($_.Exception.Message)"
+        }
         return $false
     } finally {
         if ($work) { Remove-Item -Recurse -Force -Path $work -ErrorAction SilentlyContinue }

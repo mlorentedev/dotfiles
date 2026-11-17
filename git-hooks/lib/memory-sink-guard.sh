@@ -20,20 +20,58 @@ VAULT="${VAULT_PATH:-$HOME/Projects/knowledge}"
 # configured through a symlink (macOS's /var -> /private/var, a linked
 # ~/Projects) would never compare equal and its own MEMORY.md would be blocked.
 VAULT="$(cd "$VAULT" 2>/dev/null && pwd -P || printf '%s' "$VAULT")"
+# Both sides of the compare below must be read in the SAME path dialect, and the
+# pwd -P above settles only the vault. `git rev-parse --show-toplevel` answers a
+# physical path on POSIX but `C:/...` on Git for Windows, where pwd -P answers
+# `/c/...` — the compare then never matched and the vault's OWN MEMORY.md was
+# blocked (reproduced on the Windows work box, 2026-11-08). Resolving $toplevel
+# through the shell puts it in pwd -P's dialect on every OS. Falls back to the
+# raw value when the directory cannot be entered.
+toplevel_physical="$(cd "$toplevel" 2>/dev/null && pwd -P)"
+[ -n "$toplevel_physical" ] || toplevel_physical="$toplevel"
 
 # Vault detection: the sentinel .obsidian/ at the repo root (cross-machine) or
 # the repo root being the configured vault path. The vault is the allowed sink.
-if [ -d "$toplevel/.obsidian" ] || [ "$toplevel" = "$VAULT" ]; then
+if [ -d "$toplevel/.obsidian" ] || [ "$toplevel_physical" = "$VAULT" ]; then
     exit 0
 fi
 
 # Scan staged additions/modifications for memory artifacts: a MEMORY.md file in
 # any directory, or any path under a memory/ directory. Narrow by design — a
 # legitimate need is unblocked with --no-verify (user approval).
+#
+# Fixture trees are data, not the repo's own agent memory. A test that
+# reproduces a vault layout (a bootstrap fixture under testdata/ that contains
+# memory/MEMORY.md) is exactly the case this guard must not block, so a path
+# whose memory part sits inside a testdata/ or fixtures/ tree is exempt.
+# Measured on GO-001, where the captured Python controller corpus is such a
+# fixture. The fixture tree must enclose the memory, not the reverse: a
+# fixtures/ directory under memory/ (docs/memory/fixtures/MEMORY.md) is still
+# the repo's memory and stays blocked.
 staged="$(git diff --cached --name-only --diff-filter=AM 2>/dev/null)"
 [ -n "$staged" ] || exit 0
 
-offenders="$(printf '%s\n' "$staged" | grep -E '(^|/)MEMORY\.md$|(^|/)memory/' || true)"
+# in_fixture_tree reports whether a staged path's first fixture segment comes
+# before any memory/ segment. Git quotes a path that holds non-ASCII bytes, so
+# the opening quote is dropped before the segments are read.
+in_fixture_tree() {
+    _p="/${1#\"}"
+    _head="$(printf '%s\n' "$_p" | sed -E 's#/(testdata|fixtures?|__fixtures__)/.*$##')"
+    [ "$_head" != "$_p" ] || return 1
+    ! printf '%s\n' "$_head/" | grep -q '/memory/'
+}
+
+offenders=""
+while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    in_fixture_tree "$candidate" && continue
+    offenders="${offenders}${candidate}
+"
+done <<EOF
+$(printf '%s\n' "$staged" | grep -E '(^|/)MEMORY\.md"?$|(^|/)memory/' || true)
+EOF
+offenders="${offenders%
+}"
 [ -n "$offenders" ] || exit 0
 
 {

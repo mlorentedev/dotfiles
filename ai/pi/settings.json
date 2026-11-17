@@ -9,6 +9,10 @@
     "nan/qwen3.8-flash",
     "nan/qwen3.6",
     "nan/mimo-v2.6-flash",
-    "nan/gemma4"
+    "nan/gemma4",
+    "nan/kimi-k3.1-pro",
+    "nan/qwen3.8-max",
+    "nan/deepseek-v4-pro",
+    "nan/hy4"
   ]
 }

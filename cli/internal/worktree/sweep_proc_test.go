@@ -116,6 +116,7 @@ func TestSweepRefusesWhenAProcessArrivesAfterTheGate(t *testing.T) {
 	}
 
 	now := time.Now()
+	linkFake(t, mainRepo, reapableWT)
 	if err := SaveMetadata(reapableWT, Metadata{
 		ReapOK:         true,
 		CreatedAt:      now.Add(-2 * time.Hour),
@@ -207,6 +208,7 @@ func TestGateFIsTheLastCheckBeforeRemoval(t *testing.T) {
 	}
 
 	now := time.Now()
+	linkFake(t, mainRepo, reapableWT)
 	if err := SaveMetadata(reapableWT, Metadata{
 		ReapOK:         true,
 		CreatedAt:      now.Add(-2 * time.Hour),

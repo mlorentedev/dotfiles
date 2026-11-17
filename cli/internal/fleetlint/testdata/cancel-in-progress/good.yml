@@ -1,0 +1,21 @@
+on:
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: make
+---
+# Not a pull-request workflow: nothing to cancel.
+on: push
+jobs: {}
+---
+# A push to the pull request does not start it again: no run goes stale.
+on:
+  pull_request:
+    types: [opened, reopened]
+jobs: {}

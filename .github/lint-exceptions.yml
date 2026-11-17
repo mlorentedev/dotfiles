@@ -1,0 +1,11 @@
+# Fleet lint exceptions (`dotf lint fleet`). Each entry silences one rule on one
+# file and says why. An entry that stops matching a finding becomes a finding
+# itself (fleet/exception), so this file cannot go stale silently.
+exceptions:
+  - rule: fleet/skip-cache
+    path: .github/workflows/cli.yml
+    reason: >-
+      Both golangci-lint steps run with the cache off. A cache saved on main
+      made every pull request report four SA5011 findings that a clean run does
+      not; the job takes about 15 s without it.
+    issue: "#2834"

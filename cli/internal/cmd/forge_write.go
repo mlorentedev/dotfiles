@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/forgewrite"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // forgeWriteTimeout bounds one write, so a hung forge degrades to an error.
@@ -48,7 +51,7 @@ var forgeWriteBackend = func(r forgewrite.Repo) (forgewrite.Backend, error) {
 	if api == "" {
 		api = "https://" + r.Host
 	}
-	return forgewrite.Gitea{BaseURL: api, Token: func() (string, error) { return forgeToken(host.Secret) }}, nil
+	return forgewrite.Gitea{BaseURL: api, Token: func() (string, error) { return forgeToken(host.SecretFor(r.Owner, isAgentSession())) }}, nil
 }
 
 // forgeLandedHeads asks the forge repoRoot's origin names which merged pull
@@ -76,8 +79,10 @@ func runGH(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
 	c := exec.CommandContext(ctx, "gh", args...)
 	c.Stdin = strings.NewReader(string(stdin))
 	out, err := c.Output()
+	err = deadlineErr(ctx, forgeWriteTimeout, err)
 	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
 			return out, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(ee.Stderr)))
 		}
 	}
@@ -120,7 +125,7 @@ func newForgePRCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	pr.AddCommand(newForgeCommentCmd("a pull request"), newForgePRCreateCmd(), newForgePREditCmd())
+	pr.AddCommand(newForgeCommentCmd("a pull request"), newForgePRCreateCmd(), newForgePREditCmd(), newForgePRReadyCmd())
 	return pr
 }
 
@@ -177,6 +182,7 @@ func newForgeCommentCmd(what string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			body = maybeAppendLaneProvenance(body)
 			repo, backend, err := forgeTarget()
 			if err != nil {
 				return err
@@ -265,7 +271,8 @@ func newForgePRCreateCmd() *cobra.Command {
 		Long: "create opens a pull request in the repository the cwd's origin names. The body is\n" +
 			"read only from --body-file (or stdin with -). --head defaults to the current\n" +
 			"branch; --base is required, because the default branch is not something to guess.\n" +
-			"--draft works on GitHub only. It never merges.",
+			"--draft opens a draft on GitHub and Gitea; on Gitea it is a \"WIP: \" title the\n" +
+			"instance must recognise, checked on the answer. It never merges.",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -298,6 +305,7 @@ func newForgePRCreateCmd() *cobra.Command {
 				}
 				return fmt.Errorf("ERROR: head %q carries a %s that %s does not. WHY: that is an unattended run's branch, which holds its ledger and is never merged. FIX: %s", head, runEnvelopePath, base, fix)
 			}
+			body = maybeAppendLaneProvenance(body)
 			repo, backend, err := forgeTarget()
 			if err != nil {
 				return err
@@ -316,8 +324,39 @@ func newForgePRCreateCmd() *cobra.Command {
 	c.Flags().StringVar(&bodyFile, "body-file", "", "file holding the pull request body, or - for stdin (required)")
 	c.Flags().StringVar(&head, "head", "", "branch to merge from (default: the current branch)")
 	c.Flags().StringVar(&base, "base", "", "branch to merge into (required)")
-	c.Flags().BoolVar(&draft, "draft", false, "open as a draft (GitHub only)")
+	c.Flags().BoolVar(&draft, "draft", false, "open as a draft; mark it ready with dotf forge pr ready")
 	return c
+}
+
+func newForgePRReadyCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "ready <number>",
+		Short: "Mark a draft pull request ready for review",
+		Long: "ready marks draft pull request <number> ready for review and prints its URL.\n" +
+			"GitHub: the markPullRequestReadyForReview mutation, the call gh pr ready makes.\n" +
+			"Gitea: the WIP: or [WIP] title prefix is removed, and the answer must no longer\n" +
+			"read as a draft. A pull request that is already ready is left alone.",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			n, err := parseForgeNumber(args[0])
+			if err != nil {
+				return err
+			}
+			repo, backend, err := forgeTarget()
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(c.Context(), forgeWriteTimeout)
+			defer cancel()
+			url, err := backend.ReadyPR(ctx, repo, n)
+			if err != nil {
+				return err
+			}
+			printForgeURL(c, url)
+			return nil
+		},
+	}
 }
 
 // newForgePREditCmd is issue edit under the pr name: a pull request is an
@@ -385,6 +424,7 @@ func newForgeIssueCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			body = maybeAppendLaneProvenance(body)
 			repo, backend, err := forgeTarget()
 			if err != nil {
 				return err
@@ -497,4 +537,30 @@ func readForgeBody(path string) (string, error) {
 		return "", fmt.Errorf("ERROR: the body is empty. WHY: an empty comment is never what was meant. FIX: write the text to the file first")
 	}
 	return string(data), nil
+}
+
+// maybeAppendLaneProvenance appends the non-attributed cross-OS environment
+// footer ("Environment: <machine-id> (<goos>/<goarch>) · <lane>") when run
+// inside a persistent named lane worktree (HARNESS-186, M-CODE-4).
+func maybeAppendLaneProvenance(body string) string {
+	cwd, err := os.Getwd()
+	if err != nil || cwd == "" {
+		return body
+	}
+	meta, err := worktree.LoadMetadata(cwd)
+	if err != nil || meta == nil || strings.TrimSpace(meta.Lane) == "" {
+		return body
+	}
+	machineID := strings.TrimSpace(os.Getenv("DOTF_MACHINE_ID"))
+	if machineID == "" {
+		if h, herr := os.Hostname(); herr == nil {
+			machineID = strings.TrimSpace(h)
+		}
+	}
+	line := forgewrite.FormatEnvironmentProvenance(machineID, runtime.GOOS, runtime.GOARCH, meta.Lane)
+	if err := forgewrite.ValidateProvenanceNoAttribution(line); err != nil {
+		fmt.Fprintln(os.Stderr, "WARN: environment footer skipped:", err)
+		return body
+	}
+	return forgewrite.AppendEnvironmentProvenance(body, machineID, runtime.GOOS, runtime.GOARCH, meta.Lane)
 }

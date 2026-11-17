@@ -12,12 +12,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 )
 
 // Facts is what Decide needs, read from GitHub for one head commit.
@@ -27,6 +30,7 @@ type Facts struct {
 	HeadSHA    string
 	HeadRef    string
 	BaseRef    string
+	CrossRepo  bool   // the head branch lives in a fork, not in this repository
 	MergeState string // CLEAN | BEHIND | DIRTY | BLOCKED | UNSTABLE | ...
 	Checks     []Check
 	Untriaged  bool // the triage queue lists this PR
@@ -109,6 +113,7 @@ func Decide(f Facts) []string {
 			r = append(r, c.Name+": "+c.Bucket)
 		}
 	}
+	r = append(r, reviewReasons(f)...)
 	switch {
 	case f.MergeState == "UNKNOWN" && f.UnknownFor > 0:
 		r = append(r, fmt.Sprintf("merge state is UNKNOWN after waiting %s for GitHub to compute it; a new head (a re-created merge of the base) makes it compute again", f.UnknownFor))
@@ -122,6 +127,30 @@ func Decide(f Facts) []string {
 		r = append(r, "the repository has not opted in to the standing merge grant ("+GrantFile+" on "+f.BaseRef+"): the owner merges this PR")
 	}
 	return r
+}
+
+// reviewReasons refuses a head no review ran on (#3243). A failed review is
+// already refused as a red check and a pending one is waited for, so what is
+// left is the reading the generic rule lets through: a review check that was
+// skipped, or none at all. With no checks reported, Decide already says so.
+func reviewReasons(f Facts) []string {
+	if len(f.Checks) == 0 {
+		return nil
+	}
+	found := false
+	for _, c := range f.Checks {
+		if !prtriage.IsReviewCheck(c.Name) {
+			continue
+		}
+		found = true
+		if c.Bucket == "skipping" {
+			return []string{fmt.Sprintf("review did not run on %s: the %s check was skipped", short(f.HeadSHA), c.Name)}
+		}
+	}
+	if !found {
+		return []string{fmt.Sprintf("review did not run on %s: no review check reported", short(f.HeadSHA))}
+	}
+	return nil
 }
 
 // excludedReasons applies the grant's exclusions to the head branch. An
@@ -184,6 +213,8 @@ type Result struct {
 	Merged     bool
 	Updated    bool // the base was merged into the branch first
 	HeadSHA    string
+	HeadRef    string   // the head branch in this repository, which a lane may still hold once it landed; empty for a fork's
+	Repo       string   // the --repo the PR was landed in; empty is the current repository
 	Reasons    []string // why it did not merge
 	Retargeted []int    // dependents pointed at the base before the merge
 	Warnings   []string // what went wrong after the merge landed
@@ -216,7 +247,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 		f.GrantDeclared, f.Excluded = g.declared, g.excluded
 		return Decide(f)
 	}
-	res := Result{Number: number, HeadSHA: f.HeadSHA, Reasons: append(decide(f), verdict.reasons(f)...)}
+	res := Result{Number: number, HeadSHA: f.HeadSHA, HeadRef: localHead(f), Repo: o.Repo, Reasons: append(decide(f), verdict.reasons(f)...)}
 	// Again while the base moves under the new head's CI, which a busy queue
 	// does: one update left the PR behind the next merge (#2041).
 	updates := 0
@@ -253,7 +284,7 @@ func Land(ctx context.Context, o Options, number int) (Result, error) {
 // repository without the grant, reviewer output still awaiting triage.
 func manualMerge(o Options, number int, f Facts) string {
 	ciRed := slices.ContainsFunc(f.Checks, func(c Check) bool {
-		return c.Bucket != "pass" && c.Bucket != "skipping" && c.Name != "review" && c.Name != "review-attestation"
+		return c.Bucket != "pass" && c.Bucket != "skipping" && !prtriage.IsReviewCheck(c.Name) && c.Name != attestationCheck
 	})
 	if f.State != "OPEN" || f.IsDraft || f.HeadSHA == "" || ownerOnly(f) || ciRed || len(f.Checks) == 0 {
 		return ""
@@ -409,11 +440,14 @@ func merge(ctx context.Context, gh ghFunc, o Options, n string, f Facts, res Res
 	// The retarget and the merge are one step: a merge that fails (the head
 	// moved, the base moved, a permission) puts the dependents back on the
 	// head branch, so a refused landing leaves the stack as it found it.
-	if _, err := gh("pr", "merge", n, "--squash", "--delete-branch", "--match-head-commit", f.HeadSHA); err != nil {
-		// gh also fails after the merge landed: the head branch deletion is
-		// refused, the client times out, or GraphQL is rate-limited. A PR that
-		// reads merged landed, and its dependents belong on the base, so it is
-		// a warning, not a restore.
+	//
+	// Never --delete-branch: gh 2.104.0 removes the linked worktree that has
+	// the branch checked out, and a persistent lane is one (#3531). The head
+	// branch is deleted over REST below, so landing touches no worktree.
+	if _, err := gh("pr", "merge", n, "--squash", "--match-head-commit", f.HeadSHA); err != nil {
+		// gh also fails after the merge landed: the client times out, or GraphQL
+		// is rate-limited. A PR that reads merged landed, and its dependents belong on
+		// the base, so it is a warning, not a restore.
 		landed, verr := mergedOverREST(ctx, o, n)
 		if verr != nil || !landed {
 			return res, errors.Join(fmt.Errorf("gh pr merge: %w", err), verr, restoreDependents(gh, moved, f.HeadRef))
@@ -421,7 +455,40 @@ func merge(ctx context.Context, gh ghFunc, o Options, n string, f Facts, res Res
 		res.Warnings = append(res.Warnings, fmt.Sprintf("merged, but gh pr merge reported: %v", err))
 	}
 	res.Retargeted, res.Merged = moved, true
+	if warning := deleteHead(ctx, o, f); warning != "" {
+		res.Warnings = append(res.Warnings, warning)
+	}
 	return res, nil
+}
+
+// localHead is the head branch when it lives in this repository, and "" for a
+// fork's: the same name here would be another branch.
+func localHead(f Facts) string {
+	if f.CrossRepo {
+		return ""
+	}
+	return f.HeadRef
+}
+
+// deleteHead removes the merged PR's head branch from this repository over
+// REST and returns a warning when it could not, or "" when it is gone. A fork's
+// head is left alone: the same name here would be another branch. A branch the
+// repository already deleted as the merge landed is the outcome wanted, not a
+// failure. The local branch stays for `dotf worktree done` or `lane park`,
+// which delete it once they see it landed.
+func deleteHead(ctx context.Context, o Options, f Facts) string {
+	if f.CrossRepo || f.HeadRef == "" {
+		return ""
+	}
+	segments := strings.Split(f.HeadRef, "/")
+	for i, seg := range segments {
+		segments[i] = url.PathEscape(seg)
+	}
+	_, err := o.Run(ctx, "api", "-X", "DELETE", "repos/"+apiRepo(o)+"/git/refs/heads/"+strings.Join(segments, "/"))
+	if err == nil || strings.Contains(err.Error(), "Reference does not exist") {
+		return ""
+	}
+	return fmt.Sprintf("merged, but the head branch %s was not deleted: %v", f.HeadRef, err)
 }
 
 // mergedOverREST asks the REST API whether the PR merged. Not `gh pr view`:
@@ -569,7 +636,7 @@ func readFacts(ctx context.Context, gh ghFunc, o Options, number int) (Facts, er
 }
 
 func readView(gh ghFunc, n string) (Facts, error) {
-	out, err := gh("pr", "view", n, "--json", "state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,changedFiles")
+	out, err := gh("pr", "view", n, "--json", "state,isDraft,headRefOid,headRefName,baseRefName,isCrossRepository,mergeStateStatus,changedFiles")
 	if err != nil {
 		return Facts{}, fmt.Errorf("gh pr view: %w", err)
 	}
@@ -579,13 +646,14 @@ func readView(gh ghFunc, n string) (Facts, error) {
 		HeadSHA      string `json:"headRefOid"`
 		HeadRef      string `json:"headRefName"`
 		BaseRef      string `json:"baseRefName"`
+		CrossRepo    bool   `json:"isCrossRepository"`
 		MergeState   string `json:"mergeStateStatus"`
 		ChangedFiles int    `json:"changedFiles"`
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return Facts{}, fmt.Errorf("gh pr view: %w", err)
 	}
-	return Facts{State: v.State, IsDraft: v.IsDraft, HeadSHA: v.HeadSHA, HeadRef: v.HeadRef, BaseRef: v.BaseRef, MergeState: v.MergeState, changedFiles: v.ChangedFiles}, nil
+	return Facts{State: v.State, IsDraft: v.IsDraft, HeadSHA: v.HeadSHA, HeadRef: v.HeadRef, BaseRef: v.BaseRef, CrossRepo: v.CrossRepo, MergeState: v.MergeState, changedFiles: v.ChangedFiles}, nil
 }
 
 // changedFiles is what the pull request files endpoint lists.

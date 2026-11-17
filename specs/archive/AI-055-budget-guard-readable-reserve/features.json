@@ -1,0 +1,44 @@
+[
+  {
+    "id": "AI-055-budget-guard-readable-reserve-f1",
+    "behavior": "a declared answer cap the check cannot read as a number is a gap naming the step and the value, and no clip line prints for that run",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget_AnAnswerCapItCannotReadIsAGapNotAPass$' -count=1",
+    "state": "verified",
+    "evidence": "ok on Windows go1.25.6 2026-11-11: go test exit 0; reverting prbudget.go to origin/main turns this test red, so it bites"
+  },
+  {
+    "id": "AI-055-budget-guard-readable-reserve-f2",
+    "behavior": "a workflow where no review step declares CONFIG__MAX_OUTPUT_TOKENS is a gap naming the variable, not a reserve of zero that passes every clip",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget_AWorkflowThatNeverDeclaresTheAnswerCapSaysSo$' -count=1",
+    "state": "verified",
+    "evidence": "ok on Windows go1.25.6 2026-11-11: go test exit 0; red against origin/main's largestOutputCap, which returned 0"
+  },
+  {
+    "id": "AI-055-budget-guard-readable-reserve-f3",
+    "behavior": "the reserve stays the largest declared cap when steps disagree, preserving the AI-054 property across the fail-closed rewrite",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget_TheReserveIsTheLargestCapNotTheFirst$' -count=1",
+    "state": "verified",
+    "evidence": "ok on Windows go1.25.6 2026-11-11: green against both origin/main and this branch, so the rewrite did not regress it"
+  },
+  {
+    "id": "AI-055-budget-guard-readable-reserve-f4",
+    "behavior": "a step whose call streams carries a (streamed: ...) suffix on its OK line saying the ceiling bounds the gap between chunks, so the number is a lower bound on wall clock",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget_AStreamedStepIsReportedAsALowerBound$' -count=1 && go run ./cmd/dotf harness check --repo-root .. | grep 'lower bound'",
+    "state": "verified",
+    "evidence": "ok on Windows go1.25.6 2026-11-11: go test exit 0; dotf harness check exit 0 prints the caveat on the NaN step only, the two non-streamed steps unchanged"
+  },
+  {
+    "id": "AI-055-budget-guard-readable-reserve-f5",
+    "behavior": "a step declaring no timeout-minutes is reported as declaring none instead of being measured against a 0 s ceiling",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget_AStepWithoutItsOwnTimeoutSaysSo$' -count=1",
+    "state": "verified",
+    "evidence": "ok on Windows go1.25.6 2026-11-11: go test exit 0; red against origin/main"
+  },
+  {
+    "id": "AI-055-budget-guard-readable-reserve-f6",
+    "behavior": "the repository's committed reviewer configuration still passes the stricter guard, and every AI-054 fail-closed path is unchanged",
+    "verification": "cd cli && go test ./internal/harness/ -run 'TestCheckReviewBudget' -count=1 && go vet ./internal/harness && go run ./cmd/dotf harness check --repo-root ..",
+    "state": "verified",
+    "evidence": "ok on Windows go1.25.6 2026-11-11: 19/19 guard tests PASS, whole package ok 13.151s, go vet exit 0, dotf harness check exit 0"
+  }
+]

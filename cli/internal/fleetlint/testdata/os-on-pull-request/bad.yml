@@ -1,0 +1,15 @@
+on: pull_request
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        include:
+          - os: macos-latest
+    steps:
+      - run: make

@@ -59,7 +59,10 @@ func TestSpecReviewForegroundRejectsMalformedReview(t *testing.T) {
 	withReviewBase(t, spec.ReviewBase{SHA: "basebasebase"}, "headheadhead")
 
 	prev := runForeground
-	runForeground = func(dir string, _ []string, _ string) error {
+	// The stub stands for the whole run, deadline's copy-back included, so the
+	// verdict lands in the caller's spec folder (the working directory), not
+	// in the review worktree it ran in.
+	runForeground = func(_ string, _ []string, _ string) error {
 		review := `---
 reviewer: nan/deepseek-v4-flash
 reviewed_sha: headheadhead
@@ -67,7 +70,7 @@ reviewed_sha: headheadhead
 
 FAIL
 `
-		return os.WriteFile(filepath.Join(dir, "specs", "AI-001-x", "review.md"), []byte(review), 0o600)
+		return os.WriteFile(filepath.Join("specs", "AI-001-x", "review.md"), []byte(review), 0o600)
 	}
 	t.Cleanup(func() { runForeground = prev })
 
@@ -460,5 +463,23 @@ func TestSpecReviewFallbackRecordsItsReason(t *testing.T) {
 	req, found, err := spec.ReadReviewRequest(filepath.Join(root, "specs", "AI-001-x"))
 	if err != nil || !found || req.Reviewer != "anthropic-review/claude-haiku-5-5" || req.FallbackReason != "rate-limit" {
 		t.Fatalf("want the fallback and its reason recorded, got %+v found=%v err=%v", req, found, err)
+	}
+}
+
+// #3346: `spec deadline` has already left an ERROR record by the time the
+// session is gone, so the startup-death message must not say the review file
+// was not written.
+func TestSpecReviewStartupDeathNamesTheErrorRecord(t *testing.T) {
+	root := makeRepo(t)
+	seedPool(t, root)
+	seedSpec(t, root, "AI-001-x", "---\nstatus: implementing\n---\n# AI-001-x\n")
+	stubLaunch(t, false)
+
+	_, _, err := execute(t, "spec", "review", "AI-001-x")
+	if err == nil {
+		t.Fatal("a launch whose session is already gone must fail")
+	}
+	if strings.Contains(err.Error(), "was not written") || !strings.Contains(err.Error(), "verdict ERROR") {
+		t.Errorf("err = %v, want it to name the ERROR record and not claim nothing was written", err)
 	}
 }

@@ -53,6 +53,8 @@ jobs:
       install: ${{ github.event_name != 'pull_request' || steps.filter.outputs.install == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
         if: github.event_name == 'pull_request'
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         if: github.event_name == 'pull_request'
@@ -95,7 +97,19 @@ jobs:
       # intermittently.
       GITHUB_TOKEN: ${{ github.token }}
     steps:
+      # Detached at the commit under test, on every event. On a push the
+      # default checkout is a `main` branch tracking origin/main, and
+      # converge's checkout step then fast-forwards it to whatever main holds
+      # at that second: the first converge tests a later commit than the one
+      # pushed, and the second reports a change whenever main moved again in
+      # between (#3375, twice on 2026-11-12). A detached HEAD has no upstream,
+      # so the step skips and both converges read one tree. On a pull request
+      # github.sha is the merge commit the default checkout already detaches
+      # at, so nothing changes there.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:

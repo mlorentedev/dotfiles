@@ -35,6 +35,8 @@ func (r Record) Failed() bool { return r.Error != "" }
 // stuckStatuses are the skips that recur on every run until someone acts on
 // the checkout. A dirty worktree is the one that kept a timer green while the
 // deploy never ran (#694). offline clears by itself, and ahead is local work.
+// upgrade-failed is a failure, not a skip: it clears when the package
+// upgrades, and Failed already reports it.
 var stuckStatuses = []string{"dirty", "diverged", "not-a-repo", "no-upstream", "ff-failed"}
 
 // Stuck reports whether the run skipped for a reason the next run will meet

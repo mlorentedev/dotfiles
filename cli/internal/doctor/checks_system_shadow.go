@@ -35,7 +35,7 @@ func checkShadowingSystemCopies(sys *System, cat tools.Catalog, rep *Report, fix
 		if t.Source.Type != "system" || cmd == "" || cmd != filepath.Base(cmd) {
 			continue
 		}
-		manager, pkg := t.Source.SystemPackage(sys.GOOS)
+		manager, pkg := t.Source.SystemPackage(sys.GOOS, sys.GOARCH)
 		if pkg == "" {
 			continue
 		}

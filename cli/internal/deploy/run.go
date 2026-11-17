@@ -13,6 +13,9 @@ import (
 // resolved secret for its placeholder.
 var ErrRenderIncomplete = errors.New("secrets left unresolved")
 
+// Repairer removes invalid destination state a config's source cannot express.
+type Repairer func(Config, string, string, func(string) string, bool) (bool, error)
+
 // RunOptions is what one pass over the manifest needs from its caller.
 type RunOptions struct {
 	RepoRoot, Home string
@@ -24,6 +27,9 @@ type RunOptions struct {
 	// Records is where merge entries record what they manage (RecordsDir);
 	// "" records nothing and removes nothing a source retired (#2570).
 	Records string
+	// Repair optionally removes invalid state the merge source cannot express.
+	// It runs only for an entry that applies here, before that entry deploys.
+	Repair Repairer
 }
 
 // Step is one entry's line in a run.
@@ -79,6 +85,14 @@ func Run(man *Manifest, targets []Config, o RunOptions) (RunResult, error) {
 		case c.Requires != "" && (o.Available == nil || !o.Available(c.Requires)):
 			step.Skipped, step.Absent = c.Requires+" not installed", c.Requires
 		default:
+			repaired := false
+			if o.Repair != nil {
+				var err error
+				repaired, err = o.Repair(c, o.RepoRoot, o.Home, o.Resolve, o.DryRun)
+				if err != nil {
+					return res, err
+				}
+			}
 			out, err := DeployWith(c, o.RepoRoot, o.Home, o.Resolve, o.Render, o.DryRun, o.Records)
 			if errors.Is(err, ErrRenderIncomplete) {
 				step.Skipped, step.Kept = fmt.Sprintf("kept the installed file: %v", err), true
@@ -87,6 +101,7 @@ func Run(man *Manifest, targets []Config, o RunOptions) (RunResult, error) {
 			if err != nil {
 				return res, err
 			}
+			out.Changed = out.Changed || repaired
 			step.Outcome = out
 			deployed[c.Name] = true
 		}

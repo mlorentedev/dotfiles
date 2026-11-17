@@ -113,6 +113,9 @@ func Decide(in GateInput) GateResult {
 	if in.Call.IsSkillTool || in.Call.Skill != "" {
 		return GateResult{Decision: Allow, Reason: "skill invocation"}
 	}
+	if IsReadOnlyTool(in.Call.Tool) {
+		return GateResult{Decision: Allow, Reason: "read-only discovery tool"}
+	}
 
 	var missing, warned []string
 	for _, s := range in.Persona.Skills {
@@ -292,7 +295,72 @@ func RecordConsumed(path, skill string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, raw, 0o600)
+	return atomicWriteFile(path, raw, 0o600)
+}
+
+// IsReadOnlyTool reports whether tool is a non-mutating discovery primitive
+// that must never be blocked before the agent can inspect files or read skills.
+func IsReadOnlyTool(tool string) bool {
+	switch strings.ToLower(strings.TrimSpace(tool)) {
+	case "read", "grep", "glob", "ls", "read_file", "grep_search", "find_by_name", "list_dir", "view":
+		return true
+	default:
+		return false
+	}
+}
+
+type stickyPersonaState struct {
+	Persona string `json:"persona"`
+	Branch  string `json:"branch,omitempty"`
+}
+
+// PersonaStatePath returns the path to the sticky primary persona state file
+// for a consumption scope.
+func PersonaStatePath(stateDir, scope string) string {
+	if scope == "" || scope == UnscopedScope || scope == UnparsedScope {
+		return ""
+	}
+	return filepath.Join(stateDir, "gate", scopeKey(scope)+".persona.json")
+}
+
+// LoadStickyPersona reads the sticky primary persona bound for scope and
+// branch. If branch is non-empty and differs from the recorded branch, it
+// returns "" so a lane switch can bind a fresh persona.
+func LoadStickyPersona(path, branch string) string {
+	if path == "" {
+		return ""
+	}
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is built by PersonaStatePath from the state dir
+	if err != nil {
+		return ""
+	}
+	var st stickyPersonaState
+	if json.Unmarshal(raw, &st) != nil {
+		return ""
+	}
+	if branch != "" && st.Branch != "" && st.Branch != branch {
+		return ""
+	}
+	return strings.TrimSpace(st.Persona)
+}
+
+// BindStickyPersona binds persona as the sticky primary persona for path and
+// branch. Once bound for a given branch, subsequent calls on the same branch
+// are no-ops so editing docs/adr/ or specs/ mid-session never thrashes the
+// active persona.
+func BindStickyPersona(path, persona, branch string) error {
+	persona = strings.TrimSpace(persona)
+	if path == "" || persona == "" {
+		return nil
+	}
+	if existing := LoadStickyPersona(path, branch); existing != "" {
+		return nil
+	}
+	raw, err := json.Marshal(stickyPersonaState{Persona: persona, Branch: strings.TrimSpace(branch)})
+	if err != nil {
+		return err
+	}
+	return atomicWriteFile(path, raw, 0o600)
 }
 
 // ConsumptionScope is the key a call's consumption ledger is stored under.

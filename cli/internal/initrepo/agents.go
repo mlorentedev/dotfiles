@@ -130,14 +130,54 @@ func BootstrapAgentsOpts(repoRoot string, force bool, dryRun bool) (AgentsResult
 // Development` H2 (matched as a full line, like the script's anchored grep).
 func hasSDDSection(content string) bool { return hasSection(content, sddHeading) }
 
-// hasSection reports whether content carries heading as a full line.
+// hasSection reports whether content carries heading as a full line outside a
+// fenced code block. A heading quoted in a fence is example text, not a section.
 func hasSection(content, heading string) bool {
-	for _, ln := range strings.Split(content, "\n") {
-		if ln == heading {
+	lines := strings.Split(content, "\n")
+	for i, in := range fencedLines(lines) {
+		if !in && lines[i] == heading {
 			return true
 		}
 	}
 	return false
+}
+
+// fencedLines marks each line that sits inside a fenced code block, fences
+// included. A fence opens on a run of three or more backticks or tildes (up to
+// three spaces of indent) and closes on a run of the same character at least as
+// long, carrying nothing else. An unclosed fence runs to the end, as in CommonMark.
+func fencedLines(lines []string) []bool {
+	in := make([]bool, len(lines))
+	var char byte
+	var width int
+	for i, ln := range lines {
+		run, c := fenceRun(ln)
+		switch {
+		case char == 0 && run >= 3:
+			char, width = c, run
+			in[i] = true
+		case char != 0:
+			in[i] = true
+			if c == char && run >= width && strings.TrimSpace(ln)[run:] == "" {
+				char = 0
+			}
+		}
+	}
+	return in
+}
+
+// fenceRun returns the length and character of the backtick or tilde run that
+// starts ln after at most three spaces of indent, or 0 when it has none.
+func fenceRun(ln string) (int, byte) {
+	t := strings.TrimLeft(ln, " ")
+	if len(ln)-len(t) > 3 || t == "" || (t[0] != '`' && t[0] != '~') {
+		return 0, 0
+	}
+	n := 0
+	for n < len(t) && t[n] == t[0] {
+		n++
+	}
+	return n, t[0]
 }
 
 // replaceSDDSection swaps the existing SDD section for snippet, preserving
@@ -151,18 +191,20 @@ func replaceSDDSection(content, snippet string) string {
 // replaceSection swaps the section opened by heading for snippet, keeping
 // everything before it and from the next H2 (or EOF) onward.
 func replaceSection(content, heading, snippet string) string {
+	lines := strings.Split(content, "\n")
+	fenced := fencedLines(lines)
 	var out []string
 	skipping := false
-	for _, ln := range strings.Split(content, "\n") {
+	for i, ln := range lines {
 		switch {
-		case ln == heading:
+		case !fenced[i] && ln == heading:
 			out = append(out, snippet)
 			skipping = true
-		case skipping && strings.HasPrefix(ln, "## "):
+		case skipping && !fenced[i] && strings.HasPrefix(ln, "## "):
 			skipping = false
 			out = append(out, ln)
 		case skipping:
-			// inside the old section body — drop it
+			// inside the old section body, fenced lines included — drop it
 		default:
 			out = append(out, ln)
 		}

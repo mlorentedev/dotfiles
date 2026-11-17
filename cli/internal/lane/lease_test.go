@@ -50,7 +50,7 @@ func TestNext_TheNewWorktreeCarriesTheLeaseBeforeTheAgentStarts(t *testing.T) {
 // A rerun keeps the lease it finds, so created_at does not move, and the
 // exclude line is not appended twice (#2547 AC2).
 func TestNext_ARerunKeepsTheLeaseItFinds(t *testing.T) {
-	idle := t.TempDir()
+	idle := linkedTempDir(t)
 	first := leaseNow.Add(-3 * time.Hour)
 	if err := worktree.SaveMetadata(idle, worktree.Metadata{Creator: "claude", Issue: 7, CreatedAt: first, LeaseExpiresAt: first.Add(24 * time.Hour), ReapOK: true}); err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestNext_ARerunKeepsTheLeaseItFinds(t *testing.T) {
 // worktree and leasing it is repaired by the rerun. A dry run writes nothing.
 func TestNext_AShownWorktreeWithoutALeaseIsLeasedButNotRestarted(t *testing.T) {
 	for _, dry := range []bool{false, true} {
-		shown := t.TempDir()
+		shown := linkedTempDir(t)
 		b := &fakeBackend{agent: "claude", existing: map[string]Worktree{"fix/first-thing": {Path: shown, Branch: "fix/first-thing", Open: true}}}
 		o := opts(t)
 		o.DryRun = dry

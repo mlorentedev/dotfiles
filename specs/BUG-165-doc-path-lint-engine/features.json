@@ -1,0 +1,58 @@
+[
+  {
+    "id": "BUG-165-doc-path-lint-engine-f1",
+    "behavior": "The Go command preserves every existing accepted and rejected doc-path behavior, including discovery, globs, escapes, vault paths, Windows worktrees and zsh source invariants.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'Test(CheckFiles|Discover|CurrentRepository)'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: go test ./internal/docpaths -run 'Test(CheckFiles|Discover|CurrentRepository)' -count=1 -> exit 0 in 9.104s. Includes linked-worktree and incomplete GIT_CONFIG_* fixtures; command regressions pass separately under f3/f6."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f2",
+    "behavior": "The full repository scan completes in at most two seconds on Windows and is deterministically ordered.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'TestCurrentRepository|TestCheckFilesDeterministicOutput'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: TestCurrentRepository measured 0.22s in-process. Mirroring install.ps1, the freshly built EXE's version probe absorbed 10.092s of endpoint inspection; the following full scans took 485ms and 473ms, produced the same 14 lines, and had SHA-256 98b1e2b30578c16ce3b735aa1408575b60d4cb3dd519cd44b7263c7cfd7cdcaf."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f3",
+    "behavior": "PR 1 exposes `dotf lint doc-paths` and CI coverage while leaving the shell hook operational.",
+    "verification": "cd cli && go test ./internal/cmd -run TestLintDocPaths && test -z \"$(git diff --name-only origin/main...HEAD -- .pre-commit-config.yaml scripts/check-doc-paths.sh tests/check-doc-paths.bats tests/check-doc-paths-real.bats)\"",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: go test ./internal/cmd -run '^TestLintDocPaths' -count=1 -> exit 0 in 3.543s; diff guard over .pre-commit-config.yaml, scripts/check-doc-paths.sh and both BATS files produced no paths. The existing hook remains wired."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f4",
+    "behavior": "After release, pre-commit uses the CLI and the shell guard plus both BATS files are absent with no dangling references.",
+    "verification": "test ! -e scripts/check-doc-paths.sh && test ! -e tests/check-doc-paths.bats && test ! -e tests/check-doc-paths-real.bats && ! git grep -n 'check-doc-paths.sh'",
+    "state": "pending",
+    "evidence": "Release-gated PR 2 only. The cutover worktree remains unpublished until PR 1 is merged, released and installed canonically."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f5",
+    "behavior": "Governed instruction or policy changes trigger the Go guard before merge.",
+    "verification": "cd cli && go test ./internal/docpaths -run TestCurrentRepository && ! git -C .. grep -n '^[[:space:]]*paths:' -- .github/workflows/cli.yml",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: TestCurrentRepository -> exit 0 in 0.973s; git grep for event-level paths filters in .github/workflows/cli.yml returned exit 1 as required. Pull-request and main triggers remain unfiltered."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f6",
+    "behavior": "Invalid policy, Git failures, missing paths, empty globs and repo escapes fail non-zero; inability to run never becomes success.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'Test(LoadPolicy|CheckFiles|DiscoverFails)' && go test ./internal/cmd -run '^TestLintDocPaths'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: full docpaths package -> exit 0; TestLintDocPaths command selector -> exit 0. Regressions cover sanitized root and tracked-file discovery, separated Git stdout/stderr, missing explicit files, semantic glob mistakes, surfaced I/O failures, missing paths and escapes."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f7",
+    "behavior": "The checkout-owned policy is versioned and rejects unknown fields or unsupported versions before scanning.",
+    "verification": "cd cli && go test ./internal/docpaths -run TestLoadPolicy",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: go test ./internal/docpaths -run TestLoadPolicy -count=1 -> exit 0 in 0.294s. TestCurrentPolicyLoads also pins the exact governed basename set."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f8",
+    "behavior": "Behavior tests are synthetic and the real-repository performance check is read-only.",
+    "verification": "cd cli && go test ./internal/docpaths -run 'Test(CheckFiles|DiscoverGovernedFiles|DiscoverFails|DiscoverFromLinkedWorktree|CurrentRepositoryReadOnly)'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-05: synthetic/read-only selector -> exit 0. Every synthetic fixture write asserts it remains under its testing temp root; linked-worktree fixtures use a temp root; TestCurrentRepositoryReadOnly proves the only live-repository scan does not mutate Git state."
+  }
+]

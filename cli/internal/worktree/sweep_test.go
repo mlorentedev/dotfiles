@@ -65,6 +65,7 @@ func TestSweepFailClosed(t *testing.T) {
 		"worktree " + freshWT + "\nHEAD 5555\nbranch refs/heads/feat/fresh\n\n"
 
 	// Metadata: reapable (old, expired lease, reap_ok true)
+	linkFake(t, mainRepo, reapableWT)
 	_ = SaveMetadata(reapableWT, Metadata{
 		ReapOK:         true,
 		CreatedAt:      now.Add(-2 * time.Hour),
@@ -72,6 +73,7 @@ func TestSweepFailClosed(t *testing.T) {
 	})
 
 	// Metadata: fresh (only 5m old, < 15m)
+	linkFake(t, mainRepo, freshWT)
 	_ = SaveMetadata(freshWT, Metadata{
 		ReapOK:         true,
 		CreatedAt:      now.Add(-5 * time.Minute),
@@ -134,6 +136,7 @@ func TestSweepLogsSHA(t *testing.T) {
 	mockPorcelain := "worktree " + mainRepo + "\nHEAD 1111\nbranch refs/heads/main\n\n" +
 		"worktree " + reapableWT + "\nHEAD 2222\nbranch refs/heads/feat/reapable\n\n"
 
+	linkFake(t, mainRepo, reapableWT)
 	_ = SaveMetadata(reapableWT, Metadata{
 		ReapOK:         true,
 		CreatedAt:      now.Add(-2 * time.Hour),
@@ -196,6 +199,7 @@ func TestSweepTOCTOUDirtyErrorFailsClosed(t *testing.T) {
 	mockPorcelain := "worktree " + mainRepo + "\nHEAD 1111\nbranch refs/heads/main\n\n" +
 		"worktree " + reapableWT + "\nHEAD 2222\nbranch refs/heads/feat/err\n\n"
 
+	linkFake(t, mainRepo, reapableWT)
 	_ = SaveMetadata(reapableWT, Metadata{
 		ReapOK:         true,
 		CreatedAt:      now.Add(-2 * time.Hour),
@@ -281,6 +285,7 @@ func TestSweepTOCTOUUnmergedFailsClosed(t *testing.T) {
 	mockPorcelain := "worktree " + mainRepo + "\nHEAD 1111\nbranch refs/heads/main\n\n" +
 		"worktree " + reapableWT + "\nHEAD 2222\nbranch refs/heads/feat/toctou\n\n"
 
+	linkFake(t, mainRepo, reapableWT)
 	_ = SaveMetadata(reapableWT, Metadata{
 		ReapOK:         true,
 		CreatedAt:      now.Add(-2 * time.Hour),

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 )
 
@@ -55,7 +56,14 @@ func (p *catalogPass) then(o catalogPass) {
 
 func loadCatalog(env Env) ([]tools.Tool, error) {
 	cat, err := tools.Load(filepath.Join(env.RepoRoot, "packages.json"))
-	return cat.Tools, err
+	if err != nil {
+		return nil, err
+	}
+	roles, err := envpkg.LoadMachineRoles(envpkg.MachinePath(env.Home))
+	if err != nil {
+		return nil, err
+	}
+	return tools.ForRoles(cat.Tools, roles), nil
 }
 
 // walkCatalog plans every entry and, when apply is set, installs the ones the

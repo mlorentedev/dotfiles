@@ -23,6 +23,41 @@ var launchers = map[string]func(prompt string) []string{
 		return []string{"dotf", "secrets", "run", "--only", "NAN_API_KEY,OPENROUTER_API_KEY", "--", "pi", p}
 	},
 	"agy": func(p string) []string { return []string{"agy", "-i", p} },
+	// copilot's -i starts interactive mode on the prompt; -p would run it once and exit.
+	"copilot": func(p string) []string { return []string{"copilot", "-i", p} },
+	// opencode's key comes from a shell function too, so it goes through secrets run
+	// as pi does. --prompt pre-fills the input; the observed launch decides whether
+	// it also submits (verification.md).
+	"opencode": func(p string) []string {
+		return []string{"dotf", "secrets", "run", "--only", "NAN_API_KEY", "--", "opencode", "--prompt", p}
+	},
+}
+
+// LaunchEnv is the environment a launch must start with, beyond the caller's own:
+// the agent's name for herdr, when the launch goes through `dotf secrets run`.
+// herdr names a pane's agent from the foreground process, and the wrapper makes
+// that process dotf, so the pane reads agent: null (#2813; observed for
+// opencode, #3430). The value is read from the environment the process was
+// started with, so it has to be there when the wrapper starts: set later it is
+// invisible to herdr (lesson 493). A launch that starts the agent itself needs
+// nothing, and gets nothing.
+func LaunchEnv(argv []string) []string {
+	if len(argv) < 4 || argv[0] != "dotf" || argv[1] != "secrets" || argv[2] != "run" {
+		return nil
+	}
+	dash := slices.Index(argv, "--")
+	if dash < 0 || dash+1 >= len(argv) {
+		return nil
+	}
+	name := argv[dash+1]
+	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
+		name = name[i+1:]
+	}
+	name = strings.TrimSuffix(strings.TrimSuffix(name, ".exe"), ".EXE")
+	if name == "" {
+		return nil
+	}
+	return []string{"HERDR_AGENT=" + name}
 }
 
 // Agents lists the agents LaunchArgv knows, sorted.
@@ -37,8 +72,12 @@ func Agents() []string {
 
 // LaunchArgv is the command that starts agent on prompt, interactively. The
 // prompt is refused when it would not reach the agent as one: empty, a leading
-// dash (read as a flag) or a leading @ (pi attaches the file it names).
-func LaunchArgv(agent, prompt string) ([]string, error) {
+// dash (read as a flag) or a leading @ (pi attaches the file it names). A model
+// is inserted as `--model <id>` right after the agent's executable, before its
+// mode flag and the prompt: every agent in the table was observed taking that
+// flag there (#3485). Empty, the launch is the table's own. A model that is
+// blank or starts with a dash would be read as a flag, so it is refused.
+func LaunchArgv(agent, prompt, model string) ([]string, error) {
 	build, ok := launchers[agent]
 	if !ok {
 		return nil, fmt.Errorf("lane: no launch command for agent %q (known: %s)", agent, strings.Join(Agents(), ", "))
@@ -46,7 +85,28 @@ func LaunchArgv(agent, prompt string) ([]string, error) {
 	if p := strings.TrimSpace(prompt); p == "" || p[0] == '-' || p[0] == '@' {
 		return nil, fmt.Errorf("lane: the prompt must start with text, not %q", firstWord(prompt))
 	}
-	return build(prompt), nil
+	argv := build(prompt)
+	if model == "" {
+		return argv, nil
+	}
+	m := strings.TrimSpace(model)
+	if m == "" || m[0] == '-' {
+		return nil, fmt.Errorf("lane: the model must be an id, not %q", model)
+	}
+	at := agentExecutable(argv) + 1
+	return slices.Concat(argv[:at], []string{"--model", m}, argv[at:]), nil
+}
+
+// agentExecutable is the index of the agent's own executable in a launch argv:
+// the word after `--` when the launch goes through `dotf secrets run`, else the
+// first word.
+func agentExecutable(argv []string) int {
+	if len(argv) >= 4 && argv[0] == "dotf" && argv[1] == "secrets" && argv[2] == "run" {
+		if dash := slices.Index(argv, "--"); dash >= 0 && dash+1 < len(argv) {
+			return dash + 1
+		}
+	}
+	return 0
 }
 
 func firstWord(s string) string {

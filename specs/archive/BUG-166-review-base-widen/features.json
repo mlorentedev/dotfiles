@@ -1,0 +1,30 @@
+[
+  {
+    "id": "BUG-166-review-base-widen-f1",
+    "behavior": "A spec committed after its fix on a branch resolves to a base at or before the fix, and the fix is an own commit",
+    "verification": "cd cli && go test ./internal/spec -run 'TestReviewBaseWidensToTheForkPoint|TestOwnCommitsCountTheWorkBeforeTheSpec' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-166-review-base-widen-f2",
+    "behavior": "The base never moves later than the traced base",
+    "verification": "cd cli && go test ./internal/spec -run 'TestReviewBaseNeverNarrows' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-166-review-base-widen-f3",
+    "behavior": "Refusals and the rename trace behave as before",
+    "verification": "cd cli && go test ./internal/spec -run 'TestResolveReviewBase' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-166-review-base-widen-f4",
+    "behavior": "The launch scope line says the base was widened",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestReviewScopeSaysTheBaseWasWidened' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "HARNESS-186-named-lanes-sticky-personas-f1",
+    "behavior": "AC1: dotf lane init provisions feat-lane-primary, feat-lane-secondary, and fast-track-lane idempotently (changed=0 on re-run) and dotf lane switch routes branches in-place with WIP cap",
+    "verification": "cd cli && go test ./internal/lane/... -run \"TestLaneInitIdempotent|TestLaneSwitchRoutingAndWIPCap\" -count=1",
+    "state": "passing",
+    "evidence": "PASS: TestLaneInitIdempotent (46.24s), PASS: TestLaneSwitchRoutingAndWIPCap (97.05s) in cli/internal/lane/lanes_test.go"
+  },
+  {
+    "id": "HARNESS-186-named-lanes-sticky-personas-f2",
+    "behavior": "AC2: dotf lane park and dotf worktree done/sweep park named lanes in-place after verifying branchLanding tip SHA, release claims, and archive memory threads under LockHandoffMemory",
+    "verification": "cd cli && go test ./internal/worktree/... -run TestLaneParkInPlaceAndTipVerification -count=1",
+    "state": "passing",
+    "evidence": "PASS: TestLaneParkInPlaceAndTipVerification (87.00s) in cli/internal/worktree/park_test.go"
+  },
+  {
+    "id": "HARNESS-186-named-lanes-sticky-personas-f3",
+    "behavior": "AC3: dotf harness gate exempts read-only tools, persists sticky primary persona per (session_id, branch), and uses atomic replace with retry on Windows",
+    "verification": "cd cli && go test ./internal/harness/... ./internal/cmd/... -run \"TestDecide_ExemptsReadOnly|TestStickyPersona|TestAtomicWriteFile|TestHarnessGateStickyPersona\" -count=1",
+    "state": "passing",
+    "evidence": "PASS: TestDecide_ExemptsReadOnlyDiscoveryTools, TestStickyPersona_BindsOncePerBranchAndResetsOnBranchSwitch, TestAtomicWriteFile_ConcurrentWritesOnWindowsDoNotFail, TestHarnessGateStickyPersonaAndMeeseekResolution"
+  },
+  {
+    "id": "HARNESS-186-named-lanes-sticky-personas-f4",
+    "behavior": "AC4: dotf agent auto/run allocates meeseek-<role>-<fruit> without replacement from 64-fruit dictionary, resolves role in loadGatePersona, and passes --provider to piBackend",
+    "verification": "cd cli && go test ./internal/agent/... -run \"TestFruit|TestParseWorkerID|TestDispatch_PopulatesMeeseek|TestPiBackend\" -count=1",
+    "state": "passing",
+    "evidence": "PASS: TestFruitDeck_64SequentialDrawsHaveZeroCollisions, TestParseWorkerID_RejectsPluralAndMalformedNames, TestDispatch_PopulatesMeeseekWorkerIDAndPropagatesToRequest, TestPiBackend_IncludesProviderFlagAndClassifiesUnauthenticatedAsUnavailable"
+  },
+  {
+    "id": "HARNESS-186-named-lanes-sticky-personas-f5",
+    "behavior": "AC5: pre-commit lane guard activates only on the .dotf/lanes.json marker dotf lane init writes (the issue-queue .dotf/lane.json from #2532 must not activate it), is POSIX sh, blocks main/PARKED lanes/every declared third_party_roots entry with no host name hardcoded, and exempts .obsidian vaults and active git rebase/cherry-pick",
+    "verification": "cd cli && go test ./internal/hooks/... -run TestPreCommitLaneGuard -count=1",
+    "state": "passing",
+    "evidence": "PASS: TestPreCommitLaneGuard incl. scenario 3b (issue-queue lane.json does not activate) and scenario 8 (declared root acme-sessions blocks); sh -n + shellcheck -s sh clean on git-hooks/lib/lane-guard.sh; TestLaneInitIdempotent asserts the marker is machine-independent (no slash, backslash or colon in values) and byte-identical on re-run"
+  },
+  {
+    "id": "HARNESS-186-named-lanes-sticky-personas-f6",
+    "behavior": "AC6: PR bodies and review triage comments include Environment: <machine-id> (<goos>/<goarch>) · <lane> with zero AI attribution",
+    "verification": "cd cli && go test ./internal/forgewrite/... -run TestForgePRProvenanceNoAttribution -count=1",
+    "state": "passing",
+    "evidence": "PASS: TestForgePRProvenanceNoAttribution (0.00s) in cli/internal/forgewrite/provenance_test.go"
+  }
+]

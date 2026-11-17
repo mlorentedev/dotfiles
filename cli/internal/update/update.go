@@ -6,17 +6,26 @@
 // tested path.
 //
 // The load-bearing contract: every non-actionable condition (not a repo, dirty
-// worktree, offline, no upstream, already current, ahead, diverged) is a benign SKIP
-// (nil error). The only errors are a real converge failure after a successful
-// fast-forward and a failed install of the pinned dotf — so a systemd timer /
-// Scheduled Task run reports failure only when the deploy genuinely broke,
-// never for the routine "nothing to do".
+// worktree, offline, no upstream, ahead, diverged) is a benign SKIP (nil
+// error). Already current runs the system-upgrade step (below), not a skip. The only errors are a real converge failure after a successful
+// fast-forward, a failed install of the pinned dotf, and a failed system-upgrade
+// step on a day the checkout did not move — so a systemd timer / Scheduled
+// Task run reports failure only when something genuinely broke, never for the
+// routine "nothing to do".
+//
+// A day the checkout did not move still runs the system-upgrade converge step
+// (TOOL-036), which keeps the catalog's unpinned system packages current. A
+// fast-forward converges in full and a reinstall converges with the new
+// binary, so both already include it, and a skip runs nothing.
 //
 // The checkout's DOTF_VERSION pin is part of "up to date" (BUG-144): a
 // converge run by a dotf older than the pin lacks the steps the checkout
 // declares, and `current` must not be answered while doctor would FAIL the
-// drift. When the running dotf differs from the pin, the checkout's installer
-// installs the pin and converges with the new binary.
+// drift. The pin is the upstream's (CLI-133): when the running dotf differs
+// from it, the pinned release is installed in Go over the running binary on any
+// checkout that can be fetched, and a deployable checkout then converges with
+// the new binary. install.sh and install.ps1 only bootstrap a machine with no
+// dotf yet.
 package update
 
 import (
@@ -25,18 +34,23 @@ import (
 	"strings"
 )
 
-// Deps abstracts the external surfaces so Run is unit-testable with no real git
-// or converge. Git runs `git -C <repo> <args...>` and returns trimmed stdout
-// (a non-nil error means the git command itself failed). Converge applies
-// `dotf converge` to the checkout; the command layer wires it. Pin reads the
-// checkout's DOTF_VERSION (after the fast-forward, so it is the new one), ""
-// when unpinned. Install runs the checkout's installer for that version, which
-// replaces the dotf binary and converges with the new one.
+// Deps abstracts the external surfaces so Run is unit-testable with no real git,
+// download or converge. Git runs `git -C <repo> <args...>` and returns trimmed
+// stdout (a non-nil error means the git command itself failed). Converge applies
+// `dotf converge` to the checkout in this process. Pin reads DOTF_VERSION from
+// versions.conf at a git ref ("@{u}", the upstream) or, for "", from the
+// checkout's working tree; "" when unpinned. Install puts that release of dotf
+// where the running one is and returns its path; ConvergeWith runs `converge`
+// with that binary as a child process. Upgrade runs only the system-upgrade
+// converge step and returns the step's skip reason, "" when it ran; nil runs
+// nothing.
 type Deps struct {
-	Git      func(args ...string) (string, error)
-	Converge func() error
-	Pin      func() (string, error)
-	Install  func(pin string) error
+	Git          func(args ...string) (string, error)
+	Converge     func() error
+	Pin          func(ref string) (string, error)
+	Install      func(pin string) (exe string, err error)
+	ConvergeWith func(exe string) error
+	Upgrade      func() (skipped string, err error)
 }
 
 // Config is the resolved run configuration. The converge run is captured by the
@@ -53,51 +67,34 @@ var releaseVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 // Outcome classifies a run for the caller to log. Every Outcome except the
 // setup-failure path is returned with a nil error.
 type Outcome struct {
-	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|ff-failed|updated|reinstalled|converge-failed|install-failed
+	Status   string // stable tag: not-a-repo|dirty|offline|no-upstream|current|ahead|diverged|ff-failed|updated|reinstalled|converge-failed|install-failed|upgrade-failed|upgrade-skipped
 	Message  string // human-readable line
 	Upstream string // the upstream branch, once resolved (e.g. origin/main)
 	Detail   string // multi-line evidence for the status (the dirtying paths), printed after Message
 }
 
-// Run executes the self-update against cfg.Repo using the injected Deps. It
-// returns a non-nil error ONLY when the converge fails after a clean
-// fast-forward or the pinned dotf cannot be installed; every other branch is a
-// benign skip (nil error) so a scheduled run does not report spurious failures.
+// Run executes the self-update against cfg.Repo using the injected Deps. The
+// pinned dotf is installed from any checkout that can be fetched, deployable or
+// not (CLI-133); only a deployable one (current or fast-forwarded) converges. It
+// returns a non-nil error ONLY when the pin cannot be installed, the converge
+// fails, or the system-upgrade step fails on a day the checkout is current;
+// every other branch is a benign skip (nil error) so a scheduled run does not
+// report spurious failures.
 func Run(cfg Config, d Deps) (Outcome, error) {
 	out := Sync(cfg.Repo, d.Git)
-	switch out.Status {
-	case StatusFastForwarded, StatusCurrent:
-	case StatusAhead:
-		// Local commits are not on the upstream, so they are not a deploy: the
-		// self-update only ever runs what the upstream holds. The skip is right,
-		// but it is not a divergence: the merge base is the upstream and nothing
-		// needs reconciling, so it gets its own tag (#2205).
-		return skipDrift(cfg, d, out.Status, out.Message+" — nothing to deploy")
-	case "not-a-repo":
-		return skip(out.Status, out.Message+" — nothing to self-update")
-	case "dirty":
-		if out.Detail == "" {
-			return skipDrift(cfg, d, out.Status, out.Message+" — skipping")
-		}
-		return skipDrift(cfg, d, out.Status, out.Message+" — skipping (commit or stash first). Dirtying paths:\n"+out.Detail)
-	default:
-		return skipDrift(cfg, d, out.Status, out.Message+" — skipping self-update")
+	msg, deployable, fetched := classify(out)
+	if !fetched {
+		return skip(out.Status, msg)
 	}
-	// The checkout is level with its upstream. A running dotf that is not the
-	// one it pins would converge short of what the checkout declares (and
-	// `current` would hide it), so the pinned one is installed first.
-	pin, note := pinToInstall(cfg.Version, d.Pin)
+	pin, note := pinToInstall(cfg.Version, func() (string, string, error) { return pinFor(d, out.Status) })
 	if pin != "" {
-		if err := d.Install(pin); err != nil {
-			return Outcome{Status: "install-failed", Message: fmt.Sprintf("dotf %s is not the pinned %s and installing it failed — see the report above", cfg.Version, pin)},
-				fmt.Errorf("install dotf %s (running %s): %w", pin, cfg.Version, err)
-		}
-		// The installer converged with the new binary: converging again with
-		// this one is exactly what the pin exists to avoid.
-		return Outcome{Status: "reinstalled", Message: fmt.Sprintf("dotf %s -> %s (the DOTF_VERSION pin) installed and converged by the new binary", cfg.Version, pin)}, nil
+		return installPin(cfg, d, out.Status, msg, pin, note, deployable)
+	}
+	if !deployable {
+		return skip(out.Status, msg+note)
 	}
 	if out.Status == StatusCurrent {
-		return skip(out.Status, out.Message+" — no deploy needed"+note)
+		return upgradeQuietDay(d, msg, note)
 	}
 	// Clean fast-forward landed → converge from it.
 	if err := d.Converge(); err != nil {
@@ -107,40 +104,116 @@ func Run(cfg Config, d Deps) (Outcome, error) {
 	return Outcome{Status: "updated", Message: "self-update complete (fast-forwarded to " + out.Upstream + ")" + note}, nil
 }
 
-// skipDrift is a skip that installs nothing but names a running dotf that is not
-// the checkout's pin: doctor FAILs that drift and sends the owner to `dotf
-// update`, so an exit-0 skip must not leave it unsaid.
-func skipDrift(cfg Config, d Deps, status, msg string) (Outcome, error) {
-	if !releaseVersion.MatchString(cfg.Version) {
-		return skip(status, msg)
+// classify is the run log line for Sync's status, whether the checkout can be
+// deployed (it is level with its upstream), and whether the run got as far as
+// the remote: an offline machine or a missing checkout downloads nothing.
+func classify(out Outcome) (msg string, deployable, fetched bool) {
+	switch out.Status {
+	case StatusFastForwarded:
+		return out.Message, true, true
+	case StatusCurrent:
+		return out.Message + " — no deploy needed", true, true
+	case StatusAhead:
+		// Local commits are not on the upstream, so they are not a deploy: the
+		// self-update only ever runs what the upstream holds. It is not a
+		// divergence either, so it keeps its own tag (#2205).
+		return out.Message + " — nothing to deploy", false, true
+	case "not-a-repo":
+		return out.Message + " — nothing to self-update", false, false
+	case "offline":
+		return out.Message + " — skipping self-update", false, false
+	case "dirty":
+		if out.Detail == "" {
+			return out.Message + " — skipping the deploy", false, true
+		}
+		return out.Message + " — skipping the deploy (commit or stash first). Dirtying paths:\n" + out.Detail, false, true
 	}
-	pin, err := d.Pin()
-	if err != nil || pin == "" || pin == cfg.Version {
-		return skip(status, msg)
+	return out.Message + " — skipping the deploy", false, true
+}
+
+// pinFor reads the pin to install: the upstream's after the fetch, because
+// that is what the machine is being updated to, else the checkout's, with a
+// note saying so. Assess stops before fetching a dirty checkout, so this
+// fetches it; a fetch that fails there is an offline machine, which installs
+// nothing ("" pin).
+func pinFor(d Deps, status string) (pin, note string, err error) {
+	if status == "dirty" {
+		if _, ferr := d.Git("fetch", "--quiet"); ferr != nil {
+			return "", "\ndotf pin check skipped: git fetch failed (network?)", nil
+		}
 	}
-	return skip(status, msg+"\ndotf "+cfg.Version+" is not the pinned "+pin+
-		": `dotf update` installs it once the checkout is clean and level with its upstream, or run ./install.sh from the checkout")
+	if status != "no-upstream" {
+		if pin, err = d.Pin("@{u}"); err == nil {
+			return pin, "", nil
+		}
+	}
+	pin, err = d.Pin("")
+	return pin, "\ndotf pin read from the checkout: the upstream's versions.conf could not be read", err
+}
+
+// installPin installs the pinned dotf and, on a deployable checkout, converges
+// with it as a child process: converging with this binary is exactly what the
+// pin exists to avoid. A checkout that cannot be deployed keeps its status, so
+// doctor still reports it stuck, and says the converge waited.
+func installPin(cfg Config, d Deps, status, msg, pin, note string, deployable bool) (Outcome, error) {
+	exe, err := d.Install(pin)
+	if err != nil {
+		return Outcome{Status: "install-failed", Message: fmt.Sprintf("dotf %s is not the pinned %s and installing it failed — see the report above", cfg.Version, pin) + note},
+			fmt.Errorf("install dotf %s (running %s): %w", pin, cfg.Version, err)
+	}
+	moved := fmt.Sprintf("dotf %s -> %s (the DOTF_VERSION pin) installed", cfg.Version, pin)
+	if !deployable {
+		return skip(status, msg+"\n"+moved+"; converge skipped until the checkout can fast-forward"+note)
+	}
+	if err := d.ConvergeWith(exe); err != nil {
+		return Outcome{Status: "converge-failed", Message: moved + "; its converge failed — see the report above" + note},
+			fmt.Errorf("converge by the installed dotf %s (running %s): %w", pin, cfg.Version, err)
+	}
+	return Outcome{Status: "reinstalled", Message: moved + " and converged by the new binary" + note}, nil
+}
+
+// upgradeQuietDay runs the system-upgrade step on a day the checkout did not
+// move. Its failure is the same class as a converge failure after a
+// fast-forward, where the same step would fail the run, so it fails this one
+// too, under its own status so doctor can tell it from a broken deploy.
+func upgradeQuietDay(d Deps, msg, note string) (Outcome, error) {
+	if d.Upgrade == nil {
+		return skip(StatusCurrent, msg+note)
+	}
+	skipped, err := d.Upgrade()
+	if err != nil {
+		// err already names the step (converge: system-upgrade: ... or
+		// converge: cache-gc: ...).
+		return Outcome{Status: StatusUpgradeFailed, Message: msg + "; the system-upgrade or cache-gc step failed — see the report above" + note}, err
+	}
+	if skipped != "" {
+		// A skip exits 0 inside converge too: the record is the one place a
+		// machine that never upgrades (apt without sudo -n) can show it.
+		return skip(StatusUpgradeSkipped, msg+"; the system-upgrade step skipped: "+skipped+note)
+	}
+	return Outcome{Status: StatusCurrent, Message: msg + "; system-upgrade step converged" + note}, nil
 }
 
 // pinToInstall returns the version to install, or "" when none is due, with a
-// line for the run log when the check could not be made. A source build never
-// installs (the pin exists to catch a stale release, as doctor and the
-// installers hold); an unreadable or absent pin is not drift.
-func pinToInstall(running string, readPin func() (string, error)) (pin, note string) {
+// line for the run log about where the pin came from or why it was not
+// checked. A source build never installs (the pin exists to catch a stale
+// release, as doctor holds); an unreadable or absent pin is
+// not drift. A pin below the running release installs: the pin is the contract.
+func pinToInstall(running string, readPin func() (pin, note string, err error)) (string, string) {
 	if running == "" {
 		return "", ""
 	}
 	if !releaseVersion.MatchString(running) {
 		return "", "\ndotf pin check skipped: the running dotf is a source build (" + running + ")"
 	}
-	pin, err := readPin()
+	pin, note, err := readPin()
 	if err != nil {
 		return "", "\ndotf pin check skipped: cannot read DOTF_VERSION: " + err.Error()
 	}
 	if pin == "" || pin == running {
 		return "", ""
 	}
-	return pin, ""
+	return pin, note
 }
 
 // Sync statuses that leave the checkout level with, or ahead of, its upstream.
@@ -149,6 +222,12 @@ const (
 	StatusCurrent       = "current"
 	StatusAhead         = "ahead"
 	StatusFastForwarded = "fast-forwarded"
+	// StatusUpgradeFailed is Run's alone: the checkout was current and the
+	// system-upgrade step failed.
+	StatusUpgradeFailed = "upgrade-failed"
+	// StatusUpgradeSkipped is Run's alone: the checkout was current and the
+	// system-upgrade step skipped (a failed refresh, apt without sudo -n).
+	StatusUpgradeSkipped = "upgrade-skipped"
 	// StatusBehind is Assess's answer for a clean checkout its upstream
 	// strictly contains: Sync would fast-forward it. Sync itself never
 	// returns it.

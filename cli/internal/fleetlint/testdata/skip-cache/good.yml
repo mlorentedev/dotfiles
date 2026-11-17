@@ -1,0 +1,19 @@
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-go@0123456789abcdef0123456789abcdef01234567 # v6
+        with:
+          cache-dependency-path: cli/go.sum
+      - uses: actions/setup-node@0123456789abcdef0123456789abcdef01234567 # v6
+        with:
+          cache: npm
+      # cache is this action's own input, not a setup action's.
+      - uses: owner/build-thing@0123456789abcdef0123456789abcdef01234567 # v1
+        with:
+          cache: false
+      - uses: golangci/golangci-lint-action@0123456789abcdef0123456789abcdef01234567 # v9
+        with:
+          skip-cache: false

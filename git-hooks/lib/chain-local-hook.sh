@@ -72,7 +72,16 @@ precommit_store="${PRE_COMMIT_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/pre-commit}"
 # $toplevel is the physical path, so a store reached through a symlink (macOS's
 # /var -> /private/var, a linked ~/.cache) would never match as written.
 precommit_store="$(cd "$precommit_store" 2>/dev/null && pwd -P || printf '%s' "$precommit_store")"
-case "$toplevel" in
+# Both sides of the compare below must be read in the SAME path dialect, and the
+# pwd -P above settles only the store. `git rev-parse --show-toplevel` answers a
+# physical path on POSIX but `C:/...` on Git for Windows, where pwd -P answers
+# `/c/...` — so the raw compare could never match there, and this exclusion
+# silently did nothing on the one OS where the deadlock it prevents was
+# reproduced. Resolving $toplevel through the shell puts it in pwd -P's dialect
+# on every OS. Falls back to the raw value when the directory cannot be entered.
+toplevel_physical="$(cd "$toplevel" 2>/dev/null && pwd -P)"
+[ -n "$toplevel_physical" ] || toplevel_physical="$toplevel"
+case "$toplevel_physical" in
     "$precommit_store"/*) exit 0 ;;
 esac
 
@@ -123,6 +132,15 @@ case "$hook_type" in
         fi
         ;;
 esac
+
+# #3405: pre-commit stashes every unstaged change for the length of its run,
+# even for a stage the config declares nothing for. A file checkout
+# (`git checkout -- <path>`, git's third argument 0) is a restore that scripts
+# and tests run in a loop, so handing it over hid the whole uncommitted tree from
+# anything reading it concurrently. Only a branch checkout (1) is handed over.
+if [ "$hook_type" = post-checkout ] && [ "${3:-}" = 0 ]; then
+    exit 0
+fi
 
 # uv's documented order for its tool executables: UV_TOOL_BIN_DIR, then
 # XDG_BIN_HOME, then ~/.local/bin.

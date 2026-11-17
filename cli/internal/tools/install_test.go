@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // sopsTool is the catalog entry under test (mirrors packages.json).
@@ -1042,5 +1043,43 @@ func TestInstallUvTool_SelfInstallThatPlacesNothingFails(t *testing.T) {
 	_, err := in.Install(hiveSelfTool())
 	if err == nil || !strings.Contains(err.Error(), "hive self-upgrade 4.4.1 exited 0") || !strings.Contains(err.Error(), `hive\bin\hive.cmd`) {
 		t.Errorf("Install = %v, want the self install and the launcher named", err)
+	}
+}
+
+// A winget that hangs must end as an error the converge can report, not as
+// 2h of silence (#3489). The command is this test binary, so no winget or
+// shell is needed.
+func TestBoundedRun_StopsAHungWinget(t *testing.T) {
+	if os.Getenv("DOTF_TEST_HANG") == "1" {
+		time.Sleep(time.Minute)
+		return
+	}
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	// The command must be named "winget" to be bounded: a copy of this binary.
+	name := "winget"
+	if runtime.GOOS == "windows" {
+		name = "winget.exe"
+	}
+	copyTo := filepath.Join(dir, name)
+	data, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(copyTo, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOTF_TEST_HANG", "1")
+	run := boundedRun(io.Discard, 300*time.Millisecond)
+	start := time.Now()
+	err = run(copyTo, "-test.run=^TestBoundedRun_StopsAHungWinget$")
+	if err == nil || !strings.Contains(err.Error(), "did not finish") {
+		t.Fatalf("want a timeout error, got %v", err)
+	}
+	if took := time.Since(start); took > 20*time.Second {
+		t.Errorf("a hung winget held the caller for %s", took)
 	}
 }

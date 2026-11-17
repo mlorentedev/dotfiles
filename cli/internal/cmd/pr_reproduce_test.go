@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/mlorentedev/dotfiles/cli/internal/reproduce"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,6 +102,20 @@ func TestCommandLineCanBeRunAgain(t *testing.T) {
 	} {
 		if got := commandLine(tc.argv); got != tc.want {
 			t.Errorf("commandLine(%q) = %s, want %s", tc.argv, got, tc.want)
+		}
+	}
+}
+
+// #3401: an inverted refutation now carries a control, and the row is the
+// record prtriage reads, so it names the control's reading.
+func TestReproductionRow_NamesTheControlOfAnInvertedRefutation(t *testing.T) {
+	row := reproductionRow(reproduce.Result{
+		State: reproduce.DidNotReproduce, Exit: 1, Head: "0123456789abcdef", Command: []string{"bats", "t.bats"},
+		Control: reproduce.Reproduced, ControlExit: 0,
+	}, "/tmp/p.diff", true)
+	for _, want := range []string{"did-not-reproduce (exit 1", "control reproduced (exit 0) on the clean head"} {
+		if !strings.Contains(row, want) {
+			t.Errorf("row %q does not name %q", row, want)
 		}
 	}
 }

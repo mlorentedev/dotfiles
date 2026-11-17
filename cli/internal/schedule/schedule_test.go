@@ -489,3 +489,30 @@ func TestSchtasks_RefusesAJobWithAnEnvironment(t *testing.T) {
 		t.Errorf("nothing may be registered: %v", st.tasks)
 	}
 }
+
+// A background job yields the machine to the user: launchd throttles its CPU
+// and I/O, systemd runs it at the lowest CPU and I/O priority. A job that is
+// not background renders neither, so an interactive agent keeps its priority.
+func TestBackground_RendersLowPriorityOnLaunchdAndSystemd(t *testing.T) {
+	job := testJob()
+	job.Background = true
+	plist := string(LaunchdPlist(job))
+	for _, s := range []string{"<key>ProcessType</key>\n\t<string>Background</string>\n", "<key>LowPriorityIO</key>\n\t<true/>\n"} {
+		if !strings.Contains(plist, s) {
+			t.Errorf("plist lacks %q:\n%s", s, plist)
+		}
+	}
+	svc, _ := SystemdUnits(job)
+	for _, s := range []string{"Nice=19\n", "IOSchedulingClass=idle\n", "CPUSchedulingPolicy=idle\n"} {
+		if !strings.Contains(string(svc), s) {
+			t.Errorf("service lacks %q:\n%s", s, svc)
+		}
+	}
+	job.Background = false
+	if p := string(LaunchdPlist(job)); strings.Contains(p, "ProcessType") || strings.Contains(p, "LowPriorityIO") {
+		t.Errorf("a foreground job renders no priority:\n%s", p)
+	}
+	if svc, _ := SystemdUnits(job); strings.Contains(string(svc), "Nice=") {
+		t.Errorf("a foreground job renders no priority:\n%s", svc)
+	}
+}

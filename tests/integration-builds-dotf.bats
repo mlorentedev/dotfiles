@@ -33,7 +33,7 @@ setup() {
 
 @test "integration: GO_VERSION reaches the container from cli/go.mod, not a second pin" {
     grep -qF "GO_VERSION=\$(sed -n 's/^go //p' cli/go.mod)" "$CI"
-    grep -qF -- '--build-arg GO_VERSION="$GO_VERSION"' "$CI"
+    grep -qF 'GO_VERSION=${{ steps.versions.outputs.GO_VERSION }}' "$CI"
     grep -qF 'ARG GO_VERSION=' "$DOCKERFILE"
 }
 

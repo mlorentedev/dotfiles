@@ -1,0 +1,23 @@
+[
+  {
+    "id": "BUG-169-reproduce-control-run-f1",
+    "behavior": "A probed check that reads the same with and without the probe is could-not-run and says so; plain and inverted",
+    "verification": "cd cli && go test ./internal/reproduce -run 'TestRunWithAProbeNeedsTheCleanHeadAsItsControl'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-169-reproduce-control-run-f2",
+    "behavior": "A check that fails only with the probe stays reproduced; a refutation runs no control",
+    "verification": "cd cli && go test ./internal/reproduce -run 'TestRunWithAProbeNeedsTheCleanHeadAsItsControl|TestRunWithAProbeRunsNoControlForARefutation|TestRunWithAProbe$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-169-reproduce-control-run-f3",
+    "behavior": "The triage row names the control's reading and exit only when a control ran",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestReproductionRowNamesTheControl'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

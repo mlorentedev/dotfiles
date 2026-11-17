@@ -1,0 +1,485 @@
+package fleetlint
+
+import (
+	"errors"
+	"maps"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
+	"testing"
+
+	"go.yaml.in/yaml/v3"
+)
+
+// repo lays files out under a temporary repository root.
+func repo(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for p, body := range files {
+		full := filepath.Join(dir, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func fixture(t *testing.T, rule, kind string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", rule, kind+".yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// Each bad fixture trips its own rule once and no other; each good fixture,
+// which holds the near misses the exemptions exist for, trips nothing.
+func TestRuleFixtures(t *testing.T) {
+	for _, rule := range slices.Sorted(maps.Keys(rules)) {
+		name := strings.TrimPrefix(rule, "fleet/")
+		t.Run(name, func(t *testing.T) {
+			bad, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": fixture(t, name, "bad")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(bad) != 1 || bad[0].Rule != rule || bad[0].Path != ".github/workflows/ci.yml" || bad[0].Line == 0 {
+				t.Errorf("bad: got %v, want one %s finding with a line", bad, rule)
+			}
+			good, err := lintFiles(t, map[string]string{".gitea/workflows/ci.yaml": fixture(t, name, "good")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(good) != 0 {
+				t.Errorf("good: got %v, want none", good)
+			}
+		})
+	}
+}
+
+const twoFindings = `on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: owner/setup@v4
+`
+
+func TestExceptionSilencesOnlyItsRuleAndPath(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{
+		".github/workflows/ci.yml":    twoFindings,
+		".github/workflows/other.yml": twoFindings,
+		ExceptionsPath: `exceptions:
+  - rule: fleet/timeout
+    path: .github/workflows/ci.yml
+    reason: the job is a one-shot
+    issue: "#1"
+`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for _, f := range got {
+		lines = append(lines, f.Rule+" "+f.Path)
+	}
+	want := "fleet/sha-pin .github/workflows/ci.yml|fleet/timeout .github/workflows/other.yml|fleet/sha-pin .github/workflows/other.yml"
+	if strings.Join(lines, "|") != want {
+		t.Errorf("got %q\nwant %q", strings.Join(lines, "|"), want)
+	}
+}
+
+func TestIncompleteExceptionIsAFindingAndSilencesNothing(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{
+		".github/workflows/ci.yml": twoFindings,
+		ExceptionsPath: `exceptions:
+  - rule: fleet/timeout
+    path: .github/workflows/ci.yml
+    issue: "#1"
+  - rule: fleet/sha-pin
+    path: .github/workflows/ci.yml
+    reason: "  "
+`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s []string
+	for _, f := range got {
+		s = append(s, f.String())
+	}
+	want := []string{
+		".github/lint-exceptions.yml:2: fleet/exception: exception without reason is not honoured",
+		".github/lint-exceptions.yml:5: fleet/exception: exception without reason, issue is not honoured",
+		".github/workflows/ci.yml:3: fleet/timeout: job build sets no timeout-minutes",
+		".github/workflows/ci.yml:6: fleet/sha-pin: owner/setup@v4 is not pinned by a full commit SHA",
+	}
+	if strings.Join(s, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(s, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestUnreadableInputIsAnError(t *testing.T) {
+	if _, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": "jobs: [unclosed"}); err == nil {
+		t.Error("a workflow that does not parse: want an error")
+	}
+	if _, err := lintFiles(t, map[string]string{ExceptionsPath: "exceptions: {"}); err == nil {
+		t.Error("an exceptions file that does not parse: want an error")
+	}
+	got, err := Lint(t.TempDir(), "main")
+	if err != nil || len(got) != 0 {
+		t.Errorf("no workflows: got %v, %v, want none and no error", got, err)
+	}
+}
+
+func TestMultiDocumentFileIsReadWhole(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": "on: push\njobs: {}\n---\n" + twoFindings})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Errorf("got %v, want the second document's two findings", got)
+	}
+}
+
+// An explicit true is the same leak as leaving the key out.
+func TestPersistCredentialsTrueIsAFinding(t *testing.T) {
+	wf := strings.Replace(fixture(t, "persist-credentials", "bad"), "fetch-depth: 0", "persist-credentials: true", 1)
+	got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": wf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Rule != RulePersistCredentials {
+		t.Errorf("got %v, want one %s finding", got, RulePersistCredentials)
+	}
+}
+
+// lintFiles lints a repository holding files, whose default branch is main.
+func lintFiles(t *testing.T, files map[string]string) ([]Finding, error) {
+	t.Helper()
+	return Lint(repo(t, files), "main")
+}
+
+// A branch filter with no default branch to check it against is an error,
+// never a pass; with no filter the default branch is not needed.
+func TestBranchFilterNeedsADefaultBranch(t *testing.T) {
+	_, err := Lint(repo(t, map[string]string{".github/workflows/ci.yml": fixture(t, "branch-filter", "bad")}), "")
+	if !errors.Is(err, ErrNoDefaultBranch) {
+		t.Errorf("got %v, want ErrNoDefaultBranch", err)
+	}
+	if _, err := Lint(repo(t, map[string]string{".github/workflows/ci.yml": twoFindings}), ""); err != nil {
+		t.Errorf("no filter: %v", err)
+	}
+}
+
+func TestDefaultBranchReadsOriginHEAD(t *testing.T) {
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"remote", "add", "origin", "https://example.invalid/r.git"},
+		{"symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk"},
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	if got := DefaultBranch(dir); got != "trunk" {
+		t.Errorf("got %q, want trunk", got)
+	}
+	if got := DefaultBranch(t.TempDir()); got != "" {
+		t.Errorf("not a checkout: got %q, want empty", got)
+	}
+}
+
+// A literal Windows label is a finding on a pull request and not on a push.
+func TestOSOnPullRequestReadsLiteralLabels(t *testing.T) {
+	job := "jobs:\n  w:\n    runs-on: [self-hosted, Windows]\n    timeout-minutes: 5\n    steps:\n      - run: x\n"
+	pr := "on: [pull_request]\nconcurrency:\n  group: g\n  cancel-in-progress: true\n" + job
+	got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": pr})
+	if err != nil || len(got) != 1 || got[0].Rule != RuleOSOnPullRequest {
+		t.Errorf("pull request: got %v, %v", got, err)
+	}
+	got, err = lintFiles(t, map[string]string{".github/workflows/ci.yml": "on: push\n" + job})
+	if err != nil || len(got) != 0 {
+		t.Errorf("push: got %v, %v", got, err)
+	}
+}
+
+func TestMatchesBranch(t *testing.T) {
+	cases := []struct {
+		patterns []string
+		branch   string
+		want     bool
+	}{
+		{[]string{"main"}, "main", true},
+		{[]string{"master"}, "main", false},
+		{[]string{"*", "!main"}, "main", false},
+		{[]string{"!main", "*"}, "main", true},
+		{[]string{"**"}, "release/v1", true},
+		{[]string{"*"}, "release/v1", false},
+		{[]string{"rele?ase/*"}, "relase/v1", true},
+		{[]string{"rel?ase/*"}, "release/v1", false},
+		{[]string{"main?"}, "main", true},
+		{[]string{"v1+"}, "v111", true},
+		{[]string{"**", "!ma[a-z]n"}, "main", false},
+		{[]string{"ma[0-9]n"}, "main", false},
+		{[]string{`ma\*n`}, "ma*n", true},
+		{[]string{`ma\*n`}, "main", false},
+		{[]string{"ma.n"}, "main", false},
+		{[]string{"+main"}, "+main", true},
+	}
+	for _, c := range cases {
+		if got := matchesBranch(c.patterns, c.branch); got != c.want {
+			t.Errorf("matchesBranch(%q, %q) = %v, want %v", c.patterns, c.branch, got, c.want)
+		}
+	}
+}
+
+// An explicit cancel-in-progress: false is the same as none.
+func TestCancelInProgressFalseIsAFinding(t *testing.T) {
+	wf := "on: pull_request\nconcurrency:\n  group: g\n  cancel-in-progress: false\njobs: {}\n"
+	got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": wf})
+	if err != nil || len(got) != 1 || got[0].Rule != RuleCancelInProgress || got[0].Line != 2 {
+		t.Errorf("got %v, %v", got, err)
+	}
+}
+
+// A pull-request trigger reruns on a push unless its types: leave out
+// synchronize; the default set holds it.
+func TestRerunsOnPush(t *testing.T) {
+	for on, want := range map[string]bool{
+		"pull_request":                                  true,
+		"[push, pull_request]":                          true,
+		"{pull_request: }":                              true,
+		"{pull_request: {branches: [main]}}":            true,
+		"{pull_request_target: {types: [synchronize]}}": true,
+		"{pull_request: {types: [opened, reopened]}}":   false,
+		"{push: {branches: [main]}}":                    false,
+	} {
+		var n yaml.Node
+		if err := yaml.Unmarshal([]byte(on), &n); err != nil {
+			t.Fatal(err)
+		}
+		if got := rerunsOnPush(n.Content[0]); got != want {
+			t.Errorf("on: %s: got %v, want %v", on, got, want)
+		}
+	}
+}
+
+// A boolean is read in every spelling YAML and an action's inputs accept:
+// False is false, and a quoted "false" is too.
+func TestBooleansInAnySpelling(t *testing.T) {
+	for v, want := range map[string]bool{"false": true, "False": true, "FALSE": true, `"false"`: true, "true": false, "no": false, "${{ x }}": false} {
+		var n yaml.Node
+		if err := yaml.Unmarshal([]byte("k: "+v), &n); err != nil {
+			t.Fatal(err)
+		}
+		if got := isBool(mapValue(n.Content[0], "k"), false); got != want {
+			t.Errorf("%s: got %v, want %v", v, got, want)
+		}
+	}
+	wf := "on: pull_request\nconcurrency:\n  group: g\n  cancel-in-progress: False\njobs: {}\n"
+	if got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": wf}); err != nil || len(got) != 1 || got[0].Rule != RuleCancelInProgress {
+		t.Errorf("cancel-in-progress: False: got %v, %v", got, err)
+	}
+}
+
+// A literal matrix is read as GitHub expands it: an object-valued axis
+// through its property path, and an exclude: on that axis alone removes it.
+func TestOSOnPullRequestReadsTheMatrix(t *testing.T) {
+	job := func(matrix, runsOn string) string {
+		return "on: pull_request\nconcurrency:\n  group: g\n  cancel-in-progress: true\njobs:\n  t:\n    timeout-minutes: 5\n" +
+			"    strategy:\n      matrix:\n" + matrix + "    runs-on: " + runsOn + "\n    steps:\n      - run: true\n"
+	}
+	for name, c := range map[string]struct {
+		wf   string
+		want int
+	}{
+		"nested":            {job("        runner: [{os: ubuntu-latest}, {os: windows-latest}]\n", "${{ matrix.runner.os }}"), 1},
+		"nested linux only": {job("        runner: [{os: ubuntu-latest}]\n", "${{ matrix.runner.os }}"), 0},
+		"excluded":          {job("        os: [ubuntu-latest, windows-latest]\n        exclude: [{os: windows-latest}]\n", "${{ matrix.os }}"), 0},
+		"partly excluded":   {job("        os: [ubuntu-latest, windows-latest]\n        go: [a, b]\n        exclude: [{os: windows-latest, go: a}]\n", "${{ matrix.os }}"), 1},
+		"included":          {job("        os: [ubuntu-latest]\n        include: [{os: macos-latest}]\n", "${{ matrix.os }}"), 1},
+	} {
+		got, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": c.wf})
+		if err != nil || len(got) != c.want {
+			t.Errorf("%s: got %v, %v, want %d finding(s)", name, got, err, c.want)
+		}
+	}
+}
+
+// An exception that covers nothing, or names a rule that does not exist, is a
+// finding: neither silences anything, and both would read as declared.
+func TestStaleAndUnknownExceptionsAreFindings(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{
+		".github/workflows/ci.yml": twoFindings,
+		ExceptionsPath: `exceptions:
+  - rule: fleet/timeout
+    path: .github/workflows/ci.yml
+    reason: the job is a one-shot
+    issue: "#1"
+  - rule: fleet/timeout
+    path: .github/workflows/gone.yml
+    reason: the job is a one-shot
+    issue: "#1"
+  - rule: fleet/sha-pinned
+    path: .github/workflows/ci.yml
+    reason: a typo of the rule id
+    issue: "#1"
+`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s []string
+	for _, f := range got {
+		s = append(s, f.String())
+	}
+	want := []string{
+		".github/lint-exceptions.yml:6: fleet/exception: exception for fleet/timeout on .github/workflows/gone.yml matches no finding; remove it",
+		".github/lint-exceptions.yml:10: fleet/exception: exception names fleet/sha-pinned, which is not a fleet rule",
+		".github/workflows/ci.yml:6: fleet/sha-pin: owner/setup@v4 is not pinned by a full commit SHA",
+	}
+	if strings.Join(s, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(s, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// The rules an exception may name are the rules with fixtures: TestRuleFixtures
+// walks the list, so a rule left out of it would go untested and its own
+// exceptions would read as unknown.
+func TestEveryRuleMayBeExcepted(t *testing.T) {
+	dirs, err := os.ReadDir("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range dirs {
+		if !rules["fleet/"+d.Name()] {
+			t.Errorf("fleet/%s has fixtures and cannot be excepted", d.Name())
+		}
+	}
+	if len(dirs) != len(rules) {
+		t.Errorf("%d fixture directories, %d rules", len(dirs), len(rules))
+	}
+}
+
+func TestReposAreTheCheckoutsUnderADirectory(t *testing.T) {
+	dir := repo(t, map[string]string{
+		"b/.git/HEAD": "ref: refs/heads/main\n",
+		"a/.git":      "gitdir: /elsewhere\n",
+		"notes/x.md":  "not a checkout\n",
+		"file":        "",
+	})
+	got, err := Repos(dir)
+	if err != nil || strings.Join(got, ",") != "a,b" {
+		t.Errorf("got %v, %v, want a,b", got, err)
+	}
+	if _, err := Repos(filepath.Join(dir, "missing")); err == nil {
+		t.Error("a missing directory: want an error")
+	}
+}
+
+// A checkout linked in from elsewhere is read, not skipped as clean.
+func TestReposFollowSymlinks(t *testing.T) {
+	elsewhere := repo(t, map[string]string{"real/.git/HEAD": "ref: refs/heads/main\n"})
+	dir := t.TempDir()
+	if err := os.Symlink(filepath.Join(elsewhere, "real"), filepath.Join(dir, "linked")); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+	if got, err := Repos(dir); err != nil || strings.Join(got, ",") != "linked" {
+		t.Errorf("got %v, %v, want linked", got, err)
+	}
+}
+
+// A local composite action can call third-party actions itself, so its
+// manifest is pin-checked like a workflow, on both forges. Only the pin rule
+// reads it, and only one level under actions/.
+func TestActionManifestsArePinChecked(t *testing.T) {
+	const tagged = "runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@" + strings40 + "\n    - uses: owner/setup@v4\n"
+	const pinned = "runs:\n  using: composite\n  steps:\n    - uses: owner/setup@" + strings40 + "\n    - uses: ./.github/actions/other\n    - run: true\n      shell: bash\n"
+	got, err := lintFiles(t, map[string]string{
+		".github/actions/setup/action.yml":    tagged,
+		".gitea/actions/setup/action.yaml":    tagged,
+		".github/actions/ok/action.yml":       pinned,
+		".github/actions/a/nested/action.yml": tagged,
+		".github/actions/docker/action.yml":   "runs:\n  using: docker\n  image: docker://alpine:3\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Finding{
+		{RuleSHAPin, ".gitea/actions/setup/action.yaml", 5, "owner/setup@v4 is not pinned by a full commit SHA"},
+		{RuleSHAPin, ".github/actions/setup/action.yml", 5, "owner/setup@v4 is not pinned by a full commit SHA"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestActionManifestFindingMayBeExcepted(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{
+		".github/actions/setup/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: owner/setup@v4\n",
+		ExceptionsPath:                     "exceptions:\n  - rule: fleet/sha-pin\n    path: .github/actions/setup/action.yml\n    reason: r\n    issue: i\n",
+	})
+	if err != nil || len(got) != 0 {
+		t.Errorf("got %v, %v; want no finding", got, err)
+	}
+}
+
+func TestUnreadableActionManifestIsAnError(t *testing.T) {
+	if _, err := lintFiles(t, map[string]string{".github/actions/setup/action.yml": "runs: [unclosed"}); err == nil {
+		t.Error("a manifest that does not parse read as clean")
+	}
+}
+
+// Rules lists every id a finding can carry, the exceptions file's own
+// included: a selector checks names against it.
+func TestRulesListsEveryFindingRule(t *testing.T) {
+	got := Rules()
+	want := append(slices.Sorted(maps.Keys(rules)), RuleException)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("Rules() = %v, want %v", got, want)
+	}
+}
+
+const strings40 = "0123456789abcdef0123456789abcdef01234567"
+
+// A symlinked action directory is read like any other, and a manifest that
+// cannot be stat'ed for a reason other than its absence is an error: either
+// way, skipping it would read as a clean pin check.
+func TestActionManifestsFailClosed(t *testing.T) {
+	shared := repo(t, map[string]string{"setup/action.yml": "runs:\n  using: composite\n  steps:\n    - uses: owner/setup@v4\n"})
+	dir := repo(t, map[string]string{".github/workflows/ci.yml": "on: push\njobs: {}\n"})
+	if err := os.MkdirAll(filepath.Join(dir, ".github", "actions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(shared, "setup"), filepath.Join(dir, ".github", "actions", "setup")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	got, err := Lint(dir, "main")
+	if err != nil || len(got) != 1 || got[0].Path != ".github/actions/setup/action.yml" {
+		t.Errorf("symlinked action: got %v, %v; want one finding on its manifest", got, err)
+	}
+
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("permission bits do not deny access here")
+	}
+	locked := filepath.Join(dir, ".github", "actions", "locked")
+	if err := os.Mkdir(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	if _, err := Lint(dir, "main"); err == nil {
+		t.Error("an action directory that cannot be searched read as clean")
+	}
+}

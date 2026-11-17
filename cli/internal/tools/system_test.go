@@ -1,7 +1,10 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -253,6 +256,30 @@ func TestInstallSystem_NoNameForThisOSIsSkipped(t *testing.T) {
 	}
 }
 
+// A winget_arch entry names amd64 and arm64 only; on any other Windows arch it
+// is the same skip as an OS with no name, never `winget install --id ""`.
+func TestInstallSystem_NoIdForThisArchIsSkipped(t *testing.T) {
+	vc := Tool{Name: "vcredist", Source: Source{Type: "system", WingetArch: map[string]string{
+		"amd64": "Microsoft.VCRedist.2015+.x64", "arm64": "Microsoft.VCRedist.2015+.arm64"}}}
+	w := newWorld("winget")
+	in := w.installer("windows")
+	in.GOARCH = "386"
+	res, err := in.Install(vc)
+	if err != nil || res != Skipped || !strings.Contains(w.out.String(), "windows/386") {
+		t.Errorf("Install = %v, %v, out %q; want a skip naming windows/386", res, err, w.out.String())
+	}
+	if p := in.Plan(vc); p.Action != PlanUnsupported || !strings.Contains(p.Note, "windows/386") {
+		t.Errorf("Plan = %q %q, want %q naming windows/386", p.Action, p.Note, PlanUnsupported)
+	}
+	if len(w.ran) != 0 || len(w.queries) != 0 {
+		t.Errorf("a skipped entry reached a manager: ran %v, queried %v", w.ran, w.queries)
+	}
+	in.GOARCH = "arm64"
+	if p := in.Plan(vc); p.Action == PlanUnsupported {
+		t.Errorf("windows/arm64 has an id, Plan = %q", p.Action)
+	}
+}
+
 // The package manager exiting 0 is not the package being there (the W1 lesson,
 // applied to class 3): the manager's own record is the post-condition.
 func TestInstallSystem_ExitZeroWithoutThePackageIsAnError(t *testing.T) {
@@ -261,6 +288,99 @@ func TestInstallSystem_ExitZeroWithoutThePackageIsAnError(t *testing.T) {
 	_, err := w.installer("darwin").Install(ghTool())
 	if err == nil || !strings.Contains(err.Error(), "gh") || !strings.Contains(err.Error(), "brew") {
 		t.Errorf("want an error naming gh and brew, got %v", err)
+	}
+}
+
+// winget's 0x8a15000f (APPINSTALLER_CLI_ERROR_SOURCE_DATA_MISSING) is an
+// incomplete source cache, and a plain retry reads the same cache: both CI
+// attempts failed alike (#2445). One `winget source update` per run, then one
+// retry of the install that hit it.
+func TestInstallSystem_WingetSourceDataMissingRefreshesTheSourceOnce(t *testing.T) {
+	w := newWorld("winget")
+	in := w.installer("windows")
+	stale := true // until a `source update` runs
+	run := in.Run
+	in.Run = func(name string, args ...string) error {
+		if strings.Join(args, " ") == "source update" {
+			stale = false
+		}
+		if args[0] == "install" && stale {
+			return errors.New("exit status 0x8a15000f")
+		}
+		return run(name, args...)
+	}
+	zoxide := Tool{Name: "zoxide", Source: Source{Type: "system", Winget: "ajeetdsouza.zoxide"}}
+	for _, tool := range []Tool{ghTool(), zoxide} {
+		if res, err := in.Install(tool); err != nil || res != Installed {
+			t.Fatalf("Install(%s) = %v, %v; want Installed, nil\n%s", tool.Name, res, err, w.out.String())
+		}
+	}
+	updates := 0
+	for _, argv := range w.ran {
+		if strings.Join(argv, " ") == "winget source update" {
+			updates++
+		}
+	}
+	if updates != 1 {
+		t.Errorf("ran `winget source update` %d times, want once per run: %v", updates, w.ran)
+	}
+}
+
+// Any other winget failure is not retried: it is reported with the command.
+func TestInstallSystem_OtherWingetFailuresAreNotRetried(t *testing.T) {
+	w := newWorld("winget")
+	w.failRun = errors.New("exit status 0x8a150014") // no package found
+	_, err := w.installer("windows").Install(ghTool())
+	if err == nil || !strings.Contains(err.Error(), "winget install --id GitHub.cli") {
+		t.Fatalf("want the failing command in the error, got %v", err)
+	}
+	if len(w.ran) != 1 {
+		t.Errorf("ran %v, want the one install", w.ran)
+	}
+}
+
+// The AWS CLI's MSI names its directory for the next process only, and winget's
+// listing can miss a package it just installed: a from-zero Arm64 converge
+// failed there with "winget exited 0 but does not list Amazon.AWSCLI" (#3142).
+// The command in a directory an installer registered is the package there.
+func TestInstallSystem_ACommandInARegisteredDirectoryIsInstalled(t *testing.T) {
+	aws := Tool{Name: "aws", Source: Source{Type: "system", Winget: "Amazon.AWSCLI", Command: "aws"}}
+	registered := t.TempDir()
+	for _, tc := range []struct {
+		name    string
+		place   bool
+		wantErr bool
+	}{
+		{"the command is in the registered directory", true, false},
+		{"nothing there either", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			exe := filepath.Join(registered, "aws.exe")
+			_ = os.Remove(exe)
+			w := newWorld("winget")
+			w.noEffect = true // winget exits 0 and its listing never names the id
+			in := w.installer("windows")
+			in.RegisteredPath = func() ([]string, error) { return []string{registered}, nil }
+			run := in.Run
+			in.Run = func(name string, args ...string) error {
+				if tc.place { // the MSI places aws.exe and registers its directory
+					if err := os.WriteFile(exe, []byte("fixture"), 0o755); err != nil {
+						return err
+					}
+				}
+				return run(name, args...)
+			}
+			res, err := in.Install(aws)
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "does not list Amazon.AWSCLI") {
+					t.Fatalf("Install = %v, %v; want the not-listed error", res, err)
+				}
+				return
+			}
+			if err != nil || res != Installed {
+				t.Fatalf("Install = %v, %v; want Installed, nil\n%s", res, err, w.out.String())
+			}
+		})
 	}
 }
 

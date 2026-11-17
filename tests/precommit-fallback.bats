@@ -483,6 +483,38 @@ YAML
     [[ "$(cat "$ARGS_LOG")" == *"--hook-type post-checkout"* ]] || false
 }
 
+@test "BUG-090: the store exclusion resolves the toplevel before comparing" {
+    # The exclusion compares `git rev-parse --show-toplevel` against the store.
+    # Raw, that compare can only match when both sides happen to be spelled the
+    # same way, and git spells the toplevel in ITS dialect — `C:/...` on Git for
+    # Windows against a store the shell resolved to `/c/...`, so the exclusion
+    # silently did nothing on the one OS where the deadlock it prevents was
+    # reproduced. That dialect divergence cannot be produced on POSIX, so the
+    # stub stands in with a `..` segment: same mechanism (only resolution
+    # collapses it), runs on every OS. The stub answers the toplevel probe and
+    # defers every other subcommand to the real binary, so the red direction
+    # reaches pre-commit exactly as an unnormalized compare does in production.
+    stub_precommit 0
+    STORE_REPO="$WORK/pre-commit-store/repoabc123"
+    add_store_config
+    mkdir -p "$WORK/other"
+    {
+        echo '#!/usr/bin/env bash'
+        echo 'if [ "${1:-}" = rev-parse ] && [ "${2:-}" = --show-toplevel ]; then'
+        printf '    printf "%%s\\n" "%s/other/../pre-commit-store/repoabc123"\n' "$WORK"
+        echo '    exit 0'
+        echo 'fi'
+        printf 'exec "%s" "$@"\n' "$(command -v git)"
+        echo
+    } > "$STUB/git"
+    chmod +x "$STUB/git"
+    cd "$STORE_REPO"
+
+    run bash -c "PATH='$STUB:/usr/bin:/bin' PRE_COMMIT_HOME='$WORK/pre-commit-store' '$CHAIN' post-checkout 0000000000000000000000000000000000000000 abc 1 < /dev/null"
+    [ "$status" -eq 0 ]
+    [ ! -f "$ARGS_LOG" ]
+}
+
 # A merge stopped on a conflict in f, so the index holds unmerged paths.
 make_conflict() {
     fixture_git config user.email t@t.io
@@ -530,4 +562,30 @@ make_conflict() {
     run "$CHAIN" post-checkout aaa bbb 1 < /dev/null
     [ "$status" -eq 0 ]
     grep -q -- '--hook-type post-checkout' "$ARGS_LOG"
+}
+
+# #3405: pre-commit stashes every unstaged change while it runs, even for a
+# stage the config declares nothing for. A file checkout (`git checkout --
+# <path>`, flag 0) is a restore inside scripts and tests, so handing it over hid
+# every uncommitted edit from anything reading the tree at the same time.
+@test "#3405: a file checkout (flag 0) is not handed to pre-commit" {
+    stub_precommit 0
+    add_precommit_config
+    cd "$FIXTURE"
+
+    run "$CHAIN" post-checkout aaa aaa 0 < /dev/null
+    [ "$status" -eq 0 ]
+    [ ! -e "$ARGS_LOG" ]
+}
+
+@test "#3405: a file checkout still runs an executable repo-local post-checkout hook" {
+    stub_precommit 0
+    add_precommit_config
+    printf '#!/bin/sh\necho "local $3" > "%s/local-ran"\n' "$WORK" > "$FIXTURE/.git/hooks/post-checkout"
+    chmod +x "$FIXTURE/.git/hooks/post-checkout"
+    cd "$FIXTURE"
+
+    run "$CHAIN" post-checkout aaa aaa 0 < /dev/null
+    [ "$status" -eq 0 ]
+    [ "$(cat "$WORK/local-ran")" = "local 0" ]
 }

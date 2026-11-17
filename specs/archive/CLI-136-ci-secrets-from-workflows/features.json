@@ -1,0 +1,37 @@
+[
+  {
+    "id": "CLI-136-ci-secrets-from-workflows-f1",
+    "behavior": "ci-check prints per-repository missing, excess and unknown names, never values, and fails when any repository has a missing or excess name",
+    "verification": "cd cli && go test ./internal/cmd/ -run 'TestRunCICheckReportsNamesAndFails$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-136-ci-secrets-from-workflows-f2",
+    "behavior": "An inherit caller of a reusable workflow is reported missing the callee's undeclared secrets; an explicit mapping yields the caller-side name",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestCheckRepo$|TestInheritedCalls$|TestWorkflowReads$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-136-ci-secrets-from-workflows-f3",
+    "behavior": "A secret declared for a repository that no workflow reads is reported excess",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestCheckRepo$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-136-ci-secrets-from-workflows-f4",
+    "behavior": "A whole-context read is reported unknown with its file and expression, and is neither passed nor failed",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestWorkflowReadsUnknown$|TestCheckRepoCleanAndUnknownOnly$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "CLI-136-ci-secrets-from-workflows-f5",
+    "behavior": "An absent callee secret declared required: false is reported missing and marked optional, naming the callee",
+    "verification": "cd cli && go test ./internal/secrets/ -run 'TestCalleeSecrets$|TestCheckRepo$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  }
+]

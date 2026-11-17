@@ -15,4 +15,8 @@
          (b) Add the "skip-sdd" label to the PR AND a non-empty
              "## SDD skip rationale" section in the PR body.
 
+       If this already archived a spec to satisfy archive-on-merge but still
+       failed here: the PR body or a commit message must close the spec's
+       issue ("Closes #N"), and the spec's proposal.md must name that issue.
+
        Reference: AGENTS.md "Discipline Gate (NON-NEGOTIABLE)" section.

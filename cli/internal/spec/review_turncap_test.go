@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // piTranscript writes a pi --mode json transcript of the given number of turns
@@ -190,5 +191,95 @@ func TestArchiveGateNamesTheCapOnlyForAMissingVerdict(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "turn cap") {
 		t.Errorf("a written verdict's refusal got a turn-cap hint: %v", err)
+	}
+}
+
+// #1511: a detached review that died after the launcher's startup window (a
+// spent quota took 5.6s) leaves no verdict, and archive is the first place
+// anyone hears of it. The refusal quotes what the reviewer said, so "it died
+// on quota" does not read as "nobody ran it".
+func TestArchiveGateQuotesWhatADeadReviewerSaid(t *testing.T) {
+	repoRoot, specDir := archiveCapFixture(t, 460, false)
+	quota := `{"event":"result","result":{"status":"ERROR","error":"Individual quota reached. Resets in 1h6m26s.","usage":{"total_tokens":0}}}`
+	if err := os.WriteFile(TranscriptPath(repoRoot, "X"), []byte(quota+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := checkReviewGate(repoRoot, "X", specDir, nil)
+	if err == nil {
+		t.Fatal("a review that wrote no verdict must not archive")
+	}
+	if !strings.Contains(err.Error(), "Individual quota reached") || !strings.Contains(err.Error(), "nan/deepseek-v4-flash") {
+		t.Errorf("the refusal must quote the reviewer and name it: %v", err)
+	}
+}
+
+// A long transcript is quoted from its end, where a run's outcome is written.
+func TestReviewerLastWordsQuotesTheEnd(t *testing.T) {
+	transcript := filepath.Join(t.TempDir(), "t.jsonl")
+	body := strings.Repeat("{\"event\":\"delta\"}\n", 200) + `{"event":"result","error":"the end"}` + "\n"
+	if err := os.WriteFile(transcript, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	words, ok := ReviewerLastWords(transcript)
+	if !ok || !strings.Contains(words, "the end") {
+		t.Errorf("want the transcript's end quoted, got ok=%v %q", ok, words)
+	}
+	// A startup failure names its cause first, before any usage text.
+	stderr := filepath.Join(t.TempDir(), "s.jsonl")
+	cause := "error: missing API key ñ\n" + strings.Repeat("usage: é\n", 300)
+	if err := os.WriteFile(StderrPath(stderr), []byte(cause), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	words, _ = ReviewerLastWords(stderr)
+	if !strings.Contains(words, "missing API key") || !utf8.ValidString(words) {
+		t.Errorf("want the head kept and valid UTF-8, got %q", words)
+	}
+	if _, ok := ReviewerLastWords(filepath.Join(t.TempDir(), "absent.jsonl")); ok {
+		t.Error("no transcript and no stderr must report nothing to quote")
+	}
+}
+
+// Cut points inside multi-byte runes at both ends: "a" puts every rune start
+// of the é run on an odd index, the trailing "b" makes the length even, so
+// byte 400 and byte len-400 both fall mid-rune. A byte cut fails this.
+func TestHeadAndTailCutsOnRuneBoundaries(t *testing.T) {
+	out := "a" + strings.Repeat("é", 1000) + "b"
+	if utf8.RuneStart(out[quoteHalf]) || utf8.RuneStart(out[len(out)-quoteHalf]) {
+		t.Fatal("fixture: both cut points must fall inside a rune")
+	}
+	if got := headAndTail(out, "stderr", "/x"); !utf8.ValidString(got) || strings.ContainsRune(got, utf8.RuneError) {
+		t.Errorf("a rune was split: %q", got)
+	}
+	if got := headAndTail("ok \xc3", "stderr", "/x"); !utf8.ValidString(got) {
+		t.Errorf("a truncated last rune must not reach the quote: %q", got)
+	}
+}
+
+// A long transcript, read by its ends only, is still quoted from both.
+func TestReviewerLastWordsQuotesBothEndsOfALongFile(t *testing.T) {
+	transcript := filepath.Join(t.TempDir(), "t.jsonl")
+	body := "first line\n" + strings.Repeat("x", 3*endWindow) + "\nlast line"
+	if err := os.WriteFile(transcript, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	words, ok := ReviewerLastWords(transcript)
+	if !ok || !strings.Contains(words, "first line") || !strings.Contains(words, "last line") {
+		t.Errorf("want both ends quoted, got %q", words)
+	}
+}
+
+// A missing second signature is refused with the same quote as a missing first.
+func TestArchiveGateQuotesADeadSecondSigner(t *testing.T) {
+	repoRoot, specDir := archiveCapFixture(t, 460, false)
+	if err := WriteReviewRequestIn(specDir, SecondSigner, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "nan/deepseek-v4-flash", "basebasebase", ""); err != nil {
+		t.Fatal(err)
+	}
+	quota := `{"event":"result","result":{"status":"ERROR","error":"second signer quota reached"}}`
+	if err := os.WriteFile(TranscriptPathIn(repoRoot, "X", SecondSigner), []byte(quota+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := checkSignature(repoRoot, "X", specDir, SecondSigner, nil)
+	if err == nil || !strings.Contains(err.Error(), "second signer quota reached") {
+		t.Errorf("the second signer's refusal must quote it: %v", err)
 	}
 }

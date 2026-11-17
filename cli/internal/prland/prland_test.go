@@ -13,7 +13,7 @@ import (
 func readyFacts() Facts {
 	return Facts{
 		State: "OPEN", HeadSHA: "abc123", HeadRef: "feat/x", BaseRef: "main", MergeState: "CLEAN",
-		Checks:        []Check{{Name: "test", Bucket: "pass"}, {Name: "goreleaser", Bucket: "skipping"}},
+		Checks:        []Check{{Name: "test", Bucket: "pass"}, {Name: "goreleaser", Bucket: "skipping"}, {Name: "review", Bucket: "pass"}},
 		GrantDeclared: true,
 		Excluded:      []string{"release-please"},
 		Files:         []string{"cli/x.go"},
@@ -24,6 +24,41 @@ func readyFacts() Facts {
 func TestDecide_AReadyPRHasNoReasons(t *testing.T) {
 	if r := Decide(readyFacts()); len(r) != 0 {
 		t.Fatalf("want no reasons, got %v", r)
+	}
+}
+
+// #3243 AC3: a review that did not run on the head refuses the merge, under
+// either name the reviewer's job reports. A failed one is refused by the
+// generic check rule and a pending one is waited for, so only skipped and
+// absent need this reason.
+func TestDecide_ReviewDidNotRunOnTheHead(t *testing.T) {
+	withReview := func(cs ...Check) func(*Facts) {
+		return func(f *Facts) { f.Checks = append([]Check{{Name: "test", Bucket: "pass"}}, cs...) }
+	}
+	for name, tc := range map[string]struct {
+		mutate func(*Facts)
+		want   string // "" means it lands
+	}{
+		"skipped":                      {withReview(Check{"review", "skipping"}), "review did not run on abc123: the review check was skipped"},
+		"skipped, the reusable's name": {withReview(Check{"review / review", "skipping"}), "review did not run on abc123: the review / review check was skipped"},
+		"absent":                       {withReview(), "review did not run on abc123: no review check reported"},
+		"only a look-alike":            {withReview(Check{"preview", "pass"}), "no review check reported"},
+		"the reusable's name, passed":  {withReview(Check{"review / review", "pass"}), ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := readyFacts()
+			tc.mutate(&f)
+			r := Decide(f)
+			if tc.want == "" {
+				if len(r) != 0 {
+					t.Fatalf("want no reasons, got %v", r)
+				}
+				return
+			}
+			if !strings.Contains(strings.Join(r, "\n"), tc.want) {
+				t.Errorf("reasons %v lack %q", r, tc.want)
+			}
+		})
 	}
 }
 
@@ -82,6 +117,7 @@ type fakeGH struct {
 	grantYAML string // the grant's content; "" means grantFixture
 	files     string // the files endpoint's answer; "" means oneFile
 	grantRef  string // the contents path the grant was read from
+	deleteErr error  // what deleting the head branch answers
 }
 
 func (g *fakeGH) run(_ context.Context, args ...string) ([]byte, error) {
@@ -105,6 +141,9 @@ func (g *fakeGH) run(_ context.Context, args ...string) ([]byte, error) {
 	case strings.HasPrefix(line, "pr edit"), strings.HasPrefix(line, "pr merge"):
 		g.calls = append(g.calls, line)
 		return nil, nil
+	case strings.HasPrefix(line, "api -X DELETE "):
+		g.calls = append(g.calls, line)
+		return nil, g.deleteErr
 	case strings.HasPrefix(line, "api ") && strings.Contains(line, "/pulls/"):
 		return filesAnswer(g.files)
 	case strings.HasPrefix(line, "api "):
@@ -126,6 +165,9 @@ func filesAnswer(files string) ([]byte, error) {
 
 // apiAnswer answers both `gh api` reads Land makes for a ready PR.
 func apiAnswer(line string) ([]byte, error) {
+	if strings.HasPrefix(line, "api -X DELETE ") { // the head branch's deletion has no body
+		return nil, nil
+	}
 	if strings.HasSuffix(line, "--jq .merged") { // a merge gh reported failed did not land
 		return []byte("false\n"), nil
 	}
@@ -309,7 +351,7 @@ func TestLand_AnUnreadableGrantIsAnError(t *testing.T) {
 }
 
 const readyView = `{"state":"OPEN","isDraft":false,"headRefOid":"abc123","headRefName":"feat/x","baseRefName":"main","mergeStateStatus":"CLEAN"}`
-const greenChecks = `[{"name":"test","bucket":"pass"},{"name":"goreleaser","bucket":"skipping"}]`
+const greenChecks = `[{"name":"test","bucket":"pass"},{"name":"goreleaser","bucket":"skipping"},{"name":"review","bucket":"pass"}]`
 
 func noneUntriaged(context.Context) ([]int, error) { return nil, nil }
 
@@ -322,10 +364,108 @@ func TestLand_RetargetsDependentsThenMergesTheCheckedHead(t *testing.T) {
 	}
 	want := []string{
 		"pr edit 31 --base main",
-		"pr merge 30 --squash --delete-branch --match-head-commit abc123",
+		"pr merge 30 --squash --match-head-commit abc123",
+		"api -X DELETE repos/{owner}/{repo}/git/refs/heads/feat/x",
 	}
 	if strings.Join(g.calls, "\n") != strings.Join(want, "\n") {
 		t.Errorf("calls:\n%s\nwant:\n%s", strings.Join(g.calls, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// #3531: `gh pr merge --delete-branch` also removes the linked worktree that
+// has the branch checked out (gh 2.104: "Removed worktree"), and a persistent
+// lane is such a worktree. The head branch is deleted over REST instead, so
+// landing never touches a worktree: `dotf worktree done` and `lane park` own
+// that, with their cwd, session and lease checks.
+func TestLand_NeverAsksGhToDeleteTheBranch(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`}
+
+	if _, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range g.calls {
+		if strings.Contains(c, "--delete-branch") || strings.Contains(c, " -d ") {
+			t.Errorf("gh was asked to delete the branch, and gh removes the worktree that holds it: %s", c)
+		}
+	}
+}
+
+// The caller learns which branch landed, so it can find the lane still holding
+// it: gh no longer removes that worktree (#3531).
+func TestLand_ResultNamesTheHeadBranch(t *testing.T) {
+	g := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.HeadRef != "feat/x" {
+		t.Errorf("HeadRef = %q, want feat/x", res.HeadRef)
+	}
+}
+
+// A fork's head names a branch of another repository, which no lane of this one
+// can hold; a --repo landing says which repository it was, so the caller can
+// tell whether the current repository's lanes are the ones it landed from.
+func TestLand_ResultNamesNoHeadBranchForAForkAndKeepsTheRepo(t *testing.T) {
+	fork := strings.Replace(readyView, `"mergeStateStatus"`, `"isCrossRepository":true,"mergeStateStatus"`, 1)
+	g := &fakeGH{view: fork, checks: greenChecks, deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged, Repo: "o/r"}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.HeadRef != "" || res.Repo != "o/r" {
+		t.Errorf("HeadRef = %q, Repo = %q; want no head and o/r", res.HeadRef, res.Repo)
+	}
+}
+
+func TestLand_DeletesTheHeadBranchOfTheNamedRepositoryByItsEscapedName(t *testing.T) {
+	view := strings.Replace(readyView, `"headRefName":"feat/x"`, `"headRefName":"fix/3#4-a%b"`, 1)
+	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}
+
+	if _, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged, Repo: "o/r"}, 30); err != nil {
+		t.Fatal(err)
+	}
+	if want := "api -X DELETE repos/o/r/git/refs/heads/fix/3%234-a%25b"; g.calls[len(g.calls)-1] != want {
+		t.Errorf("calls %v, want the last to be %q", g.calls, want)
+	}
+}
+
+// A fork's head branch lives in another repository: deleting the same name in
+// this one could remove a branch that has nothing to do with the PR.
+func TestLand_LeavesTheHeadBranchOfAForkAlone(t *testing.T) {
+	view := strings.Replace(readyView, `"mergeStateStatus"`, `"isCrossRepository":true,"mergeStateStatus"`, 1)
+	g := &fakeGH{view: view, checks: greenChecks, deps: `[]`}
+
+	res, err := Land(context.Background(), Options{Run: g.run, Untriaged: noneUntriaged}, 30)
+	if err != nil || !res.Merged {
+		t.Fatalf("want a merge, got %+v, %v", res, err)
+	}
+	for _, c := range g.calls {
+		if strings.HasPrefix(c, "api -X DELETE") {
+			t.Errorf("deleted a branch of this repository for a fork's PR: %s", c)
+		}
+	}
+}
+
+// The repository may delete merged heads itself, and does so as the merge
+// lands, so the branch can already be gone: that is the outcome wanted, not a
+// warning. Any other refusal is reported, and the merge stays merged.
+func TestLand_AHeadBranchThatIsGoneIsNotAWarning(t *testing.T) {
+	gone := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`, deleteErr: errors.New("gh: Reference does not exist (HTTP 422)")}
+	res, err := Land(context.Background(), Options{Run: gone.run, Untriaged: noneUntriaged}, 30)
+	if err != nil || !res.Merged || len(res.Warnings) != 0 {
+		t.Errorf("an already-deleted head: %+v, %v; want merged, no warning", res, err)
+	}
+
+	denied := &fakeGH{view: readyView, checks: greenChecks, deps: `[]`, deleteErr: errors.New("gh: Resource not accessible (HTTP 403)")}
+	res, err = Land(context.Background(), Options{Run: denied.run, Untriaged: noneUntriaged}, 30)
+	if err != nil || !res.Merged {
+		t.Fatalf("a refused deletion undid the merge: %+v, %v", res, err)
+	}
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "feat/x") || !strings.Contains(res.Warnings[0], "403") {
+		t.Errorf("warnings %q, want one naming the branch and gh's reason", res.Warnings)
 	}
 }
 
@@ -440,7 +580,7 @@ func TestLand_UpdateBranchMergesTheBaseThenLandsTheNewHead(t *testing.T) {
 	if err != nil || !res.Merged || !res.Updated {
 		t.Fatalf("want an update then a merge, got %+v, %v", res, err)
 	}
-	want := "pr update-branch 30\npr merge 30 --squash --delete-branch --match-head-commit def456"
+	want := "pr update-branch 30\npr merge 30 --squash --match-head-commit def456"
 	if got := strings.Join(calls, "\n"); got != want {
 		t.Errorf("calls:\n%s\nwant:\n%s", got, want)
 	}
@@ -482,7 +622,7 @@ func TestLand_UpdateBranchUpdatesAgainWhenTheBaseMovesDuringTheWait(t *testing.T
 	if err != nil || !res.Merged {
 		t.Fatalf("want two updates then a merge, got %+v, %v", res, err)
 	}
-	want := "pr update-branch 30\npr update-branch 30\npr merge 30 --squash --delete-branch --match-head-commit fed789"
+	want := "pr update-branch 30\npr update-branch 30\npr merge 30 --squash --match-head-commit fed789"
 	if got := strings.Join(calls, "\n"); got != want {
 		t.Errorf("calls:\n%s\nwant:\n%s", got, want)
 	}
@@ -570,7 +710,7 @@ func TestLand_AFailedMergeRestoresTheRetargetedDependents(t *testing.T) {
 	}
 	want := []string{
 		"pr edit 31 --base main",
-		"pr merge 30 --squash --delete-branch --match-head-commit abc123",
+		"pr merge 30 --squash --match-head-commit abc123",
 		"pr edit 31 --base feat/x",
 	}
 	if strings.Join(*calls, "\n") != strings.Join(want, "\n") {
@@ -801,7 +941,7 @@ func TestLand_AMergeThatLandedDespiteAnErrorIsMerged(t *testing.T) {
 	}
 	want := []string{
 		"pr edit 31 --base main",
-		"pr merge 30 --squash --delete-branch --match-head-commit abc123",
+		"pr merge 30 --squash --match-head-commit abc123",
 	}
 	if strings.Join(*calls, "\n") != strings.Join(want, "\n") {
 		t.Errorf("calls:\n%s\nwant (no restore):\n%s", strings.Join(*calls, "\n"), strings.Join(want, "\n"))

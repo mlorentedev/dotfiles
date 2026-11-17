@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/adversarial-review/SKILL.md
-generated_sha: aa2dbd33af20ede3
+generated_sha: 0f3b371905040ce7
 id: adversarial-review-skill
 type: skill
 status: active
@@ -159,6 +159,8 @@ For each acceptance criterion / scenario:
    | Performance | N+1 queries, unbounded loops, blocking calls in async code |
    | Resilience | Unhandled errors, missing timeouts, race conditions |
    | Quality | Cyclomatic complexity above 10 (measure with `cyclomatic-complexity`), deep nesting, magic numbers, missing types, dead code |
+   | AI & MCP Boundaries | Prompt injection escaping into privileged tool/MCP calls; unvalidated MCP/tool responses treated as trusted data; action-binding failures (attacker text driving side-effects without explicit confirmation); relying on text guardrails instead of deterministic code boundaries |
+   | Supply Chain | Unpinned dependencies; install-time scripts (`preinstall`/`postinstall`) touching network/filesystem; devDependencies leaking into production builds; dependency confusion risks |
 
 ## Severity and recommendations
 

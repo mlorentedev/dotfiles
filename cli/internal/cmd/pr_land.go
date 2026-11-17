@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -15,14 +16,29 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/execerr"
+	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 	"github.com/mlorentedev/dotfiles/cli/internal/prland"
-	"github.com/mlorentedev/dotfiles/cli/internal/prtriage"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
+	"github.com/mlorentedev/dotfiles/cli/internal/worktree"
 )
 
 // errNotLanded is returned when a PR fails a landing condition; the reasons
 // are printed first. Same exit contract as errPending.
 var errNotLanded = errors.New("pr land: not merged")
+
+// landHoldingLane names the canonical lane of the current repository that has
+// branch checked out, or "" when none does; tests replace it.
+var landHoldingLane = func(branch string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	repoRoot, err := worktree.ResolveMainRepoRoot(cwd)
+	if err != nil {
+		return ""
+	}
+	return lane.HoldingLane(repoRoot, env.ResolvePath("WORKTREE_ROOT"), branch)
+}
 
 // prLandOptions builds the GitHub wiring; tests replace it.
 var prLandOptions = func(repo string, registry registryLoader) prland.Options {
@@ -37,12 +53,18 @@ var prLandOptions = func(repo string, registry registryLoader) prland.Options {
 			if err != nil {
 				return nil, err
 			}
-			pending, err := prtriage.FetchWithRegistry(ctx, repo, reg)
+			pending, err := triageFetch(ctx, repo, reg)
 			if err != nil {
 				return nil, err
 			}
 			numbers := make([]int, 0, len(pending))
 			for _, st := range pending {
+				// A head no review ran on is refused by Decide in its own
+				// words; listing it here would add "awaits triage" for output
+				// that does not exist.
+				if st.HeadUnreviewed {
+					continue
+				}
 				numbers = append(numbers, st.PR.Number)
 			}
 			return numbers, nil
@@ -68,7 +90,8 @@ func newPrLandCmd() *cobra.Command {
     it, and no entry of its excluded: list matches: release-please,
     branch:<prefix> (the head branch) or path:<file or dir/> (a changed path);
     an entry of any other kind refuses;
-  - every check passed or was skipped;
+  - every check passed or was skipped, and a review ran on the head: a
+    review check that was skipped, or none at all, refuses;
   - its merge state is CLEAN: up to date with its base, with no conflicts;
   - the triage queue does not list it: reviewer output has been dispositioned;
   - no lesson it adds under docs/lessons/ takes a number another lesson
@@ -78,7 +101,12 @@ func newPrLandCmd() *cobra.Command {
 The head is read again before the merge, and a head that moved is a refusal.
 Every PR based on this one's branch is pointed at its base first, because
 GitHub closes a PR whose base branch is deleted. The merge is a squash with
---match-head-commit, never --auto.
+--match-head-commit, never --auto. The head branch is then deleted on the
+forge and nothing local is: gh's own --delete-branch would also remove the
+worktree holding the branch, which a persistent lane is, so the
+local branch and worktree are left to dotf worktree done or dotf lane park.
+When a canonical lane still holds the landed branch, land prints the
+FIX: line naming dotf lane park for it.
 
 --wait waits for the checks before reading them, and then for GitHub to compute
 the merge state of a PR whose checks are all green: that state can stay UNKNOWN
@@ -267,6 +295,15 @@ func writeLandResult(w io.Writer, res prland.Result) error {
 	}
 	for _, warning := range res.Warnings {
 		_, _ = fmt.Fprintf(w, "warning: #%d %s\n", number, warning)
+	}
+	// Landing no longer removes the worktree holding the branch, so a lane is
+	// left on a branch that has landed (#3531); say how to free it.
+	// Only for the current repository: with --repo the PR may be another
+	// repository's, whose branch merely shares a name with a lane here.
+	if res.HeadRef != "" && res.Repo == "" {
+		if name := landHoldingLane(res.HeadRef); name != "" {
+			_, _ = fmt.Fprintf(w, "FIX: dotf lane park %s (#%d landed and the lane still holds %s)\n", name, number, res.HeadRef)
+		}
 	}
 	_, _ = fmt.Fprintf(w, "[MERGED] #%d at %.7s\n", number, res.HeadSHA)
 	return nil

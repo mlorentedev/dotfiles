@@ -676,3 +676,15 @@ func TestFrontmatterUnescapesQuotedValues(t *testing.T) {
 		}
 	}
 }
+
+// An eval answer to a planted case has a verdict but no reviewed_sha: there is
+// no commit to have reviewed. ParseReview refuses it, as a gate must; a grader
+// reads the verdict alone, with the gate's normalization.
+func TestFrontmatterVerdictReadsAVerdictWithoutTheGateFields(t *testing.T) {
+	if got := FrontmatterVerdict("---\nverdict: \"PASS WITH GAPS\"\n---\nbody\n"); got != VerdictPassWithGaps {
+		t.Fatalf("got %q, want PASS-WITH-GAPS", got)
+	}
+	if got := FrontmatterVerdict("no frontmatter\nverdict: FAIL\n"); got != "" {
+		t.Fatalf("a verdict outside the frontmatter was read: %q", got)
+	}
+}

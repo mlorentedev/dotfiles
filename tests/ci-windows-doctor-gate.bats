@@ -44,6 +44,17 @@ test_windows_job() {
     grep -qF "[Environment]::GetEnvironmentVariable('PATH', 'User')" "$DOTFILES_DIR/.github/scripts/doctor-gate.ps1"
 }
 
+# #3174: refreshing PATH is only half of what a terminal has. A process PATH on
+# Windows is the Machine entries then the User ones, and env-persist can write
+# only the User PATH, so mise's shims and the pinned python they front can never
+# precede a Machine copy of python. The profile's `mise activate` is what puts
+# them first; `pwsh -NoProfile` skips it. The gate FAILed pyyaml on a box whose
+# own setup doctor had just passed it, so it has to run the activation too.
+@test "TEST-003: the gate activates mise the way the profile does, and as setup does (#3174)" {
+    grep -qF 'mise activate pwsh --shims' "$DOTFILES_DIR/.github/scripts/doctor-gate.ps1"
+    grep -qF 'mise activate pwsh --shims' "$DOTFILES_DIR/setup-windows.ps1"
+}
+
 @test "TEST-003: every known-failure entry names its owning ticket" {
     # An entry without a ticket is an allow rule nobody owns.
     awk 'BEGIN{ok=1} /^[[:space:]]*$/{seen=0; next} /^#/{ if ($0 ~ /#[0-9]+/) seen=1; next } { if (!seen) { print "no ticket before: " $0; ok=0 } seen=0 } END{exit !ok}' \
@@ -79,6 +90,19 @@ test_windows_job() {
     [ -n "$gate" ] || false
     run grep -E '^[^#]*GH_TOKEN' <<<"$gate"
     [ "$status" -eq 1 ] || { echo "the doctor gate step carries GH_TOKEN again"; false; }
+}
+
+# mise verifies GitHub artifact attestations through the GitHub API. Without a
+# token, a shared runner IP exhausts the anonymous limit and a pinned CLI fails
+# to install (#3182). mise reads MISE_GITHUB_TOKEN and never GH_TOKEN, so the
+# token reaches mise and not the gh calls setup makes.
+@test "test-windows: setup hands mise the workflow token as MISE_GITHUB_TOKEN, not GH_TOKEN (#3182)" {
+    job="$(test_windows_job)"
+    step="$(printf '%s\n' "$job" | awk '/- name: Run setup-windows.ps1 end-to-end/{f=1} f && /^      - / && !/Run setup-windows.ps1 end-to-end/{exit} f')"
+    [ -n "$step" ] || false
+    printf '%s\n' "$step" | grep -qF 'MISE_GITHUB_TOKEN: ${{ github.token }}'
+    run grep -E '^[^#]*GH_TOKEN' <<<"$step"
+    [ "$status" -eq 1 ] || { echo "the setup step carries GH_TOKEN"; false; }
 }
 
 # The machine scope skips doctor's gh checks too, and spec-issue-state was the

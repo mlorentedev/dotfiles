@@ -11,7 +11,7 @@
 
 | Directory | Purpose |
 |---|---|
-| `ai/` | Per-agent configuration sources (claude, opencode, copilot, pi, agy, hermes, nan) deployed by setup; thin overlays over the `AGENTS.md` SSOT |
+| `ai/` | Per-agent configuration sources (claude, opencode, copilot, pi, agy, nan) deployed by setup; thin overlays over the `AGENTS.md` SSOT |
 | `cli/` | The `dotf` Go CLI — own module (`go.mod`), own release pipeline (goreleaser). See layout below |
 | `docs/` | Build/operate knowledge: `adr/`, `runbooks/`, `troubleshooting/`, `lessons.md`, this file |
 | `forge/` | GitHub-side state declared in git: `branch-protection.json` and its schema (GUARD-017), read by `dotf forge protection check` and the `dotf doctor` branch-protection section |

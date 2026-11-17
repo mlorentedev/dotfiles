@@ -1,0 +1,43 @@
+{
+  "id": "go-first-error-race",
+  "repo": "mlorentedev/dotfiles",
+  "kind": "planted",
+  "role": "spec-reviewer",
+  "prompt": "harness/evals/planted/go-first-error-race/prompt.md",
+  "reference_answer": "harness/evals/planted/go-first-error-race/reference.md",
+  "key_author": "human",
+  "expected_verdict": "FAIL",
+  "expected": [
+    {
+      "id": "first-err-race",
+      "severity_floor": "Major",
+      "anchors_all": [
+        "firstErr"
+      ],
+      "anchors_any": [
+        "race",
+        "synchroniz",
+        "mutex",
+        "concurrent"
+      ],
+      "confirmed_by": "planted; go test -race on Go 1.24 with two unreadable paths reports a DATA RACE on the firstErr assignment (measured 2026-11-14)"
+    }
+  ],
+  "optional": [],
+  "decoys": [
+    {
+      "id": "loop-variable-capture",
+      "anchors_all": [
+        "loop variable"
+      ],
+      "anchors_any": [
+        "captur",
+        "closure",
+        "shared"
+      ],
+      "reason": "false: since Go 1.22 each iteration of a for-range loop declares new variables, and the module declares go 1.24, so the closures see their own i and p",
+      "sample": "| Major | REAL | concurrency | The goroutine closure captures the loop variables i and p, so every goroutine reads the last path |"
+    }
+  ],
+  "noise": []
+}

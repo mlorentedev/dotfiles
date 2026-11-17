@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/handoff/SKILL.md
-generated_sha: 0fefcf90069ae2f7
+generated_sha: b4871586891dda3e
 id: handoff-skill
 type: skill
 status: active
@@ -131,6 +131,22 @@ Maintain exactly ONE `## Session Handoff` block with these fields, in this exact
   End your thread with `Journal: sessions/<file>` so the record is reachable from
   the index.
 
+  **A finished thread leaves MEMORY.md (MEMORY-019, MEMORY-020).** When the line
+  of work is done (merged or closed, nothing left for a next session), write its
+  last block with `--finished`:
+
+  ```bash
+  printf '%s' "$BODY" | dotf mem handoff-write --memory "$MEMORY_MD" --agent <agent> --finished
+  ```
+
+  The entry moves byte-identical to `archive/superseded-handoffs-<date>.md` and
+  the thread file to `archive/threads/`, so the index a session start loads holds
+  only live work. dotf 0.81.0 moves only the entry: the file stays in `threads/`,
+  `dotf doctor` reports it, and moving it to `archive/threads/` by hand clears it;
+  later releases move both. The flag is explicit: `Next action: None` is never read as
+  finished. A thread that still has `Awaiting Manu` items is refused; answer or
+  move them first. Parking a named lane archives its branch's thread the same way.
+
 ### 1b. Session record — append-only history (`sessions/<date>-<project>-<agent>-<thread>.md`)
 
 In ADDITION to the replaced-in-place continuity block, record the session journal:
@@ -230,13 +246,16 @@ The board (2b) is not the only place a promise can hide, and it is not the one t
 ### 3. Repo / worktree / branch state & housekeeping
 
 1. **Verify Git clean state:** No dangling uncommitted work unless explicitly listed in **Open threads**.
-2. **Audit Worktrees:**
+2. **Audit Worktrees & Persistent Named Lanes (ADR-060):**
    ```bash
    dotf worktree list
-   # For worktrees associated with merged PRs:
-   dotf worktree done <branch>  # refuses while a session lives in it; deletes the landed branch
+   # For persistent named lanes (feat-lane-primary, feat-lane-secondary, fast-track-lane) whose PR merged:
+   dotf lane park
+   # For ephemeral worktrees associated with merged PRs:
+   dotf worktree done <branch>  # parks named lanes in-place or removes ephemeral worktrees
    ```
-   **Never the worktree this session was launched from**, nor one holding the shell's working directory. Removing it strands the session, and the harness cannot resume a conversation whose launch directory is gone (dotfiles #1653; `dotf worktree done` refuses it, `--force` included). List it under **Open threads** for removal after the session ends instead.
+   **Entrance for the next session:** where lanes are active (the session-start line says so), the next session starts work with `dotf lane switch <branch>` or `dotf lane next`, never `dotf worktree add`; write that command, with the branch, into **Next action** when the thread continues in a lane.
+   **Note:** Persistent named lanes (`meta.Lane != ""`) are parked in-place (`PARKED`, detached at `origin/main`, directory preserved, memory thread archived to `memory/archive/`), so `dotf lane park` never deletes the launch directory. For ephemeral worktrees, **never remove the worktree this session was launched from**, nor one holding the shell's working directory (dotfiles #1653). List it under **Open threads** for removal after the session ends instead.
 3. **Prune Remote Refs:** Run `git fetch --prune` on all touched repos.
 4. **Delete Merged Local Branches:**
    ```bash

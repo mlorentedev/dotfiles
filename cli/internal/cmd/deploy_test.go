@@ -140,6 +140,63 @@ func TestDeployCmd_NamedArgInstallsOnlyThatConfig(t *testing.T) {
 	}
 }
 
+func TestDeployCmd_CopilotRetiredSettingsAreRepairedForBareAndNamedRuns(t *testing.T) {
+	for _, args := range [][]string{nil, {"copilot-settings"}} {
+		t.Run(strings.Join(args, "-"), func(t *testing.T) {
+			repo, home := copilotRetiredDeployRepo(t)
+			copilotHome := filepath.Join(home, ".copilot")
+			t.Setenv("COPILOT_HOME", copilotHome)
+			originalAvailable := deployCommandAvailable
+			t.Cleanup(func() { deployCommandAvailable = originalAvailable })
+			deployCommandAvailable = func(name string) bool { return name == "copilot" }
+
+			out, err := runDeploy(t, repo, home, args)
+			if err != nil {
+				t.Fatalf("dotf deploy %v: %v\n%s", args, err, out)
+			}
+			dst := filepath.Join(copilotHome, "settings.json")
+			raw, err := os.ReadFile(dst)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(raw), "telemetry") || !strings.Contains(string(raw), `"keep": true`) {
+				t.Fatalf("deployed settings = %s", raw)
+			}
+			if !strings.Contains(out, row("deployed", "copilot-settings")) {
+				t.Fatalf("repair was not reported as a deployment:\n%s", out)
+			}
+
+			out, err = runDeploy(t, repo, home, args)
+			if err != nil || !strings.Contains(out, row("in sync", "copilot-settings")) {
+				t.Fatalf("second deploy %v: %v\n%s", args, err, out)
+			}
+		})
+	}
+}
+
+func copilotRetiredDeployRepo(t *testing.T) (string, string) {
+	t.Helper()
+	repo, home := t.TempDir(), t.TempDir()
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "deploy.json"), `{
+	  "version": 6,
+	  "configs": [{
+	    "name": "copilot-settings",
+	    "src": "ai/copilot/settings.json",
+	    "dst": "{COPILOT_HOME}/settings.json",
+	    "render": false,
+	    "mode": "0644",
+	    "strategy": "merge",
+	    "requires": "copilot"
+	  }]
+	}`)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "copilot", "settings.json"), `{"model":"gpt-5.6-sol"}`)
+	writeMirrorFixture(t, filepath.Join(repo, "ai", "copilot", "retired-settings.json"),
+		`{"version":1,"retired_paths":["telemetry.disabled"]}`)
+	writeMirrorFixture(t, filepath.Join(home, ".copilot", "settings.json"),
+		`{"telemetry":{"disabled":true},"model":"gpt-5.6-sol","keep":true}`)
+	return repo, home
+}
+
 // An unknown name fails loudly and lists what IS declared, so a setup script
 // that still names a retired entry cannot pass as a no-op.
 func TestDeployCmd_UnknownNameFailsAndListsDeclared(t *testing.T) {

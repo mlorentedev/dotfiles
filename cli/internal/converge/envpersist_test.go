@@ -206,11 +206,8 @@ func TestEnvPersist_FailedBootstrapFails(t *testing.T) {
 	}
 }
 
-func TestEnvPersist_DarwinOnlyAndSkippedWithoutARunner(t *testing.T) {
+func TestEnvPersist_SkippedWithoutARunner(t *testing.T) {
 	r := envPersist{}
-	if got := r.Platforms(); len(got) != 1 || got[0] != "darwin" {
-		t.Errorf("Platforms = %v", got)
-	}
 	res, err := r.Reconcile(envPersistEnv(t), false)
 	if err != nil || res.Skip == "" {
 		t.Fatalf("no runner must skip, got %+v, %v", res, err)

@@ -74,6 +74,51 @@ func TestRun_DeploysWhatAppliesAndSaysWhyTheRestDidNot(t *testing.T) {
 	}
 }
 
+func TestRun_OptionalRepairCountsAsAChangeAndHonorsDryRun(t *testing.T) {
+	repo, home, man := runFixture(t)
+	dst := filepath.Join(home, ".a", "config.json")
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte(`{"a":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(home, "repair-ran")
+	calls := 0
+	repair := func(c Config, _, _ string, _ func(string) string, dryRun bool) (bool, error) {
+		calls++
+		if c.Name != "every-os" {
+			t.Fatalf("repair called for skipped config %s", c.Name)
+		}
+		if !dryRun {
+			if err := os.WriteFile(marker, []byte("yes"), 0o600); err != nil {
+				return false, err
+			}
+		}
+		return true, nil
+	}
+
+	planOpts := runOptions(repo, home, true)
+	planOpts.Repair = repair
+	planned, err := Run(man, man.Configs, planOpts)
+	if err != nil || len(planned.Changed()) != 1 || calls != 1 {
+		t.Fatalf("plan = %+v, calls=%d, err=%v", planned, calls, err)
+	}
+	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("dry-run repair wrote a file")
+	}
+
+	applyOpts := runOptions(repo, home, false)
+	applyOpts.Repair = repair
+	applied, err := Run(man, man.Configs, applyOpts)
+	if err != nil || len(applied.Changed()) != 1 || calls != 2 {
+		t.Fatalf("apply = %+v, calls=%d, err=%v", applied, calls, err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatal("apply did not run the repair")
+	}
+}
+
 // A rendered entry stages a copy before it can compare. Under a plan that copy
 // must not create the destination directory: `dotf converge --plan` on an
 // empty HOME writes nothing (PLAT-001b AC1).

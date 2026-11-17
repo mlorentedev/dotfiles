@@ -19,11 +19,16 @@ repository; this file is the NOTICE-equivalent that preserves attribution as the
 | `async-python-patterns` | [wshobson/agents](https://github.com/wshobson/agents) | async-python-patterns | MIT | © 2024 Seth Hobson |
 | `cyclomatic-complexity` | [saurabhkumar8112/cyclomatic-complexity-skill](https://github.com/saurabhkumar8112/cyclomatic-complexity-skill) | cyclomatic-complexity | Apache-2.0 | © 2026 Saurabh Kumar |
 | `test-driven-development` (testing-anti-patterns: authoring gate, anti-pattern 6), `adversarial-review` (test deletions) | [openclaw/openclaw](https://github.com/openclaw/openclaw/tree/main/.agents/skills/test-audit) | test-audit | MIT | © 2026 OpenClaw Foundation |
+| `security-audit` | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) | security-audit-skill | MIT | © 2025-2026 Cloudflare, Inc. |
+| `web-perf` | [cloudflare/skills](https://github.com/cloudflare/skills) | web-perf | Apache-2.0 | © Cloudflare, Inc. |
 
-All sources verified by reading the repository `LICENSE` file at vendor time (2026-06-03).
+All sources verified by reading the repository `LICENSE` file at vendor time (2026-06-03; 2026-11-13 for the `security-audit` and `web-perf` rows).
 Apache-2.0 and MIT both permit redistribution with attribution; this file plus the per-skill
 footer satisfy the notice requirement. If a skill is updated upstream, re-vendor the `SKILL.md`
 into the vault source and run `dotf harness refresh`.
+
+The `security-audit` row is the exception to "only the `SKILL.md`": its `scripts/` (the findings and coverage-ledger validators and the report schema) are vendored beside it, because the skill's
+phases run them.
 
 The `test-audit` row is a partial adaptation, not a vendored skill: its authoring gate, junk
 patterns, retention bar and candidate-evidence fields were folded into two existing skills

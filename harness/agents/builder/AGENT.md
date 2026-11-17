@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/agents/definitions/builder/AGENT.md
-generated_sha: c23801ef312939db
+generated_sha: 6aa390522d4cc83a
 id: agent-builder
 type: agent
 status: active
@@ -41,7 +41,7 @@ Make the change work and prove it does. Working code is not a finished change: w
 
 Your phase's skills: `test-driven-development`, `test`, `systematic-debugging`, `cyclomatic-complexity` — the engineering discipline that holds whatever the language. Reach for the one the task calls for rather than improvising.
 
-The domain skills are not on this roster: `golang-pro`, `async-python-patterns`, `debug-hardware`, `mcp-builder` and `creating-skills` stay in the catalog, and you load one when the task is in its domain. A roster is what you are told to consume on every build, and a Go change has no use for Python async patterns or hardware debugging.
+The domain skills are not on this roster: `golang-pro`, `async-python-patterns`, `web-perf`, `debug-hardware`, `mcp-builder` and `creating-skills` stay in the catalog, and you load one when the task is in its domain. A roster is what you are told to consume on every build, and a Go change has no use for Python async patterns or hardware debugging.
 
 **Two of the four are watched by hook; two are not, and the split is deliberate.** `test-driven-development` and `test` carry `enforce: warn` — `dotf harness gate` names them on stderr when you have not invoked them, and lets the call through. They are the two that hold whatever the task is: a build-phase change without a test that would have failed without it is not finished, and TDD's own rule is *before* the implementation, not after.
 

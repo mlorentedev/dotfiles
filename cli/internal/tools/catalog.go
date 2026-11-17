@@ -9,10 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
 
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 	"github.com/mlorentedev/dotfiles/cli/internal/platform"
 )
 
@@ -21,12 +23,34 @@ type Catalog struct {
 	Tools []Tool `json:"tools"`
 }
 
+// AppliesToRoles reports whether a no-argument install includes the tool.
+func (t Tool) AppliesToRoles(roles []string) bool {
+	if len(t.Roles) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(t.Roles, func(role string) bool {
+		return slices.Contains(roles, role)
+	})
+}
+
+// ForRoles keeps common tools plus those selected by a machine role.
+func ForRoles(list []Tool, roles []string) []Tool {
+	out := make([]Tool, 0, len(list))
+	for _, tool := range list {
+		if tool.AppliesToRoles(roles) {
+			out = append(out, tool)
+		}
+	}
+	return out
+}
+
 // Tool is one catalog entry: a pinned, cross-OS-installable package.
 type Tool struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Profile string `json:"profile"`
-	Source  Source `json:"source"`
+	Name    string   `json:"name"`
+	Version string   `json:"version"`
+	Profile string   `json:"profile"`
+	Roles   []string `json:"roles,omitempty"`
+	Source  Source   `json:"source"`
 }
 
 // Source declares how to fetch a tool. Four kinds:
@@ -47,9 +71,11 @@ type Tool struct {
 //     name skips the entry on that OS, as a platforms miss does. It is not
 //     pinned, so Tool.Version must be absent and presence is the convergence
 //     rule: the entry is satisfied when its Command is on PATH, or else when the
-//     manager lists the package (dpkg-query, brew list --versions, winget list),
-//     and it is never upgraded. A catalog that carries one is only read by a
-//     dotf that knows the type; an older one skips it with a warning.
+//     manager lists the package (dpkg-query, brew list --versions, winget list).
+//     `dotf tools install` never upgrades it; the converge step system-upgrade
+//     does, after refreshing the manager (TOOL-036, ADR-036 amendment
+//     2026-11-10). A catalog that carries one is only read by a dotf that
+//     knows the type; an older one skips it with a warning.
 type Source struct {
 	Type string `json:"type"`
 	Repo string `json:"repo"`
@@ -62,6 +88,13 @@ type Source struct {
 	Apt    string `json:"apt,omitempty"`
 	Brew   string `json:"brew,omitempty"`
 	Winget string `json:"winget,omitempty"`
+	// WingetArch maps a Windows GOARCH (amd64, arm64) to a winget id, for a
+	// package winget publishes once per arch: the VC++ runtime is
+	// Microsoft.VCRedist.2015+.x64 and .arm64, and the x64 id on an Arm64 box
+	// leaves the native runtime absent. It names both arches, the way an
+	// Asset key names the platforms it serves, and replaces Winget: an entry
+	// carries one or the other.
+	WingetArch map[string]string `json:"winget_arch,omitempty"`
 	// Cask is a Homebrew cask token, the darwin package of a GUI app or font.
 	// It is its own key, not a Brew value, because brew lists and installs
 	// casks in a separate namespace (`--cask`): queried as a formula, an
@@ -105,6 +138,9 @@ type Source struct {
 	// expand {version}. The installer (CLI-029 PR-B) downloads it and verifies the
 	// fetched asset against its entry.
 	Checksums string `json:"checksums"`
+	// Member names the exact regular-file path to extract from a github-archive
+	// asset. It uses the same GOOS or GOOS/GOARCH keys as Asset.
+	Member map[string]string `json:"member,omitempty"`
 }
 
 // SelfInstall is a source's self_install: the OSes it applies to and the
@@ -208,19 +244,45 @@ func Load(path string) (Catalog, error) {
 			return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q is listed more than once", path, t.Name)
 		}
 		seen[t.Name] = struct{}{}
+		roleSeen := map[string]bool{}
+		for _, role := range t.Roles {
+			if role == "" || roleSeen[role] {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has an empty or duplicate role", path, t.Name)
+			}
+			if !slices.Contains(envpkg.KnownRoles(), role) {
+				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has unknown role %q", path, t.Name, role)
+			}
+			roleSeen[role] = true
+		}
 		// A misspelt platform makes the tool unsupported everywhere, and the
 		// installer reports an unsupported tool as a skip, so nothing else
 		// would ever say so.
 		// A missing asset is a skip, so a release tool with no asset map (or
 		// one misspelt "assets", which the decoder drops) would install
 		// nothing anywhere and say only "no release asset".
-		if t.Source.Type == "github-release" && len(t.Source.Asset) == 0 {
-			return Catalog{}, fmt.Errorf("parse package catalog %q: github-release tool %q declares no asset", path, t.Name)
+		if isGitHubSource(t.Source.Type) && len(t.Source.Asset) == 0 {
+			return Catalog{}, fmt.Errorf("parse package catalog %q: %s tool %q declares no asset", path, t.Source.Type, t.Name)
 		}
 		// Likewise a misspelt key.
 		for key := range t.Source.Asset {
 			if !platform.ValidKey(key) {
 				return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has asset key %q (want a GOOS, or GOOS/GOARCH with amd64 or arm64)", path, t.Name, key)
+			}
+			if t.Source.Type == "github-archive" {
+				if len(t.Source.Member) == 0 {
+					return Catalog{}, fmt.Errorf("parse package catalog %q: github-archive tool %q declares no member", path, t.Name)
+				}
+				for key, member := range t.Source.Member {
+					if !platform.ValidKey(key) {
+						return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q has member key %q (want a GOOS, or GOOS/GOARCH with amd64 or arm64)", path, t.Name, key)
+					}
+					if !safeArchiveMember(member) {
+						return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q member %q must be a safe relative archive path", path, t.Name, member)
+					}
+				}
+				if err := validateArchiveSource(t); err != nil {
+					return Catalog{}, fmt.Errorf("parse package catalog %q: tool %q: %w", path, t.Name, err)
+				}
 			}
 		}
 		if p := platform.Unknown(t.Source.Platforms); p != "" {
@@ -243,12 +305,12 @@ func Load(path string) (Catalog, error) {
 // KnownSourceTypes are the source.type values this dotf reads. Install skips any
 // other with a warning, so a guard (not the reader) is what catches a misspelt
 // type in the catalog that ships.
-var KnownSourceTypes = []string{"github-release", "npm", "uv-tool", "system"}
+var KnownSourceTypes = []string{"github-release", "github-archive", "npm", "uv-tool", "system"}
 
 // systemKeys are the source keys a "system" entry may carry. The typed decoder
 // drops any other key without a word, so a misspelt or unsupported manager
 // (pacman, dnf) would read as "no name for this OS" and skip in silence.
-var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "cask": true, "needs_sudo": true, "winget": true, "command": true, "platforms": true}
+var systemKeys = map[string]bool{"type": true, "apt": true, "brew": true, "cask": true, "needs_sudo": true, "winget": true, "winget_arch": true, "command": true, "platforms": true}
 
 // sourceKeys lists, per tool, the keys its source object carries, for the checks
 // the typed decode cannot make.
@@ -280,11 +342,14 @@ var packageName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+@/:-]*$`)
 func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	for key := range keys {
 		if !systemKeys[key] {
-			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, cask, needs_sudo, winget, command or platforms)", t.Name, key)
+			return fmt.Errorf("tool %q: system source has unknown key %q (want apt, brew, cask, needs_sudo, winget, winget_arch, command or platforms)", t.Name, key)
 		}
 	}
-	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Cask == "" && t.Source.Winget == "" {
-		return fmt.Errorf("tool %q: system source names no package manager (want apt, brew, cask or winget)", t.Name)
+	if t.Source.Apt == "" && t.Source.Brew == "" && t.Source.Cask == "" && t.Source.Winget == "" && len(t.Source.WingetArch) == 0 {
+		return fmt.Errorf("tool %q: system source names no package manager (want apt, brew, cask, winget or winget_arch)", t.Name)
+	}
+	if err := validateWingetArch(t); err != nil {
+		return err
 	}
 	if t.Source.Brew != "" && t.Source.Cask != "" {
 		return fmt.Errorf("tool %q: system source names both a brew formula and a cask; darwin installs one package per entry", t.Name)
@@ -294,7 +359,7 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 	if len(t.Source.Platforms) > 0 {
 		reachable := false
 		for _, goos := range t.Source.Platforms {
-			if _, pkg := t.Source.SystemPackage(goos); pkg != "" {
+			if t.Source.namesPackage(goos) {
 				reachable = true
 			}
 		}
@@ -312,9 +377,45 @@ func validateSystem(t Tool, keys map[string]json.RawMessage) error {
 		// The name becomes one argument of the manager's command line, and the
 		// one-line remedy dotf prints for a person to paste: a flag, a second
 		// word or a shell metacharacter would change what either does.
-		if pkg != "" && !packageName.MatchString(pkg) {
-			return fmt.Errorf("tool %q: %s name %q is not a package name (start with a letter or digit; then letters, digits and . _ + @ / : -)", t.Name, manager, pkg)
+		if err := checkPackageName(t, manager, pkg); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+// wingetArches are the Windows arches dotf ships for, the keys a winget_arch
+// map must name, each of them: a missing one would skip the package there in
+// silence, on the box that needs it.
+var wingetArches = []string{"amd64", "arm64"}
+
+func validateWingetArch(t Tool) error {
+	m := t.Source.WingetArch
+	if len(m) == 0 {
+		return nil
+	}
+	if t.Source.Winget != "" {
+		return fmt.Errorf("tool %q: system source names both winget and winget_arch; name one id for every arch or one per arch", t.Name)
+	}
+	for goarch := range m {
+		if !slices.Contains(wingetArches, goarch) {
+			return fmt.Errorf("tool %q: winget_arch has key %q (want %s)", t.Name, goarch, strings.Join(wingetArches, " and "))
+		}
+	}
+	for _, goarch := range wingetArches {
+		if m[goarch] == "" {
+			return fmt.Errorf("tool %q: winget_arch names no id for %s (want %s)", t.Name, goarch, strings.Join(wingetArches, " and "))
+		}
+		if err := checkPackageName(t, "winget_arch", m[goarch]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkPackageName(t Tool, manager, pkg string) error {
+	if pkg != "" && !packageName.MatchString(pkg) {
+		return fmt.Errorf("tool %q: %s name %q is not a package name (start with a letter or digit; then letters, digits and . _ + @ / : -)", t.Name, manager, pkg)
 	}
 	return nil
 }
@@ -325,17 +426,29 @@ func (t Tool) SupportsOS(goos string) bool {
 	if t.Source.Type == "system" {
 		// No name for this OS's manager is the same answer as a platforms miss,
 		// so Install, Plan and `tools list` skip it without a branch each.
-		if _, pkg := t.Source.SystemPackage(goos); pkg == "" {
+		if !t.Source.namesPackage(goos) {
 			return false
 		}
 	}
 	return platform.Supports(t.Source.Platforms, goos)
 }
 
-// SystemPackage is the manager and package name a "system" entry gives goos:
-// apt on linux, brew on darwin (brew-cask for a cask), winget on windows. The package is "" when the
-// entry names none there, or goos has no manager.
-func (s Source) SystemPackage(goos string) (manager, pkg string) {
+// namesPackage reports whether the entry names a package for goos on some
+// arch. Load holds a winget_arch map to every arch dotf ships for Windows, so
+// the OS alone answers where it installs.
+func (s Source) namesPackage(goos string) bool {
+	if goos == "windows" && len(s.WingetArch) > 0 {
+		return true
+	}
+	_, pkg := s.SystemPackage(goos, "")
+	return pkg != ""
+}
+
+// SystemPackage is the manager and package name a "system" entry gives
+// goos/goarch: apt on linux, brew on darwin (brew-cask for a cask), winget on
+// windows, where a winget_arch entry answers per goarch. The package is ""
+// when the entry names none there, or goos has no manager.
+func (s Source) SystemPackage(goos, goarch string) (manager, pkg string) {
 	switch goos {
 	case "linux":
 		return "apt", s.Apt
@@ -345,6 +458,9 @@ func (s Source) SystemPackage(goos string) (manager, pkg string) {
 		}
 		return "brew", s.Brew
 	case "windows":
+		if len(s.WingetArch) > 0 {
+			return "winget", s.WingetArch[goarch]
+		}
 		return "winget", s.Winget
 	}
 	return "", ""
@@ -367,6 +483,18 @@ func (t Tool) AssetName(goos, goarch string) string {
 	return t.expand(tmpl, goarch)
 }
 
+// MemberName resolves the exact member path for one platform.
+func (t Tool) MemberName(goos, goarch string) string {
+	tmpl, ok := t.Source.Member[goos+"/"+goarch]
+	if !ok {
+		tmpl, ok = t.Source.Member[goos]
+	}
+	if !ok {
+		return ""
+	}
+	return t.expand(tmpl, goarch)
+}
+
 // ChecksumsName resolves the sha256-manifest filename, or "" when the catalog
 // declares none. {goarch} is accepted for symmetry but checksum manifests are
 // arch-agnostic, so it is rarely present.
@@ -381,4 +509,43 @@ func (t Tool) ChecksumsName(goarch string) string {
 // checksum templates.
 func (t Tool) expand(tmpl, goarch string) string {
 	return strings.NewReplacer("{version}", t.Version, "{goarch}", goarch).Replace(tmpl)
+}
+
+func isGitHubSource(sourceType string) bool {
+	return sourceType == "github-release" || sourceType == "github-archive"
+}
+
+func safeArchiveMember(member string) bool {
+	if member == "" || strings.Contains(member, `\`) || path.IsAbs(member) {
+		return false
+	}
+	if len(member) >= 2 && member[1] == ':' {
+		return false
+	}
+	return path.Clean(member) == member && member != "." && member != ".." &&
+		!strings.HasPrefix(member, "../")
+}
+
+func validateArchiveSource(t Tool) error {
+	for _, asset := range t.Source.Asset {
+		if !supportedArchive(asset) {
+			return fmt.Errorf("asset %q has an unsupported archive type", asset)
+		}
+	}
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, goarch := range []string{"amd64", "arm64"} {
+			hasAsset := t.AssetName(goos, goarch) != ""
+			hasMember := t.MemberName(goos, goarch) != ""
+			if hasAsset != hasMember {
+				return fmt.Errorf("asset and member must resolve for the same platforms (%s/%s)", goos, goarch)
+			}
+		}
+	}
+	return nil
+}
+
+func supportedArchive(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".zip") || strings.HasSuffix(lower, ".tar.gz") ||
+		strings.HasSuffix(lower, ".tgz")
 }

@@ -26,7 +26,7 @@ func checkSystemPackages(sys *System, cfg *Config, rep *Report, fix bool) {
 	rep.Section("System packages (packages.json)")
 	cat := loadCatalog(sys, cfg)
 	checkShadowingSystemCopies(sys, cat, rep, fix)
-	manager, _ := (tools.Source{}).SystemPackage(sys.GOOS)
+	manager, _ := (tools.Source{}).SystemPackage(sys.GOOS, sys.GOARCH)
 	if manager != "apt" && manager != "brew" {
 		rep.Skip("only apt and casks marked needs_sudo ask for sudo, and " + sys.GOOS + " installs through another manager")
 		return

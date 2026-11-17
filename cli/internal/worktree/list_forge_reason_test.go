@@ -48,6 +48,7 @@ func TestSweepReportsAWorktreeKeptBecauseTheForgeCouldNotAnswer(t *testing.T) {
 		}
 	}
 	now := time.Now()
+	linkFake(t, mainRepo, wt)
 	if err := SaveMetadata(wt, Metadata{ReapOK: true, CreatedAt: now.Add(-2 * time.Hour), LeaseExpiresAt: now.Add(-time.Hour)}); err != nil {
 		t.Fatal(err)
 	}

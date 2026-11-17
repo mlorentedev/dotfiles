@@ -1,0 +1,60 @@
+---
+spec: "HARNESS-142-reviewer-isolated-worktree"
+verdict: "PASS-WITH-GAPS"
+reviewed_sha: "c4d0e6c8b891159a2fb7267140d76a7fa9421689"
+reviewer: "nan/glm5.3-flash"
+date: "2026-11-05"
+---
+
+## Adversarial review
+
+**Scope**: HARNESS-142-reviewer-isolated-worktree
+**Sources**: specs/HARNESS-142-reviewer-isolated-worktree/{proposal,tasks,verification}.md, features.json; git diff adf49c93bb006b6322bb9bc6b20f1a44303e16e9...HEAD (branch commits per `git log --first-parent --no-merges`, round-1 review at df695954, fix round in f8b5b83e/9aa21e5c)
+
+### Spec and task alignment
+- **AC1, AC2** — verified: `TestReviewInWorktreeLeavesCallerTreeUntouched` and `TestReviewInWorktreeStillReportsStrayWrites` build a *real* git repository and a *real* detached review worktree (`worktree.AddDetached`), run a fake reviewer under the real `spec deadline` wrapper that writes `tests/probe_test.go` and edits a tracked file, and assert the caller's porcelain status is exactly `?? specs/AI-001-x/review.md`, both stray paths are named, exit is 4, and the worktree is gone from `git worktree list`. Re-ran fresh this session: PASS.
+- **AC3** — verified: `TestDeadlineCopiesBackAndRemovesReviewWorktree` covers exit 0, 4, 3, 124 (deadline) and 125 (stall) plus `--second` (`review-second.md`), each on a real worktree; `TestDeadlineKeepsTheWorktreeWhenTheCopyBackFails` proves the only-copy-of-a-verdict retention (`OutputSaved` stays false); sweep side covered by `TestReviewWorktreeSwept`, `TestSweepKeepsAReviewWorktreeThatMayHoldTheOnlyVerdict`, `TestSweepKeepsAReviewWorktreeWhileItsLeaseLivesOrAReviewerRuns`, `TestRealRunnerForceRemovesAReviewWorktreeWithUntrackedOutput`, and labelling by `TestWorktreeTableLabelsAReviewWorktree`. Live cross-check in this very run: my own review worktree carries `kind: "review"`, `reap_ok: true`, lease = launch + deadline + 30m margin (23:30 → 00:45), and the freshly built binary labels it `(review c4d0e6c)` with the lease note.
+- **AC4** — verified: `TestReviewLaunchUsesReviewWorktree` asserts for both runners that tmux starts in the worktree, the prompt names it as a fresh worktree at the sha, agy gets `--add-dir <worktree>`, and deadline receives `--worktree`/`--copy-back`; it also fails if tmux still starts in the caller's tree, and asserts a dry run creates no worktree. Independently confirmed by a CLI probe with a freshly built binary: dry-run prints the `Worktree: … (detached at <sha>)` line and creates nothing.
+- **AC5** — verified two ways: `TestReviewRefusesDirtyTreeWithoutAllowDirty` (real repository) and `TestCallerDirtNamesWhatTheReviewerWouldNotSee` plus `TestCallerDirtNamesTheSourceOfARenameIntoTheSpecFolder` (staged rename *into* the spec folder names its source). Independently confirmed by a live CLI probe: untracked file outside `specs/<id>/` refuses naming the path, tracked modification refuses, `--allow-dirty` launches with the warning, dirt inside `specs/<id>/` launches.
+- **AC6** — verified: `TestReviewWorktreeCarriesEarlierRounds` (round files and request reach the worktree, rotated verdict absent) and `TestReviewWorktreeDropsAVerdictTheCallerRotated`. Additionally verified **live**: this review runs as a pi reviewer inside a review worktree created by the launcher for round 2 — the caller's uncommitted `review-round1.md`, `review-request-round1.json` and current `review-request.json` are present in my `specs/<id>/`, and the verdict committed at HEAD was correctly deleted from my worktree (the round-1 fix operating in production).
+- **Round-1 findings** — all three addressed: the stale-verdict resurrection (REAL Major) fixed by mirroring instead of copying over (mutation probe this session: disabling the deletion loop in `mirrorSpecFolder` turns `TestReviewWorktreeDropsAVerdictTheCallerRotated` red — the test is not vacuous); the foreground-never-started cleanup fixed (`TestReviewForegroundRemovesTheWorktreeWhenTheRunNeverStarts`); verification.md criterion statuses filled.
+- **Contract digests** in `review-request.json` match `dotf spec digest HARNESS-142-reviewer-isolated-worktree` exactly (features.json, proposal.md, tasks.md; spec.md empty).
+- **Deferred-by-design items, honestly declared**: the proposal's copy-back wording includes the transcript and `.stderr`; the implementation instead writes them caller-side from the start (documented in verification.md's decision log, with the Windows file-lock and still-flushing-sink rationale). The outcome the AC demands — transcript and `.stderr` in the caller's `specs/<id>/` — holds; only the mechanism differs from the proposal's wording. Recorded as a finding below so it is not silent.
+- The diff range also carries other specs' work (BUG-165, review-pool re-weight, hermes retirement, etc.) that arrived through merges; per the launch instruction it was judged only where it interacts. The two PR-Agent re-weight commits touch the pool this review is drawn from; no interaction with the worktree mechanism was found.
+
+### Findings
+
+| Severity | Reality | Area | Finding | Evidence | Test (named, or UNTESTED) | Fix location (code / tests / spec / vault) |
+|----------|---------|------|---------|----------|---------------------------|---------------------------------------------|
+| Minor | REAL | archive-readiness | `verification.md` "Promotion candidates" lines are unanswered (`<yes/no>` placeholders). `dotf spec archive` refuses a line left unanswered, so the archive is blocked until they are filled. | Read of specs/HARNESS-142-reviewer-isolated-worktree/verification.md, Promotion candidates section (this session) | UNTESTED (doc gate) | spec (`verification.md` — outside the contract set, editable without invalidating this review) |
+| Minor | REAL | spec hygiene | `tasks.md` closing checklist unticked although the evidence it names now exists: this session re-ran the full Go suite (53 packages ok), `golangci-lint run ./...` (0 issues), `GOOS=windows go vet` and `GOOS=windows golangci-lint run ./...` (0 issues), and PR #3213 is open. | This session's command outputs, vs tasks.md Verification/Closing sections | UNTESTED | spec (`tasks.md` — **contract set**: do not edit before archive; disposition via follow-up or accept as-is) |
+| Minor | THEORETICAL | launch cleanup | In tmux mode, `launchDetached` removes the worktree when tmux itself fails but not when `confirmLaunched` fails (reviewer died on startup). The deadline never runs in that case, so the worktree idles until its lease (deadline + 30m) passes and sweep reaps it. Self-healing, but inconsistent with the adjacent error path. | Code read, `cli/internal/cmd/spec.go` `launchDetached` (`return err` on confirmLaunched) vs the `errors.Join(..., removeReviewTree(...))` on the previous line | UNTESTED | code |
+| Minor | THEORETICAL | worktree lifecycle | `AddDetachedWithRunner` partial failure: if `git worktree add --detach` succeeds but `SaveMetadata` fails, the error is returned and the caller leaves the worktree. With no metadata file, nothing labels it and `isLeaseExpired` returns false (`sweep.go:217-222`), so sweep never reaps it — a permanent orphan until manual removal. | Code read, `cli/internal/worktree/detached.go` (metadata save after add) + `sweep.go` | UNTESTED | code |
+| Minor | THEORETICAL | test gap | The committed-verdict regression test stubs `createReviewTree` rather than checking a verdict out of real git, so the premise "git worktree add --detach materializes HEAD's review.md" is exercised by no automated test — only by round-1's manual reproduction and this run's live observation (my own worktree dropped HEAD's committed review.md). A real-checkout variant would close it. | Read of `TestReviewWorktreeDropsAVerdictTheCallerRotated`; mutation probe (deletion disabled → test red) proves the guard logic, not the git premise | UNTESTED (real-checkout variant) | tests |
+| Minor | SPECULATIVE | stray-write snapshot | A staged copy (`C`) into the spec folder does not record its outside-source as caller dirt; only renames (`R`) do (`SnapshotTree`'s `movedIn`). Consequence: a copied-away file outside `specs/<id>/` is invisible to the AC5 refusal. | Code read, `cli/internal/spec/stray_writes.go` | UNTESTED | code (surface only; do not gate) |
+| Minor | REAL | spec-vs-code wording | Proposal says `spec deadline` "copies back ... its transcript and the transcript's `.stderr`"; the code never copies them because they are written caller-side from the start. Outcome identical, mechanism differs, and the deviation is documented in verification.md's decision log — not silent, but the proposal text no longer describes the code. | spec.go launch block (transcript path resolved against `repoRoot`) + verification.md decision "The transcript and its `.stderr` stay in the caller's spec folder" | UNTESTED (wording only; behavior covered by `TestReviewLaunchUsesReviewWorktree`) | none now — proposal is contract set; note stands as record |
+| Question | REAL | platform coverage | Removal of a review worktree on a real Windows box is unexercised (verification.md declares this; CI's Windows leg runs unit tests only), and a pi reviewer in a review worktree was declared untested — the second half is now discharged by this very run. The Windows half remains open for the first real Windows review. | verification.md "Not yet exercised for real"; this run is the pi arm | UNTESTED (real Windows) | none (observation for the first Windows run; sweep is the documented backstop) |
+
+### Evaluator rubric
+
+| Dimension | Grade (A-D) | Rationale (one line) |
+|-----------|-------------|----------------------|
+| Correctness        | A | All six ACs verified fresh, including real-git integration tests and live end-to-end probes; no observed defects; remaining gaps are unobserved error paths. |
+| Verification       | A | verification.md maps every criterion to named tests and a recorded real acceptance run; this session reproduced the suite, both lints, Windows vet, and two independent CLI probes. |
+| Scope              | A | The spec's own diff matches the proposal task-for-task; other work in the range arrived through merges and does not interact. |
+| Reliability        | B | Every observed exit path (0/3/4/124/125, failed copy-back, failed launch) handled and tested; two theoretical cleanup gaps (confirmLaunched failure, metadata-save failure) left to the lease/sweep backstop. |
+| Maintainability    | A | Small functions, clear seams (`planReviewTree`/`createReviewTree` overridable for fixtures), zero lint issues on darwin and windows, CC within limits. |
+| Handoff-readiness  | B | Verification.md thorough and decisions logged, but promotion candidates unanswered and the tasks.md closing checklist unticked, both of which the archive or the human must catch. |
+
+### Verdict
+PASS WITH GAPS
+
+### Recommended next steps
+
+All findings above are Minor; none blocks the archive on this verdict's authority — but note finding 1 will block it mechanically until answered. Per the routing rule for a PASS-WITH-GAPS, the contract set (`proposal.md`, `tasks.md`, `features.json`) is closed; these go to the implementer to disposition in `verification.md` (applied / ticketed / declined with a reason) or into a follow-up ticket:
+
+- Fill the three promotion-candidate lines in `verification.md` (the mirror-not-copy decision and the `OutputSaved` reap rule are both plausible lesson material for `docs/lessons/`).
+- Disposition the unticked `tasks.md` boxes: tick-or-explain in a follow-up, or accept that the evidence in `verification.md` stands in for them.
+- Ticket (or fix) the two theoretical cleanup gaps: `launchDetached` worktree removal on `confirmLaunched` failure, and `AddDetachedWithRunner` removing the worktree when metadata save fails after a successful add.
+- Optionally add a real-checkout variant of the committed-verdict regression test, and extend `SnapshotTree`'s `movedIn` to copies (`C`) if the AC5 refusal is ever relied on for staged copies.
+- First real Windows review: confirm the worktree removal path on that platform and record it in `verification.md`.

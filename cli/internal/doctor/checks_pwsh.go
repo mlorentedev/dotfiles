@@ -60,7 +60,7 @@ func checkPowerShell(sys *System, cfg *Config, rep *Report) {
 func pwshPackage(sys *System, cfg *Config) (manager, pkg string) {
 	for _, t := range loadCatalog(sys, cfg).Tools {
 		if t.Source.Type == "system" && strings.EqualFold(t.Source.Command, pwsh.Command) && t.SupportsOS(sys.GOOS) {
-			return t.Source.SystemPackage(sys.GOOS)
+			return t.Source.SystemPackage(sys.GOOS, sys.GOARCH)
 		}
 	}
 	return "", ""

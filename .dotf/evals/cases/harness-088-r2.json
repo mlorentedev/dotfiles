@@ -1,0 +1,47 @@
+{
+  "id": "harness-088-r2",
+  "repo": "mlorentedev/dotfiles",
+  "kind": "replay",
+  "role": "spec-reviewer",
+  "spec": "HARNESS-088-handoff-threads",
+  "source_review": "specs/archive/HARNESS-088-handoff-threads/review-round-2.md",
+  "key_author": "agy/gemini-3.1-pro-high",
+  "reviewed_sha": "2bba67e03b188ddab16c2e30bf4a55070150d5c8",
+  "base_sha": "0df4bf8d59a012b226ec214ecbf3640e6ab47c7a",
+  "base_derivation": "review-request-round-2.json base_sha: the commit that added the spec, so the range also carries other PRs' code (#1551); kept because it is what the reviewer saw",
+  "fetch_ref": "refs/pull/1886/head",
+  "expected_verdict": "FAIL",
+  "expected": [
+    {
+      "id": "handoff-write-complexity",
+      "severity_floor": "Minor",
+      "anchors_all": [
+        "newMemHandoffWriteCmd"
+      ],
+      "anchors_any": [
+        "cyclomatic",
+        "complexity",
+        "gocyclo"
+      ],
+      "confirmed_by": "verification.md, Round-2 findings: 'fixed for this change', the command body split into handoffWrite.run, readHandoffBody and handoffWrite.publish"
+    }
+  ],
+  "optional": [],
+  "decoys": [
+    {
+      "id": "session-end-stamps-claude",
+      "anchors_all": [
+        "SessionEnd"
+      ],
+      "anchors_any": [
+        "collide",
+        "collision",
+        "ErrExist",
+        "discard"
+      ],
+      "reason": "declined in verification.md, Round-2 findings: the session-end hook is registered only in Claude's binding (harness/manifest.json agents.bind[0].emit_hooks), so the agent it names is the one running and no second agent's journal can collide with it. The hardcoded name is true; the collision it claims is not",
+      "sample": "| Major | REAL | multi-agent | `SessionEnd` hardcodes the agent name to \"claude\" in both the journal filename (`JournalName`) and the frontmatter (`buildRecord`) regardless of the actual agent running. If multiple different agents run concurrently on the same project/day, they will collide on the filename. The first write succeeds, but the subsequent ones will hit `fs.ErrExist` (due to `O_EXCL`) and silently discard their session archives. |"
+    }
+  ],
+  "noise": []
+}

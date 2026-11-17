@@ -3,6 +3,7 @@ package doctor
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,19 +64,25 @@ func loadConfig(sys *System, startDir string) (*Config, error) {
 	return cfg, nil
 }
 
-// ParseVersionsConf reads the KEY=VALUE manifest (no export, no quotes per its
-// header). Comments (#) and blank lines are skipped; surrounding whitespace is
-// trimmed. This is the native replacement for sourcing the file in shell.
-// Exported for `dotf update`, which reads the checkout's DOTF_VERSION with it.
+// ParseVersionsConf reads the KEY=VALUE manifest at path (no export, no quotes
+// per its header). This is the native replacement for sourcing the file in
+// shell. Exported for `dotf update`, which reads the checkout's DOTF_VERSION
+// with it.
 func ParseVersionsConf(path string) (map[string]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open versions.conf: %w", err)
 	}
 	defer func() { _ = f.Close() }()
+	return ParseVersions(f)
+}
 
+// ParseVersions parses versions.conf content: comments (#) and blank lines are
+// skipped, surrounding whitespace is trimmed. `dotf update` reads the
+// upstream's copy through it, from `git show` rather than a file.
+func ParseVersions(r io.Reader) (map[string]string, error) {
 	out := map[string]string{}
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(r)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {

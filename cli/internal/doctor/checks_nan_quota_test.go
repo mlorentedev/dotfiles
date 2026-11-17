@@ -22,7 +22,7 @@ const nanRegistryAge = "version: 1\nsecrets:\n" +
 const nanRegistryBW = "version: 1\nsecrets:\n" +
 	"  - {id: NAN_API_KEY, plane: app, backend: bw, bw: {item: nan-api-key, field: api-key}, expose: {env: [NAN_API_KEY]}}\n"
 
-// nanUsage415 is /v1/usage with qwen3.8-flash at 83% of its 500M quota.
+// nanUsage415 is a /v1/usage answer: tokens per model over NaN's window.
 const nanUsage415 = `{"start_date":"2026-06-01","end_date":"2026-06-23","totals":{"by_model":[` +
 	`{"model":"qwen3.8-flash","total_tokens":415000000},{"model":"deepseek-v4-flash","total_tokens":300000000}]},"has_more":false}`
 
@@ -32,10 +32,10 @@ const nanUsage415 = `{"start_date":"2026-06-01","end_date":"2026-06-23","totals"
 const nanServed = `{"data":[{"id":"deepseek-v4-flash"},{"id":"qwen3.8-flash"},{"id":"mimo-v2.6-flash"},` +
 	`{"id":"qwen3.6"},{"id":"qwen3-embedding"},{"id":"rerank"},{"id":"glm5.3-flash"}]}`
 
-// nanCfg builds a dotfiles tree holding the registry, the repo's real model map
-// and schema with services.rerank set to rerankID and tiers.low.nan pinned to
-// qwen3.8-flash, and the repo's quota table with its checked date replaced.
-func nanCfg(t *testing.T, registry, rerankID, checked string) *Config {
+// nanCfg builds a dotfiles tree holding the registry and the repo's real model
+// map and schema, with services.rerank set to rerankID and tiers.low.nan pinned
+// to qwen3.8-flash.
+func nanCfg(t *testing.T, registry, rerankID string) *Config {
 	t.Helper()
 	repo := filepath.Join("..", "..", "..")
 	dir := t.TempDir()
@@ -50,15 +50,10 @@ func nanCfg(t *testing.T, registry, rerankID, checked string) *Config {
 	var m map[string]any
 	readJSON(t, filepath.Join(repo, "harness", "model-map.json"), &m)
 	m["services"].(map[string]any)["rerank"].(map[string]any)["model"] = rerankID
-	// Pin the binding the percentages below are about, so the fixture does not
+	// Pin the binding the usage below is about, so the fixture does not
 	// depend on what the repo's map routes today (#1772 moved qwen3.8-flash off).
 	m["tiers"].(map[string]any)["low"].(map[string]any)["nan"] = "qwen3.8-flash"
 	writeJSON(t, filepath.Join(dir, "harness", "model-map.json"), m)
-
-	var q map[string]any
-	readJSON(t, filepath.Join(repo, "harness", "nan-quotas.json"), &q)
-	q["checked"] = checked
-	writeJSON(t, filepath.Join(dir, "harness", "nan-quotas.json"), q)
 	return &Config{DotfilesDir: dir}
 }
 
@@ -106,30 +101,32 @@ func runNaNQuota(sys *System, cfg *Config) (string, int) {
 	return buf.String(), rep.Failures()
 }
 
-// AC2's shape against fixtures: every bound metered model reported with used,
-// quota and percent; 83% WARNs without failing doctor.
+// Every bound model is reported with its tokens, and no share of a quota:
+// NaN bills credits from one pool (2026-11), which /v1/usage does not report.
 func TestCheckNaNQuota_ReportsEachBoundModel(t *testing.T) {
 	var auth string
-	out, fails := runNaNQuota(nanSys(nanUsage415, nanServed, &auth), nanCfg(t, nanRegistryAge, "rerank", "2026-06-10"))
+	out, fails := runNaNQuota(nanSys(nanUsage415, nanServed, &auth), nanCfg(t, nanRegistryAge, "rerank"))
 
 	if fails != 0 {
 		t.Errorf("failures = %d, want 0:\n%s", fails, out)
 	}
-	for _, want := range []string{"qwen3.8-flash: 415.0M / 500.0M tokens this month (83%)", "deepseek-v4-flash: 300.0M / 3000.0M", "rerank: unmetered"} {
+	for _, want := range []string{"qwen3.8-flash: 415.0M tokens since 2026-06-01", "deepseek-v4-flash: 300.0M tokens", "rerank: 0.0M tokens", "tokens are not credits"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "%") {
+		t.Errorf("a percentage of a quota NaN no longer has reached the report:\n%s", out)
 	}
 	if auth != "Bearer "+nanTestKey {
 		t.Errorf("the request did not carry the resolved key as a bearer token")
 	}
 }
 
-// AC7 at the doctor's default verbosity: nothing binds qwen3.8-flash, pi spends
-// it anyway, and its 83% still WARNs. Metered usage under the threshold is shown
-// without --verbose; an unmetered model is not.
-func TestCheckNaNQuota_WatchesMeteredModelsNothingBinds(t *testing.T) {
-	cfg := nanCfg(t, nanRegistryAge, "rerank", "2026-06-10")
+// pi, opencode and qq/qf spend the account outside model-map.json, so a served
+// model with traffic is reported at default verbosity even when nothing binds it.
+func TestCheckNaNQuota_ReportsUsageNothingBinds(t *testing.T) {
+	cfg := nanCfg(t, nanRegistryAge, "rerank")
 	mapPath := filepath.Join(cfg.DotfilesDir, "harness", "model-map.json")
 	var m map[string]any
 	readJSON(t, mapPath, &m)
@@ -141,13 +138,8 @@ func TestCheckNaNQuota_WatchesMeteredModelsNothingBinds(t *testing.T) {
 	checkNaNQuota(nanSys(nanUsage415, nanServed, nil), cfg, rep)
 	out := buf.String()
 
-	for _, want := range []string{"qwen3.8-flash: 415.0M / 500.0M tokens this month (83%)", "deepseek-v4-flash: 300.0M / 3000.0M"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("default output lacks %q:\n%s", want, out)
-		}
-	}
-	if strings.Contains(out, "rerank: unmetered") {
-		t.Errorf("an unmetered model should only show with --verbose:\n%s", out)
+	if !strings.Contains(out, "qwen3.8-flash: 415.0M tokens") {
+		t.Errorf("default output lacks the unbound model's usage:\n%s", out)
 	}
 	if rep.Failures() != 0 {
 		t.Errorf("failures = %d, want 0:\n%s", rep.Failures(), out)
@@ -156,7 +148,7 @@ func TestCheckNaNQuota_WatchesMeteredModelsNothingBinds(t *testing.T) {
 
 // AC3: a bound id NaN does not serve fails doctor, by name.
 func TestCheckNaNQuota_FailsOnAnUnservedBinding(t *testing.T) {
-	out, fails := runNaNQuota(nanSys(nanUsage415, nanServed, nil), nanCfg(t, nanRegistryAge, "qwen3-rerank", "2026-06-10"))
+	out, fails := runNaNQuota(nanSys(nanUsage415, nanServed, nil), nanCfg(t, nanRegistryAge, "qwen3-rerank"))
 	if fails != 1 || !strings.Contains(out, "qwen3-rerank is bound in model-map.json but NaN does not serve it") {
 		t.Errorf("failures = %d, want 1 naming qwen3-rerank:\n%s", fails, out)
 	}
@@ -166,7 +158,7 @@ func TestCheckNaNQuota_FailsOnAnUnservedBinding(t *testing.T) {
 func TestCheckNaNQuota_SkipsWhenNaNIsUnreachable(t *testing.T) {
 	sys := newSys(nil, nil, nil)
 	sys.ResolveSecret = resolvesTo(nanTestKey)
-	out, fails := runNaNQuota(sys, nanCfg(t, nanRegistryAge, "rerank", "2026-06-10"))
+	out, fails := runNaNQuota(sys, nanCfg(t, nanRegistryAge, "rerank"))
 	if fails != 0 || !strings.Contains(out, "NaN is unreachable") {
 		t.Errorf("failures = %d, want a SKIP naming the outage:\n%s", fails, out)
 	}
@@ -178,7 +170,7 @@ func TestCheckNaNQuota_DoesNotResolveABWKeyWithoutTheDaemon(t *testing.T) {
 	sys := newSys(nil, nil, nil)
 	resolved := false
 	sys.ResolveSecret = func(secrets.Entry) (string, error) { resolved = true; return nanTestKey, nil }
-	out, fails := runNaNQuota(sys, nanCfg(t, nanRegistryBW, "rerank", "2026-06-10"))
+	out, fails := runNaNQuota(sys, nanCfg(t, nanRegistryBW, "rerank"))
 	if fails != 0 || resolved || !strings.Contains(out, "bw serve daemon") {
 		t.Errorf("failures = %d, resolved = %v, want a SKIP naming the daemon:\n%s", fails, resolved, out)
 	}
@@ -199,8 +191,8 @@ func TestCheckNaNQuota_SkipsWithoutAKey(t *testing.T) {
 				called = true
 				return 0, nil, errors.New("unexpected")
 			}
-			out, fails := runNaNQuota(sys, nanCfg(t, registry, "rerank", "2026-06-10"))
-			if fails != 0 || called || !strings.Contains(out, "not being watched") {
+			out, fails := runNaNQuota(sys, nanCfg(t, registry, "rerank"))
+			if fails != 0 || called || !strings.Contains(out, "not being checked") {
 				t.Errorf("failures = %d, called = %v, want a SKIP and no request:\n%s", fails, called, out)
 			}
 		})
@@ -225,27 +217,11 @@ func TestCheckNaNQuota_NeverPrintsTheKey(t *testing.T) {
 			sys := newSys(nil, nil, nil)
 			sys.ResolveSecret = resolvesTo(nanTestKey)
 			sys.HTTPGetBody = get
-			out, _ := runNaNQuota(sys, nanCfg(t, nanRegistryAge, "rerank", "2026-06-10"))
+			out, _ := runNaNQuota(sys, nanCfg(t, nanRegistryAge, "rerank"))
 			if strings.Contains(out, nanTestKey) || strings.Contains(out, "sk-nan") {
 				t.Errorf("the key reached the report:\n%s", out)
 			}
 		})
-	}
-}
-
-func TestCheckNaNQuota_WarnsOnAStaleTable(t *testing.T) {
-	out, fails := runNaNQuota(nanSys(nanUsage415, nanServed, nil), nanCfg(t, nanRegistryAge, "rerank", "2026-01-01"))
-	if fails != 0 || !strings.Contains(out, "harness/nan-quotas.json was read 2026-01-01") {
-		t.Errorf("want a WARN naming the stale date:\n%s", out)
-	}
-}
-
-// The table's age is a fact about the checkout, so it is reported even on a box
-// with no key, where the rest of the section SKIPs.
-func TestCheckNaNQuota_WarnsOnAStaleTableWithoutAKey(t *testing.T) {
-	out, fails := runNaNQuota(newSys(nil, nil, nil), nanCfg(t, nanRegistryAge, "rerank", "2026-01-01"))
-	if fails != 0 || !strings.Contains(out, "harness/nan-quotas.json was read 2026-01-01") {
-		t.Errorf("want the stale-table WARN before the key SKIP:\n%s", out)
 	}
 }
 
