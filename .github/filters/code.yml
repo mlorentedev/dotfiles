@@ -10,8 +10,8 @@
 # carries the reason it cannot change what a test checks.
 code:
   - '**'
-  # Prose. check-doc-paths and lessons-fmt run in pre-commit, docs-drift on the
-  # push to main.
+  # Prose. doc-paths runs in cli.yml's tests and in pre-commit, lessons-fmt in
+  # pre-commit, docs-drift on the push to main.
   - '!docs/**'
   # Spec records. Archive PRs are the common case; the spec-id guard runs on the
   # push to main.

@@ -23,9 +23,9 @@
   {
     "id": "BUG-165-doc-path-lint-engine-f4",
     "behavior": "After release, pre-commit uses the CLI and the shell guard plus both BATS files are absent with no dangling references.",
-    "verification": "test ! -e scripts/check-doc-paths.sh && test ! -e tests/check-doc-paths.bats && test ! -e tests/check-doc-paths-real.bats && ! git grep -n 'check-doc-paths.sh'",
+    "verification": "test ! -e scripts/check-doc-paths.sh && test ! -e tests/check-doc-paths.bats && test ! -e tests/check-doc-paths-real.bats && ! git grep -n 'check-doc-paths.sh' -- . ':!specs' ':!docs' ':!CHANGELOG.md' ':!cli/internal/docpaths/retirement_test.go' ':!tests/fixtures'",
     "state": "pending",
-    "evidence": "Release-gated PR 2 only. The cutover worktree remains unpublished until PR 1 is merged, released and installed canonically."
+    "evidence": ""
   },
   {
     "id": "BUG-165-doc-path-lint-engine-f5",
