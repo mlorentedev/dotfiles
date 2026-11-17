@@ -171,9 +171,8 @@ func newEvalRunCmd() *cobra.Command {
 			// The interrupt is caught here so the loop stops between attempts
 			// too, not only while a runner is alive. The first one cancels the
 			// run; releasing the handler then lets a second one kill it.
-			ctx, stop := signal.NotifyContext(c.Context(), os.Interrupt, syscall.SIGTERM)
+			ctx, stop := interruptContext(c.Context())
 			defer stop()
-			releaseOnCancel(ctx, stop)
 			return runEvalRun(ctx, c.OutOrStdout(), defaultEvalRunDeps(), o)
 		},
 	}
@@ -184,6 +183,14 @@ func newEvalRunCmd() *cobra.Command {
 	c.Flags().IntVar(&o.maxRuns, "max-runs", evals.DefaultMaxRuns, "the most runs this invocation may launch")
 	c.Flags().BoolVar(&o.planOnly, "plan", false, "print the matrix and the estimate, and launch nothing")
 	return c
+}
+
+// interruptContext is cancelled by the first SIGINT or SIGTERM, and then
+// releases the handler so the next one reaches its default action.
+func interruptContext(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
+	releaseOnCancel(ctx, stop)
+	return ctx, stop
 }
 
 // releaseOnCancel calls stop once ctx is done, so the signal handler that

@@ -3,14 +3,19 @@
 package cmd
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/evals"
 )
@@ -73,5 +78,69 @@ printf '%s\n' '| # | Severity | Finding |' '|---|---|---|' '| 1 | Major | count 
 	}
 	if !strings.Contains(stdout, "1 attempts: 1 answered") {
 		t.Errorf("the report lacks the count:\n%s", stdout)
+	}
+}
+
+// The command's own signal wiring, in a child process that receives real
+// interrupts: the first cancels the run, and a later one must kill the
+// process instead of being swallowed while an attempt runs to its deadline.
+func TestEvalRunInterruptContextLetsASecondInterruptKill(t *testing.T) {
+	if os.Getenv("DOTF_EVAL_INTERRUPT_CHILD") == "1" {
+		ctx, stop := interruptContext(context.Background())
+		defer stop()
+		fmt.Println("ready")
+		<-ctx.Done()
+		fmt.Println("cancelled")
+		time.Sleep(time.Minute)
+		os.Exit(3)
+	}
+	child := exec.Command(os.Args[0], "-test.run=^TestEvalRunInterruptContextLetsASecondInterruptKill$")
+	child.Env = append(os.Environ(), "DOTF_EVAL_INTERRUPT_CHILD=1")
+	out, err := child.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := child.Start(); err != nil {
+		t.Fatal(err)
+	}
+	lines := bufio.NewScanner(out)
+	expectLine(t, lines, "ready")
+	if err := child.Process.Signal(os.Interrupt); err != nil {
+		t.Fatal(err)
+	}
+	expectLine(t, lines, "cancelled")
+	done := make(chan error, 1)
+	go func() { done <- child.Wait() }()
+	interruptUntilExit(t, child, done)
+}
+
+func expectLine(t *testing.T, s *bufio.Scanner, want string) {
+	t.Helper()
+	if !s.Scan() || s.Text() != want {
+		t.Fatalf("child printed %q, want %q (%v)", s.Text(), want, s.Err())
+	}
+}
+
+// interruptUntilExit keeps interrupting, since the release runs just after
+// the cancel, and fails if the child outlives five seconds of interrupts.
+func interruptUntilExit(t *testing.T, child *exec.Cmd, done <-chan error) {
+	t.Helper()
+	deadline := time.After(5 * time.Second)
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case err := <-done:
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || !exit.Sys().(syscall.WaitStatus).Signaled() {
+				t.Fatalf("the child did not die by the signal: %v", err)
+			}
+			return
+		case <-tick.C:
+			_ = child.Process.Signal(os.Interrupt)
+		case <-deadline:
+			_ = child.Process.Kill()
+			t.Fatal("a second interrupt did not kill the run: the handler still swallows it")
+		}
 	}
 }
