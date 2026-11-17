@@ -1,5 +1,5 @@
 ---
-id: "BUG-168-converge-step-dependencies"
+id: "BUG-173-converge-step-dependencies"
 type: spec
 status: verifying # draft | implementing | verifying | archived
 created: "2026-11-16"
@@ -10,7 +10,7 @@ owner: manu
 wip_override: "owner-requested fix: a failed leaf step keeps every later converge step from being reached (#3554) (10 active, limit 10, 2026-11-16)"
 ---
 
-# BUG-168-converge-step-dependencies
+# BUG-173-converge-step-dependencies
 
 ## Why
 

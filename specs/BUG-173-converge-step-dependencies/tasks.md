@@ -1,13 +1,13 @@
 ---
 tags: [spec, tasks, templates]
 created: "2026-11-16"
-id: "BUG-168-converge-step-dependencies"
+id: "BUG-173-converge-step-dependencies"
 type: spec-tasks
 status: active
 owner: manu
 ---
 
-# Tasks - BUG-168-converge-step-dependencies
+# Tasks - BUG-173-converge-step-dependencies
 
 > TDD order. One task = one focused commit. Tick as you go. Reorder freely while spec is in `draft` state; freeze once you start `implementing`.
 >
@@ -48,12 +48,12 @@ This spec emits a sibling `features.json` (alongside this file) following [[patt
 
 **Pass-state gating:** the agent CANNOT write `"state": "passing"` — only the harness, after running `verification` and capturing exit code 0, may set that terminal state. Reviewers must reject PRs where features.json contains `passing` entries with empty `evidence`.
 
-Minimal `features.json` skeleton (drop into `<repo>/specs/BUG-168-converge-step-dependencies/features.json`):
+Minimal `features.json` skeleton (drop into `<repo>/specs/BUG-173-converge-step-dependencies/features.json`):
 
 ```json
 [
   {
-    "id": "BUG-168-converge-step-dependencies-f1",
+    "id": "BUG-173-converge-step-dependencies-f1",
     "behavior": "<one-line copy of an acceptance criterion>",
     "verification": "<single shell command; exit 0 means pass>",
     "state": "pending",

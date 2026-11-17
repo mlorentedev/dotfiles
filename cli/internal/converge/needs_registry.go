@@ -1,6 +1,6 @@
 package converge
 
-// What each reconciler in Registry needs (BUG-168, ADR-064). A need is an
+// What each reconciler in Registry needs (BUG-173, ADR-064). A need is an
 // earlier step whose failure makes running this one unsafe: it reads what the
 // earlier step writes, or a decision says it must not run without it. A step
 // that only happens to come later needs nothing from the one before it.
@@ -8,7 +8,7 @@ package converge
 // An edge that is missing runs a step against a prerequisite that failed; an
 // edge too many only reports a step as not reached. So an uncertain edge is
 // kept, and one is removed only with the code that shows it is not read. The
-// evidence for each list is in specs/BUG-168-converge-step-dependencies.
+// evidence for each list is in specs/BUG-173-converge-step-dependencies.
 //
 // legacy-setup declares nothing on purpose: the setup script re-runs native
 // work and runs after every native step (ADR-045 decision 5), so it needs

@@ -17,7 +17,7 @@ created: "2026-11-16"
 Accepted 2026-11-16. The owner chose option 1 on #3554 and delegated the implementation. Decisions 5, 6,
 7 and 10 below (the default for an undeclared step, `legacy-setup`, keeping uncertain edges, the
 revisit) were settled in the session that wrote this ADR. Each stands until the owner reverses it,
-which takes one line on #3554. The spec is `specs/BUG-168-converge-step-dependencies/`.
+which takes one line on #3554. The spec is `specs/BUG-173-converge-step-dependencies/`.
 
 ## Context
 
@@ -91,4 +91,4 @@ decides how much of the machine is left unconverged.
 
 - #3554, #3553, #3555
 - ADR-041 decision 4; ADR-045 decisions 4, 5 and 11
-- `specs/BUG-168-converge-step-dependencies/`
+- `specs/BUG-173-converge-step-dependencies/`

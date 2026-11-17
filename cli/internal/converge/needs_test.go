@@ -23,7 +23,7 @@ func details(rep Report) map[string]string {
 	return out
 }
 
-// BUG-168: a failed step keeps from running only the steps that need it,
+// BUG-173: a failed step keeps from running only the steps that need it,
 // directly or through another. The rest run, and the run still fails.
 func TestRun_AFailureHoldsBackOnlyItsDependents(t *testing.T) {
 	root := needing{&fake{name: "root"}, nil}

@@ -32,7 +32,7 @@ func TestRegistry_EachNeedIsAnEarlierStep(t *testing.T) {
 	}
 }
 
-// The graph, read as the run reads it. BUG-168 is the first group: a step
+// The graph, read as the run reads it. BUG-173 is the first group: a step
 // nothing native needs no longer keeps the rest from being reached.
 func TestRegistry_WhatAFailureHoldsBack(t *testing.T) {
 	reg := Registry(Options{})
