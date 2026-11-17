@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
 	"golang.org/x/text/width"
@@ -532,10 +532,18 @@ func upgradeDetail(dryRun bool, refresh string, due, done []sysTarget, waiting [
 // parses, and on failure an error that ends with the line the manager said it
 // on (stderr, else stdout: winget reports on stdout).
 func ExecManager(name string, args ...string) ([]byte, error) {
+	return execManager(tools.WingetCallTimeout, name, args...)
+}
+
+// execManager is ExecManager with the winget bound as a parameter, so a test
+// can end a hung call in milliseconds. winget alone is bounded (#3513): the
+// refresh and the upgrade run unattended, and a hang after the error is printed
+// would hold the converge for hours.
+func execManager(limit time.Duration, name string, args ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command(name, args...) //nolint:gosec // name is the OS's package manager, chosen by the step
+	cmd, finish := tools.BoundedCommand(limit, name, args...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
+	err := finish(cmd.Run())
 	if err != nil {
 		if line := lastLine(stderr.String(), stdout.String()); line != "" {
 			err = fmt.Errorf("%w: %s", err, line)
