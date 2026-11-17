@@ -28,7 +28,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Command regressions: `go test ./internal/cmd -run '^TestLintDocPaths'` -> PASS in 3.280 s.
 - Vet: `go vet ./internal/docpaths ./internal/cmd` -> PASS.
 - Formatting: `gofmt -l` over all changed Go files -> no output.
-- Feature commands f1, f2, f3, f5, f6, f7 and f8 -> exit 0 with uncached runs; f4 is correctly pending behind the release gate.
+- Feature commands f1, f2, f3, f5, f6, f7 and f8 -> exit 0 with uncached runs; f4 was pending behind the release gate then and passes since the cutover (#3561, Criterion 4 above).
 - Windows smoke with incomplete `GIT_CONFIG_COUNT=1`: install-style `version` probe -> 10.092 s; following full scans -> 485 ms / 473 ms, deterministic 14-line output, exit 0.
 - Fresh-build startup observation: endpoint security inspects each newly built unsigned EXE on first execution. `install.ps1` deliberately pays that one-time cost in its executable probe before placement, and its standalone path then runs the installed target through `converge`; hook use occurs after inspection rather than on the commit path.
 - Lesson hygiene: `go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons` -> `[OK] lessons are in their canonical form`.
