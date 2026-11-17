@@ -32,7 +32,11 @@ Once a day the timer runs `dotf update` (the Go port of the former
 5. On a day `HEAD` did not move and `dotf` is at its pin, runs two steps instead: `dotf converge --only system-upgrade,cache-gc`.
    `system-upgrade` refreshes brew, apt or winget and upgrades the catalog's outdated unpinned system packages
    (TOOL-036). `cache-gc` keeps its own weekly cadence (below), so on most days it reports `not due`. A full
-   converge already includes both steps, so neither runs twice.
+   converge already includes both steps, so neither runs twice. On Windows without elevation, a winget
+   package installed machine-wide is not attempted (its installer would ask for an administrator), and one that
+   fails to upgrade is left waiting; both are named in the step's detail, and the run
+   records `upgrade-skipped` and exits 0. Run `dotf converge --only system-upgrade` from an elevated terminal to
+   upgrade those (#3553).
 
 Every skip exits 0 (benign). A pinned `dotf` that cannot be installed (`install-failed`), a converge that runs and
 fails (`converge-failed`), and a failed `system-upgrade` or `cache-gc` step on a quiet day (`upgrade-failed`) exit

@@ -39,10 +39,39 @@ fi
 # Scan staged additions/modifications for memory artifacts: a MEMORY.md file in
 # any directory, or any path under a memory/ directory. Narrow by design — a
 # legitimate need is unblocked with --no-verify (user approval).
+#
+# Fixture trees are data, not the repo's own agent memory. A test that
+# reproduces a vault layout (a bootstrap fixture under testdata/ that contains
+# memory/MEMORY.md) is exactly the case this guard must not block, so a path
+# whose memory part sits inside a testdata/ or fixtures/ tree is exempt.
+# Measured on GO-001, where the captured Python controller corpus is such a
+# fixture. The fixture tree must enclose the memory, not the reverse: a
+# fixtures/ directory under memory/ (docs/memory/fixtures/MEMORY.md) is still
+# the repo's memory and stays blocked.
 staged="$(git diff --cached --name-only --diff-filter=AM 2>/dev/null)"
 [ -n "$staged" ] || exit 0
 
-offenders="$(printf '%s\n' "$staged" | grep -E '(^|/)MEMORY\.md$|(^|/)memory/' || true)"
+# in_fixture_tree reports whether a staged path's first fixture segment comes
+# before any memory/ segment. Git quotes a path that holds non-ASCII bytes, so
+# the opening quote is dropped before the segments are read.
+in_fixture_tree() {
+    _p="/${1#\"}"
+    _head="$(printf '%s\n' "$_p" | sed -E 's#/(testdata|fixtures?|__fixtures__)/.*$##')"
+    [ "$_head" != "$_p" ] || return 1
+    ! printf '%s\n' "$_head/" | grep -q '/memory/'
+}
+
+offenders=""
+while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    in_fixture_tree "$candidate" && continue
+    offenders="${offenders}${candidate}
+"
+done <<EOF
+$(printf '%s\n' "$staged" | grep -E '(^|/)MEMORY\.md"?$|(^|/)memory/' || true)
+EOF
+offenders="${offenders%
+}"
 [ -n "$offenders" ] || exit 0
 
 {
