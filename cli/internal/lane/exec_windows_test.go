@@ -14,6 +14,10 @@ import (
 // it runs at all, and the prompt carries a second command that writes another:
 // Exec must start neither, whatever the prompt holds.
 func TestExec_RefusesABatchShimAndNeverStartsIt(t *testing.T) {
+	// No native executable behind the shim, whatever this machine's mise holds.
+	prev := nativeBehind
+	t.Cleanup(func() { nativeBehind = prev })
+	nativeBehind = func(string) string { return "" }
 	dir := t.TempDir()
 	ran := filepath.Join(dir, "shim-ran")
 	injected := filepath.Join(dir, "injected")

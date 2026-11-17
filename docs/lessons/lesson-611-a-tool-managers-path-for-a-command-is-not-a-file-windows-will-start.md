@@ -1,5 +1,5 @@
 ---
-id: "lesson-610-a-tool-managers-path-for-a-command-is-not-a-file-windows-will-start"
+id: "lesson-611-a-tool-managers-path-for-a-command-is-not-a-file-windows-will-start"
 type: lesson
 status: active
 title: "A tool manager's path for a command is not a file Windows will start"

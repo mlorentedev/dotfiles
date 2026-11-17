@@ -53,4 +53,4 @@ Observable outcomes. Each must be testable.
 - Bitácora board: the GitHub issue / Project item tracking this spec (see the `issue:` frontmatter field)
 - #3440, #3442, #3506: the refusal this builds on
 - `specs/PLAT-001c-tools-via-mise/tasks.md`: "has no `mise-shim.exe` beside it, so mise falls back to file shims"
-- `docs/lessons/lesson-610-a-tool-managers-path-for-a-command-is-not-a-file-windows-will-start.md`
+- `docs/lessons/lesson-611-a-tool-managers-path-for-a-command-is-not-a-file-windows-will-start.md`

@@ -37,7 +37,7 @@ owner: manu
 
 Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`. `dotf spec archive` refuses a line left unanswered, a `no` without a reason, and a `yes` whose file does not exist; a `00_meta/` path is looked up in the vault.
 
-- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-610-a-tool-managers-path-for-a-command-is-not-a-file-windows-will-start.md
+- [x] Lesson for the repo's `docs/lessons/`? yes: docs/lessons/lesson-611-a-tool-managers-path-for-a-command-is-not-a-file-windows-will-start.md
 - [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: it narrows an existing refusal inside its own rule (start a native executable), and changes no contract
 - [x] New pattern candidate for `00_meta/patterns/`? Only if this recurs in >1 project. no: specific to how dotf starts agents on Windows
 
