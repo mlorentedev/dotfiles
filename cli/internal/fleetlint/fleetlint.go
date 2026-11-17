@@ -1,5 +1,5 @@
-// Package fleetlint checks a repository's CI workflows against the fleet's CI
-// standard: every rule has a stable id, and a repository silences one rule on
+// Package fleetlint checks a repository's CI workflows, and the hygiene
+// scripts it should no longer vendor, against the fleet's CI standard: every rule has a stable id, and a repository silences one rule on
 // one file by declaring an exception with a reason and an issue.
 package fleetlint
 
@@ -84,6 +84,11 @@ func lint(dir, defaultBranch string, branches bool) ([]Finding, error) {
 			all = append(all, found...)
 		}
 	}
+	vendored, err := vendoredFindings(dir)
+	if err != nil {
+		return nil, err
+	}
+	all = append(all, vendored...)
 	exc, bad, err := readExceptions(dir)
 	if err != nil {
 		return nil, err
