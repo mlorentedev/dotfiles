@@ -17,5 +17,8 @@ func TestMain(m *testing.M) {
 		os.Exit(runAsReleaseDotf(os.Args[1:]))
 	}
 	gittest.Quiet()
+	// No test starts what this machine's mise holds behind a batch shim: a
+	// test that wants a native target sets its own (#3569, lesson 610).
+	nativeBehind = func(string) string { return "" }
 	os.Exit(m.Run())
 }
