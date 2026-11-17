@@ -62,20 +62,16 @@ func TestEvalRunPlanPrintsTheMatrixAndEstimate(t *testing.T) {
 }
 
 // Above the cap the plan is still printed, so the operator sees what was
-// refused, and the command exits non-zero.
+// refused, and the command exits non-zero. Only --plan goes through the real
+// command: without it, the cap would be all that stood between this test and
+// a paid run, so that leg is TestEvalRunLaunchesNothingForAPlanOrAboveTheCap.
 func TestEvalRunRefusesAPlanAboveTheCap(t *testing.T) {
-	for _, plan := range []bool{true, false} {
-		args := []string{"eval", "run", "--repo-root", evalRepoRoot(t), "--candidate", "nan/glm5.3-flash", "--max-runs", "2"}
-		if plan {
-			args = append(args, "--plan")
-		}
-		stdout, _, err := execute(t, args...)
-		if err == nil || !strings.Contains(err.Error(), "--max-runs") {
-			t.Fatalf("plan=%v: a matrix above the cap was not refused: %v", plan, err)
-		}
-		if !strings.Contains(stdout, "harness-088-r2") {
-			t.Errorf("plan=%v: the refused plan was not printed:\n%s", plan, stdout)
-		}
+	stdout, _, err := execute(t, "eval", "run", "--plan", "--repo-root", evalRepoRoot(t), "--candidate", "nan/glm5.3-flash", "--max-runs", "2")
+	if err == nil || !strings.Contains(err.Error(), "--max-runs") {
+		t.Fatalf("a matrix above the cap was not refused: %v", err)
+	}
+	if !strings.Contains(stdout, "harness-088-r2") {
+		t.Errorf("the refused plan was not printed:\n%s", stdout)
 	}
 }
 
@@ -144,6 +140,12 @@ func (s *launchSpy) deps(t *testing.T) evalRunDeps {
 	}
 }
 
+// overCap asks for 3 epochs of one case under a cap of 2.
+func overCap(o evalRunOpts) evalRunOpts {
+	o.epochs = 3
+	return o
+}
+
 func spyOpts(t *testing.T, plan bool, maxRuns int) evalRunOpts {
 	return evalRunOpts{root: evalRepoRoot(t), candidates: []string{"nan/glm5.3-flash"}, caseIDs: []string{"harness-088-r2"},
 		epochs: 1, maxRuns: maxRuns, planOnly: plan}
@@ -152,13 +154,22 @@ func spyOpts(t *testing.T, plan bool, maxRuns int) evalRunOpts {
 // --plan and a matrix above the cap stop before anything that could spend:
 // no corpus check, no preflight, no run directory, no launch.
 func TestEvalRunLaunchesNothingForAPlanOrAboveTheCap(t *testing.T) {
-	for name, o := range map[string]evalRunOpts{"--plan": spyOpts(t, true, 30), "above the cap": spyOpts(t, false, 0)} {
+	for name, tc := range map[string]struct {
+		o       evalRunOpts
+		wantErr error
+	}{"--plan": {spyOpts(t, true, 30), nil}, "above the cap": {overCap(spyOpts(t, false, 2)), evals.ErrOverCap}} {
 		t.Run(name, func(t *testing.T) {
 			s := &launchSpy{}
 			var out strings.Builder
-			_ = runEvalRun(context.Background(), &out, s.deps(t), o)
+			err := runEvalRun(context.Background(), &out, s.deps(t), tc.o)
+			if !errors.Is(err, tc.wantErr) || (tc.wantErr == nil && err != nil) {
+				t.Errorf("err = %v, want %v", err, tc.wantErr)
+			}
 			if len(s.calls) != 0 {
 				t.Errorf("ran %v", s.calls)
+			}
+			if !strings.Contains(out.String(), "harness-088-r2") {
+				t.Errorf("the plan was not printed:\n%s", out.String())
 			}
 		})
 	}
