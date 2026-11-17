@@ -46,23 +46,23 @@ owner: manu
 
 ### Release gate
 
-- [ ] Merge PR 1 after CI/review triage.
-- [ ] Cut and owner-merge the release PR containing `dotf lint doc-paths`.
-- [ ] Update/install the pinned released `dotf`; verify `dotf lint doc-paths --help` exits 0 before PR 2.
+- [x] Merge PR 1 after CI/review triage.
+- [x] Cut and owner-merge the release PR containing `dotf lint doc-paths`.
+- [x] Update/install the pinned released `dotf`; verify `dotf lint doc-paths --help` exits 0 before PR 2.
 
 ### PR 2 - cut over and retire shell implementation
 
-- [ ] [AC4] Add a failing guard test proving pre-commit and CI invoke `dotf lint doc-paths` and no longer invoke `scripts/check-doc-paths.sh`.
-- [ ] [AC4] Switch `.pre-commit-config.yaml` to the released command and replace/remove the old `ci.yml` shell step according to the PR-1 CLI coverage.
-- [ ] [AC4] Delete `scripts/check-doc-paths.sh`, `tests/check-doc-paths.bats`, and `tests/check-doc-paths-real.bats`.
-- [ ] [AC4] Run the twin/test retirement guard and a repository-wide grep; expected: no live reference to the deleted script or BATS files.
-- [ ] [AC1] [AC2] [AC5] [AC6] Run `dotf lint doc-paths` twice on Windows; expected: identical output, exit 0 and each run <=2 seconds.
+- [x] [AC4] Add a failing guard test proving pre-commit and CI invoke `dotf lint doc-paths` and no longer invoke `scripts/check-doc-paths.sh`.
+- [x] [AC4] Switch `.pre-commit-config.yaml` to the released command and replace/remove the old `ci.yml` shell step according to the PR-1 CLI coverage.
+- [x] [AC4] Delete `scripts/check-doc-paths.sh`, `tests/check-doc-paths.bats`, and `tests/check-doc-paths-real.bats`.
+- [x] [AC4] Run the twin/test retirement guard and a repository-wide grep; expected: no live reference to the deleted script or BATS files.
+- [x] [AC1] [AC2] [AC5] [AC6] Run `dotf lint doc-paths` twice on Windows; expected: identical output, exit 0 and each run <=2 seconds.
 - [ ] [AC1] Run the command on Linux CI and Windows CI; expected: parity in governed files and findings.
 - [ ] Commit and open PR 2; verify no commit path depends on a pre-release binary.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
 - [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
 - [x] Type checks pass
 - [ ] Lint passes
