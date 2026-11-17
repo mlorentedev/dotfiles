@@ -1,0 +1,13 @@
+{
+  "reviewed_sha": "acfa1df97ac4dedbc19b3dea68ba73358a443885",
+  "reviewer": "agy/gemini-4-hydrogen-high",
+  "requested_at": "2026-11-17T05:59:17Z",
+  "review_digest_before": "",
+  "base_sha": "ccf90b3b8cd9ebfe5c5e2bbda03284acd8a0ccfc",
+  "contract_digests": {
+    "features.json": "3c230f44919ab3a8f8c94997e3c5685daf7916d6ac3cfb6cb4a831ef2c95fd88",
+    "proposal.md": "90a9caa927c48222b7ffb7f860ca8c73fa1b15c2c626b62a6300a848b9607264",
+    "spec.md": "",
+    "tasks.md": "400a5c2c4aa1d8cfd62d2a7ee334f2ed4fdb8c866f2ccd3ee1369816db42b626"
+  }
+}
