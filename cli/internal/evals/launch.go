@@ -72,34 +72,44 @@ func (l ExecLauncher) Launch(_ context.Context, a Attempt) (res LaunchResult, er
 	if err != nil {
 		return LaunchResult{}, err
 	}
-	defer func() {
-		rmErr := tree.Remove()
-		if rmErr == nil {
-			return
-		}
-		rmErr = fmt.Errorf("eval launch: tree %s left behind: %w", tree.Dir, rmErr)
-		if err != nil {
-			err = errors.Join(err, rmErr)
-			return
-		}
-		res.Leftover = rmErr
-	}()
-	if err := os.MkdirAll(filepath.Join(tree.Dir, spec.EvalAnswerDir), 0o755); err != nil {
+	defer removeTree(tree, &res, &err)
+	return l.attempt(a, entry, tree.Dir)
+}
+
+// removeTree removes the attempt's tree however it ended. A tree that will
+// not go away joins our own failure, or, beside a result, is the operator's
+// to clean up and leaves the result standing.
+func removeTree(tree Tree, res *LaunchResult, err *error) {
+	rmErr := tree.Remove()
+	if rmErr == nil {
+		return
+	}
+	rmErr = fmt.Errorf("eval launch: tree %s left behind: %w", tree.Dir, rmErr)
+	if *err != nil {
+		*err = errors.Join(*err, rmErr)
+		return
+	}
+	res.Leftover = rmErr
+}
+
+// attempt runs the candidate in a prepared tree and keeps what it answered.
+func (l ExecLauncher) attempt(a Attempt, entry spec.ReviewerEntry, tree string) (LaunchResult, error) {
+	if err := os.MkdirAll(filepath.Join(tree, spec.EvalAnswerDir), 0o755); err != nil {
 		return LaunchResult{}, err
 	}
 	if err := os.MkdirAll(a.OutDir, 0o755); err != nil {
 		return LaunchResult{}, err
 	}
-	plan, err := l.plan(a, entry, tree.Dir)
+	plan, err := l.plan(a, entry, tree)
 	if err != nil {
 		return LaunchResult{}, err
 	}
 	began := time.Now()
-	ran, err := l.run(plan, tree.Dir)
+	ran, err := l.run(plan, tree)
 	if err != nil {
 		return LaunchResult{}, fmt.Errorf("eval launch: %s could not run: %w", a.Candidate, err)
 	}
-	res = resultOf(ran)
+	res := resultOf(ran)
 	res.Duration = time.Since(began)
 	switch keepErr := keepAnswer(plan.Answer, plan.Result); {
 	case errors.Is(keepErr, errNotRegular):
