@@ -114,6 +114,20 @@ func checkPathFiles(sys *System, cfg *Config, rep *Report) {
 	} else {
 		rep.Pass(filepath.Base(out) + " up to date (" + out + ")")
 	}
+	vars, err := envpkg.ResolveVars(cfg.ContractPath, envpkg.MachinePath(home), sys.GOOS, home)
+	if err != nil {
+		rep.Fail("current generated path values unresolvable: " + err.Error())
+		return
+	}
+	if drift := envpkg.GeneratedDrift(vars, sys.Getenv); len(drift) > 0 {
+		names := make([]string, 0, len(drift))
+		for _, v := range drift {
+			names = append(names, v.Name)
+		}
+		rep.Fail(fmt.Sprintf(
+			"current process still carries %d stale generated path value(s) (%s) — start a fresh shell or process",
+			len(drift), strings.Join(names, ", ")))
+	}
 }
 
 // checkSecrets reproduces healthcheck section 8 over the registry SSOT: every

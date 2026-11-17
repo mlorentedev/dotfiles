@@ -138,7 +138,7 @@ setup() {
 
 @test "AI-042: the agy template restores managed lists through merge union" {
     [ "$(jq -c '.trustedWorkspaces' "$DOTFILES_DIR/ai/agy/settings.json")" = \
-        '["{HOME}/Projects/*","{HOME}/Projects/Workspace/*","{WORKTREE_ROOT}"]' ]
+        '["{PROJECTS_PATH}/*","{WORKTREE_ROOT}","{COPILOT_WORKTREE_ROOT}"]' ]
     [ "$(jq -c '.permissions.deny' "$DOTFILES_DIR/ai/agy/settings.json")" = \
         '["command(rm -rf /)","command(rm -rf ~/*)"]' ]
 }

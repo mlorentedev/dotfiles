@@ -1,9 +1,8 @@
 {
   "trustedFolders": [
-    "{HOME}/Projects",
-    "{HOME}/Projects/*",
-    "{HOME}/Projects/Workspace",
-    "{HOME}/Projects/Workspace/*",
-    "{WORKTREE_ROOT}/*/*"
+    "{PROJECTS_PATH}",
+    "{PROJECTS_PATH}/*",
+    "{WORKTREE_ROOT}/*/*",
+    "{COPILOT_WORKTREE_ROOT}/*/*"
   ]
 }
