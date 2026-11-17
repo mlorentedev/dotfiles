@@ -60,6 +60,7 @@ func TestCheckSelfDeploy_ByState(t *testing.T) {
 		{name: "opted in, no run recorded → WARN naming the first run", optIn: true, state: current, want: StatusWarn, needle: "no run recorded yet"},
 		{name: "last run failed → FAIL with its error", optIn: true, state: current, record: run(time.Hour, "converge-failed", errors.New("converge: exit 1")), want: StatusFail, needle: "converge: exit 1"},
 		{name: "last run failed in two steps → FAIL on one line", optIn: true, state: current, record: run(time.Hour, "converge-failed", errors.Join(errors.New("converge: tools: boom"), errors.New("converge: git-lfs: bang"))), want: StatusFail, needle: "converge: tools: boom (and 1 more line in last.json) — converge-failed message"},
+		{name: "last run failed in three steps → FAIL counting the rest in the plural", optIn: true, state: current, record: run(time.Hour, "converge-failed", errors.Join(errors.New("converge: tools: boom"), errors.New("converge: git-lfs: bang"), errors.New("converge: lanes: crash"))), want: StatusFail, needle: "converge: tools: boom (and 2 more lines in last.json)"},
 		{name: "last run older than three days → WARN", optIn: true, state: current, record: run(4*24*time.Hour, "updated", nil), want: StatusWarn, needle: "4 days ago"},
 		{name: "last run skipped on a dirty checkout → WARN", optIn: true, state: current, record: run(time.Hour, "dirty", nil), want: StatusWarn, needle: "dirty message"},
 		{name: "last run offline → PASS", optIn: true, state: current, record: run(time.Hour, "offline", nil), want: StatusPass, needle: "offline message"},
