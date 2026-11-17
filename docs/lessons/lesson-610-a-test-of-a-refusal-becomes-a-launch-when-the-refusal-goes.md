@@ -27,5 +27,7 @@ Before removing a guard, list every test that reaches the guarded code through r
 (`git grep` for the command's invocation), and move each one onto injected ones first. The eval
 command's steps after the plan (corpus check, preflight, run directory, launch) are each a field of
 `evalRunDeps`, so its tests use a spy that records the order and launches nothing. The real
-`execute(...)` tests keep only paths that stop before any of them: `--plan` and a matrix above the
-cap.
+`execute(...)` tests keep only paths that stop before any of them (`--plan` and a matrix above the
+cap), plus one end-to-end test that does launch, on purpose: PATH holds only stub `dotf` and `pi`
+binaries and the state directory is a temp dir, so nothing real is reachable even through the full
+command.
