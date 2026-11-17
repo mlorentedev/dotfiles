@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/tools"
@@ -98,7 +99,8 @@ func (r systemUpgrade) Probe(env Env) error {
 		// What is still behind is what Reconcile left waiting for elevation:
 		// a machine-wide install it did not attempt, or an id whose upgrade
 		// failed. The step keeps no state between the two calls, so the rule
-		// is the one both can read: the token.
+		// is the one both can read: the token. An id Reconcile upgraded and
+		// winget left behind has already failed the step there.
 		due = nil
 	}
 	if len(due) > 0 {
@@ -203,8 +205,37 @@ func (r systemUpgrade) windows(dryRun bool, targets []sysTarget) (Result, error)
 			waiting = append(waiting, fmt.Sprintf("%s (%s)", t.pkg, exitStatus(err)))
 		}
 	}
+	if !elevated {
+		// The probe cannot tell an id left waiting from one this run claims
+		// to have upgraded, so the claim is checked here, where it is made.
+		var unmoved []sysTarget
+		if done, unmoved, err = r.confirmUpgraded(done); err != nil {
+			return Result{}, err
+		}
+		for _, t := range unmoved {
+			failed = append(failed, fmt.Errorf("%s: winget reported the upgrade done and it is still outdated", t.pkg))
+		}
+	}
 	res := Result{Changes: len(done), Detail: upgradeDetail(false, "winget source update", due, done, nil) + elevationNote(waiting)}
 	return res, errors.Join(failed...)
+}
+
+// confirmUpgraded lists again and separates the ids winget upgraded from the
+// ones it only said it did. It lists nothing when nothing was upgraded.
+func (r systemUpgrade) confirmUpgraded(done []sysTarget) (moved, unmoved []sysTarget, err error) {
+	if len(done) == 0 {
+		return nil, nil, nil
+	}
+	unmoved, err = r.outdated("windows", done)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, t := range done {
+		if !slices.Contains(unmoved, t) {
+			moved = append(moved, t)
+		}
+	}
+	return moved, unmoved, nil
 }
 
 // NeedsElevationNote opens the part of the step's detail that names the winget

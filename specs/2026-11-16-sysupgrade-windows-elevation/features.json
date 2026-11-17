@@ -23,7 +23,7 @@
   {
     "id": "2026-11-16-sysupgrade-windows-elevation-f4",
     "behavior": "AC6: the tree vets for windows, linux and darwin",
-    "verification": "cd cli && GOOS=windows go vet ./internal/converge/ ./internal/cmd/ && GOOS=linux go vet ./internal/converge/ ./internal/cmd/ && GOOS=darwin go vet ./internal/converge/ ./internal/cmd/",
+    "verification": "cd cli && for os in windows linux darwin; do GOOS=$os go build ./... && GOOS=$os go vet ./... || exit 1; done",
     "state": "pending",
     "evidence": ""
   }

@@ -476,6 +476,23 @@ func TestSystemUpgradeWindowsWithoutElevationSkipsMachineWideAndToleratesAFailur
 	}
 }
 
+// Without elevation the probe lets every outdated id through, so an upgrade
+// winget reports done and leaves behind has to fail where the claim is made.
+func TestSystemUpgradeWindowsWithoutElevationFailsAnUpgradeThatDidNotMove(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	f := newPkgFake(map[string][]string{"winget": {"Git.Git", "eza-community.eza"}})
+	f.wingetOverride = wingetRows([]string{"Git.Git"})
+	step := upgradeStep(f)
+
+	res, err := step.Reconcile(env, false)
+	if err == nil || !strings.Contains(err.Error(), "Git.Git") || !strings.Contains(err.Error(), "still outdated") {
+		t.Fatalf("err = %v, want it to name Git.Git as still outdated", err)
+	}
+	if res.Changes != 0 || strings.Contains(res.Detail, "upgraded: Git.Git") {
+		t.Errorf("res = %+v, want an id that did not move not counted as upgraded", res)
+	}
+}
+
 // A plan says what a run would leave waiting, and attempts nothing either.
 func TestSystemUpgradeWindowsPlanNamesMachineWideWithoutElevation(t *testing.T) {
 	env := upgradeEnv(t, "windows")

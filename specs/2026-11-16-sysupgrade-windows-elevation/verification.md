@@ -18,7 +18,7 @@ Tests are in `cli/internal/converge/sysupgrade_test.go` unless a path is given.
       `TestSystemUpgradeWindowsPlanNamesMachineWideWithoutElevation`
 - [x] AC2 -> the same test (marker, `machine-wide install`, exit status without winget's output) and
       `TestSystemUpgradeWindowsWithoutElevationAttemptsNothingWhenScopeIsUnknown`
-- [x] AC3 -> the same test's `Probe` assertion
+- [x] AC3 -> the same test's `Probe` assertion. The probe lets every outdated id through without elevation, so an id winget reports upgraded and leaves behind fails in `Reconcile`, which lists again: `TestSystemUpgradeWindowsWithoutElevationFailsAnUpgradeThatDidNotMove` (found in review).
 - [x] AC4 -> `TestSystemUpgradeWindowsUpgradesPerIdAndIsolatesAFailure` (now pinned to an elevated run),
       `TestSystemUpgradeWindowsElevatedUpgradesMachineWide`
 - [x] AC5 -> `TestSystemUpgradeSkipReadsOnlyTheStepsSkip/ran_but_left_ids_waiting_for_elevation` in
