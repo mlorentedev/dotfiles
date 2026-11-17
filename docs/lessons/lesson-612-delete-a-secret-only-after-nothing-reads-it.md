@@ -1,5 +1,5 @@
 ---
-id: "lesson-611-delete-a-secret-only-after-nothing-reads-it"
+id: "lesson-612-delete-a-secret-only-after-nothing-reads-it"
 type: lesson
 status: active
 title: "Delete a secret only after nothing reads it"
