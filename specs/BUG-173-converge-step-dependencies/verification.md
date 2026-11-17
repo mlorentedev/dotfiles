@@ -64,7 +64,8 @@ Run on Windows 11, 2026-11-16, from this worktree.
 
 ## Review dispositions
 
-Independent review of 2026-11-16 (`review.md`, verdict PASS, two Minor findings):
+Independent review of 2026-11-16 (`review.md`, verdict PASS, three Minor findings):
 
+- No test places a `not reached` step between steps that still run: ticketed (#3576).
 - `errorLine`'s plural count had no named test: applied, `TestCheckSelfDeploy_ByState` has a three-line case.
 - A `Revisiter` that depends on another `Revisiter` that failed while revisiting would still run: declined for now. `records-harness` is the only `Revisiter`, so there is no pair to order; the second one to be added is where the rule gets written and tested.

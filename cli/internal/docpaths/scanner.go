@@ -40,6 +40,12 @@ func CheckFiles(opts CheckOptions, files []string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	// The vault is optional: a root that is not a directory on this machine is
+	// no vault, and its references are skipped, not reported one by one. The
+	// caller's root is never empty when it comes from the environment's default.
+	if fi, err := os.Stat(opts.VaultRoot); opts.VaultRoot != "" && (err != nil || !fi.IsDir()) {
+		opts.VaultRoot = ""
+	}
 	report := Report{Checked: append([]string(nil), files...)}
 	for _, file := range files {
 		findings, err := checkFile(opts, top, file)

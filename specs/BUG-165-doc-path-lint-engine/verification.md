@@ -62,8 +62,10 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Review dispositions
 
-Independent review of 2026-11-16 (`review.md`, verdict FAIL, two Major and four Minor findings). The spec needs a new review before it archives.
+Independent review of 2026-11-16 (`review.md`, verdict FAIL, one Blocker, two Major and four Minor findings). The spec needs a new review before it archives.
 
+- Blocker, the command exited 1 where the vault is not checked out: applied. `CheckFiles` treats a vault root that is not a directory as no vault, as the shell guard's `[ -d ]` did (#1043); `TestCheckFilesVaultPaths` covers a missing directory and a file, and fails without the fix. `VAULT_PATH='C:
+onexistent-vault-dir' go run ./cmd/dotf lint doc-paths` exits 0. The pre-commit hook runs the pinned release, so it has the fix from the next release on.
 - Major, open task lines and stale `f4` text: applied. The four lines are closed with the pull requests that did them (#3201, #3561) and the `f4` sentence says what is true since the cutover. The `gofmt` failure in the same finding is the reviewer's CRLF checkout, not the code: CI's `lint` and `cli-lint` pass on #3561.
 - Major, the policy's exclusions and source extensions were not pinned: applied. `TestCurrentPolicyLoads` compares both lists; removing `specs/` from `harness/doc-paths.json` now fails it.
 - Minor, aliased absolute paths, the glob contract, function size and the substring-matched retirement guard: ticketed (#3574).
