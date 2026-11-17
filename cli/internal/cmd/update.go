@@ -33,7 +33,8 @@ On a day HEAD did not move it runs one step instead, 'dotf converge --only
 system-upgrade', which keeps the catalog's unpinned system packages current
 (brew, apt, winget); a full converge already includes that step. A step that
 skips (offline, apt without sudo -n) is recorded as upgrade-skipped with the
-reason and exits 0.
+reason and exits 0. So is one that left winget packages waiting for an elevated
+run on Windows.
 
 The DOTF_VERSION pin is part of being up to date, and it is the upstream's:
 after the fetch, update reads versions.conf at the upstream branch (the
@@ -113,10 +114,16 @@ func runSystemUpgrade(w io.Writer, repo string) (string, error) {
 }
 
 // systemUpgradeSkip is the system-upgrade entry's skip reason in rep, "" when
-// the step ran (or failed: the run's error carries that).
+// the step ran (or failed: the run's error carries that). A step that ran but
+// left winget ids waiting for elevation counts as well: it exits 0 on every
+// run, so the record is where a machine that never upgrades them shows it
+// (#3553).
 func systemUpgradeSkip(rep converge.Report) string {
 	for _, e := range rep.Entries {
-		if e.Name == "system-upgrade" && e.Status == converge.StatusSkipped {
+		if e.Name != "system-upgrade" {
+			continue
+		}
+		if e.Status == converge.StatusSkipped || strings.Contains(e.Detail, converge.NeedsElevationNote) {
 			return e.Detail
 		}
 	}

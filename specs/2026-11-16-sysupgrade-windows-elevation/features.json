@@ -1,0 +1,30 @@
+[
+  {
+    "id": "2026-11-16-sysupgrade-windows-elevation-f1",
+    "behavior": "AC1-AC3: not elevated, a machine-wide id is never attempted, a failing id is left waiting, both are named, and the probe is nil",
+    "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgradeWindows.*WithoutElevation' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgradeWindowsWithoutElevationSkipsMachineWideAndToleratesAFailure'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "2026-11-16-sysupgrade-windows-elevation-f2",
+    "behavior": "AC4: elevated, a failing winget id fails the step and the probe names it",
+    "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgradeWindows(UpgradesPerIdAndIsolatesAFailure|ElevatedUpgradesMachineWide)' ./internal/converge/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgradeWindowsUpgradesPerIdAndIsolatesAFailure'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "2026-11-16-sysupgrade-windows-elevation-f3",
+    "behavior": "AC5: dotf update reads a step that left ids waiting as a skip reason",
+    "verification": "out=$(cd cli && go test -count=1 -v -run 'TestSystemUpgradeSkipReadsOnlyTheStepsSkip' ./internal/cmd/) && printf '%s' \"$out\" | grep -q -- '--- PASS: TestSystemUpgradeSkipReadsOnlyTheStepsSkip/ran_but_left_ids_waiting_for_elevation'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "2026-11-16-sysupgrade-windows-elevation-f4",
+    "behavior": "AC6: the tree vets for windows, linux and darwin",
+    "verification": "cd cli && for os in windows linux darwin; do GOOS=$os go build ./... && GOOS=$os go vet ./... || exit 1; done",
+    "state": "pending",
+    "evidence": ""
+  }
+]
