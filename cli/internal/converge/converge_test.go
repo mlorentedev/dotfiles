@@ -18,6 +18,8 @@ type fake struct {
 	probeErr  error
 	gate      string
 	skip      string
+	// failFrom, when set, fails the apply with that ordinal and every later one.
+	failFrom int
 
 	applied, planned, probed bool
 	applies                  int
@@ -32,6 +34,9 @@ func (f *fake) Reconcile(_ Env, dryRun bool) (Result, error) {
 	} else {
 		f.applied = true
 		f.applies++
+		if f.failFrom > 0 && f.applies >= f.failFrom {
+			return Result{}, errors.New(f.name + " failed on apply")
+		}
 	}
 	if f.skip != "" {
 		return Result{Skip: f.skip}, f.err

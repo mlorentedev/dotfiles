@@ -4,6 +4,7 @@
 package converge
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -125,9 +126,10 @@ func Select(reconcilers []Reconciler, names []string) ([]Reconciler, error) {
 
 // Observer hears a run as it happens (CLI-114): Start when a step begins to
 // run, Done with its entry once that entry is final. A step the OS does not
-// support is done without a start. The entries the run appends without running
-// a step ("not reached", a plan's gate) are never done: they are in the
-// returned report, for the caller to print.
+// support, and one a failed step kept from running ("not reached"), are done
+// without a start, so Done is heard in the report's order. The entries a
+// plan's gate appends are never done: they are the tail of the returned
+// report, for the caller to print.
 type Observer interface {
 	Start(name string)
 	Done(e Entry)
@@ -139,10 +141,11 @@ func (nopObserver) Start(string) {}
 func (nopObserver) Done(Entry)   {}
 
 // Run drives the reconcilers in order. A reconciler that does not list
-// env.GOOS is skipped, never passed. The first failure stops the run: the
-// reconcilers after it are reported as not reached, because a later step may
-// depend on the one that failed (ADR-041 decision 4). The returned error names
-// the reconciler that failed.
+// env.GOOS is skipped, never passed. A failure does not stop the run: it keeps
+// from running the reconcilers that need the one that failed, directly or
+// through another, and those are reported as not reached with the cause. The
+// rest still run, in order (ADR-041 decision 4 as amended by ADR-064). The
+// returned error joins every failure, each naming its reconciler.
 func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 	return RunObserved(reconcilers, env, dryRun, nopObserver{})
 }
@@ -150,41 +153,52 @@ func Run(reconcilers []Reconciler, env Env, dryRun bool) (Report, error) {
 // RunObserved is Run, telling obs about each step as it runs.
 func RunObserved(reconcilers []Reconciler, env Env, dryRun bool, obs Observer) (Report, error) {
 	rep := Report{DryRun: dryRun, GOOS: env.GOOS}
-	var failed error
+	var failures []error
 	var ran []Reconciler
+	down := downSet{}
 	gate := ""
-	for _, r := range reconcilers {
-		switch {
-		case failed != nil:
-			rep.Entries = append(rep.Entries, Entry{Name: r.Name(), Status: StatusSkipped, Detail: "not reached"})
-			continue
-		case gate != "":
+	for i, r := range reconcilers {
+		if gate != "" {
 			rep.Entries = append(rep.Entries, Entry{Name: r.Name(), Status: StatusSkipped, Detail: gate})
+			continue
+		}
+		if why := down.blocks(needsOf(reconcilers, i)); why != "" {
+			down[r.Name()] = why
+			entry := Entry{Name: r.Name(), Status: StatusSkipped, Detail: NotReached + ": " + why}
+			obs.Done(entry)
+			rep.Entries = append(rep.Entries, entry)
 			continue
 		}
 		entry, g, err := runOne(r, env, dryRun, obs)
 		obs.Done(entry)
 		rep.Entries = append(rep.Entries, entry)
 		if err != nil {
-			failed = fmt.Errorf("converge: %s: %w", r.Name(), err)
+			down[r.Name()] = r.Name() + " failed"
+			failures = append(failures, fmt.Errorf("converge: %s: %w", r.Name(), err))
+			continue
 		}
 		if dryRun && g != "" {
 			gate = g
 		}
-		if err == nil && !dryRun && entry.Status == StatusChange {
-			failed = revisit(&rep, ran, r.Name(), env, obs)
-		}
 		ran = append(ran, r)
+		if !dryRun && entry.Status == StatusChange {
+			failures = append(failures, revisit(&rep, ran, down, r.Name(), env, obs)...)
+		}
 	}
-	return rep, failed
+	return rep, errors.Join(failures...)
 }
 
-// revisit applies again each reconciler that already ran and revisits after
-// the one named, in registry order, and appends their entries. The first
-// failure stops it and is returned, as Run's own loop does.
-func revisit(rep *Report, ran []Reconciler, after string, env Env, obs Observer) error {
+// revisit applies again each reconciler that ran without failing and revisits
+// after the one named, in registry order, and appends their entries. One that
+// fails is down from then on, like a step of the run's own loop, and the
+// others are still revisited.
+func revisit(rep *Report, ran []Reconciler, down downSet, after string, env Env, obs Observer) []error {
+	var failures []error
 	for _, q := range ran {
 		if rv, ok := q.(Revisiter); !ok || rv.RevisitAfter() != after || !platform.Supports(q.Platforms(), env.GOOS) {
+			continue
+		}
+		if _, isDown := down[q.Name()]; isDown {
 			continue
 		}
 		entry, _, err := runOne(q, env, false, obs)
@@ -192,10 +206,11 @@ func revisit(rep *Report, ran []Reconciler, after string, env Env, obs Observer)
 		obs.Done(entry)
 		rep.Entries = append(rep.Entries, entry)
 		if err != nil {
-			return fmt.Errorf("converge: %s: %w", q.Name(), err)
+			down[q.Name()] = q.Name() + " failed"
+			failures = append(failures, fmt.Errorf("converge: %s: %w", q.Name(), err))
 		}
 	}
-	return nil
+	return failures
 }
 
 // now is the clock runOne times a step by; tests replace it.

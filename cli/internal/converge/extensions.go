@@ -29,10 +29,9 @@ import (
 // ones `harness bind` writes, which never touches a foreign hook.
 //
 // It runs after tools, whose PATH reaches the claude that mise installs, and
-// after configs-deploy, which writes Claude Code's settings. It sits last among
-// the native steps because the first failure stops a run: a plugin that cannot
-// install for want of network must not keep git or the SSH target from
-// converging.
+// after configs-deploy, which writes Claude Code's settings. No native step
+// needs it (needs_registry.go), so a plugin that cannot install for want of
+// network does not keep git or the SSH target from converging.
 type agentExtensions struct {
 	// claude builds the guarded claude seam for home; false when claude is not
 	// installed. Unset, the Claude half is skipped.
