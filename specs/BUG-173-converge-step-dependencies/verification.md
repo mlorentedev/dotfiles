@@ -61,3 +61,10 @@ Run on Windows 11, 2026-11-16, from this worktree.
 - [ ] Folder moved: `specs/BUG-173-converge-step-dependencies/` -> `specs/archive/BUG-173-converge-step-dependencies/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+## Review dispositions
+
+Independent review of 2026-11-16 (`review.md`, verdict PASS, two Minor findings):
+
+- `errorLine`'s plural count had no named test: applied, `TestCheckSelfDeploy_ByState` has a three-line case.
+- A `Revisiter` that depends on another `Revisiter` that failed while revisiting would still run: declined for now. `records-harness` is the only `Revisiter`, so there is no pair to order; the second one to be added is where the rule gets written and tested.

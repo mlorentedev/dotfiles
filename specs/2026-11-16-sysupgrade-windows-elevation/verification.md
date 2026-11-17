@@ -72,3 +72,12 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - [ ] Folder moved: `specs/2026-11-16-sysupgrade-windows-elevation/` -> `specs/archive/2026-11-16-sysupgrade-windows-elevation/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+## Review dispositions
+
+Independent review of 2026-11-16 (`review.md`, verdict PASS, four Minor findings):
+
+- The confirming listing's error discards the partial result: ticketed (#3573).
+- `splitMachineWide` with `wingetNoneFound` untested, and the probe's third listing: ticketed (#3573).
+- Detail wording when every id waits: ticketed (#3573).
+- `systemUpgrade.windows` is 44 lines against a 40-line guideline: declined. Splitting it for four lines would separate the three outcomes that are read together.
