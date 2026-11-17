@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mlorentedev/dotfiles/cli/internal/evals"
 	"github.com/mlorentedev/dotfiles/cli/internal/spec"
@@ -242,5 +243,20 @@ func TestEvalRunDirIsAFreshDirectoryUnderTheStateDir(t *testing.T) {
 	}
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 		t.Errorf("run dir not created: %v", err)
+	}
+}
+
+// After the first interrupt cancels the run, the signal handler is released,
+// so a second Ctrl-C reaches its default action instead of being swallowed
+// while an in-flight attempt runs to its deadline.
+func TestEvalRunReleasesTheSignalAfterTheFirstInterrupt(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	released := make(chan struct{})
+	releaseOnCancel(ctx, func() { close(released) })
+	cancel()
+	select {
+	case <-released:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the signal handler was not released after the cancel")
 	}
 }

@@ -169,9 +169,11 @@ func newEvalRunCmd() *cobra.Command {
 				return fmt.Errorf("eval run: not inside a repository — pass --repo-root")
 			}
 			// The interrupt is caught here so the loop stops between attempts
-			// too, not only while a runner is alive.
+			// too, not only while a runner is alive. The first one cancels the
+			// run; releasing the handler then lets a second one kill it.
 			ctx, stop := signal.NotifyContext(c.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
+			releaseOnCancel(ctx, stop)
 			return runEvalRun(ctx, c.OutOrStdout(), defaultEvalRunDeps(), o)
 		},
 	}
@@ -182,6 +184,15 @@ func newEvalRunCmd() *cobra.Command {
 	c.Flags().IntVar(&o.maxRuns, "max-runs", evals.DefaultMaxRuns, "the most runs this invocation may launch")
 	c.Flags().BoolVar(&o.planOnly, "plan", false, "print the matrix and the estimate, and launch nothing")
 	return c
+}
+
+// releaseOnCancel calls stop once ctx is done, so the signal handler that
+// cancelled the run stops swallowing the signals after it.
+func releaseOnCancel(ctx context.Context, stop func()) {
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
 }
 
 // runEvalRun plans the run and prints it; without --plan it checks the corpus,
