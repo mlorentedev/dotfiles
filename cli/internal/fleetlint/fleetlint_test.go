@@ -501,12 +501,19 @@ func TestVendoredHygieneScriptsAreFindings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Finding{
-		{RuleVendoredScript, "scripts/check-actions-pinned.sh", 1, "a vendored copy of the fleet's pin check; run `dotf lint fleet --rule fleet/sha-pin` (the ci-workflows hygiene composite) and delete it"},
-		{RuleVendoredScript, "scripts/check-lessons.sh", 1, "a vendored copy of the fleet's lessons check; run `dotf lessons fmt --check` (the ci-workflows hygiene composite) and delete it"},
+	// Assert the stable fields and the replacement command, not the prose.
+	want := []struct{ path, command string }{
+		{"scripts/check-actions-pinned.sh", "`dotf lint fleet --rule fleet/sha-pin`"},
+		{"scripts/check-lessons.sh", "`dotf lessons fmt --check`"},
 	}
-	if !slices.Equal(got, want) {
-		t.Errorf("got %v, want %v", got, want)
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %d findings", got, len(want))
+	}
+	for i, w := range want {
+		g := got[i]
+		if g.Rule != RuleVendoredScript || g.Path != w.path || g.Line != 1 || !strings.Contains(g.Message, w.command) {
+			t.Errorf("finding %d: got %+v, want %s on %s:1 naming %s", i, g, RuleVendoredScript, w.path, w.command)
+		}
 	}
 	clean, err := lintFiles(t, map[string]string{"scripts/pin-actions.sh": "#!/bin/sh\n"})
 	if err != nil || len(clean) != 0 {
