@@ -14,8 +14,8 @@ func (r *recorder) Done(e Entry)      { r.log = append(r.log, "done "+e.Name+": 
 
 // CLI-114 AC5: the observer hears each step that runs, start then done, in
 // run order and with its final entry (a revisit's "after" prefix included).
-// A step the OS does not support is done without a start: nothing ran. The
-// entries the run never reached are never done; the renderer flushes them.
+// A step the OS does not support is done without a start: nothing ran. So is
+// a step a failure kept from running, so the observer hears the report in order.
 func TestRunObserved_ReportsEachStepItRuns(t *testing.T) {
 	harness := revisiting{&fake{name: "harness"}, "tools"}
 	win := &fake{name: "win", platforms: []string{"windows"}}
@@ -34,11 +34,12 @@ func TestRunObserved_ReportsEachStepItRuns(t *testing.T) {
 		"start tools", "done tools: tools detail",
 		"start harness", "done harness: after tools: harness detail",
 		"start broken", "done broken: boom",
+		"done later: not reached: broken failed",
 	}
 	if got := strings.Join(obs.log, "\n"); got != strings.Join(want, "\n") {
 		t.Errorf("observer heard:\n%s\nwant:\n%s", got, strings.Join(want, "\n"))
 	}
-	if n := len(rep.Entries); n != 6 || rep.Entries[5].Detail != "not reached" {
+	if n := len(rep.Entries); n != 6 || rep.Entries[5].Detail != "not reached: broken failed" {
 		t.Errorf("entries %d, last %+v: want the unreached step in the report", n, rep.Entries[n-1])
 	}
 }

@@ -64,6 +64,8 @@ The macOS bring-up also showed what happens when agent instructions arrive late.
    7. **verify**: `dotf doctor`. Its failures are the run's failures.
    
    On a fresh machine, tier 0 installs `dotf` before step 1, because nothing else can run without it. That is the one bootstrap exception to "records before binary", and the binary it installs is the stable pin that the records on `main` were released against.
+
+   Amended by ADR-064 (2026-11-16): the order stands, and what a failure holds back is now declared per step. The legacy step still needs every native step (decision 5).
 5. **The setup scripts become one reconciler each, and shrink to nothing (strangler fig).**
    - `setup-linux.sh` runs as the `legacy` reconciler on Linux, and `setup-windows.ps1` on Windows. It has no plan (it reports `opaque`), and it runs after every native reconciler, so a native step always wins.
    - Each later PR ports one block into a reconciler and deletes it from both twins in the same change (ADR-020 §5).

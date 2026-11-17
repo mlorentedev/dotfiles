@@ -253,13 +253,15 @@ func (s step) Reconcile(converge.Env, bool) (converge.Result, error) {
 type fixedDurations struct{ *convergePrinter }
 
 func (f fixedDurations) Done(e converge.Entry) {
-	e.Duration = 1200 * time.Millisecond
+	if e.Duration > 0 { // a step that never ran keeps its blank duration
+		e.Duration = 1200 * time.Millisecond
+	}
 	f.convergePrinter.Done(e)
 }
 
 // CLI-114 AC5: on a terminal each step's start line precedes its own output
 // and its result line follows it; the step the run never reached is printed
-// exactly once, at the end, before the counts and the failure summary.
+// exactly once, in its place, before the counts and the failure summary.
 func TestConvergeConsole_Streams(t *testing.T) {
 	for _, terminal := range []bool{true, false} {
 		name := "converge-stream-pipe"

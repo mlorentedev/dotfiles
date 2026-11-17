@@ -1,0 +1,65 @@
+[
+  {
+    "id": "BUG-173-converge-step-dependencies-f1",
+    "behavior": "a failed step keeps from running only the steps that need it",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestRun_AFailureHoldsBackOnlyItsDependents$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f2",
+    "behavior": "the run returns an error naming every failed step",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestRun_JoinsEveryFailure$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f3",
+    "behavior": "a held-back step is reported not reached with its cause, in place, and the observer hears it",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestRunObserved_ReportsEachStepItRuns$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f4",
+    "behavior": "a step that declares nothing needs every step before it",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestRun_AnUndeclaredStepNeedsEveryStepBeforeIt$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f5",
+    "behavior": "a need that is absent, skipped or unsupported holds nothing back",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestRun_AnAbsentOrSkippedNeedDoesNotBlock$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f6",
+    "behavior": "a failed step is not revisited and a failed revisit holds back only its dependents",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^(TestRun_RevisitSkipsAFailedStepAndItsFailureIsNotTerminal|TestRun_ARevisitThatFailsHoldsBackItsDependents)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f7",
+    "behavior": "every Registry step declares its needs except legacy-setup, each an earlier step",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^(TestRegistry_EveryStepDeclaresItsNeeds|TestRegistry_EachNeedIsAnEarlierStep)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f8",
+    "behavior": "in Registry a failed system-upgrade holds back only legacy-setup and a failed checkout every step",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^(TestRegistry_WhatAFailureHoldsBack|TestRegistry_TheQuietDayStepsDoNotNeedEachOther)$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-173-converge-step-dependencies-f9",
+    "behavior": "dotf doctor shows a multi-line recorded error on one line",
+    "verification": "cd cli && go test ./internal/doctor/ -count=1 -run '^TestCheckSelfDeploy_ByState$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
