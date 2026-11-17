@@ -27,4 +27,6 @@ until it syncs.
 Retire a secret in this order: merge the change that stops reading it, update the checkout `dotf`
 reads (and release the binary when the reading logic lives there), then delete the store item.
 Until #3578 makes `dotf secrets verify` sync first, an OK from it says only that the `bw serve`
-cache holds the item, not the vault. Sync `bw serve` before trusting it on a deletion.
+cache holds the item, not the vault. Verify the deletion while the registry entry still exists,
+after a forced sync (`POST /sync?force=true` on `bw serve`; an unforced one can keep a stale
+cache). Once the entry is gone, `dotf secrets verify` no longer checks that item at all.
