@@ -573,3 +573,25 @@ func TestVendoredScriptSelectedAlone(t *testing.T) {
 		t.Errorf("got %v, %v; want only the vendored-script finding", got, err)
 	}
 }
+
+// A repository with a single workflow whose job calls a reusable workflow:
+// the shape the deleted check-actions-pinned.sh misread (#1855). A SHA pin is
+// clean; a tag pin is one sha-pin finding on the uses: line.
+func TestShaPinSingleWorkflowReusableJob(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	for _, tc := range []struct {
+		ref  string
+		want int
+	}{{sha, 0}, {"v1", 1}} {
+		dir := repo(t, map[string]string{
+			".github/workflows/ci.yml": "on: push\njobs:\n  call:\n    uses: owner/repo/.github/workflows/ci.yml@" + tc.ref + "\n",
+		})
+		got, err := LintRules(dir, "", []string{"fleet/sha-pin"})
+		if err != nil || len(got) != tc.want {
+			t.Fatalf("@%s: got %v, %v; want %d finding(s)", tc.ref, got, err, tc.want)
+		}
+		if tc.want == 1 && got[0].Line != 4 {
+			t.Errorf("@%s: finding on line %d, want 4", tc.ref, got[0].Line)
+		}
+	}
+}
