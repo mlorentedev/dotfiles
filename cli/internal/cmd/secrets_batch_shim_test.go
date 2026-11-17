@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -70,4 +71,43 @@ func TestSecretsRun_AllowsWhatCmdExeNeverSees(t *testing.T) {
 			t.Errorf("%v: want it left to the launch, got %v", argv, err)
 		}
 	}
+}
+
+// #3569: the first `pi` on PATH is a .cmd shim and the tool manager holds a
+// native pi. The check passes and names the file the launch starts, so the two
+// cannot disagree; with no native copy the refusal is the one it was.
+func TestSecretsRun_StartsTheNativeExecutableBehindABatchShim(t *testing.T) {
+	prevShims, prevBehind := batchShimsRunViaCmdExe, nativeBehind
+	t.Cleanup(func() { batchShimsRunViaCmdExe, nativeBehind = prevShims, prevBehind })
+	batchShimsRunViaCmdExe = true
+	native := filepath.Join(t.TempDir(), "fakeagent.exe")
+	if err := os.WriteFile(native, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	shimOnPath(t, "fakeagent.cmd")
+	// LookPath finds the shim by its bare name only where PATHEXT applies.
+	shimOnPath(t, "fakeagent")
+	nativeBehind = func(string) string { return native }
+
+	argv := []string{"fakeagent", "fix it & echo x"}
+	if err := assertSafeChildCommand(argv); err != nil {
+		t.Fatalf("want the launch allowed, got %v", err)
+	}
+	got, err := childTarget(argv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" && got != native {
+		t.Errorf("target %q, want the native executable %q", got, native)
+	}
+
+	t.Run("busybox starts the shim itself, so it stays refused", func(t *testing.T) {
+		if runtime.GOOS != "windows" {
+			t.Skip("a bare name resolves to a .cmd file only through PATHEXT")
+		}
+		err := assertSafeChildCommand([]string{"busybox", "fakeagent", "x"})
+		if err == nil || !strings.Contains(err.Error(), "cmd.exe") {
+			t.Errorf("want the batch-shim refusal for a nested command, got %v", err)
+		}
+	})
 }
