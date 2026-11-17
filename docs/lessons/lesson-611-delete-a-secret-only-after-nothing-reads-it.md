@@ -26,5 +26,5 @@ until it syncs.
 
 Retire a secret in this order: merge the change that stops reading it, update the checkout `dotf`
 reads (and release the binary when the reading logic lives there), then delete the store item.
-Verify a deletion only after syncing `bw serve` (`POST /sync` on its local port). Before that, an OK
-from `dotf secrets verify` says the cache holds the item, not the vault.
+Until #3578 makes `dotf secrets verify` sync first, an OK from it says only that the `bw serve`
+cache holds the item, not the vault. Sync `bw serve` before trusting it on a deletion.
