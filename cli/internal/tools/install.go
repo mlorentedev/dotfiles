@@ -224,15 +224,15 @@ func (in *Installer) defaults() {
 		in.IsRoot = func() bool { return os.Geteuid() == 0 }
 	}
 	if in.Run == nil {
-		in.Run = boundedRun(in.Out, wingetCallTimeout)
+		in.Run = boundedRun(in.Out, WingetCallTimeout)
 	}
 }
 
-// wingetCallTimeout bounds one winget call. A winget that hangs after it has
+// WingetCallTimeout bounds one winget call. A winget that hangs after it has
 // printed its error left the first converge of a clean Windows guest silent
 // for 2h, until the harness gave up (#3489); the longest honest call is Docker
 // Desktop's installer, which takes minutes.
-const wingetCallTimeout = 30 * time.Minute
+const WingetCallTimeout = 30 * time.Minute
 
 // wingetKillGrace is how long a killed winget gets to release its output
 // pipes: a grandchild installer that holds them would otherwise keep Wait
@@ -246,25 +246,34 @@ func isWinget(name string) bool {
 	return base == "winget" || base == "winget.exe"
 }
 
-// boundedRun streams name's output to out like a plain exec, and ends a winget
-// call that outlives limit with an error that says so. Other commands are not
+// BoundedCommand builds name's command with the winget bound applied: a winget
+// call that outlives limit is killed. The caller sets its own pipes, runs the
+// command, and passes the result through finish, which releases the timer and
+// turns a stopped call into an error that says so. Other commands are not
 // bounded: an npm or package-manager install has no cap worth guessing.
+func BoundedCommand(limit time.Duration, name string, args ...string) (cmd *exec.Cmd, finish func(runErr error) error) {
+	ctx, cancel := context.Background(), context.CancelFunc(func() {})
+	if isWinget(name) {
+		ctx, cancel = context.WithTimeout(ctx, limit)
+	}
+	cmd = exec.CommandContext(ctx, name, args...) //nolint:gosec // a package manager the catalog names
+	cmd.WaitDelay = wingetKillGrace
+	return cmd, func(runErr error) error {
+		defer cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("%s did not finish in %s and was stopped: %w", name, limit, runErr)
+		}
+		return runErr
+	}
+}
+
+// boundedRun streams name's output to out like a plain exec, with the winget
+// bound of BoundedCommand.
 func boundedRun(out io.Writer, limit time.Duration) func(name string, args ...string) error {
 	return func(name string, args ...string) error {
-		ctx := context.Background()
-		if isWinget(name) {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, limit)
-			defer cancel()
-		}
-		cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // a package manager the catalog names
+		cmd, finish := BoundedCommand(limit, name, args...)
 		cmd.Stdout, cmd.Stderr = out, out
-		cmd.WaitDelay = wingetKillGrace
-		err := cmd.Run()
-		if ctx.Err() == context.DeadlineExceeded {
-			return fmt.Errorf("%s did not finish in %s and was stopped: %w", name, limit, err)
-		}
-		return err
+		return finish(cmd.Run())
 	}
 }
 
