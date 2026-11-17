@@ -101,8 +101,7 @@ dotf converge            # apply, then prove each reconciler's post-condition
   so they cannot disagree.
 - **Mandatory probe.** Every reconciler has a post-condition probe. An apply
   that fails its probe fails the run and names the reconciler. The reconcilers
-  that need it are reported `not reached`, with the cause; the rest still run
-  (ADR-064).
+  that need it are reported `not reached`, with the cause; the rest still run.
 - **Platforms.** A reconciler that does not apply to this OS is reported as
   `skipped`, naming the OS, never as passed.
 - **Idempotence.** A second run on a converged machine reports `0 changed`.
