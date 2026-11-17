@@ -233,4 +233,3 @@ func TestGitHubCommentSendsBodyOnStdinNotArgs(t *testing.T) {
 		t.Errorf("the body did not travel on stdin: %s", gotStdin)
 	}
 }
-
