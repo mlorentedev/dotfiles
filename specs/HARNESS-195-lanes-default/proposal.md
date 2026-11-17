@@ -78,7 +78,7 @@ These are true unknowns. The design decisions are recorded in **What**.
 - [ ] AC6. `launchers` holds an entry for each agent with a recorded observed launch (`LANE-READY`) in `verification.md`. `dotf secrets run` refuses an npm `.cmd` shim on Windows the same way `lane exec` does.
 - [ ] AC7. `dotf lane doctor` reports a detached worktree with no lease, an expired lease, and a drifted deployed guard, each with its fix. Exit status is unchanged for warnings.
 - [ ] AC8. AGENTS.md, the `dotf init` template that seeds other repositories' AGENTS.md (`cli/internal/initrepo/templates/agents-spec-section.md`) and the three skills name the lane entrances. Neither AGENTS.md nor the template calls the implementation tiers "lanes", and a test fails if either does again.
-- [x] AC9. dotfiles is active on the Mac, the Linux guest and the Windows guest. A real session of each launched agent starts in a lane and reports it through AC3's line. The evidence is recorded in `verification.md`.
+- [ ] AC9. dotfiles is active on the Mac, the Linux guest and the Windows guest. A real session of each launched agent starts in a lane and reports it through AC3's line. Activation is per machine, through `dotf converge` alone; the session is per agent, at least once on any machine (owner's reading, 2026-11-15). The evidence is recorded in `verification.md`.
 
 ## References
 
