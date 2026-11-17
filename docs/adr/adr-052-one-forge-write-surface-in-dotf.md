@@ -88,5 +88,5 @@ The amendment above keeps one write token per host. That token is a PAT on the o
 The operator decided on 2026-11-15 that the forge identity follows who supervises the work (kubelab ADR-062, 2026-11-16 amendment). A session the operator watches, or leaves running under the standing merge grant, writes as the operator, so the 2026-11-11 routing by owner (#3316) is withdrawn.
 
 - `agent_secrets` is removed from `forge/hosts.json` and from `forgewrite.Host`. Every write on a host uses its `secret`, in every session. A stale `agent_secrets` key in a local copy is ignored, which routes to the operator's token, the outcome this amendment chooses.
-- `GITEA_KUBELAB_AGENT_TOKEN` leaves the registry. The agents' account keeps its token in kubelab's prod SOPS, read only by work nobody supervises (the developer node, kubelab's `make gitea-git`, hermes).
+- `GITEA_KUBELAB_AGENT_TOKEN` leaves the registry. The agents' account keeps its token in kubelab's prod SOPS, which kubelab's `make gitea-git` reads for every agent git push, supervised or not, so a push stays bounded by default-branch protection. Only `dotf forge` API writes move to the operator's token.
 - The 2026-11-11 (#3257) rule stands: no route selects the organization-scoped token.
