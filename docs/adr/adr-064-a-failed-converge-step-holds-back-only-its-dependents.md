@@ -14,8 +14,10 @@ created: "2026-11-16"
 
 ## Status
 
-Accepted 2026-11-16. The owner chose it on #3554 ("Option 1"). The spec is
-`specs/BUG-168-converge-step-dependencies/`.
+Accepted 2026-11-16. The owner chose option 1 on #3554 and delegated the implementation. Decisions 5, 6,
+7 and 10 below (the default for an undeclared step, `legacy-setup`, keeping uncertain edges, the
+revisit) were settled in the session that wrote this ADR. Each stands until the owner reverses it,
+which takes one line on #3554. The spec is `specs/BUG-168-converge-step-dependencies/`.
 
 ## Context
 
@@ -27,7 +29,7 @@ The rule was written for three steps and applied to all of them. On 2026-11-16 `
 failed on a Windows workstation because winget could not upgrade three machine-wide packages without
 elevation (#3553). It is step 6. The 18 steps after it did not run: git config, git hooks, lanes, the
 SSH target, the agent extensions and the setup script. None of them reads anything `system-upgrade`
-writes. The nightly `dotf update` repeated this every night.
+writes. Every `dotf update` and `dotf converge` run on that machine ended the same way.
 
 #3555 makes that one failure a report. The class stays: any step can fail for a reason local to it
 (no network for a plugin, a scheduler that refuses a task), and the order of the registry then
@@ -75,7 +77,8 @@ decides how much of the machine is left unconverged.
 ## Consequences
 
 - A failure in a step nothing native needs costs that step and `legacy-setup`. On the machine in
-  #3554 that is 2 steps instead of 19.
+  #3554 that is 2 steps instead of 19. The setup script is therefore still not run there after such a
+  failure: decision 6 is the one to reverse if that is not wanted.
 - A failure in `tools` still holds back most of the registry, because most steps use what it
   installs. Narrowing those edges is future work, one edge at a time, each with its evidence.
 - More than one step can fail in a run. The report, `last.json` and the failure summary already hold

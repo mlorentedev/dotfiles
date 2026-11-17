@@ -14,7 +14,7 @@ wip_override: "owner-requested fix: a failed leaf step keeps every later converg
 
 ## Why
 
-`dotf converge` stopped at the first failed step and reported every later step as `not reached`. On 2026-11-16 `system-upgrade` (step 6 of 24) failed on a Windows workstation (#3553), and git config, git hooks, lanes, the SSH target, the agent extensions and the setup script did not run, although none of them reads anything `system-upgrade` writes. The nightly `dotf update` repeated it every night. The owner chose on #3554 to let a failure hold back only the steps that depend on it.
+`dotf converge` stopped at the first failed step and reported every later step as `not reached`. On 2026-11-16 `system-upgrade` (step 6 of 24) failed on a Windows workstation (#3553), and git config, git hooks, lanes, the SSH target, the agent extensions and the setup script did not run, although none of them reads anything `system-upgrade` writes. Every run on that machine ended the same way. The owner chose on #3554 to let a failure hold back only the steps that depend on it.
 
 ## What
 
@@ -47,13 +47,13 @@ Paths are under `cli/internal/`. "Policy" marks an edge a decision requires alth
 | `pwsh-modules` | checkout, tools | `versions.conf` `converge/pwshmodules.go:67`; pwsh comes from the catalog |
 | `pi-settings` | checkout, tools | `ai/pi/settings.json` `converge/pisettings.go:30`; pi comes from tools |
 | `configs-deploy` | checkout, records-mirror, tools, pi-settings | `ai/deploy.json` `converge/configs.go:36`; merges into the file pi-settings seeds (`pisettings.go:16-21`, #1948); `{VAR}` paths can resolve from the mirrored contract `env/env.go:205-207` |
-| `orca-hooks` | checkout | reads only Orca's own files `orca/hooks.go:30-33`; checkout is the floor |
+| `orca-hooks` | checkout | reads only Orca's own files `orca/hooks.go:30-33`; checkout is the floor. Checked by grep, with `ts-bridge-client`, `self-deploy` and `hive-upgrade-retire`: none calls `has(`, a runner, a path resolver, `DeployDir` or `RepoRoot` |
 | `shell-completions` | checkout, tools | zsh and herdr from tools `converge/shellcompletions.go:56-63` |
 | `records-bind` | checkout, records-mirror, records-harness, tools, configs-deploy | bind targets `converge/bind.go:34`; settings seeded by configs-deploy `bind.go:17-19`; `{VAR}` `harness/bind_apply.go:164-174`; binds the agents records-harness wrote |
 | `git-config` | checkout, tools, configs-deploy | its probe fails without the deployed gitconfig `converge/gitconfig.go:66-68` |
 | `ts-bridge-client` | checkout | reads machine roles and its own drop-in `converge/tsbridge.go:66-76`; floor |
 | `git-lfs` | checkout, tools | git and git-lfs from the catalog `converge/gitlfs.go:12-13` |
-| `git-hooks` | checkout, tools | `RepoRoot/git-hooks` `converge/githooks.go:27`; git from tools |
+| `git-hooks` | checkout, tools | `RepoRoot/git-hooks` `converge/githooks.go:27`; git from tools. Not records-mirror: it writes `DeployDir/git-hooks`, which is not in the mirror's set (`harness/deploydir.go:21-27`), and creates the directories itself (`hooks/hooks.go:191,203`) |
 | `lanes` | checkout, records-mirror, tools, git-hooks | `converge/lanes.go:33,36,60`; creating a worktree fires the hooks (`lane/activate.go:79`) |
 | `env-persist` | checkout, tools | contract `converge/envpersist.go:81`; writes the tool dirs into the user Path `envpersist_user.go:90,113` |
 | `self-deploy` | checkout | roles and scheduler only `converge/selfdeploy.go:57,75`; floor |

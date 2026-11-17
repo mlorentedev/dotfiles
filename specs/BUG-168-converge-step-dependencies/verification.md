@@ -30,6 +30,9 @@ Run on Windows 11, 2026-11-16, from this worktree.
 - `go test ./internal/converge/ -timeout 30m` -> `ok` (207s)
 - `go test ./internal/cmd/ -run 'Converge|Update' -timeout 30m` -> `ok` (62s)
 - `go test ./internal/doctor/ -run TestCheckSelfDeploy -count=1` -> `ok`
+- `go test ./internal/update/ ./internal/vm/` -> `ok`
+- `go test ./internal/doctor/` -> FAIL in 4 tests this change does not touch, for reasons of this machine: three `TestCheckMiseTools_*` cannot create a symlink (no privilege on this Windows account), and `TestCheckWorkstationTarget_ByStatus` reads the account as a domain account. CI is the reference for that package.
+- `golangci-lint run ./internal/converge/ ./internal/doctor/ ./internal/cmd/` (2.12.2) -> no finding other than the gofmt lines the CRLF checkout produces
 - `go build ./...`, `go vet ./...`, `GOOS=linux go vet ./...`, `GOOS=darwin go vet ./...` -> clean
 - `go run ./cmd/dotf converge --plan` -> exit 0, 24 steps reported in registry order (4 to change, 16 ok, 1 opaque, 3 skipped, 0 failed). A plan writes nothing.
 - **Not run locally:** the whole `go test ./...` (on this machine several packages exceed the default timeout with or without this change; CI is the reference), `golangci-lint` (the checkout is CRLF and the linter reports gofmt noise), and any applied `converge`. The installed `dotf` does not carry #3555, so an apply raises elevation prompts on this machine. No real run with a failing step was made: the failure paths are proven with fakes only.
