@@ -30,6 +30,7 @@ type exceptions map[exception]int
 var rules = map[string]bool{
 	RuleTimeout: true, RuleSHAPin: true, RulePersistCredentials: true, RuleNoSecretsInherit: true,
 	RuleCancelInProgress: true, RuleOSOnPullRequest: true, RuleSkipCache: true, RuleBranchFilter: true,
+	RuleVendoredScript: true,
 }
 
 // Rules are the ids a finding can carry, sorted: every rule, and the

@@ -43,6 +43,9 @@ func fixture(t *testing.T, rule, kind string) string {
 // which holds the near misses the exemptions exist for, trips nothing.
 func TestRuleFixtures(t *testing.T) {
 	for _, rule := range slices.Sorted(maps.Keys(rules)) {
+		if treeRules[rule] {
+			continue
+		}
 		name := strings.TrimPrefix(rule, "fleet/")
 		t.Run(name, func(t *testing.T) {
 			bad, err := lintFiles(t, map[string]string{".github/workflows/ci.yml": fixture(t, name, "bad")})
@@ -364,8 +367,8 @@ func TestEveryRuleMayBeExcepted(t *testing.T) {
 			t.Errorf("fleet/%s has fixtures and cannot be excepted", d.Name())
 		}
 	}
-	if len(dirs) != len(rules) {
-		t.Errorf("%d fixture directories, %d rules", len(dirs), len(rules))
+	if len(dirs) != len(rules)-len(treeRules) {
+		t.Errorf("%d fixture directories, %d workflow rules", len(dirs), len(rules)-len(treeRules))
 	}
 }
 
@@ -481,5 +484,92 @@ func TestActionManifestsFailClosed(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 	if _, err := Lint(dir, "main"); err == nil {
 		t.Error("an action directory that cannot be searched read as clean")
+	}
+}
+
+// A repository that still carries a hygiene script the ci-workflows composite
+// replaced is a finding per script, naming its replacement; pin-actions.sh,
+// which nothing replaces yet, is not.
+func TestVendoredHygieneScriptsAreFindings(t *testing.T) {
+	got, err := lintFiles(t, map[string]string{
+		"scripts/check-lessons.sh":        "#!/bin/sh\n",
+		"scripts/check-actions-pinned.sh": "#!/bin/sh\n",
+		"scripts/pin-actions.sh":          "#!/bin/sh\n",
+		"tools/scripts/check-lessons.sh":  "#!/bin/sh\n",
+		".github/workflows/ci.yml":        "on: push\njobs: {}\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Finding{
+		{RuleVendoredScript, "scripts/check-actions-pinned.sh", 1, "a vendored copy of the fleet's pin check; run `dotf lint fleet --rule fleet/sha-pin` (the ci-workflows hygiene composite) and delete it"},
+		{RuleVendoredScript, "scripts/check-lessons.sh", 1, "a vendored copy of the fleet's lessons check; run `dotf lessons fmt --check` (the ci-workflows hygiene composite) and delete it"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	clean, err := lintFiles(t, map[string]string{"scripts/pin-actions.sh": "#!/bin/sh\n"})
+	if err != nil || len(clean) != 0 {
+		t.Errorf("without them: got %v, %v; want none", clean, err)
+	}
+}
+
+func TestVendoredScriptMayBeExceptedAndGoesStale(t *testing.T) {
+	const exc = "exceptions:\n  - rule: fleet/vendored-script\n    path: scripts/check-actions-pinned.sh\n    reason: r\n    issue: i\n"
+	got, err := lintFiles(t, map[string]string{"scripts/check-actions-pinned.sh": "#!/bin/sh\n", ExceptionsPath: exc})
+	if err != nil || len(got) != 0 {
+		t.Errorf("excepted: got %v, %v; want none", got, err)
+	}
+	got, err = lintFiles(t, map[string]string{ExceptionsPath: exc})
+	if err != nil || len(got) != 1 || got[0].Rule != RuleException {
+		t.Errorf("gone: got %v, %v; want one stale %s", got, err, RuleException)
+	}
+}
+
+func TestVendoredScriptFailsClosed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks and permissions differ on Windows")
+	}
+	target := repo(t, map[string]string{"check-lessons.sh": "#!/bin/sh\n"})
+	dir := repo(t, map[string]string{".github/workflows/ci.yml": "on: push\njobs: {}\n"})
+	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(target, "check-lessons.sh"), filepath.Join(dir, "scripts", "check-lessons.sh")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Lint(dir, "main")
+	if err != nil || len(got) != 1 || got[0].Path != "scripts/check-lessons.sh" {
+		t.Errorf("symlink: got %v, %v; want its finding", got, err)
+	}
+	// A dangling one is still the vendored path in the tree: a checkout that
+	// carries it has not deleted the copy.
+	if err := os.Symlink(filepath.Join(target, "gone.sh"), filepath.Join(dir, "scripts", "check-actions-pinned.sh")); err != nil {
+		t.Fatal(err)
+	}
+	got, err = Lint(dir, "main")
+	if err != nil || len(got) != 2 {
+		t.Errorf("dangling symlink: got %v, %v; want both findings", got, err)
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a mode-000 directory")
+	}
+	if err := os.Chmod(filepath.Join(dir, "scripts"), 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "scripts"), 0o755) })
+	if _, err := Lint(dir, "main"); err == nil {
+		t.Error("an unreadable scripts/ read as clean")
+	}
+}
+
+func TestVendoredScriptSelectedAlone(t *testing.T) {
+	dir := repo(t, map[string]string{
+		"scripts/check-lessons.sh": "#!/bin/sh\n",
+		".github/workflows/ci.yml": "on: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: owner/setup@v4\n",
+	})
+	got, err := LintRules(dir, "", []string{RuleVendoredScript})
+	if err != nil || len(got) != 1 || got[0].Rule != RuleVendoredScript {
+		t.Errorf("got %v, %v; want only the vendored-script finding", got, err)
 	}
 }

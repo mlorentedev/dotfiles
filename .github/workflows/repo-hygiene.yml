@@ -2,7 +2,8 @@ name: Repo hygiene
 
 # Repository hygiene: the lessons' canonical form, unique numbers, resolving
 # wikilinks and generated index (`dotf lessons fmt --check`, run from the
-# checkout so it never waits for a release), and SHA-pinned actions. Each step
+# checkout so it never waits for a release), and SHA-pinned actions
+# (`dotf lint fleet --rule fleet/sha-pin`, also from the checkout). Each step
 # prints what failed.
 
 on:
@@ -34,5 +35,6 @@ jobs:
       - name: Lessons in their canonical form, index generated from them
         working-directory: cli
         run: go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons
-      - name: Actions pinned to commit SHAs
-        run: bash scripts/check-actions-pinned.sh
+      - name: Actions pinned to commit SHAs, in workflows and local actions
+        working-directory: cli
+        run: go run ./cmd/dotf lint fleet --dir .. --rule fleet/sha-pin
