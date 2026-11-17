@@ -1,0 +1,44 @@
+[
+  {
+    "id": "TOOL-042-renovate-pins-f1",
+    "behavior": "Every versions.conf pin has a renovate line or a skip with a reason",
+    "verification": "cd cli && go test ./internal/tools/ -run '^(TestVersionsConf_EveryPinNamesItsUpstreamOrWhyItHasNone)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-042-renovate-pins-f2",
+    "behavior": "No Renovate group can move enough pins to fail the spec-gate",
+    "verification": "cd cli && go test ./internal/tools/ -run '^(TestRenovate_NoGroupCanOutgrowTheSpecGate)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-042-renovate-pins-f3",
+    "behavior": "npm-backend CLIs track the package dotf installs",
+    "verification": "cd cli && go test ./internal/tools/ -run '^(TestVersionsConf_NpmCLIsTrackThePackageDotfInstalls)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-042-renovate-pins-f4",
+    "behavior": "renovate.json's regex finds every annotated pin at its value",
+    "verification": "cd cli && go test ./internal/tools/ -run '^(TestVersionsConf_RenovateFindsEveryAnnotatedPinAtItsValue)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-042-renovate-pins-f6",
+    "behavior": "Go is patch-only and moves with cli/go.mod; unsafe pins are skipped",
+    "verification": "cd cli && go test ./internal/tools/ -run '^(TestRenovate_GoMovesByPatchTogetherWithGoMod|TestVersionsConf_PinsRenovateMustNotMoveAreSkipped)$' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "TOOL-042-renovate-pins-f5",
+    "behavior": "The annotations change nothing a reader sees",
+    "verification": "bats tests/versions-conf.bats",
+    "state": "pending",
+    "evidence": ""
+  }
+]

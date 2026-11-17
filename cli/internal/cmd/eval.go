@@ -22,7 +22,7 @@ func newEvalCmd() *cobra.Command {
 		SilenceUsage: true,
 		RunE:         func(c *cobra.Command, _ []string) error { return c.Help() },
 	}
-	c.AddCommand(newEvalCheckCmd())
+	c.AddCommand(newEvalCheckCmd(), newEvalRunCmd())
 	return c
 }
 
@@ -67,6 +67,92 @@ func newEvalCheckCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&root, "repo-root", "", "repository to check (default: the current one)")
 	return c
+}
+
+// errEvalRunNotYet is returned by a run without --plan until the run path lands
+// (HARNESS-101 slice 3).
+var errEvalRunNotYet = errors.New("eval run: only --plan exists so far; launching candidates is not implemented yet")
+
+// evalRunOpts are eval run's flags.
+type evalRunOpts struct {
+	root       string
+	candidates []string
+	caseIDs    []string
+	epochs     int
+	maxRuns    int
+	planOnly   bool
+}
+
+// evalRunDeps is the command's filesystem surface: the corpus and the
+// candidates it reads.
+type evalRunDeps struct {
+	loadCases      func(root string) ([]evals.Case, error)
+	loadCandidates func(root string) (evals.Candidates, error)
+}
+
+func newEvalRunCmd() *cobra.Command {
+	var o evalRunOpts
+	c := &cobra.Command{
+		Use:   "run",
+		Short: "Plan an evaluation run of the eval cases for named candidates (launching is not implemented yet)",
+		Long: "run builds the matrix of every eval case × each --candidate × --epochs, and\n" +
+			"refuses it above --max-runs: the cap is what authorises spend. --plan prints the\n" +
+			"matrix and each candidate's estimate (NaN credits, agy runs) and launches nothing.\n" +
+			"A corpus whose keys fail `dotf eval check` is not run. Candidates come from\n" +
+			evals.CandidatesFile + ", never from the reviewer pool. Only --plan works so far:\n" +
+			"launching and grading candidates is not implemented yet.",
+		Example:       "  dotf eval run --plan --candidate nan/glm5.3-flash\n  dotf eval run --plan --candidate agy/gemini-4-hydrogen-high --case harness-088-r2 --epochs 1",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(c *cobra.Command, _ []string) error {
+			if o.root == "" {
+				o.root = env.RepoDir()
+			}
+			if o.root == "" {
+				return fmt.Errorf("eval run: not inside a repository — pass --repo-root")
+			}
+			deps := evalRunDeps{loadCases: evals.LoadCases, loadCandidates: evals.LoadCandidates}
+			return runEvalRun(c.OutOrStdout(), deps, o)
+		},
+	}
+	c.Flags().StringVar(&o.root, "repo-root", "", "repository holding the cases and candidates (default: the current one)")
+	c.Flags().StringArrayVar(&o.candidates, "candidate", nil, "candidate id from "+evals.CandidatesFile+" (repeatable)")
+	c.Flags().StringArrayVar(&o.caseIDs, "case", nil, "case id to run (repeatable; default: every case)")
+	c.Flags().IntVar(&o.epochs, "epochs", evals.DefaultEpochs, "runs per (candidate, case)")
+	c.Flags().IntVar(&o.maxRuns, "max-runs", evals.DefaultMaxRuns, "the most runs this invocation may launch")
+	c.Flags().BoolVar(&o.planOnly, "plan", false, "print the matrix and the estimate, and launch nothing")
+	return c
+}
+
+// runEvalRun loads the corpus and candidates, plans the run and prints it.
+func runEvalRun(w io.Writer, deps evalRunDeps, o evalRunOpts) error {
+	cases, err := deps.loadCases(o.root)
+	if err != nil {
+		return fmt.Errorf("eval run: %w", err)
+	}
+	if cases, err = evals.SelectCases(cases, o.caseIDs); err != nil {
+		return fmt.Errorf("eval run: %w", err)
+	}
+	cs, err := deps.loadCandidates(o.root)
+	if err != nil {
+		return fmt.Errorf("eval run: %w", err)
+	}
+	plan, err := evals.BuildPlan(cases, cs, o.candidates, o.epochs, o.maxRuns)
+	// Only a plan refused for its size is printed with the error: any other
+	// refusal has no plan worth showing.
+	if (err == nil || errors.Is(err, evals.ErrOverCap)) && plan.Runs > 0 {
+		if _, werr := io.WriteString(w, plan.Render()); werr != nil {
+			return werr
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("eval run: %w", err)
+	}
+	if o.planOnly {
+		return nil
+	}
+	return errEvalRunNotYet
 }
 
 // renderEvalCheck formats the check report and counts the failed cases.

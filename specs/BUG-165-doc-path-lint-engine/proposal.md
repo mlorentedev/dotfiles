@@ -1,7 +1,7 @@
 ---
 id: "BUG-165-doc-path-lint-engine"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: verifying # draft | implementing | verifying | archived
 created: "2026-11-05"
 issue: "mlorentedev/dotfiles#3266"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
@@ -46,7 +46,7 @@ Observable outcomes. Each must be testable.
 - [x] `dotf lint doc-paths` reproduces every accepted/rejected token, discovery, glob, escape, Windows-worktree, vault, governed-pattern-floor, and zsh bare-source outcome currently covered by BATS.
 - [x] The full current repository check completes in <=2 seconds on the affected Windows workstation and produces deterministic sorted output on Windows and POSIX.
 - [x] PR 1 ships the Go engine, checkout-owned `harness/doc-paths.json`, command tests, and current-repository CI coverage while the shell hook remains operational.
-- [ ] After a release/pin containing the command, PR 2 switches pre-commit to `dotf lint doc-paths`, removes the old CI step, and deletes the shell script plus both BATS files with no dangling references.
+- [x] After a release/pin containing the command, PR 2 switches pre-commit to `dotf lint doc-paths`, removes the old CI step, and deletes the shell script plus both BATS files with no dangling references.
 - [x] A change to any governed instruction file or `harness/doc-paths.json` triggers the Go guard before merge, including docs-only changes.
 - [x] Malformed policy, unreadable Git state, missing explicit files, missing paths, empty globs, and repo escapes exit non-zero; no timeout or inability-to-run path reports success.
 - [x] `harness/doc-paths.json` is versioned, decoded with unknown fields rejected, and an unreadable or unsupported version fails before scanning.

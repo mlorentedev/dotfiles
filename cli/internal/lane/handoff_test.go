@@ -609,3 +609,30 @@ func TestNext_NoBackendWithNamedLanesRefusesWhenEveryLaneIsActive(t *testing.T) 
 		t.Errorf("Handoff = %+v, %v; want the WIP cap refusal", out.Commands, err)
 	}
 }
+
+// A model named for the hand-off travels on the typed line, so the successor
+// starts on it; a model the shells would not read alike (brackets, spaces) is
+// refused before anything is created, since that line is typed into a shell.
+func TestNext_TypesTheModelOnTheExecLineAndRefusesOneTheShellsReadApart(t *testing.T) {
+	b := newFake(t, "claude")
+	o := opts(t)
+	o.Model = "nan/kimi-k3.1-pro"
+	if _, err := Handoff(o, b, queue); err != nil {
+		t.Fatal(err)
+	}
+	if cmd, want := b.typed["w1:p1"], "dotf lane exec --agent claude --model nan/kimi-k3.1-pro --prompt-file "+PromptFile; cmd != want {
+		t.Errorf("typed %q, want %q", cmd, want)
+	}
+	o = opts(t)
+	o.Model = "claude-opus-4-7[1m]"
+	if _, err := Handoff(o, newFake(t, "claude"), queue); err == nil || !strings.Contains(err.Error(), "model") {
+		t.Errorf("want a refusal naming the model, got %v", err)
+	}
+	// With no backend the agent is a placeholder and no launch argv is built, so
+	// the flag-shaped id has to be caught by the plan itself.
+	o = opts(t)
+	o.Model = "--help"
+	if _, err := Handoff(o, nil, queue); err == nil || !strings.Contains(err.Error(), "model") {
+		t.Errorf("no backend: want a refusal naming the model, got %v", err)
+	}
+}

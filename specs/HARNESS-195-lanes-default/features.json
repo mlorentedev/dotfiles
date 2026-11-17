@@ -61,5 +61,12 @@
     "verification": "grep -Eq '^- \\[x\\] AC9 -> ' specs/HARNESS-195-lanes-default/verification.md && grep -Eq '^\\| [a-z]+ \\| [^|]+ \\| 20[0-9]{2}-[0-9]{2}-[0-9]{2} \\| [^|]+ \\| LANE-READY \\|$' specs/HARNESS-195-lanes-default/verification.md",
     "state": "pending",
     "evidence": ""
+  },
+  {
+    "id": "HARNESS-195-lanes-default-f10",
+    "behavior": "AC10. --model reaches herdr agent start and the lane launch argv right after the agent executable; refused without --agent, blank, flag-shaped or shell-ambiguous",
+    "verification": "cd cli && go test ./internal/lane/ ./internal/herdr/ ./internal/cmd/ -run 'Model' -v -count=1 | awk '/^--- FAIL|^FAIL/{f=1} /^--- PASS/{p=1} END{exit !(p && !f)}'",
+    "state": "pending",
+    "evidence": ""
   }
 ]

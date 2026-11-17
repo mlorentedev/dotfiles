@@ -38,8 +38,10 @@ func newConvergeCmd() *cobra.Command {
 			"cannot plan, so it is reported opaque, never as converged.\n\n" +
 			"--plan reports what each reconciler would change and writes nothing.\n" +
 			"Without it, each reconciler applies and then proves its post-condition; the\n" +
-			"first failure stops the run and names the reconciler. A reconciler that does\n" +
-			"not apply to this OS is reported as skipped, never as passed.\n\n" +
+			"run fails if any reconciler fails, naming each. A failure keeps from running\n" +
+			"only the reconcilers that need the one that failed, reported as not reached\n" +
+			"with the cause; the rest still run. A reconciler that does not apply to this\n" +
+			"OS is reported as skipped, never as passed.\n\n" +
 			"Re-running on a converged machine reports 0 changed.\n\n" +
 			"--only runs the named reconcilers, in registry order, and leaves the\n" +
 			"persisted report of the last full run alone.\n\n" +
@@ -359,7 +361,8 @@ func (c *convergePrinter) Start(name string) {
 }
 
 // Done prints a step's line. converge.RunObserved calls it in the report's
-// order, and the entries it never calls it for are the report's tail.
+// order, and the entries it never calls it for, the ones after a plan's gate,
+// are the report's tail.
 func (c *convergePrinter) Done(e converge.Entry) {
 	c.barrier()
 	c.line(e)

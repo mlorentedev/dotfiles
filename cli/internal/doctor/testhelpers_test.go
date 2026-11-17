@@ -72,6 +72,12 @@ func newSys(env map[string]string, onPath []string, cmdOut map[string]string) *S
 		CommandOutputEnv: func(_ []string, name string, args ...string) (string, error) {
 			return sysCommandOutput(cmdOut, name, args...)
 		},
+		CommandOutputEnvDir: func(_ []string, _, name string, args ...string) (string, error) {
+			return sysCommandOutput(cmdOut, name, args...)
+		},
+		CommandStdoutEnvDir: func(_ []string, _, name string, args ...string) (string, error) {
+			return sysCommandOutput(cmdOut, name, args...)
+		},
 		CommandOutputDir: func(_, name string, args ...string) (string, error) {
 			return sysCommandOutput(cmdOut, name, args...)
 		},

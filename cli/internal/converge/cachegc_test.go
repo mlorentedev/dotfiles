@@ -21,10 +21,13 @@ type gcFake struct {
 	fail    map[string]error // joined argv -> error
 	log     []string
 	free    []uint64 // successive answers of the free-space probe
+	// miseInstalled is what `mise ls --installed --json` prints.
+	miseInstalled string
 }
 
 func newGCFake(tools ...string) *gcFake {
-	f := &gcFake{present: map[string]bool{}, fail: map[string]error{}, free: []uint64{100 << 30, 103 << 30}}
+	f := &gcFake{present: map[string]bool{}, fail: map[string]error{}, free: []uint64{100 << 30, 103 << 30},
+		miseInstalled: `{"node": [], "python": [], "go": []}`}
 	for _, t := range tools {
 		f.present[t] = true
 	}
@@ -36,6 +39,9 @@ func (f *gcFake) run(name string, args ...string) ([]byte, error) {
 	f.log = append(f.log, argv)
 	if argv == "uv cache dir" {
 		return []byte("/cache/uv\n"), nil
+	}
+	if argv == "mise ls --installed --json" && f.fail[argv] == nil {
+		return []byte(f.miseInstalled), nil
 	}
 	return nil, f.fail[argv]
 }
@@ -129,7 +135,7 @@ func TestCacheGC_NotDueWithinAWeekRunsNothing(t *testing.T) {
 func TestCacheGC_ApplyRunsEveryPresentPrunerInOrderAndWritesTheStamp(t *testing.T) {
 	state := t.TempDir()
 	writeStamp(t, state, gcNow.Add(-8*24*time.Hour))
-	f := newGCFake("uv", "pre-commit", "npm", "docker", "limactl", "colima")
+	f := newGCFake("uv", "pre-commit", "npm", "mise", "docker", "limactl", "colima")
 	res, err := f.step(state).Reconcile(Env{Home: state}, false)
 	if err != nil {
 		t.Fatal(err)
@@ -139,6 +145,8 @@ func TestCacheGC_ApplyRunsEveryPresentPrunerInOrderAndWritesTheStamp(t *testing.
 		"uv cache prune",
 		"pre-commit gc",
 		"npm cache verify",
+		"mise ls --installed --json",
+		"mise prune --tools --yes go node",
 		"docker info",
 		"docker builder prune -f --filter until=168h",
 		"docker image prune -f --filter until=168h",
@@ -259,5 +267,74 @@ func TestCacheGC_AnUnreadableStampIsDue(t *testing.T) {
 	res, err := newGCFake("uv").step(state).Reconcile(Env{Home: state}, true)
 	if err != nil || !res.Opaque {
 		t.Errorf("want due, got %+v, %v", res, err)
+	}
+}
+
+// A venv records its interpreter by absolute path, so pruning a Python that a
+// pin moved away from breaks every venv built on it (hive's uv tool, project
+// .venvs). The mise pruner names every installed tool but python (#3533).
+func TestCacheGC_MisePruneLeavesPythonAlone(t *testing.T) {
+	state := t.TempDir()
+	f := newGCFake("mise")
+	f.miseInstalled = `{"python": [], "http:zsh-autosuggestions": [], "age": []}`
+	if _, err := f.step(state).Reconcile(Env{Home: state}, false); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"mise ls --installed --json", "mise prune --tools --yes age http:zsh-autosuggestions"}
+	if !slices.Equal(f.log, want) {
+		t.Errorf("commands:\n got %q\nwant %q", f.log, want)
+	}
+}
+
+func TestCacheGC_MisePruneRunsNothingWhenOnlyPythonIsInstalled(t *testing.T) {
+	state := t.TempDir()
+	f := newGCFake("mise")
+	f.miseInstalled = `{"python": []}`
+	if _, err := f.step(state).Reconcile(Env{Home: state}, false); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"mise ls --installed --json"}; !slices.Equal(f.log, want) {
+		t.Errorf("commands:\n got %q\nwant %q", f.log, want)
+	}
+}
+
+func TestCacheGC_MiseListFailureFailsTheStepAndKeepsItDue(t *testing.T) {
+	state := t.TempDir()
+	f := newGCFake("mise")
+	f.fail["mise ls --installed --json"] = errors.New("exit 1")
+	if _, err := f.step(state).Reconcile(Env{Home: state}, false); err == nil {
+		t.Fatal("a failed listing must fail the step, so the next daily run retries it")
+	}
+	for _, c := range f.log {
+		if strings.HasPrefix(c, "mise prune") {
+			t.Errorf("nothing is pruned without a listing, ran %q", c)
+		}
+	}
+}
+
+func TestCacheGC_MiseUnreadableListingFailsTheStepWithoutPruning(t *testing.T) {
+	state := t.TempDir()
+	f := newGCFake("mise")
+	f.miseInstalled = "not json"
+	if _, err := f.step(state).Reconcile(Env{Home: state}, false); err == nil {
+		t.Fatal("an unreadable listing must fail the step")
+	}
+	if want := []string{"mise ls --installed --json"}; !slices.Equal(f.log, want) {
+		t.Errorf("commands:\n got %q\nwant %q", f.log, want)
+	}
+}
+
+func TestCacheGC_PlanNamesTheHeldMiseToolsAndRunsNothing(t *testing.T) {
+	state := t.TempDir()
+	f := newGCFake("mise")
+	res, err := f.step(state).Reconcile(Env{Home: state}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Detail, "mise prune --tools (every installed tool but python)") {
+		t.Errorf("plan detail = %q", res.Detail)
+	}
+	if len(f.log) != 0 {
+		t.Errorf("a plan runs nothing, ran %q", f.log)
 	}
 }

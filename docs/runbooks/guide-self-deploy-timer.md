@@ -32,7 +32,11 @@ Once a day the timer runs `dotf update` (the Go port of the former
 5. On a day `HEAD` did not move and `dotf` is at its pin, runs two steps instead: `dotf converge --only system-upgrade,cache-gc`.
    `system-upgrade` refreshes brew, apt or winget and upgrades the catalog's outdated unpinned system packages
    (TOOL-036). `cache-gc` keeps its own weekly cadence (below), so on most days it reports `not due`. A full
-   converge already includes both steps, so neither runs twice.
+   converge already includes both steps, so neither runs twice. On Windows without elevation, a winget
+   package installed machine-wide is not attempted (its installer would ask for an administrator), and one that
+   fails to upgrade is left waiting; both are named in the step's detail, and the run
+   records `upgrade-skipped` and exits 0. Run `dotf converge --only system-upgrade` from an elevated terminal to
+   upgrade those (#3553).
 
 Every skip exits 0 (benign). A pinned `dotf` that cannot be installed (`install-failed`), a converge that runs and
 fails (`converge-failed`), and a failed `system-upgrade` or `cache-gc` step on a quiet day (`upgrade-failed`) exit
@@ -66,6 +70,7 @@ kind that keeps what is in use:
 | uv (cache not in use) | `uv cache prune` | entries no environment refers to, leftover temp dirs |
 | pre-commit | `pre-commit gc` | hook repos no config uses |
 | npm | `npm cache verify` | unreferenced cache data |
+| mise | `mise prune --tools --yes <every installed tool but python>` | tool versions no tracked config asks for and no running process uses, such as the one a pin moved away from. Python is held: venvs name their interpreter by absolute path |
 | docker (daemon answering) | `docker builder prune -f --filter until=168h`, `docker image prune -f --filter until=168h` | build cache and dangling images older than a week; tagged images are kept |
 | lima | `limactl prune --keep-referred` | downloads no instance or template refers to |
 | colima (running) | `colima ssh -- sudo fstrim -a` | hands the blocks Docker freed back to the host's disk file |

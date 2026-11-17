@@ -56,7 +56,7 @@ Every number below was measured in this session on `main` at `99cd03ae`.
 | `reviewed_sha` values still in the local clone | 80 of 141; 42 are ancestors of `origin/main` |
 | A squash-merged `reviewed_sha` (`fb88359c`, AI-030) | still served by GitHub through PR #1922's ref |
 | AI-055 round 2 at its own `reviewed_sha` (`06f3100b`) | `TestCheckReviewBudget_AFileWithoutAClipFailsClosed` is absent. The deleted test is visible, so the two REAL Majors #3476 could not see can be found |
-| Earlier rounds' `review*.md` inside the replayed tree, over all 122 rounds whose `reviewed_sha` is in the clone | 0. A review file never leaks into the replayed tree. `verification.md` can: at AI-055 round 4 it already dispositions round 2's Minors |
+| Earlier rounds' `review*.md` inside the replayed tree, over all 122 rounds whose `reviewed_sha` is in the clone | Corrected 2026-11-15, recounted on the 5 corpus cases only: not 0. `harness-088-r2`'s tree holds `specs/HARNESS-088-handoff-threads/review-round-1.md`. It holds none of that case's expected anchors (`newMemHandoffWriteCmd`, `cyclomatic`, `complexity`, `gocyclo`), so it gives no answer to copy. An earlier round is state the original reviewer also had, so it stays; only the round's own `source_review` would leak its key, and `Preflight` refuses that. `verification.md` can carry later dispositions: at AI-055 round 4 it already dispositions round 2's Minors |
 | Fetching a squash-merged `reviewed_sha` | `git fetch origin refs/pull/1922/head` then `git cat-file -e fb88359c`: present |
 | Anchor matching, tested by hand on AI-055 rounds 2 and 4 | `declaresStreaming`, `answerReserve` and `stepCeiling` each match exactly one findings row in both rounds. `AFileWithoutAClipFailsClosed` matches two rows in round 2, because two different findings name it |
 
@@ -207,6 +207,20 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
   `reference.md`, the ideal answer the key is checked against. They use the same
   `expected`/`decoys` fields and name `human` as `key_author`. #3476's prompt is case one, and its
   false bash 3.2 claim is its first decoy.
+  A planted run (decided 2026-11-14, HARNESS-101 slice 3, delegated by the owner) sends `prompt.md`
+  as written, followed by where to write the answer and the time budget, and runs in an empty
+  directory. The answer is a file at `.dotf-eval/review.md` inside that directory, the place a replay
+  writes to, so one grading path reads both. #3476 took the answer from stdout (`--print`) instead.
+  The file is chosen for three reasons:
+  - stdout is already the transcript: `pi` runs with `--mode json`, an event stream, so an answer
+    there would need a parser per runner;
+  - one answer channel keeps a gap between planted and replay scores from being an artifact of two
+    channels;
+  - a spec reviewer must write its review to a file, so a candidate that cannot do so is a real
+    `empty-answer`.
+
+  **Reopen if** a planted run ends `empty-answer` while its stored transcript holds a findings table:
+  the model found the defect and answered in chat.
 - **How a row is classed, in order** (amended 2026-11-14, HARNESS-101 slice 1):
   - noise is discarded first;
   - then a decoy match is a false positive, even when the row also names a real symbol;
@@ -231,8 +245,14 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
 
 1. Resolve `reviewed_sha`. If the clone lacks it, fetch the SHA itself, then `fetch_ref`, then verify. A branch rebased after its review would not carry the SHA on its PR ref.
    If it cannot be resolved, the case fails loudly as infrastructure; it is never scored zero.
-2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotfiles/evals/<run-id>/<case>-<epoch>/`,
-   outside every repository tree, and remove it when the run ends.
+2. `git worktree add --detach` it under `$XDG_STATE_HOME/dotfiles/evals/<run-id>/trees/<candidate>/<case>-<epoch>/`,
+   outside every repository tree, and remove it when the attempt ends, however it ends. The
+   attempt's answer, transcript and record are kept apart from it, under
+   `<run-id>/runs/<candidate>/<case>/<epoch>/` (amended 2026-11-15, HARNESS-101 slice 3: the
+   candidate level keeps two candidates' attempts at one case apart).
+   Before the first attempt, a preflight resolves every case's commit, finds every candidate's
+   runner, checks every secret by exit status alone, and refuses a replay whose reviewed commit
+   holds its own `source_review` or its case file. It names every problem at once.
 3. Launch through `internal/spec`'s review launcher in a new **eval slot**:
    - The candidate comes from `harness/evals/candidates.json`, using a pool entry's shape: runner,
      provider, model, secret id. The pool is not read.
@@ -240,9 +260,10 @@ Each case is one JSON file, validated by `harness/evals/case.schema.json`:
    - The reviewer writes its verdict inside the replay tree, to `.dotf-eval/review.md`, never to
      `specs/`. The answer is then kept in the run directory, beside the launch request and the
      transcript. Amended 2026-11-14: a verdict path outside the tree is out of reach of agy's
-     `--add-dir` scope and of the launcher's stray-write snapshot, which runs `git status` in
-     the verdict's folder.
-4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits. The launcher's stray-write check reports a commit as a defect of the run. The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
+     `--add-dir` scope and of `spec review`'s stray-write snapshot, which runs `git status` in
+     the verdict's folder. Amended 2026-11-15: the eval launcher runs the runner in-process and
+     does not take that snapshot yet; recording an attempt's stray writes is a task of its own.
+4. The replay worktree is ephemeral state that `dotf eval` owns. It sits outside `WORKTREE_ROOT`, so lanes and the session cockpit never see it. A replay never commits; a commit made anyway is a defect of the run, which the attempt's record will name once stray writes are recorded (a `git status` snapshot alone cannot see a commit, so that check compares `HEAD` too). The lane guard (`git-hooks/lib/lane-guard.sh`) is a pre-commit hook. In a lane-managed repository it refuses only `git commit` in a leaseless detached worktree; launching the reviewer, running tests and reading the tree are not git commits, so it never sees them. No exemption is needed.
 5. The tree is the historical commit itself, so nothing is hand-cut. Any trace the environment
    still leaves (today's tools against old code) is listed once in the case's `noise`.
 
@@ -260,7 +281,7 @@ Curation is human, once per case. Grading is mechanical, every run. Graded per r
 
 | Measure | How |
 |---|---|
-| Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer` |
+| Completion | The launcher's exit: answered, stalled, or one of the `--fallback-reason` classes (`rate-limit`, `quota`, `provider-error`, `timeout`, `content-filter`, `empty-answer`). #3273's two models ended `empty-answer`. Amended 2026-11-14 (HARNESS-101 slice 3): `infra-error` is a class of its own, for an attempt that failed on our side (checkout, tree, an answer we cannot read, an interrupt); it is never charged to the model. An attempt the deadline or the interrupt cut short is not graded, even if it left a file. `stalled` is produced from the launcher's stall detector (amended 2026-11-15) and, like a timeout, is not graded. `rate-limit`, `quota` and `content-filter` are not produced yet: they need the transcript, and until then such a run reads `provider-error` |
 | Format | The findings table parses. An unparseable answer is a format failure, scored as such, never as zero findings |
 | Verdict match | `PASS` / `PASS-WITH-GAPS` / `FAIL` against `expected_verdict` |
 | Recall | Matched `expected` over `expected`, weighted by severity floor. An `expected` entry the reviewer described without its anchors is a miss in that grading, even though the row itself is unadjudicated |
@@ -285,7 +306,7 @@ out of that model's reduced score. `nan/deepseek-v4-flash` authored 62 of the ar
   mean and minimum recall, decoy-hit rate, and median duration and tokens.
 - **Plan before spending.** `dotf eval run --plan` prints the matrix (cases × candidates × epochs) and
   an estimate per runner:
-  - **NaN:** credits, from a token envelope times the rates in `ai/nan/README.md`. The envelope is the median of earlier runs of that case. A case that has never run uses its kind's default, declared in `candidates.json` and seeded from #3476's measured AI-055 replays (104.5K total tokens for Hydrogen medium, 191.6K for high). #3273's 200K in / 20K out is an assumed call size, not a measurement. The plan labels each estimate `measured` or `default`, and never prints zero or unknown, because the cap is the only thing that authorises spend.
+  - **NaN:** credits, from a token envelope times each candidate's `credits_per_mtok` in `candidates.json`, a copy of `ai/nan/README.md`'s rates that a test holds to the README (amended 2026-11-14: the plan reads no prose). The envelope is the median of earlier runs of that case. A case that has never run uses its kind's default, declared in `candidates.json` and seeded from #3476's measured AI-055 replays (104.5K total tokens for Hydrogen medium, 191.6K for high). #3273's 200K in / 20K out is an assumed call size, not a measurement. The measured envelopes are totals with no input/output split, so the plan prices every token at the highest of its input, cached and output rates. Only the rate is a bound: an envelope measured on another model and case is not, and the plan says so. The plan labels each estimate `measured` or `default`, and never prints zero or unknown, because the cap is the only thing that authorises spend: a candidate it cannot price refuses the plan.
   - **Anthropic:** money, from the price rows `dotf pr route` already holds (ADR-046 §5), applied to the same envelope.
   - **Copilot:** premium requests on the seat.
   - **agy:** a run count, because its quota cannot be read.
@@ -358,6 +379,11 @@ login that CI does not hold, and its quota is the owner's. A scheduled run in ci
   scores as unadjudicated, not as a match, until someone adjudicates it.
 - A replay runs today's skill and tools against old code. Results compare models with each other,
   not with the reviewer that originally ran.
+- A replay worktree shares the repository's object store, so a candidate that runs
+  `git log --all` or `git show <later sha>` can read commits after `reviewed_sha`, the source
+  review among them. The preflight keeps the answer out of the tree, not out of reach. A candidate
+  whose transcript shows it reading a later commit has its run flagged by hand until a check
+  exists (known limit, recorded 2026-11-15).
 
 **Neutral**
 

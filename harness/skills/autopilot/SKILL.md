@@ -1,7 +1,7 @@
 ---
 generated: true
 generated_from: 00_meta/skills/autopilot/SKILL.md
-generated_sha: a3841a63bd0781d9
+generated_sha: efdb0f4d44880c48
 id: autopilot-skill
 type: skill
 status: active
@@ -254,7 +254,7 @@ PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 echo "Opened PR #${PR_NUM} at ${PR_URL}"
 ```
 
-*Note:* Opening as a draft prevents reviewer noise while checks run. Mark ready when checks stabilize: `gh pr ready "$PR_NUM"`.
+*Note:* Opening as a draft prevents reviewer noise while checks run. Mark ready when checks stabilize: `dotf forge pr ready "$PR_NUM"` (GitHub and Gitea alike, ADR-052).
 
 ---
 

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Moves the pins in versions.conf and packages.json (#3284). Dependabot keeps gomod, github-actions and docker, so only the custom managers run here.",
+  "extends": ["github>mlorentedev/ci-workflows//renovate/default#v0.8.0"],
+  "enabledManagers": ["custom.regex", "custom.jsonata"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "versions.conf: each pin has a `# renovate:` line above it, and above its `# mise:` or `# pwsh-module:` marker when it has one. `# renovate: skip <reason>` does not match, so the pin stays out.",
+      "managerFilePatterns": ["/^versions\\.conf$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) depType=(?<depType>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\n(?:#[^\\n]*\\n)?[A-Z0-9_]+_VERSION=(?<currentValue>\\S+)"
+      ],
+      "extractVersionTemplate": "{{#if extractVersion}}{{{extractVersion}}}{{else}}^v?(?<version>.+)${{/if}}"
+    },
+    {
+      "customType": "regex",
+      "description": "CI builds dotf with the go line of cli/go.mod, so it moves in the same PR as GO_VERSION.",
+      "managerFilePatterns": ["/^cli/go\\.mod$/"],
+      "matchStrings": ["\\ngo (?<currentValue>\\d+\\.\\d+\\.\\d+)\\n"],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version",
+      "depTypeTemplate": "runtime"
+    },
+    {
+      "customType": "jsonata",
+      "description": "packages.json catalog pins.",
+      "fileFormat": "json",
+      "managerFilePatterns": ["/^packages\\.json$/"],
+      "matchStrings": [
+        "tools[source.type = 'github-release' or source.type = 'github-archive'].{ 'depName': source.repo, 'currentValue': version, 'datasource': 'github-releases', 'depType': 'catalog' }",
+        "tools[source.type = 'uv-tool'].{ 'depName': source.package, 'currentValue': version, 'datasource': 'pypi', 'depType': 'catalog' }"
+      ],
+      "extractVersionTemplate": "^v?(?<version>.+)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Minor and patch bumps answer the knowledge gate themselves: Renovate's PRs are authored by the token's owner, so the gate's bot skip never applies. A major gets no section, so the gate stays red until someone writes what changed.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "prBodyNotes": [
+        "## Knowledge\n\n- Lesson: none: a minor or patch pin bump records no new behaviour\n- ADR: none: no decision is made by moving a pin\n- Runbook: none: docs/runbooks/tool-installation.md already says how pins move"
+      ]
+    },
+    {
+      "description": "One minor-and-patch PR per depType instead of the preset's single group. Renovate's PRs are authored by the token's owner, so the spec-gate's bot skip never applies; each group stays under its 50-line threshold, and renovate_test.go fails when one would not.",
+      "matchDepTypes": ["runtime", "cli", "lint", "k8s", "catalog"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "{{depType}} pins"
+    },
+    {
+      "description": "Go moves by patch only: a minor release has broken the pinned golangci-lint (it panicked under Go 1.27), so a minor is a decision, not a bump.",
+      "matchPackageNames": ["go"],
+      "matchUpdateTypes": ["major", "minor"],
+      "enabled": false
+    },
+    {
+      "description": "Release binaries run in CI with the repository's secrets, so they wait the same three days the preset gives npm, pypi and go.",
+      "matchDatasources": ["github-releases", "github-tags"],
+      "minimumReleaseAge": "3 days"
+    }
+  ]
+}

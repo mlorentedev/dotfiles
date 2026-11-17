@@ -96,7 +96,7 @@ func checkSelfDeployRun(sys *System, home, where string, rep *Report) {
 	last := fmt.Sprintf("last `dotf update` %s (%s)", ago(age), r.Status)
 	switch {
 	case r.Failed():
-		rep.Fail(last + " failed: " + r.Error + " — " + msg)
+		rep.Fail(last + " failed: " + errorLine(r.Error) + " — " + msg)
 	case age > selfDeployStale:
 		rep.Warn(last + ": the daily trigger has not run since; check " + where)
 	case r.Stuck():
@@ -112,4 +112,19 @@ func ago(d time.Duration) string {
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	}
 	return fmt.Sprintf("%d days ago", int(d.Hours()/24))
+}
+
+// errorLine is the first line of a recorded error, saying how many more it
+// holds: a run that failed in several steps joins their errors, one per line,
+// and a check's row is one line.
+func errorLine(s string) string {
+	first, rest, more := strings.Cut(strings.TrimSpace(s), "\n")
+	if !more {
+		return first
+	}
+	lines, n := "lines", strings.Count(rest, "\n")+1
+	if n == 1 {
+		lines = "line"
+	}
+	return fmt.Sprintf("%s (and %d more %s in last.json)", strings.TrimSpace(first), n, lines)
 }

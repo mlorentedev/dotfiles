@@ -18,6 +18,7 @@ import (
 // Options is one hand-off: which repo, which queue, which agent.
 type Options struct {
 	Agent    string // empty: the agent of the calling pane
+	Model    string // empty: the agent's own default; else typed as --model on the exec line
 	DryRun   bool   // decide and print, change nothing
 	Config   Config
 	Template string // the prompt template's text
@@ -292,12 +293,17 @@ func shown(o Options, b Backend, wt Worktree, out Outcome, p plan) (Outcome, err
 
 // plan is what a hand-off hands the successor: its prompt, the dotf its pane
 // runs, and a note when that is not quite what the caller asked for.
-type plan struct{ prompt, dotf, agent, note string }
+type plan struct{ prompt, dotf, agent, model, note string }
 
 // exec is the command line typed into the successor's pane, reading its prompt
-// from file.
+// from file. With no model the line is byte-identical to the one before models
+// existed: the pane's dotf may predate the flag.
 func (p plan) exec(file string) string {
-	return fmt.Sprintf("%s lane exec --agent %s --prompt-file %s", p.dotf, p.agent, file)
+	model := ""
+	if p.model != "" {
+		model = " --model " + p.model
+	}
+	return fmt.Sprintf("%s lane exec --agent %s%s --prompt-file %s", p.dotf, p.agent, model, file)
 }
 
 // prepare renders the prompt, settles the agent and builds the command line.
@@ -309,11 +315,23 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 	if err != nil {
 		return plan{}, err
 	}
+	// The model is checked before the agent resolves, so the placeholder plan
+	// (no backend, no agent named) refuses the same ids a launch would: one that
+	// reads as a flag, and, since the exec line is typed into a shell, one that
+	// is not a word every shell reads alike (the rule the binary's path follows).
+	if o.Model != "" {
+		if strings.HasPrefix(o.Model, "-") {
+			return plan{}, fmt.Errorf("lane: the model must be an id, not %q", o.Model)
+		}
+		if !plainWord.MatchString(o.Model) {
+			return plan{}, fmt.Errorf("lane: model %q has a character the shells do not read alike; name the model by its plain id", o.Model)
+		}
+	}
 	if out.Agent, err = resolveAgent(o.Agent, b); err != nil {
 		return plan{}, err
 	}
 	if out.Agent != agentPlaceholder() {
-		if _, err := LaunchArgv(out.Agent, prompt); err != nil {
+		if _, err := LaunchArgv(out.Agent, prompt, o.Model); err != nil {
 			return plan{}, err
 		}
 	}
@@ -324,7 +342,7 @@ func prepare(o Options, b Backend, out *Outcome) (plan, error) {
 		}
 		dotf = "dotf"
 	}
-	return plan{prompt, dotf, out.Agent, note}, nil
+	return plan{prompt, dotf, out.Agent, o.Model, note}, nil
 }
 
 // humanPath is a path as a person pastes it into their own shell: bare when it

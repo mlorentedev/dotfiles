@@ -18,6 +18,8 @@ type fake struct {
 	probeErr  error
 	gate      string
 	skip      string
+	// failFrom, when set, fails the apply with that ordinal and every later one.
+	failFrom int
 
 	applied, planned, probed bool
 	applies                  int
@@ -32,6 +34,9 @@ func (f *fake) Reconcile(_ Env, dryRun bool) (Result, error) {
 	} else {
 		f.applied = true
 		f.applies++
+		if f.failFrom > 0 && f.applies >= f.failFrom {
+			return Result{}, errors.New(f.name + " failed on apply")
+		}
 	}
 	if f.skip != "" {
 		return Result{Skip: f.skip}, f.err
@@ -252,9 +257,9 @@ func (f failsOnRevisit) Probe(Env) error {
 	return nil
 }
 
-// A failing revisit fails the run like any step, naming it, and nothing after
-// it runs.
-func TestRun_AFailedRevisitStopsTheRun(t *testing.T) {
+// A failing revisit fails the run like any step, naming it, and a step that
+// needs it does not run (here, one that declares nothing).
+func TestRun_AFailedRevisitHoldsBackAnUndeclaredStep(t *testing.T) {
 	harness := failsOnRevisit{revisiting{&fake{name: "harness"}, "tools"}}
 	tools, later := &fake{name: "tools", changes: 1}, &fake{name: "later"}
 

@@ -61,8 +61,8 @@ repos:
       # agent instruction files resolve on disk.
       - id: check-doc-paths
         name: Check referenced doc paths in instruction files
-        entry: ./scripts/check-doc-paths.sh
-        language: script
+        entry: dotf lint doc-paths
+        language: system
         pass_filenames: false
         stages: [pre-commit]
 
