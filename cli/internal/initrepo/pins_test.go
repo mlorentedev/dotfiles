@@ -11,7 +11,7 @@ import (
 
 // usesRef matches a YAML `uses:` key and captures its reference and what
 // follows it on the line. Comments and scalar values that merely contain
-// "uses:" do not match, the same scope scripts/check-actions-pinned.sh judges.
+// "uses:" do not match, the same scope the fleet/sha-pin rule judges.
 var usesRef = regexp.MustCompile(`^\s*(?:-\s+)?uses:\s+["']?([^"'\s#]+)["']?(.*)$`)
 
 // tagComment captures the tag a trailing comment names for a pinned SHA.

@@ -282,3 +282,27 @@ func TestATreeThatWillNotGoAwayKeepsTheGrade(t *testing.T) {
 		t.Errorf("detail = %q, want the tree left behind named", rec.Detail)
 	}
 }
+
+// One matrix mixes runners, and each reads its own deployed copy of the review
+// skill: the path is the candidate's runner's, not one per launcher.
+func TestLaunchPointsEachRunnerAtItsOwnSkill(t *testing.T) {
+	c := Case{ID: "a-r1", Kind: "replay", Spec: "AI-055", ReviewedSHA: strings.Repeat("a", 40), BaseSHA: strings.Repeat("b", 40)}
+	for runner, want := range map[string]string{"agy": spec.ReviewerSkillPath("agy"), "pi": spec.ReviewerSkillPath("pi")} {
+		a := attemptFor(t.TempDir(), c, runner+"/x", 1)
+		checkout := func(_ Case, _ string, _ int) (Tree, error) {
+			return Tree{Dir: a.Tree, Remove: func() error { return os.RemoveAll(a.Tree) }}, os.MkdirAll(a.Tree, 0o755)
+		}
+		r := &fakeRunner{}
+		l := testLauncher(t.TempDir(), r, checkout)
+		l.Candidates = map[string]spec.ReviewerEntry{
+			"agy/x": {ID: "agy/x", Runner: "agy", Model: "x", Auth: "login"},
+			"pi/x":  {ID: "pi/x", Runner: "pi", Provider: "nan", Model: "x", SecretID: "NAN_API_KEY"},
+		}
+		if _, err := l.Launch(context.Background(), a); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(strings.Join(r.argv, " "), want) {
+			t.Errorf("%s: the prompt does not name %s", runner, want)
+		}
+	}
+}

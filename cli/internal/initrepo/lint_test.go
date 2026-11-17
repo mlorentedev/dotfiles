@@ -104,7 +104,7 @@ func TestLintTemplatePinsMatchTheRepository(t *testing.T) {
 	}
 
 	// Every action is a full commit SHA with its tag as a comment, the form
-	// scripts/check-actions-pinned.sh accepts.
+	// `dotf lint fleet --rule fleet/sha-pin` accepts.
 	pinned := regexp.MustCompile(`^\s*-?\s*uses:\s*[\w.-]+/[\w./-]+@[0-9a-f]{40} # v\d`)
 	for _, line := range strings.Split(tmpl, "\n") {
 		if strings.Contains(line, "uses:") && !pinned.MatchString(line) {

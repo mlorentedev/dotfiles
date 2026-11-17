@@ -132,3 +132,21 @@ func TestPreflightPassesAMatrixThatCanRun(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A candidate with a secret is launched as `dotf secrets run --only <id> --`,
+// so without dotf on PATH it cannot start; a login candidate does not need it.
+func TestPreflightNeedsDotfForACandidateWithASecret(t *testing.T) {
+	repo, sha := leakRepo(t)
+	c := Case{ID: "clean", Kind: "replay", ReviewedSHA: sha, SourceReview: "specs/archive/X/review-round2.md"}
+	p := Plan{Cells: []Cell{
+		{Case: "clean", Kind: "replay", Candidate: "nan/glm", Epochs: 1},
+		{Case: "clean", Kind: "replay", Candidate: "agy/x", Epochs: 1},
+	}}
+	err := Preflight(repo, p, []Case{c}, preflightCandidates, preflightDeps("dotf"))
+	if err == nil || !strings.Contains(err.Error(), "nan/glm: dotf is not on PATH, and it injects secret NAN_API_KEY") {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(err.Error(), "agy/x") {
+		t.Errorf("a login candidate was refused for dotf:\n%v", err)
+	}
+}

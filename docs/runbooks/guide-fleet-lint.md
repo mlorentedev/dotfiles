@@ -25,11 +25,13 @@ created: "2026-11-11"
 | `fleet/os-on-pull-request` | A Windows or macOS job does not run on a pull request unless an `if:` decides it. A literal matrix is read, with `include:`, a nested `matrix.a.b` path, and an `exclude:` on that axis alone; a computed one is conditional. | Those runners cost more and queue longer; change detection should decide. |
 | `fleet/skip-cache` | No `*/setup-*` step sets `cache: false`, and golangci-lint-action does not set `skip-cache: true`. A cache left unset is not read. | A switched-off cache pays the download on every run. |
 | `fleet/branch-filter` | A `push` or `pull_request` `branches:` filter includes the default branch, read as GitHub reads it: in order, the last pattern that matches decides, `!` excludes, `*` stays within a path segment and `**` crosses a slash, `?` and `+` make the preceding character optional or repeated, `[...]` is a character class and `\` escapes. `branches-ignore` is not read. | A filter that leaves the default branch out means the workflow never checks it. |
+| `fleet/vendored-script` | The repository no longer carries `scripts/check-lessons.sh` or `scripts/check-actions-pinned.sh`, a symlink included. The finding names the dotf command that replaces each (`dotf lessons fmt --check`, `dotf lint fleet --rule fleet/sha-pin`), which the ci-workflows `hygiene` composite runs. `scripts/pin-actions.sh` is not read: nothing replaces it yet. | A vendored copy drifts from the others, and a fix to one reaches none (ci-workflows#31). |
 
 Workflows are read under `.github/workflows` and `.gitea/workflows`. `fleet/sha-pin` also reads
 `runs.steps` in `.github/actions/<name>/action.yml` or `action.yaml` (and under `.gitea/actions`), one level deep: a
 composite action calls third-party actions as a workflow does, and an exception names its manifest by path. The
-other step rules stay with workflows. The default branch is `--default-branch`,
+other step rules stay with workflows. `fleet/vendored-script` reads only those two paths under the
+repository root, on line 1 of each. The default branch is `--default-branch`,
 else what `origin/HEAD` names. A branch filter with neither is an error (exit 2), never a pass.
 
 A clone made by `actions/checkout` has no `origin/HEAD`, so a workflow passes the branch from the event:
