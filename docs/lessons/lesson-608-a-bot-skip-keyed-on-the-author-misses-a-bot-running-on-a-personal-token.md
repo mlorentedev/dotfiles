@@ -1,5 +1,5 @@
 ---
-id: "lesson-607-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token"
+id: "lesson-608-a-bot-skip-keyed-on-the-author-misses-a-bot-running-on-a-personal-token"
 type: lesson
 status: active
 title: "A bot skip keyed on the author misses a bot running on a personal token"
@@ -29,5 +29,8 @@ Size the groups instead of widening the gate: one group per `depType`, each unde
 A pin move is two lines, so a group of at most 24 pins stays under 50. `renovate_test.go` reads the
 gate's `THRESHOLD=` and fails when a group would outgrow it, so the cap follows the gate. Teaching the
 gate to skip a diff that changes only version values is the other option. It widens a gate, so it is
-the owner's to decide (#3284). Before relying on a skip keyed on who authored a PR, check who the
-author actually is for that integration.
+the owner's to decide (#3284). The knowledge-gate has the same author-keyed skip and
+requires a `## Knowledge` section, which Renovate does not write; `prBodyNotes` in `renovate.json` adds
+one, and `tests/check-knowledge-gate.bats` runs the gate on it. Before relying on a skip keyed on who
+authored a PR, sweep every gate that reads the author, labels or body, and check who the author actually
+is for that integration.
