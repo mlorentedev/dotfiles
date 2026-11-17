@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,7 +36,9 @@ while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done
 shift
 exec "$@"
 `)
-	stub("pi", `printf '%s\n' '{"type":"message_end"}'
+	cwdFile := filepath.Join(t.TempDir(), "pi-cwd")
+	stub("pi", `pwd -P > '`+cwdFile+`'
+printf '%s\n' '{"type":"message_end"}'
 printf '%s\n' '| # | Severity | Finding |' '|---|---|---|' '| 1 | Major | count never increments |' > .dotf-eval/review.md
 `)
 	t.Setenv("PATH", bin)
@@ -58,9 +62,14 @@ printf '%s\n' '| # | Severity | Finding |' '|---|---|---|' '| 1 | Major | count 
 	if err := json.Unmarshal(raw, &rec); err != nil || rec.Completion != evals.CompletionAnswered {
 		t.Errorf("record = %s (%v)", raw, err)
 	}
-	trees := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(runs[0]))))), "trees")
-	if left, _ := filepath.Glob(filepath.Join(trees, "*", "*")); len(left) != 0 {
-		t.Errorf("trees left behind: %v", left)
+	// The tree is the directory the runner actually ran in, as the stub saw
+	// it, so the check cannot pass by looking somewhere the tree never was.
+	cwd, err := os.ReadFile(cwdFile)
+	if err != nil || strings.TrimSpace(string(cwd)) == "" {
+		t.Fatalf("the stub runner recorded no working directory: %v", err)
+	}
+	if _, err := os.Stat(strings.TrimSpace(string(cwd))); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the attempt's tree was left behind: %s (%v)", cwd, err)
 	}
 	if !strings.Contains(stdout, "1 attempts: 1 answered") {
 		t.Errorf("the report lacks the count:\n%s", stdout)
