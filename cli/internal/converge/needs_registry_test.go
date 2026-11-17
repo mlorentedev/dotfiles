@@ -70,6 +70,19 @@ func TestRegistry_WhatAFailureHoldsBack(t *testing.T) {
 			"pi-settings", "configs-deploy", "shell-completions", "records-bind", "git-config", "git-lfs",
 			"git-hooks", "lanes", "env-persist", "agent-extensions", "legacy-setup",
 		}},
+		// What tools installs is what most of the registry runs. A failed
+		// tools still lets through the steps that read the machine's roles,
+		// the scheduler or the checkout alone.
+		{"tools", []string{
+			"system-upgrade", "cache-gc", "pwsh-modules", "pi-settings", "configs-deploy",
+			"shell-completions", "records-bind", "git-config", "git-lfs", "git-hooks", "lanes",
+			"env-persist", "agent-extensions", "legacy-setup",
+		}},
+		{"env-generate", []string{
+			"tools", "system-upgrade", "cache-gc", "pwsh-modules", "pi-settings", "configs-deploy",
+			"shell-completions", "records-bind", "git-config", "git-lfs", "git-hooks", "lanes",
+			"env-persist", "agent-extensions", "legacy-setup",
+		}},
 		// No agent is installed before its instructions exist (#2016).
 		{"records-harness", []string{
 			"tools", "system-upgrade", "cache-gc", "pwsh-modules", "pi-settings", "configs-deploy",

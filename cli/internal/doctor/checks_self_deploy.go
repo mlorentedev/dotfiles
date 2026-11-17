@@ -122,5 +122,9 @@ func errorLine(s string) string {
 	if !more {
 		return first
 	}
-	return fmt.Sprintf("%s (and %d more lines in last.json)", strings.TrimSpace(first), strings.Count(rest, "\n")+1)
+	lines, n := "lines", strings.Count(rest, "\n")+1
+	if n == 1 {
+		lines = "line"
+	}
+	return fmt.Sprintf("%s (and %d more %s in last.json)", strings.TrimSpace(first), n, lines)
 }
