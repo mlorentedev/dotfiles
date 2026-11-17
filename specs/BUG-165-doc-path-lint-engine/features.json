@@ -23,9 +23,9 @@
   {
     "id": "BUG-165-doc-path-lint-engine-f4",
     "behavior": "After release, pre-commit uses the CLI and the shell guard plus both BATS files are absent with no dangling references.",
-    "verification": "test ! -e scripts/check-doc-paths.sh && test ! -e tests/check-doc-paths.bats && test ! -e tests/check-doc-paths-real.bats && ! git grep -n 'check-doc-paths.sh' -- . ':!specs' ':!docs' ':!CHANGELOG.md' ':!cli/internal/docpaths/retirement_test.go' ':!tests/fixtures'",
-    "state": "pending",
-    "evidence": ""
+    "verification": "test ! -e scripts/check-doc-paths.sh && test ! -e tests/check-doc-paths.bats && test ! -e tests/check-doc-paths-real.bats && { git grep -q 'check-doc-paths.sh' -- . ':!specs' ':!docs' ':!CHANGELOG.md' ':!cli/internal/docpaths/retirement_test.go' ':!tests/fixtures'; [ $? -eq 1 ]; }",
+    "state": "verified",
+    "evidence": "2026-11-16, Windows, dotf 0.81.0: the command exits 0; git grep finds no live reference (exit 1). TestShellGuardIsRetiredAfterCutover passes."
   },
   {
     "id": "BUG-165-doc-path-lint-engine-f5",
