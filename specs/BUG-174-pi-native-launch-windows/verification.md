@@ -32,7 +32,8 @@ owner: manu
 
 - Ask mise instead of changing what is installed. Native mise shims (`mise-shim.exe`) and a native pi ahead on PATH were the first plan; neither changes what `exec.LookPath("pi")` finds while `~/.pi/agent/bin` is ahead of mise's shims, and both belong to PLAT-001c.
 - Only an `.exe` is accepted from mise. Checking the answer with `RefuseBatchShim` was not enough: an extensionless path has a `.cmd` beside it, and Windows appends PATHEXT.
-- `secrets run` resolves once more in `runChild` instead of passing the target through its callers: the check runs before the store is read, the launch after, and both call `childTarget`.
+- `secrets run` asks the tool manager twice per start, not once: the command checks the child before the store is read (`assertSafeChildCommand`), and `runChild` resolves again after, through `safeChildTarget`, which is both its check and its launch target. Inside `runChild` there is one resolution (`TestRunChild_StartsTheNativeExecutableBehindABatchShim` asserts it). The target is not passed from the early check to the launch through the callers.
+- `dotf doctor` does not report a batch-only launcher: #3572.
 
 ## Promotion candidates
 

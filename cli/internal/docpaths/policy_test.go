@@ -68,6 +68,15 @@ func TestCurrentPolicyLoads(t *testing.T) {
 	if !reflect.DeepEqual(policy.GovernedBasenames, wantBasenames) {
 		t.Fatalf("governed basenames = %v, want %v", policy.GovernedBasenames, wantBasenames)
 	}
+	// The exclusions and the source extensions are the policy as much as the
+	// basenames are: dropping "docs/" would put every historical document under
+	// the guard, and no other test would notice (BUG-165 review).
+	if want := []string{"harness/", "specs/", "docs/"}; !reflect.DeepEqual(policy.ExcludePrefixes, want) {
+		t.Fatalf("exclude prefixes = %v, want %v", policy.ExcludePrefixes, want)
+	}
+	if want := []string{".conf", ".sh", ".zsh"}; !reflect.DeepEqual(policy.SourceExtensions, want) {
+		t.Fatalf("source extensions = %v, want %v", policy.SourceExtensions, want)
+	}
 	if len(policy.RequiredMembers) < 5 || len(policy.KnownExtensions) < 10 {
 		t.Fatalf("current policy is incomplete: %+v", policy)
 	}

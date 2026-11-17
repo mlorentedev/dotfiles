@@ -42,7 +42,7 @@ owner: manu
 - [x] [AC1] [AC2] [AC3] [AC6] [AC7] [AC8] Run `cd cli; go test ./internal/docpaths ./internal/cmd`, `go vet ./internal/docpaths ./internal/cmd`, and the exact `features.json` commands.
 - [x] [AC1] [AC6] Add review regressions for working-directory-relative explicit files, sanitized Git root discovery, surfaced glob traversal errors, linked worktrees, and the exact governed basename set.
 - [x] Commit and open PR 1 as #3201.
-- [ ] Verify CI and the existing shell hook pass on the remediation head.
+- [x] Verify CI and the existing shell hook pass on the remediation head. (#3201 merged with CI green.)
 
 ### Release gate
 
@@ -57,15 +57,15 @@ owner: manu
 - [x] [AC4] Delete `scripts/check-doc-paths.sh`, `tests/check-doc-paths.bats`, and `tests/check-doc-paths-real.bats`.
 - [x] [AC4] Run the twin/test retirement guard and a repository-wide grep; expected: no live reference to the deleted script or BATS files.
 - [x] [AC1] [AC2] [AC5] [AC6] Run `dotf lint doc-paths` twice on Windows; expected: identical output, exit 0 and each run <=2 seconds.
-- [ ] [AC1] Run the command on Linux CI and Windows CI; expected: parity in governed files and findings.
-- [ ] Commit and open PR 2; verify no commit path depends on a pre-release binary.
+- [x] [AC1] Run the command on Linux CI and Windows CI; expected: parity in governed files and findings. (`TestCurrentRepository` in `test (ubuntu-latest)`, `test (macos-latest)` and `test (windows-latest)` on #3561.)
+- [x] Commit and open PR 2; verify no commit path depends on a pre-release binary. (#3561, merged; the hook runs the pinned release.)
 
 ## Closing
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test
 - [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
 - [x] Type checks pass
-- [ ] Lint passes
+- [x] Lint passes (CI's `lint` and `cli-lint` on #3561; a CRLF checkout fails `gofmt` locally on every Go file)
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
 - [x] PR opened referencing this spec folder

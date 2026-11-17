@@ -149,6 +149,21 @@ func TestCheckFilesVaultPaths(t *testing.T) {
 	if len(report.Findings) != 0 {
 		t.Fatalf("an unavailable optional vault must skip vault checks: %+v", report.Findings)
 	}
+
+	// A root that names no directory is as absent as an empty one: the default
+	// the command resolves is a path, whether or not a vault is checked out (#1043).
+	for name, root := range map[string]string{
+		"a directory that does not exist": filepath.Join(vault, "gone"),
+		"a file":                          filepath.Join(vault, "00_meta", "real.md"),
+	} {
+		report, err = CheckFiles(CheckOptions{RepoRoot: repo, VaultRoot: root, Policy: policy}, []string{"AGENTS.md"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(report.Findings) != 0 {
+			t.Errorf("%s: vault checks must be skipped: %+v", name, report.Findings)
+		}
+	}
 }
 
 func TestCheckFilesRejectsBareSourceCommand(t *testing.T) {

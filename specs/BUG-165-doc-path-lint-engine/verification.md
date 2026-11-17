@@ -28,7 +28,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Command regressions: `go test ./internal/cmd -run '^TestLintDocPaths'` -> PASS in 3.280 s.
 - Vet: `go vet ./internal/docpaths ./internal/cmd` -> PASS.
 - Formatting: `gofmt -l` over all changed Go files -> no output.
-- Feature commands f1, f2, f3, f5, f6, f7 and f8 -> exit 0 with uncached runs; f4 is correctly pending behind the release gate.
+- Feature commands f1, f2, f3, f5, f6, f7 and f8 -> exit 0 with uncached runs; f4 was pending behind the release gate then and passes since the cutover (#3561, Criterion 4 above).
 - Windows smoke with incomplete `GIT_CONFIG_COUNT=1`: install-style `version` probe -> 10.092 s; following full scans -> 485 ms / 473 ms, deterministic 14-line output, exit 0.
 - Fresh-build startup observation: endpoint security inspects each newly built unsigned EXE on first execution. `install.ps1` deliberately pays that one-time cost in its executable probe before placement, and its standalone path then runs the installed target through `converge`; hook use occurs after inspection rather than on the commit path.
 - Lesson hygiene: `go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons` -> `[OK] lessons are in their canonical form`.
@@ -59,3 +59,13 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 - [ ] Folder moved: `specs/BUG-165-doc-path-lint-engine/` -> `specs/archive/BUG-165-doc-path-lint-engine/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
 - [ ] Promotions above executed (if any)
+
+## Review dispositions
+
+Independent review of 2026-11-16 (`review.md`, verdict FAIL, one Blocker, two Major and four Minor findings). The spec needs a new review before it archives.
+
+- Blocker, the command exited 1 where the vault is not checked out: applied. `CheckFiles` treats a vault root that is not a directory as no vault, as the shell guard's `[ -d ]` did (#1043); `TestCheckFilesVaultPaths` covers a missing directory and a file, and fails without the fix. `VAULT_PATH='C:
+onexistent-vault-dir' go run ./cmd/dotf lint doc-paths` exits 0. The pre-commit hook runs the pinned release, so it has the fix from the next release on.
+- Major, open task lines and stale `f4` text: applied. The four lines are closed with the pull requests that did them (#3201, #3561) and the `f4` sentence says what is true since the cutover. The `gofmt` failure in the same finding is the reviewer's CRLF checkout, not the code: CI's `lint` and `cli-lint` pass on #3561.
+- Major, the policy's exclusions and source extensions were not pinned: applied. `TestCurrentPolicyLoads` compares both lists; removing `specs/` from `harness/doc-paths.json` now fails it.
+- Minor, aliased absolute paths, the glob contract, function size and the substring-matched retirement guard: ticketed (#3574).

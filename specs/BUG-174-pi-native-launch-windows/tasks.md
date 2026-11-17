@@ -27,7 +27,7 @@ owner: manu
 - [x] [AC1] [AC2] [AC3] [AC4] `lane.NativeTarget` and `lane.MiseNative` (`exec_native.go`); `Exec` on Windows starts what `NativeTarget` returns
 - [x] [AC2] Accept only an `.exe` from mise: the first version accepted mise's answer for opencode and bats, an extensionless npm stub with a `.cmd` beside it (measured on this machine before the commit)
 - [x] [AC5] Windows test through the real `runChild`, failing when the launch goes back to `argv[0]`
-- [x] [AC5] `secrets run`: `childTarget` is the one resolution, used by the check and by `runChild`; a nested command keeps `refuseBatchShimChild`
+- [x] [AC5] `secrets run`: `safeChildTarget` is the check and, when it passes, the file `runChild` starts, so the launch resolves once (`childTarget` behind it); a nested command keeps `refuseBatchShimChild`
 
 ## Closing
 
