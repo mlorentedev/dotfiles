@@ -1,0 +1,37 @@
+[
+  {
+    "id": "BUG-174-pi-native-launch-windows-f1",
+    "behavior": "a batch-shim target starts the native .exe mise holds for that name",
+    "verification": "cd cli && go test ./internal/lane/ -count=1 -run '^TestNativeTarget_StartsTheExecutableBehindABatchShim$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-174-pi-native-launch-windows-f2",
+    "behavior": "without a native .exe behind the shim the launch is refused",
+    "verification": "cd cli && go test ./internal/lane/ -count=1 -run '^TestNativeTarget_RefusesWithoutANativeExecutableBehindTheShim$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-174-pi-native-launch-windows-f3",
+    "behavior": "a native target is started as PATH resolves it and mise is not asked",
+    "verification": "cd cli && go test ./internal/lane/ -count=1 -run '^TestNativeTarget_LeavesANativeResolutionAlone$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-174-pi-native-launch-windows-f4",
+    "behavior": "a caller that names a file is never given another file",
+    "verification": "cd cli && go test ./internal/lane/ -count=1 -run '^TestNativeTarget_NeverSubstitutesANamedFile$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "BUG-174-pi-native-launch-windows-f5",
+    "behavior": "secrets run starts the file its check allowed, and a nested command stays refused",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -run '^TestSecretsRun_(StartsTheNativeExecutableBehindABatchShim|RefusesABatchShimChildWhereWindowsRunsItThroughCmdExe)$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]

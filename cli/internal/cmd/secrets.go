@@ -719,7 +719,14 @@ func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer)
 	if err := assertSafeChildCommand(argv); err != nil {
 		return 1, err
 	}
-	c := exec.Command(argv[0], argv[1:]...) //nolint:gosec // argv is the user's own command
+	// The check above and this launch must agree on the file: a check that
+	// passed for a native executable while the launch started the shim PATH
+	// holds would be #3440 again.
+	target, err := childTarget(argv)
+	if err != nil {
+		return 1, err
+	}
+	c := exec.Command(target, argv[1:]...) //nolint:gosec // argv is the user's own command
 	c.Env = environ
 	c.Stdin, c.Stdout, c.Stderr = stdin, stdout, stderr
 	if err := c.Start(); err != nil {
@@ -744,7 +751,7 @@ func runChild(argv, environ []string, stdin io.Reader, stdout, stderr io.Writer)
 		}
 	}()
 
-	err := c.Wait()
+	err = c.Wait()
 	close(done)
 	signal.Stop(sigs)
 
@@ -771,6 +778,14 @@ func ageKeyPath() string {
 // the environment or inspect secrets to standard output (e.g. `env`, `printenv`, `export`).
 // Enforces ADR-028 and cross-agent doctrine: "Never dump a secrets store to standard output".
 func assertSafeChildCommand(argv []string) error {
+	return assertSafeChild(argv, false)
+}
+
+// assertSafeChild is assertSafeChildCommand, told whether argv is the command
+// dotf starts itself or one a multi-call binary starts for it (nested). The
+// difference is the batch shim: dotf can start the native executable behind
+// its own child's shim, and cannot choose what busybox starts.
+func assertSafeChild(argv []string, nested bool) error {
 	if len(argv) == 0 {
 		return errors.New("no command given after --")
 	}
@@ -782,7 +797,7 @@ func assertSafeChildCommand(argv []string) error {
 	// busybox is a multi-call binary whose first argument is the command it runs,
 	// so `busybox env` is `env` and `busybox sh -c` is a shell (round 2, F5).
 	if base == "busybox" && len(argv) >= 2 {
-		return assertSafeChildCommand(argv[1:])
+		return assertSafeChild(argv[1:], true)
 	}
 
 	// Catch shell wrappers executing introspection: `sh -c "env | grep..."`, `bash -lc "'env'"`, `bash -c "set"`, etc.
@@ -794,7 +809,34 @@ func assertSafeChildCommand(argv []string) error {
 			}
 		}
 	}
-	return refuseBatchShimChild(argv)
+	if nested {
+		return refuseBatchShimChild(argv)
+	}
+	_, err := childTarget(argv)
+	return err
+}
+
+// nativeBehind is where childTarget asks for the executable behind a batch
+// shim. A variable so a test answers without a mise.
+var nativeBehind = lane.MiseNative
+
+// childTarget is the file runChild starts for argv. Off Windows, and for a
+// command that is not on PATH (the launch's error to report), that is argv[0].
+// On Windows it is what PATH resolves, or the native executable the tool
+// manager holds behind a batch shim; with no such executable the launch is
+// refused, as `dotf lane exec` refuses it (#3440, #3569).
+func childTarget(argv []string) (string, error) {
+	if !batchShimsRunViaCmdExe {
+		return argv[0], nil
+	}
+	if _, err := exec.LookPath(argv[0]); err != nil {
+		return argv[0], nil //nolint:nilerr // not found is the launch's error to report
+	}
+	bin, err := lane.NativeTarget(argv[0], exec.LookPath, nativeBehind)
+	if err != nil {
+		return "", fmt.Errorf("secrets run: %w", err)
+	}
+	return bin, nil
 }
 
 // batchShimsRunViaCmdExe is true where Windows starts a .cmd or .bat file
@@ -802,10 +844,12 @@ func assertSafeChildCommand(argv []string) error {
 // refusal; nothing else sets it.
 var batchShimsRunViaCmdExe = runtime.GOOS == "windows"
 
-// refuseBatchShimChild refuses a child that Windows would run through cmd.exe,
-// the refusal `dotf lane exec` makes for the same reason: npm installs an
-// agent as a .cmd shim, and cmd.exe re-parses the arguments it is handed
-// (#3440). A command that is not on PATH is left to the launch to report.
+// refuseBatchShimChild refuses a command that Windows would run through
+// cmd.exe, the refusal `dotf lane exec` makes for the same reason: npm installs
+// an agent as a .cmd shim, and cmd.exe re-parses the arguments it is handed
+// (#3440). It is the check for a command dotf does not start itself, so there
+// is no native executable to start in its place. A command that is not on PATH
+// is left to the launch to report.
 func refuseBatchShimChild(argv []string) error {
 	if !batchShimsRunViaCmdExe {
 		return nil
