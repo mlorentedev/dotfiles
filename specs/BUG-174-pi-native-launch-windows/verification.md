@@ -15,17 +15,18 @@ owner: manu
 - [x] AC2 -> `TestNativeTarget_RefusesWithoutANativeExecutableBehindTheShim` (eight answers)
 - [x] AC3 -> `TestNativeTarget_LeavesANativeResolutionAlone`
 - [x] AC4 -> `TestNativeTarget_NeverSubstitutesANamedFile`
-- [x] AC5 -> `TestSecretsRun_StartsTheNativeExecutableBehindABatchShim`, with the existing `TestSecretsRun_RefusesABatchShimChildWhereWindowsRunsItThroughCmdExe` unchanged
+- [x] AC5 -> on Windows `TestRunChild_StartsTheNativeExecutableBehindABatchShim` (the real `runChild`; reverting its launch line to `argv[0]` fails it, checked 2026-11-16); `TestSecretsRun_StartsTheNativeExecutableBehindABatchShim`, with the existing `TestSecretsRun_RefusesABatchShimChildWhereWindowsRunsItThroughCmdExe` unchanged
 
 ## Test status
 
-- Test suite: `cd cli && go test ./internal/lane/ -count=1` and `go test ./internal/cmd/ -count=1 -run 'Secrets'` pass on Windows 11 x64; `GOOS=linux go vet` and `GOOS=darwin go vet` of both packages exit 0.
+- Test suite: on Windows 11 x64, `go test ./internal/lane/ -count=1 -run 'NativeTarget|TestExec_|RefuseBatch'` and `go test ./internal/cmd/ -count=1 -run 'TestRunChild_StartsTheNative|Secrets'` pass. The whole of both packages is CI's evidence (`test (ubuntu-latest)`, `test (macos-latest)`, `test (windows-latest)` on the PR head), not this machine's: `go test ./internal/lane/ -count=1` ran past the default 10 minute limit here, as `./internal/cmd/` does (#3566); `GOOS=linux go vet` and `GOOS=darwin go vet` of both packages exit 0.
 - Manual smoke test, this machine, 2026-11-16, a throwaway test calling `NativeTarget(name, exec.LookPath, MiseNative)`:
   - `pi`: PATH gives `~\.pi\agent\bin\pi.cmd`, the target is `%LOCALAPPDATA%\mise\installs\pi\1.5.2\pi.exe`.
   - `agy`, `claude`, `copilot`: native on PATH, unchanged.
   - `opencode`, `bats`: mise answers with an extensionless npm stub, so they stay refused.
 - Not exercised: `dotf secrets run -- pi` end to end. It needs the unlocked secrets store, and `dotf spec review` starts the released `dotf` from PATH, which does not carry this change yet.
-- No regressions in existing test suite: yes for the two packages; the full `./internal/cmd/` run exceeds the default 10 minute limit on this machine (#3566).
+- No regressions in existing test suite: yes on CI's three test legs; not established locally (see above).
+- Tests never ask this machine's mise: both packages default the lookup to "nothing", and a test that wants a native target sets its own (lesson 610).
 
 ## Decisions made during implementation
 

@@ -30,7 +30,7 @@
   {
     "id": "BUG-174-pi-native-launch-windows-f5",
     "behavior": "secrets run starts the file its check allowed, and a nested command stays refused",
-    "verification": "cd cli && go test ./internal/cmd/ -count=1 -run '^TestSecretsRun_(StartsTheNativeExecutableBehindABatchShim|RefusesABatchShimChildWhereWindowsRunsItThroughCmdExe)$'",
+    "verification": "cd cli && go test ./internal/cmd/ -count=1 -run '^(TestRunChild_StartsTheNativeExecutableBehindABatchShim|TestSecretsRun_(StartsTheNativeExecutableBehindABatchShim|RefusesABatchShimChildWhereWindowsRunsItThroughCmdExe))$'",
     "state": "pending",
     "evidence": ""
   }

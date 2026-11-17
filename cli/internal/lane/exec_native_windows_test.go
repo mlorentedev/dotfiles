@@ -8,6 +8,10 @@ import (
 	"testing"
 )
 
+// No test starts what this machine's mise holds behind a batch shim: a test
+// that wants a native target sets its own (lesson 610).
+func init() { nativeBehind = func(string) string { return "" } }
+
 // #3569 through the real Exec: a .cmd shim is the first `fakeagent` on PATH and
 // the tool manager holds a native executable of that name. The executable
 // starts with the prompt byte for byte, and the shim never runs. The test

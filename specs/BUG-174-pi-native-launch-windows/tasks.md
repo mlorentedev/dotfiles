@@ -26,6 +26,7 @@ owner: manu
 - [x] [AC1] [AC2] [AC3] [AC4] Failing tests for `lane.NativeTarget` (`exec_native_test.go`) and for the real `Exec` on Windows (`exec_native_windows_test.go`)
 - [x] [AC1] [AC2] [AC3] [AC4] `lane.NativeTarget` and `lane.MiseNative` (`exec_native.go`); `Exec` on Windows starts what `NativeTarget` returns
 - [x] [AC2] Accept only an `.exe` from mise: the first version accepted mise's answer for opencode and bats, an extensionless npm stub with a `.cmd` beside it (measured on this machine before the commit)
+- [x] [AC5] Windows test through the real `runChild`, failing when the launch goes back to `argv[0]`
 - [x] [AC5] `secrets run`: `childTarget` is the one resolution, used by the check and by `runChild`; a nested command keeps `refuseBatchShimChild`
 
 ## Closing
@@ -33,10 +34,10 @@ owner: manu
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test
 - [x] Every acceptance criterion has a matching entry in `features.json` (see below) with a non-vacuous verification command
 - [x] Type checks pass
-- [ ] Lint passes (CI: the local CRLF checkout fails `gofmt` on every file)
+- [x] Lint passes (CI's `lint` job; the local CRLF checkout fails `gofmt` on every file)
 - [x] No unrelated changes in the diff (no scope creep)
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#3570)
 
 ## Machine-readable features
 
