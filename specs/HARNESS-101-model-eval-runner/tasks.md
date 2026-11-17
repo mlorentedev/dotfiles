@@ -44,7 +44,7 @@ owner: manu
 
 ### Slice 3: `dotf eval run`
 
-- [ ] [AC3] `dotf eval run` places each run under dotf's state directory (`env.StateDir()`, `$XDG_STATE_HOME/dotfiles/evals/<run-id>/`) and exits non-zero naming a case whose commit cannot be resolved
+- [x] [AC3] `dotf eval run` places each run under dotf's state directory (`env.StateDir()`, `$XDG_STATE_HOME/dotfiles/evals/<run-id>/`) and exits non-zero naming a case whose commit cannot be resolved (the preflight names it before any launch)
 - [x] [AC6] Failing test: `--plan` prints the matrix and per-runner estimate; a matrix above `--max-runs` is refused
 - [x] [AC6] Implement the plan and the cap, for NaN (credits) and agy (run count); rates in `candidates.json`, held to `ai/nan/README.md` by a test
 - [ ] [AC6] Anthropic estimate in money from `dotf pr route`'s price rows, once a candidate runs on Anthropic (none does today)
@@ -56,12 +56,12 @@ owner: manu
 - [x] [AC5] Preflight (`evals.Preflight`): every commit resolved, every runner on PATH, every secret checked by exit status, and a replay refused when its reviewed commit holds its `source_review` or its case file; all problems named at once
 - [ ] [AC5] Tokens (input, output, thinking) read from each runner's transcript
 - [ ] [AC5] Flag a run whose transcript shows it reading a commit after `reviewed_sha` (ADR-063, known limit)
-- [ ] [AC3] Wire `dotf eval run` to `Preflight`, `ExecLauncher` and `Run` (real `LookPath`, secrets checked through `dotf secrets run`), and keep it refusing to start without an approved `--plan`. The runner must receive the candidate's secret, not only pass the preflight check: `RunWithLimits` inherits the parent environment, so inject it per attempt (#3539 review)
+- [x] [AC3] Wire `dotf eval run` to the corpus check, `Preflight` (real `LookPath`, `dotf` included; secrets by `dotf secrets verify --require-all <id>`), `ExecLauncher` and `Run`. No approval gate beyond the cap: ADR-063 makes `--max-runs` what authorises spend, and the first real run waits for the owner by procedure. Corrected: the secret already reaches the runner, because `ReviewerCommand` wraps every non-login runner in `dotf secrets run --only <id> --` (pinned in `spec`'s `review_launch_test.go`); the #3539 review row that deferred it was refuted
 - [ ] [AC5] Tell `rate-limit`, `quota` and `content-filter` apart from `provider-error` by the transcript
 - [ ] [AC5] A request record for a planted run (`WriteEvalRequest` takes only an `EvalLaunch`), with the `prompt.md` digest
 - [ ] [AC5] Remove trees an earlier interrupted run left under `<run>/trees/`
 - [ ] [AC5] Record an attempt's stray writes in its replay tree (`spec.SnapshotTree` before and after, plus `HEAD`, which a status snapshot cannot see move), as `spec review` reports them
-- [ ] [AC3] The run's interrupt context covers the gaps between attempts and reaches a runner in flight (`ExecLauncher.Launch` ignores its context today; a cancelled context waits for the deadline, #3539 review), and the stall timeout is set per runner so a silent `agy --print` is not cut as stalled (`ExecLauncher.Stall` zero means the 10-minute default; no value turns the detector off today)
+- [ ] [AC3] The run's interrupt context reaches a runner in flight (the command's signal context covers the gaps between attempts, and a real SIGINT reaches the runner; `ExecLauncher.Launch` ignores a cancelled context, which waits for the deadline, #3539 review), and the stall timeout is set per runner so a silent `agy --print` is not cut as stalled (`ExecLauncher.Stall` zero means the 10-minute default; no value turns the detector off today)
 - [ ] [AC3] A replay checkout under lanes: check what `dotf lane status` and `dotf lane doctor` report for a worktree the run adds
 - [ ] [AC5] Implement run, grade and epoch reduction; flag results on a candidate's own keys
 - [ ] [AC7] Failing test: `results.json` validates against `result.schema.json` with the provenance fields; no code path opens the pool, map or pins for writing

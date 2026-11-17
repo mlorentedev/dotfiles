@@ -51,7 +51,7 @@ var forgeWriteBackend = func(r forgewrite.Repo) (forgewrite.Backend, error) {
 	if api == "" {
 		api = "https://" + r.Host
 	}
-	return forgewrite.Gitea{BaseURL: api, Token: func() (string, error) { return forgeToken(host.SecretFor(r.Owner, isAgentSession())) }}, nil
+	return forgewrite.Gitea{BaseURL: api, Token: func() (string, error) { return forgeToken(host.Secret) }}, nil
 }
 
 // forgeLandedHeads asks the forge repoRoot's origin names which merged pull
