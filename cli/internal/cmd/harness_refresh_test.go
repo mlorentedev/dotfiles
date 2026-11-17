@@ -15,7 +15,9 @@ import (
 // gitIn runs git in dir and returns trimmed stdout, failing the test on error.
 func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	c := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"}, args...)...)
+	// core.hooksPath: a machine that installs its hooks globally would run
+	// them on every commit of a fixture, seconds each (#3566).
+	c := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main", "-c", "core.hooksPath=" + os.DevNull}, args...)...)
 	c.Dir = dir
 	out, err := c.CombinedOutput()
 	if err != nil {
