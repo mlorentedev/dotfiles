@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
@@ -161,9 +162,21 @@ func TestCheckPersistedEnv_UserPathHead(t *testing.T) {
 			if got := statusOfLine(buf.String(), "user Path"); got != tc.want {
 				t.Fatalf("want %q, got %q\n%s", tagOf(tc.want), tagOf(got), buf.String())
 			}
-			if tc.want == StatusWarn && tc.err == nil && statusOfLine(buf.String(), "dotf converge --only env-persist") != StatusWarn {
+			// The Path line itself, not the first line naming the step: the
+			// variables this fixture leaves unset report their own FAIL above it.
+			if tc.want == StatusWarn && tc.err == nil && !lineMentions(buf.String(), "user Path", "dotf converge --only env-persist") {
 				t.Errorf("the WARN must name the converge step\n%s", buf.String())
 			}
 		})
 	}
+}
+
+// lineMentions reports whether a line of out holds both strings.
+func lineMentions(out, a, b string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, a) && strings.Contains(line, b) {
+			return true
+		}
+	}
+	return false
 }
