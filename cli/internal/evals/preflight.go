@@ -61,6 +61,11 @@ func candidateProblems(id string, candidates map[string]spec.ReviewerEntry, d Pr
 		out = append(out, fmt.Sprintf("%s: runner %s is not on PATH", id, e.Runner))
 	}
 	if strings.TrimSpace(e.Auth) != "login" && strings.TrimSpace(e.SecretID) != "" {
+		// The runner is launched as `dotf secrets run --only <id> --`, the only
+		// way a credential reaches it (ADR-028), so dotf has to be found too.
+		if _, err := d.LookPath("dotf"); err != nil {
+			return append(out, fmt.Sprintf("%s: dotf is not on PATH, and it injects secret %s", id, e.SecretID))
+		}
 		if err := d.CheckSecret(e.SecretID); err != nil {
 			out = append(out, fmt.Sprintf("%s: secret %s does not resolve (%v)", id, e.SecretID, err))
 		}
