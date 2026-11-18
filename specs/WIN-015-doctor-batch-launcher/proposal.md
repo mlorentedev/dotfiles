@@ -20,7 +20,7 @@ On Windows `dotf` refuses to start an agent whose launcher is a batch file, beca
 
 ## What
 
-`dotf doctor` gains a section, on Windows, with one line per agent of the lane launch table: the file a launch starts, or a warning that the only launcher is a batch file dotf refuses.
+`dotf doctor` gains a section, on Windows, with one line per agent of the lane launch table: the file a launch starts, or a warning that the only launcher is a batch file dotf refuses. As in every doctor section, a passing or skipped line prints with `--verbose` and is counted in the section's summary otherwise; a warning always prints.
 
 ## Out of scope
 
@@ -39,10 +39,10 @@ On Windows `dotf` refuses to start an agent whose launcher is a batch file, beca
 
 Observable outcomes. Each must be testable.
 
-- [x] AC1: an agent PATH resolves to a native executable is reported OK, naming the file.
-- [x] AC2: an agent PATH resolves to a batch file, with a native `.exe` behind it, is reported OK naming both files.
+- [x] AC1: an agent PATH resolves to a native executable is reported OK, naming the file (a line under `--verbose`, a count otherwise).
+- [x] AC2: an agent PATH resolves to a batch file, with a native `.exe` behind it, is reported OK naming both files (under `--verbose`).
 - [x] AC3: an agent whose only launcher is a batch file is a warning that names the file and `mise use -g <agent>`; what the tool manager answers is never named as a target unless `lane.NativeTarget` accepts it.
-- [x] AC4: an agent that is not installed is skipped, and every agent of the lane launch table has a line.
+- [x] AC4: an agent that is not installed is skipped, and every agent of the lane launch table has a line under `--verbose`.
 - [x] AC5: off Windows the section is one skipped line, and neither PATH nor the tool manager is asked.
 - [x] AC6: the check starts no process through the System and asks the tool manager only through the seam, once per agent whose launcher is a batch file; a System without the seam reads as a tool manager with nothing.
 
