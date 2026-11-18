@@ -28,7 +28,7 @@ owner: manu
 
 - `cd cli && go test ./internal/doctor/ -count=1 -run TestCheckAgentLaunchers` -> `ok ... 5.366s`.
 - `go vet ./internal/doctor/` for Windows and for Linux: clean.
-- The whole package, `go test ./internal/doctor/ -count=1`, fails on this machine with four tests that fail the same way without this change (three `TestCheckMiseTools_*` that need symlinks, `TestCheckWorkstationTarget_ByStatus` on a domain account). They are ticketed, not part of this change; CI runs the package on all three systems.
+- The whole package, `go test ./internal/doctor/ -count=1`, fails on this machine with four tests that fail the same way without this change (three `TestCheckMiseTools_*` that need symlinks, `TestCheckWorkstationTarget_ByStatus` on a domain account). They are tracked in #1804 and #3247, not part of this change; CI runs the package on all three systems.
 
 ## Decisions made during implementation
 
