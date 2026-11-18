@@ -1,0 +1,13 @@
+{
+  "reviewed_sha": "423923e51c1c8b60995efea27a3fc5d092353dc3",
+  "reviewer": "nan/mimo-v2.6-flash",
+  "requested_at": "2026-11-18T02:49:17Z",
+  "review_digest_before": "",
+  "base_sha": "d99773a328ad650a7331eb917bdf1fa3227342b4",
+  "contract_digests": {
+    "features.json": "ffb86b5b2ae6f99644c78af194944afb3fdc195cd37eb26be5d85fbdf9ed8560",
+    "proposal.md": "3444b8089cda5297dae0e211d2090d12d8d273a84a32c29f6fbf53ac30842071",
+    "spec.md": "",
+    "tasks.md": "8840337da68545736324ca280a9ab74c01943bb436a1c71481e46ca0f5734de0"
+  }
+}
