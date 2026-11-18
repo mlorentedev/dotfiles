@@ -56,3 +56,32 @@ func TestRunObserved_AGateSkipsWithoutRunning(t *testing.T) {
 		t.Errorf("observer heard %q, want only the step that ran", got)
 	}
 }
+
+// A step a failed need holds back is reported where it stands in the run, not
+// after it: the steps around it that need nothing from the failure still run,
+// and the observer hears the three in registry order (CLI-142).
+func TestRunObserved_ReportsAnUnreachedStepInPlace(t *testing.T) {
+	broken := needing{&fake{name: "broken", err: errors.New("boom")}, nil}
+	held := needing{&fake{name: "held"}, []string{"broken"}}
+	free := needing{&fake{name: "free", changes: 1}, nil}
+
+	var obs recorder
+	rep, err := RunObserved([]Reconciler{broken, held, free}, Env{GOOS: "linux"}, false, &obs)
+	if err == nil {
+		t.Fatal("want the broken step's error")
+	}
+	want := []string{
+		"start broken", "done broken: boom",
+		"done held: not reached: broken failed",
+		"start free", "done free: free detail",
+	}
+	if got := strings.Join(obs.log, "\n"); got != strings.Join(want, "\n") {
+		t.Errorf("observer heard:\n%s\nwant:\n%s", got, strings.Join(want, "\n"))
+	}
+	if got := statuses(rep); got != "broken=failed held=skipped free=change" {
+		t.Errorf("entries: %s, want the unreached step between the two that ran", got)
+	}
+	if held.applied || !free.applied {
+		t.Errorf("held ran = %v, free ran = %v: want only the independent step run", held.applied, free.applied)
+	}
+}
