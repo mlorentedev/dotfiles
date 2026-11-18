@@ -277,6 +277,7 @@ func (e sweepEnv) knowledgeAndSecrets() []check {
 		{kind: kindIdentity, section: "bw serve daemon (optional local unlock cache)", restore: restoreBW, run: func() { checkBWServeDaemon(e.sys, e.cfg, e.rep) }},
 		{kind: kindIdentity, section: "Bitwarden mapping (registry -> vault)", restore: restoreBW, run: func() { checkBWMapping(e.sys, e.cfg, e.rep) }},
 		{kind: kindMachine, run: func() { checkAgentConfigSecrets(e.sys, e.rep) }},
+		{kind: kindMachine, run: func() { checkAgentLaunchers(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkHiveBackendCanServe(e.sys, e.rep) }},
 		{kind: kindMachine, run: func() { checkHiveDaemonAnswers(e.sys, e.cfg, e.rep) }},
 		{kind: kindIdentity, section: "Disaster recovery", restore: restoreAge, run: func() { checkDisasterRecovery(e.sys, e.cfg, e.rep) }},

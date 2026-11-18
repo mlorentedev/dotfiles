@@ -1,0 +1,30 @@
+[
+  {
+    "id": "WIN-015-doctor-batch-launcher-f1",
+    "behavior": "an installed agent is reported with the file a launch starts, or warned about when its only launcher is a batch file",
+    "verification": "cd cli && go test ./internal/doctor/ -count=1 -run '^TestCheckAgentLaunchers_ReportsWhatALaunchStarts$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-015-doctor-batch-launcher-f2",
+    "behavior": "every agent of the lane launch table has a line",
+    "verification": "cd cli && go test ./internal/doctor/ -count=1 -run '^TestCheckAgentLaunchers_CoversTheLaunchTable$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-015-doctor-batch-launcher-f3",
+    "behavior": "off Windows the section is one skipped line and nothing is looked up",
+    "verification": "cd cli && go test ./internal/doctor/ -count=1 -run '^TestCheckAgentLaunchers_SkipsOffWindows$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-015-doctor-batch-launcher-f4",
+    "behavior": "without a tool-manager answer the batch launcher is reported and the machine's mise is not asked",
+    "verification": "cd cli && go test ./internal/doctor/ -count=1 -run '^TestCheckAgentLaunchers_WithoutAToolManagerAnswer$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
