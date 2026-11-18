@@ -60,6 +60,13 @@ owner: manu
 - [x] [AC1] Run the command on Linux CI and Windows CI; expected: parity in governed files and findings. (`TestCurrentRepository` in `test (ubuntu-latest)`, `test (macos-latest)` and `test (windows-latest)` on #3561.)
 - [x] Commit and open PR 2; verify no commit path depends on a pre-release binary. (#3561, merged; the hook runs the pinned release.)
 
+## Review follow-ups (#3574)
+
+- [x] An absolute file argument through another name for the checkout's directory is placed by the directory it is in
+- [x] The glob contract is decided (the scanner's, not the retired script's) and pinned by `TestCheckFilesGlobContract`
+- [x] `matchGlob` and `runLintDocPaths` are split (`descend`, `docPathsRoot`)
+- [x] The retirement guard parses the pre-commit configuration
+
 ## Closing
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test
