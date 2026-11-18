@@ -68,10 +68,11 @@ jobs:
 
   # Not gated on the path filter. Go tests guard files outside cli/ (#1888): an
   # allow-list filter treats every unlisted path as safe to skip (lesson 322), and
-  # the guard written for a file never ran on the diff that changed it. setup-go
-  # restores GOCACHE, so `go test` reruns only the packages whose inputs changed,
-  # files read at test time included: on a diff outside cli/ this costs about 30 s
-  # on Linux and 95 s on Windows, in parallel with ci.yml's longer legs. Only the
+  # the guard written for a file never ran on the diff that changed it. Go's test
+  # cache never keys on a file outside the module, so those guards could answer
+  # from the restored GOCACHE for a tree they never read: `-count=1` reruns every
+  # test (#3588, lesson 218). On a diff outside cli/ this costs about 30 s on
+  # Linux and 95 s on Windows, in parallel with ci.yml's longer legs. Only the
   # Windows leg drops, on a documentation-only pull request (CI-013).
   test:
     name: test (${{ matrix.os }})
@@ -93,7 +94,7 @@ jobs:
       - name: Build
         run: go build ./...
       - name: Test
-        run: go test ./...
+        run: go test -count=1 ./...
       - name: Smoke (help + version)
         run: |
           go run ./cmd/dotf --help
