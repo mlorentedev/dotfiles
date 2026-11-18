@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	envpkg "github.com/mlorentedev/dotfiles/cli/internal/env"
 )
 
 func TestCurrentRepository(t *testing.T) {
@@ -23,7 +25,9 @@ func TestCurrentRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	report, err := CheckFiles(CheckOptions{
-		RepoRoot: repo, VaultRoot: os.Getenv("VAULT_PATH"), Policy: policy,
+		// Resolved as `dotf lint doc-paths` resolves it, so this test covers the
+		// seam where a missing vault once failed the command (BUG-165 round 1).
+		RepoRoot: repo, VaultRoot: envpkg.ResolvePath("VAULT_PATH"), Policy: policy,
 	}, files)
 	if err != nil {
 		t.Fatal(err)

@@ -69,3 +69,10 @@ onexistent-vault-dir' go run ./cmd/dotf lint doc-paths` exits 0. The pre-commit 
 - Major, open task lines and stale `f4` text: applied. The four lines are closed with the pull requests that did them (#3201, #3561) and the `f4` sentence says what is true since the cutover. The `gofmt` failure in the same finding is the reviewer's CRLF checkout, not the code: CI's `lint` and `cli-lint` pass on #3561.
 - Major, the policy's exclusions and source extensions were not pinned: applied. `TestCurrentPolicyLoads` compares both lists; removing `specs/` from `harness/doc-paths.json` now fails it.
 - Minor, aliased absolute paths, the glob contract, function size and the substring-matched retirement guard: ticketed (#3574).
+
+Independent review, round 2, of 2026-11-18 (`review.md`, verdict FAIL, one Major and three Minor findings; round 1 kept as `review-round1.md`):
+
+- Major, the repository scan can pass from Go's test cache: applied through #3590. Go never keys a cached test result on a file outside the module root, which is `cli/`. Locally the finding reproduces as written. CI reran every package in 7 measured runs (0 cached of 120), but only because a fresh checkout changes in-module mtimes. #3590 makes the rerun explicit with `go test -count=1 ./...` in both Go test steps and corrects the `cli.yml` comment, so the AC5 gate no longer depends on that side effect (#3588).
+- Minor, the shipped hook still has the round-1 Blocker: deferred to the next release, #3522, which the owner cuts. The fix is on main (`713af95b`); `versions.conf` pins `DOTF_VERSION=0.81.0` until then.
+- Minor, `TestCurrentRepository` read `VAULT_PATH` raw while the command resolves it: applied. The test resolves it through `envpkg.ResolvePath`, as `lint.go` does. It passes with the vault checked out and with `VAULT_PATH=/nonexistent-vault-dir` (`go test -count=1 ./internal/docpaths -run '^TestCurrentRepository$'`).
+- Minor, the retirement guard matches by substring: already ticketed (#3574, item 4).
