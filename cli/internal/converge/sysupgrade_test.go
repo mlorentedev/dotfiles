@@ -33,6 +33,10 @@ type pkgFake struct {
 	pinned   map[string]bool     // brew formulae the manager lists but will not upgrade
 	sudoOK   bool
 	fail     map[string]error // a command, as joined argv, that fails
+	// failAt makes a command fail on its nth run only (1 is the first), and
+	// calls counts the runs of each command.
+	failAt map[string]int
+	calls  map[string]int
 	// wingetOverride, when set, is the `winget upgrade` listing verbatim.
 	wingetOverride []byte
 	// machine is the ids `winget list --scope machine` answers.
@@ -40,7 +44,7 @@ type pkgFake struct {
 }
 
 func newPkgFake(outdated map[string][]string) *pkgFake {
-	return &pkgFake{outdated: outdated, pinned: map[string]bool{}, fail: map[string]error{}}
+	return &pkgFake{outdated: outdated, pinned: map[string]bool{}, fail: map[string]error{}, failAt: map[string]int{}, calls: map[string]int{}}
 }
 
 func (f *pkgFake) clear(manager string, names ...string) {
@@ -54,6 +58,9 @@ func (f *pkgFake) run(name string, args ...string) ([]byte, error) {
 	f.log = append(f.log, argv)
 	if err := f.fail[argv]; err != nil {
 		return nil, err
+	}
+	if f.calls[argv]++; f.failAt[argv] == f.calls[argv] {
+		return nil, errors.New("exit status 1: boom")
 	}
 	switch {
 	case argv == "sudo -n true":
@@ -710,5 +717,102 @@ func TestSystemUpgradeWindowsNoUpgradesIsNotAFailure(t *testing.T) {
 	f.fail["winget upgrade --accept-source-agreements"] = fmt.Errorf("%w: No installed package found matching input criteria.", exitCoder{0x8A15002B})
 	if _, err := upgradeStep(f).wingetBehind(nil); err == nil {
 		t.Error("another winget error, English text or not, is still a failure")
+	}
+}
+
+const (
+	wingetListing     = "winget upgrade --accept-source-agreements"
+	wingetMachineList = "winget list --scope machine --accept-source-agreements --disable-interactivity"
+)
+
+// The second listing only confirms what the run already did. When it fails the
+// step fails, and its line still says what winget reported upgraded and what
+// was left waiting (#3573).
+func TestSystemUpgradeWindowsKeepsWhatItDidWhenTheConfirmingListingFails(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	f := newPkgFake(map[string][]string{"winget": {"Git.Git", "eza-community.eza", "GitHub.cli"}})
+	f.machine = []string{"GitHub.cli"}
+	f.failAt[wingetListing] = 2
+
+	res, err := upgradeStep(f).Reconcile(env, false)
+	if err == nil || !strings.Contains(err.Error(), "confirming the upgrades") || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("err = %v, want the failed confirmation named", err)
+	}
+	if res.Changes != 2 {
+		t.Errorf("Changes = %d, want the 2 upgrades winget reported: a failed step keeps its line only with changes", res.Changes)
+	}
+	for _, want := range []string{"not confirmed: Git.Git, eza-community.eza", NeedsElevationNote, "GitHub.cli (" + machineWide + ")"} {
+		if !strings.Contains(res.Detail, want) {
+			t.Errorf("Detail = %q, want it to hold %q", res.Detail, want)
+		}
+	}
+	if strings.Contains(res.Detail, "upgraded: Git.Git") {
+		t.Errorf("Detail = %q, want no unconfirmed id named as upgraded", res.Detail)
+	}
+}
+
+// winget answers a scope with no package in it with NO_APPLICATIONS_FOUND, not
+// with an empty table: nothing is machine-wide, so everything is attempted.
+func TestSystemUpgradeWindowsWithoutElevationReadsNoMachineWideInstallAsNone(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	f := newPkgFake(map[string][]string{"winget": {"Git.Git"}})
+	f.fail[wingetMachineList] = fmt.Errorf("%w: no installed package found", exitCoder{0x8A150014})
+
+	res, err := upgradeStep(f).Reconcile(env, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Changes != 1 || !strings.Contains(res.Detail, "upgraded: Git.Git") || strings.Contains(res.Detail, NeedsElevationNote) {
+		t.Errorf("res = %+v, want Git.Git upgraded and nothing left waiting", res)
+	}
+	if len(f.ran(wingetMachineList)) != 1 {
+		t.Errorf("the machine scope was not asked once: %q", f.log)
+	}
+}
+
+// Without elevation the probe lets every outdated id through, so it has no
+// use for a listing: one that failed there would fail a step that succeeded.
+func TestSystemUpgradeWindowsProbeDoesNotListWithoutElevation(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	f := newPkgFake(map[string][]string{"winget": {"Git.Git"}})
+	step := upgradeStep(f)
+	if _, err := step.Reconcile(env, false); err != nil {
+		t.Fatal(err)
+	}
+	before := f.calls[wingetListing]
+	f.fail[wingetListing] = errors.New("exit status 1: transient")
+	if err := step.Probe(env); err != nil {
+		t.Errorf("Probe = %v, want nil", err)
+	}
+	if f.calls[wingetListing] != before || len(f.ran(wingetListing)) != before {
+		t.Errorf("the probe listed again: %q", f.ran(wingetListing))
+	}
+}
+
+// When every outdated id waits for elevation the catalog is not up to date,
+// and the line must not say it is.
+func TestSystemUpgradeWindowsDoesNotCallTheCatalogUpToDateWhenEveryIdWaits(t *testing.T) {
+	env := upgradeEnv(t, "windows")
+	for _, dryRun := range []bool{true, false} {
+		f := newPkgFake(map[string][]string{"winget": {"GitHub.cli"}})
+		f.machine = []string{"GitHub.cli"}
+		res, err := upgradeStep(f).Reconcile(env, dryRun)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(res.Detail, "up to date") || !strings.Contains(res.Detail, NeedsElevationNote) {
+			t.Errorf("dryRun=%v: Detail = %q, want the waiting id named and no claim of being up to date", dryRun, res.Detail)
+		}
+	}
+	// The same line on macOS, where a cask waits for sudo.
+	f := newPkgFake(map[string][]string{"brew-cask": {"veracrypt"}})
+	res, err := upgradeStep(f).Reconcile(upgradeEnv(t, "darwin"), false)
+	if err != nil || strings.Contains(res.Detail, "up to date") || !strings.Contains(res.Detail, "left, needs sudo: veracrypt") {
+		t.Errorf("darwin: res = %+v, %v: want the cask named and no claim of being up to date", res, err)
+	}
+	f = newPkgFake(map[string][]string{"winget": nil})
+	res, err = upgradeStep(f).Reconcile(env, false)
+	if err != nil || !strings.Contains(res.Detail, "catalog entries up to date") {
+		t.Errorf("res = %+v, %v: want a catalog with nothing outdated still called up to date", res, err)
 	}
 }
