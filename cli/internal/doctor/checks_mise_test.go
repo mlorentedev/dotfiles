@@ -3,6 +3,7 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +38,8 @@ func miseFixture(t *testing.T, goos, ageVersion string, synced bool, extra ...ma
 		"mise bin-paths --bin-names age@1.2.1 jq@1.7.1": "age\nage-keygen\njq\n",
 		"mise install":              "",
 		"mise ls --prunable --json": "{}",
+		// Which config mise runs each pin from: nothing foreign by default.
+		"mise ls --current --json": "{}",
 	}
 	for _, m := range extra {
 		for k, v := range m {
@@ -668,6 +671,7 @@ func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
 		"mise bin-paths --bin-names bats@1.13.0": "bats\n",
 		"mise install":                           "",
 		"mise ls --prunable --json":              "{}",
+		"mise ls --current --json":               "{}",
 	})
 	s.GOOS = "windows"
 	var scoped, unscoped []string
@@ -763,5 +767,107 @@ func TestCheckMiseTools_WindowsBatsProbeReadsStdoutAlone(t *testing.T) {
 	// The failure must be the bats pin, not some unrelated fixture error.
 	if rep.Failures() == 0 || !strings.Contains(b.String(), "not running at their pin through mise: bats") {
 		t.Errorf("a failed bats run whose stderr names the pin must fail the bats pin\n%s", b.String())
+	}
+}
+
+// currentLs is `mise ls --current --json` for tools, each (version, source).
+func currentLs(tools map[string][2]string) string {
+	var parts []string
+	for tool, vs := range tools {
+		parts = append(parts, fmt.Sprintf(`%q:[{"version":%q,"requested_version":%q,"active":true,"source":{"type":"mise.toml","path":%q}}]`, tool, vs[0], vs[0], vs[1]))
+	}
+	return "{" + strings.Join(parts, ",") + "}"
+}
+
+// A pin another config holds is reported whichever way its version differs
+// (#3532): a newer one passes the sync's post-condition, so before this the
+// check said "at their pin" while go and golangci-lint ran versions no
+// reviewed commit chose. It is a WARN naming the file and the fix, and it
+// replaces the pass line rather than adding a second line for the tool.
+func TestCheckMiseTools_ANewerPinHeldByAnotherConfigWarnsNamingTheFile(t *testing.T) {
+	foreign := "/home/ace/.config/mise/config.toml"
+	s, cfg := miseFixture(t, "darwin", "1.2.1", true, map[string]string{
+		"mise ls --current --json": currentLs(map[string][2]string{"age": {"1.3.0", foreign}}),
+	})
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	if rep.Failures() != 0 || rep.Warnings() != 1 {
+		t.Errorf("want one WARN and no FAIL, got %d warn, %d fail\n%s", rep.Warnings(), rep.Failures(), b.String())
+	}
+	for _, w := range []string{foreign, "age 1.3.0", "pin 1.2.1", "FIX: remove the pin there"} {
+		if !strings.Contains(b.String(), w) {
+			t.Errorf("output lacks %q\n%s", w, b.String())
+		}
+	}
+	if strings.Contains(b.String(), "CLI(s) at their pin") {
+		t.Errorf("a pin run from another file must not read as at its pin\n%s", b.String())
+	}
+}
+
+// Only a pinned tool is claimed: this Mac's go sits in config.toml on purpose
+// (not a `# mise: cli` pin yet), and a tool no pin asks for is not drift. Where
+// mise cannot say, the check says it could not check instead of passing.
+func TestCheckMiseTools_OnlyPinnedToolsAreClaimedAndAnUnreadableAnswerIsNotAPass(t *testing.T) {
+	foreign := "/home/ace/.config/mise/config.toml"
+	s, cfg := miseFixture(t, "darwin", "1.2.1", true, map[string]string{
+		"mise ls --current --json": currentLs(map[string][2]string{"go": {"1.26.10", foreign}}),
+	})
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	if rep.Failures() != 0 || rep.Warnings() != 0 || !strings.Contains(b.String(), "2 CLI(s) at their pin") {
+		t.Errorf("an unpinned tool in a foreign file is not drift\n%s", b.String())
+	}
+
+	s, cfg = miseFixture(t, "darwin", "1.2.1", true, map[string]string{"mise ls --current --json": "not json"})
+	b.Reset()
+	rep = capture(&b)
+	checkMiseTools(s, cfg, rep, false)
+	if rep.Failures() != 0 || rep.Warnings() != 1 || !strings.Contains(b.String(), "cannot tell which config") || strings.Contains(b.String(), "CLI(s) at their pin") {
+		t.Errorf("want one WARN saying it could not check, and no pass\n%s", b.String())
+	}
+}
+
+// --fix repairs what the sync owns and never the user's own config.toml: the
+// foreign file is theirs (PLAT-001c), so it is reported with the fix, untouched.
+func TestCheckMiseTools_FixNeverEditsTheForeignConfig(t *testing.T) {
+	foreignDir := t.TempDir()
+	foreign := filepath.Join(foreignDir, "config.toml")
+	const body = "[tools]\nage = \"1.3.0\"\n"
+	writeFile(t, foreign, body)
+	s, cfg := miseFixture(t, "darwin", "1.2.1", true, map[string]string{
+		"mise ls --current --json": currentLs(map[string][2]string{"age": {"1.3.0", foreign}}),
+	})
+	var b bytes.Buffer
+	rep := capture(&b)
+	checkMiseTools(s, cfg, rep, true)
+	got, err := os.ReadFile(foreign)
+	if err != nil || string(got) != body {
+		t.Errorf("the foreign config changed: %q, %v", got, err)
+	}
+	if !strings.Contains(b.String(), foreign) || !strings.Contains(b.String(), "line 2") {
+		t.Errorf("--fix must still name the file and the line to remove\n%s", b.String())
+	}
+}
+
+// The source lookup runs from HOME, so a project's own mise.toml, which mise
+// reads from the working directory, is never reported as the user shadowing a
+// pin (reviewer finding on #3587).
+func TestCheckMiseTools_TheSourceLookupRunsFromHome(t *testing.T) {
+	s, cfg := miseFixture(t, "darwin", "1.2.1", true)
+	var home, ranIn string
+	plain := s.CommandStdoutDir
+	s.CommandStdoutDir = func(dir, name string, args ...string) (string, error) {
+		if name == "mise" && strings.Join(args, " ") == "ls --current --json" {
+			ranIn = dir
+		}
+		return plain(dir, name, args...)
+	}
+	home = s.Getenv("HOME")
+	rep := capture(&bytes.Buffer{})
+	checkMiseTools(s, cfg, rep, false)
+	if ranIn == "" || ranIn != home {
+		t.Errorf("mise ls --current --json ran from %q, want HOME %q", ranIn, home)
 	}
 }

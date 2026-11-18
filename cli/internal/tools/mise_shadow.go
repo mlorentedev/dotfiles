@@ -2,12 +2,15 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
-// shadowFix is what an operator does about a pin that another config holds.
-const shadowFix = "remove the pin there, or let that file's owner stop pinning a tool versions.conf owns"
+// ShadowFix is what an operator does about a pin that another config holds.
+const ShadowFix = "remove the pin there, or let that file's owner stop pinning a tool versions.conf owns"
 
 // lsEntry is the part of one `mise ls --json <tool>` entry the shadow
 // check reads. mise prints an array with one entry per installed version; the
@@ -66,7 +69,7 @@ func (s MiseSync) ShadowNote(pins []MiseTool, missing []string) (cause, fix stri
 	for i, path := range files {
 		parts[i] = path + " pins " + strings.Join(byFile[path], ", ") + " and outranks " + s.ConfigPath()
 	}
-	return strings.Join(parts, "; "), shadowFix
+	return strings.Join(parts, "; "), ShadowFix
 }
 
 // pinOf is the pin for name, or a pin with no version when none is declared.
@@ -133,4 +136,104 @@ func (s MiseSync) shadowSuffix(pins []MiseTool, missing []string) string {
 		return ""
 	}
 	return "; " + cause + ": " + fix
+}
+
+// SourceDrift is a pinned tool that mise runs from a config other than the one
+// the sync owns: Tool at Version, requested by the file at Path, where
+// versions.conf says Pin. Line is where Path declares the tool, 0 when the file
+// cannot be read or does not write the tool (a project file, an env override).
+type SourceDrift struct {
+	Tool, Version, Pin, Path string
+	Line                     int
+}
+
+// SourceDrift lists every pin whose active entry comes from a foreign config,
+// whichever way its version differs from the pin: a file that pins a newer
+// version passes the sync's post-condition and ShadowNote never looks at it,
+// so a go 1.27.4 and a golangci-lint 2.15.0 that no reviewed commit chose ran
+// unseen (#3532). One `mise ls --current --json` answers for every pin. The
+// caller runs it from the home directory, so a project's own mise.toml is not
+// reported as drift. An error means mise could not say, which is not the same
+// as "no drift"; a tool with no active entry or no source path is not claimed.
+func (s MiseSync) SourceDrift(pins []MiseTool) ([]SourceDrift, error) {
+	run := s.Stdout
+	if run == nil {
+		run = s.Run
+	}
+	out, err := run("mise", "ls", "--current", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("mise ls --current --json: %w", err)
+	}
+	var byTool map[string][]lsEntry
+	if err := json.Unmarshal(out, &byTool); err != nil {
+		return nil, fmt.Errorf("mise ls --current --json: an answer this does not read: %w", err)
+	}
+	var drifts []SourceDrift
+	for _, pin := range pins {
+		for _, key := range lsKeys(pin.Name) {
+			e, ok := activeEntry(byTool[key])
+			if !ok {
+				continue
+			}
+			if !samePath(e.Source.Path, s.ConfigPath()) {
+				drifts = append(drifts, SourceDrift{
+					Tool: pin.Name, Version: e.Version, Pin: pin.Version, Path: e.Source.Path,
+					Line: declaredAt(e.Source.Path, lsKeys(pin.Name)),
+				})
+			}
+			break
+		}
+	}
+	return drifts, nil
+}
+
+// activeEntry is the entry mise runs, when it names the config that asked for it.
+func activeEntry(entries []lsEntry) (lsEntry, bool) {
+	for _, e := range entries {
+		if e.Active && e.Source.Path != "" {
+			return e, true
+		}
+	}
+	return lsEntry{}, false
+}
+
+// lsKeys are the names mise may list a pinned tool under: its short name, and
+// the key the sync writes when that is not the short name (a Windows bats is
+// npm:bats, a Windows direnv is github:direnv/direnv, an npm CLI is aliased).
+func lsKeys(name string) []string {
+	keys := []string{name}
+	switch name {
+	case "bats":
+		keys = append(keys, "npm:bats")
+	case "direnv":
+		keys = append(keys, "github:direnv/direnv")
+	}
+	if backend, ok := aliasBackend(name); ok {
+		keys = append(keys, backend)
+	}
+	return keys
+}
+
+// declaredAt is the 1-based line where the config at path declares one of keys,
+// as `key = ...` or as a `[tools.key]` table, bare or quoted; 0 when the file
+// cannot be read or has none. Best effort: it names a line to remove, it
+// claims nothing.
+func declaredAt(path string, keys []string) int {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	quoted := make([]string, len(keys))
+	for i, k := range keys {
+		quoted[i] = regexp.QuoteMeta(k)
+	}
+	alt := `(?:` + strings.Join(quoted, "|") + `)`
+	key := `(?:"` + alt + `"|'` + alt + `'|` + alt + `)`
+	re := regexp.MustCompile(`^\s*(?:` + key + `\s*=|\[tools\.` + key + `\])`)
+	for i, line := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
+		if re.MatchString(line) {
+			return i + 1
+		}
+	}
+	return 0
 }
