@@ -111,6 +111,8 @@ func (l ExecLauncher) attempt(a Attempt, entry spec.ReviewerEntry, tree string) 
 	}
 	res := resultOf(ran)
 	res.Duration = time.Since(began)
+	// Read whatever the run ended as: a cut run still spent what it spent.
+	res.Tokens = ReadTokens(entry.Runner, plan.Transcript)
 	switch keepErr := keepAnswer(plan.Answer, plan.Result); {
 	case errors.Is(keepErr, errNotRegular):
 		res.ExitErr = errors.Join(res.ExitErr, keepErr)

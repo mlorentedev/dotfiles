@@ -91,3 +91,19 @@ func TestLaunchReturnsWhenTheDeadlineCutsARunnerWithChildren(t *testing.T) {
 		t.Errorf("the tree outlived the attempt: %v", err)
 	}
 }
+
+// Spend is not a grade: a runner the deadline cut still reports what it spent
+// before the cut, and the record keeps it.
+func TestLaunchKeepsTheTokensOfARunTheDeadlineCut(t *testing.T) {
+	root, c := plantedRoot(t)
+	a := attemptIn(t.TempDir(), c)
+	script := `printf '%s\n' '{"event":"step_update","step_update":{"step_index":1,"state":"DONE","usage":{"input_tokens":100,"output_tokens":20,"thinking_tokens":5,"cache_read_tokens":300}}}'; sleep 30`
+	res, err := launchWithin(t, shellLauncher(root, script, 2*time.Second), a, 30*time.Second)
+	if err != nil || !res.TimedOut {
+		t.Fatalf("err %v, result %+v", err, res)
+	}
+	want := Tokens{Input: 100, Cached: 300, Output: 20, Thinking: 5}
+	if res.Tokens == nil || *res.Tokens != want {
+		t.Errorf("tokens = %+v, want %+v", res.Tokens, want)
+	}
+}
