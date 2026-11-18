@@ -73,11 +73,19 @@ type LaunchResult struct {
 }
 
 // Tokens is what a runner reported spending. Absent is "not reported", never 0.
+// Input is the uncached prompt; Cached is read from or written to the
+// provider's cache, which both pi and agy report apart from Input. Thinking is
+// the reasoning count the runner reports, and pi counts it inside Output.
 type Tokens struct {
 	Input    int `json:"input"`
+	Cached   int `json:"cached"`
 	Output   int `json:"output"`
 	Thinking int `json:"thinking"`
 }
+
+// Total is every token the run sent or received, the unit a plan's envelope
+// is written in. Thinking is not added again.
+func (t Tokens) Total() int { return t.Input + t.Cached + t.Output }
 
 // Launcher runs one attempt. It returns an error only for a failure on our
 // side; a runner that failed is a LaunchResult with ExitErr set. It copies the
