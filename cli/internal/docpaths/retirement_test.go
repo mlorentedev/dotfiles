@@ -79,8 +79,9 @@ func TestShellGuardIsRetiredAfterCutover(t *testing.T) {
 	}
 }
 
-// The guard reads the hook, not the file's text: each of these configurations
-// holds the substring the guard used to look for (CLI-141).
+// The guard reads the hook, not the file's text. Four of these configurations
+// passed when it looked for a substring; the two that name the retired script
+// it already refused (CLI-141).
 func TestCutOverReadsTheHookNotTheText(t *testing.T) {
 	const head = "repos:\n  - repo: local\n    hooks:\n"
 	hook := func(lines ...string) string { return head + "      - " + strings.Join(lines, "\n        ") + "\n" }

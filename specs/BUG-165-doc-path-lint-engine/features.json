@@ -74,6 +74,6 @@
     "behavior": "The retirement guard reads the doc-path hook's entry, pass_filenames and stages from the parsed pre-commit configuration.",
     "verification": "cd cli && go test ./internal/docpaths -count=1 -run '^Test(ShellGuardIsRetiredAfterCutover|CutOverReadsTheHookNotTheText)$'",
     "state": "verified",
-    "evidence": "Windows 2026-11-17: exit 0; six configurations the substring check accepted are refused."
+    "evidence": "Windows 2026-11-17: exit 0; six configurations are refused, four of which the substring check accepted."
   }
 ]
