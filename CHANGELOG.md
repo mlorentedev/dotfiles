@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.82.0](https://github.com/mlorentedev/dotfiles/compare/v0.81.0...v0.82.0) (2026-11-18)
+
+
+### Features
+
+* **doctor:** report which file a launch of each agent starts on Windows ([#3589](https://github.com/mlorentedev/dotfiles/issues/3589)) ([591adb7](https://github.com/mlorentedev/dotfiles/commit/591adb75619e831fc1fec2efc793cd7411f2fd40)), closes [#3572](https://github.com/mlorentedev/dotfiles/issues/3572)
+* **doctor:** warn when another mise config runs a pinned CLI ([#3587](https://github.com/mlorentedev/dotfiles/issues/3587)) ([5207ba7](https://github.com/mlorentedev/dotfiles/commit/5207ba72427a17eab2063be1fef0e4e92379c66a))
+* **env:** derive workspace paths from the project boundary ([#3556](https://github.com/mlorentedev/dotfiles/issues/3556)) ([d1dee10](https://github.com/mlorentedev/dotfiles/commit/d1dee106f5a12dd033f1962d1c1e25940d5ffc6d)), closes [#3191](https://github.com/mlorentedev/dotfiles/issues/3191)
+* **eval:** launch an attempt with a real runner, after a preflight ([#3539](https://github.com/mlorentedev/dotfiles/issues/3539)) ([d81c66f](https://github.com/mlorentedev/dotfiles/commit/d81c66f60448a44678600dd83524e7f8441b0421))
+* **eval:** launch the matrix after the corpus check and the preflight ([#3549](https://github.com/mlorentedev/dotfiles/issues/3549)) ([863478a](https://github.com/mlorentedev/dotfiles/commit/863478abacf0b4d2a96d982504e90d211509f4c4))
+* **eval:** plan a planted launch and run a plan's attempts through a launcher ([#3527](https://github.com/mlorentedev/dotfiles/issues/3527)) ([6f702ee](https://github.com/mlorentedev/dotfiles/commit/6f702eea36f64c6437e49ba3973f75b97e7faf1f))
+* **eval:** record the tokens each runner reports in its transcript ([#3591](https://github.com/mlorentedev/dotfiles/issues/3591)) ([59ca1d2](https://github.com/mlorentedev/dotfiles/commit/59ca1d2aec45aff56d5757cdd99db0e4ef393963))
+* **evals:** plan an evaluation run and refuse it above its cap ([#3520](https://github.com/mlorentedev/dotfiles/issues/3520)) ([fbaca25](https://github.com/mlorentedev/dotfiles/commit/fbaca255088ee74619ac6dcff933371f361f52eb))
+* **lane:** bind agy's PreInvocation session line ([#3497](https://github.com/mlorentedev/dotfiles/issues/3497)) ([14074a5](https://github.com/mlorentedev/dotfiles/commit/14074a5d26680a9335f8524f7171b1acde3d5825))
+* **lane:** declare dotfiles a lane repository ([#3514](https://github.com/mlorentedev/dotfiles/issues/3514)) ([7e4bafa](https://github.com/mlorentedev/dotfiles/commit/7e4bafa74cb3b3457d138606f688309015a9f815))
+* **lane:** start an agent on a named model from worktree add, lane exec and lane next ([#3528](https://github.com/mlorentedev/dotfiles/issues/3528)) ([439a54b](https://github.com/mlorentedev/dotfiles/commit/439a54b30702f3539ed3947e5c6777cf4b9fbc51))
+* **lint:** report a vendored hygiene script as a fleet finding ([#3565](https://github.com/mlorentedev/dotfiles/issues/3565)) ([60ad8e2](https://github.com/mlorentedev/dotfiles/commit/60ad8e25b8eca48ef8516a4661100fae7c603135))
+* **prland:** name the lane that still holds a landed branch ([#3544](https://github.com/mlorentedev/dotfiles/issues/3544)) ([16665e4](https://github.com/mlorentedev/dotfiles/commit/16665e40e1bea985f846067ce840c561a74c414c))
+* **secrets:** declare web's CI GitHub App credentials ([#3579](https://github.com/mlorentedev/dotfiles/issues/3579)) ([3045157](https://github.com/mlorentedev/dotfiles/commit/3045157e86f02dac68c581bbef3899b563c1a0b9))
+* **tools:** let Renovate propose versions.conf and packages.json bumps ([#3543](https://github.com/mlorentedev/dotfiles/issues/3543)) ([716c238](https://github.com/mlorentedev/dotfiles/commit/716c238ef86d2e5381a94da2dab895ee20582fc0)), closes [#3284](https://github.com/mlorentedev/dotfiles/issues/3284)
+
+
+### Bug Fixes
+
+* **converge:** a failed step holds back only the steps that need it ([#3560](https://github.com/mlorentedev/dotfiles/issues/3560)) ([d0c98f7](https://github.com/mlorentedev/dotfiles/commit/d0c98f7d6546bf813e4efa656091d9b1313257ef)), closes [#3554](https://github.com/mlorentedev/dotfiles/issues/3554)
+* **converge:** bound winget in the system-upgrade step ([#3562](https://github.com/mlorentedev/dotfiles/issues/3562)) ([2060f62](https://github.com/mlorentedev/dotfiles/commit/2060f6296cf0ad7a03ced3d2c770bf751b9fe1ac))
+* **converge:** do not attempt machine-wide winget upgrades without elevation ([#3555](https://github.com/mlorentedev/dotfiles/issues/3555)) ([9036b17](https://github.com/mlorentedev/dotfiles/commit/9036b17fe8df3be25eb90dcdea107542ab866727)), closes [#3553](https://github.com/mlorentedev/dotfiles/issues/3553)
+* **converge:** keep what system-upgrade did when its confirming listing fails ([#3580](https://github.com/mlorentedev/dotfiles/issues/3580)) ([19be8d7](https://github.com/mlorentedev/dotfiles/commit/19be8d735339213b8a4928dcfd5dcd451516675d)), closes [#3573](https://github.com/mlorentedev/dotfiles/issues/3573)
+* **converge:** prune old mise tool versions in cache-gc ([#3534](https://github.com/mlorentedev/dotfiles/issues/3534)) ([ab16831](https://github.com/mlorentedev/dotfiles/commit/ab168310c9b361381b5de3d02063e873a5fad02e)), closes [#3533](https://github.com/mlorentedev/dotfiles/issues/3533)
+* **doctor:** read the scoped bats probe from stdout alone ([#3536](https://github.com/mlorentedev/dotfiles/issues/3536)) ([72d209c](https://github.com/mlorentedev/dotfiles/commit/72d209cd0513276dcb687491ffa0e6a155803033))
+* **doctor:** run the bats probe with Git Bash first, as the sync does ([#3515](https://github.com/mlorentedev/dotfiles/issues/3515)) ([49639be](https://github.com/mlorentedev/dotfiles/commit/49639be42f196b71f55556cdd2c8ae09806944fa))
+* **forge:** write with the host's token in every session ([#3563](https://github.com/mlorentedev/dotfiles/issues/3563)) ([c3decda](https://github.com/mlorentedev/dotfiles/commit/c3decdac232b3f58b6b6688ad034744c8fb43117))
+* **guard:** exempt fixture trees from the memory-sink guard ([#3552](https://github.com/mlorentedev/dotfiles/issues/3552)) ([e06c735](https://github.com/mlorentedev/dotfiles/commit/e06c73525bd6891c0bb5251dc9b07499103607d7))
+* **lane:** start the native executable mise holds behind a batch shim ([#3570](https://github.com/mlorentedev/dotfiles/issues/3570)) ([60b59f5](https://github.com/mlorentedev/dotfiles/commit/60b59f56d321d5ccb484bc0b9ce926444b5db4f8)), closes [#3569](https://github.com/mlorentedev/dotfiles/issues/3569)
+* **lint:** accept a doc-paths file argument that reaches the checkout through an alias ([#3585](https://github.com/mlorentedev/dotfiles/issues/3585)) ([d24efa2](https://github.com/mlorentedev/dotfiles/commit/d24efa2ce48a817d259ed61c0d74ef3ff8cc95a5)), closes [#3574](https://github.com/mlorentedev/dotfiles/issues/3574)
+* **lint:** retire the shell doc path guard ([#3561](https://github.com/mlorentedev/dotfiles/issues/3561)) ([ccf90b3](https://github.com/mlorentedev/dotfiles/commit/ccf90b3b8cd9ebfe5c5e2bbda03284acd8a0ccfc)), closes [#3266](https://github.com/mlorentedev/dotfiles/issues/3266)
+* **lint:** skip vault references without a vault, and record three spec reviews ([#3575](https://github.com/mlorentedev/dotfiles/issues/3575)) ([713af95](https://github.com/mlorentedev/dotfiles/commit/713af95b5326327b9049a418f071c93a33044456)), closes [#3569](https://github.com/mlorentedev/dotfiles/issues/3569)
+* **mem:** archive a handoff thread in one shape and report a failed park archive ([#3518](https://github.com/mlorentedev/dotfiles/issues/3518)) ([4d42f18](https://github.com/mlorentedev/dotfiles/commit/4d42f1885481cc8cfe8267f88043d3c9ff1faf01))
+* **mem:** say when a parked thread's file belongs to another thread ([#3529](https://github.com/mlorentedev/dotfiles/issues/3529)) ([f4e3c7d](https://github.com/mlorentedev/dotfiles/commit/f4e3c7d5052c5ce87674ab12e885769d185d7832)), closes [#3521](https://github.com/mlorentedev/dotfiles/issues/3521)
+* **prland:** land without gh --delete-branch so a persistent lane survives ([#3538](https://github.com/mlorentedev/dotfiles/issues/3538)) ([900029d](https://github.com/mlorentedev/dotfiles/commit/900029dbfb1dff5cdd30628a142f2a01feddf72e))
+* **secrets:** keep a multi-line value's line breaks in sync ci ([#3582](https://github.com/mlorentedev/dotfiles/issues/3582)) ([cabe95f](https://github.com/mlorentedev/dotfiles/commit/cabe95faba97194cadf62fb3e5ee29fba72fb5d9))
+* **setup-windows:** append the scripts directory to the user Path ([#3516](https://github.com/mlorentedev/dotfiles/issues/3516)) ([24c10d1](https://github.com/mlorentedev/dotfiles/commit/24c10d1359494f511e08563524bd2d2cccff6246))
+* **tools:** answer the knowledge gate in Renovate's PR bodies ([#3548](https://github.com/mlorentedev/dotfiles/issues/3548)) ([a23da78](https://github.com/mlorentedev/dotfiles/commit/a23da782e46c4ab725f9f8b92dc2fd879d0f0a36)), closes [#3284](https://github.com/mlorentedev/dotfiles/issues/3284)
+* **tools:** name the mise config that shadows a pin ([#3526](https://github.com/mlorentedev/dotfiles/issues/3526)) ([24fae57](https://github.com/mlorentedev/dotfiles/commit/24fae57660636c6ce1f4b64c46d4d6ad67490db2))
+
 ## [0.81.0](https://github.com/mlorentedev/dotfiles/compare/v0.80.0...v0.81.0) (2026-11-14)
 
 
