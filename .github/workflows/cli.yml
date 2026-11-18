@@ -71,9 +71,10 @@ jobs:
   # the guard written for a file never ran on the diff that changed it. Go's test
   # cache never keys on a file outside the module, so those guards could answer
   # from the restored GOCACHE for a tree they never read: `-count=1` reruns every
-  # test (#3588, lesson 218). On a diff outside cli/ this costs about 30 s on
-  # Linux and 95 s on Windows, in parallel with ci.yml's longer legs. Only the
-  # Windows leg drops, on a documentation-only pull request (CI-013).
+  # test (#3588, lesson 218). Measured on #3590, the Test step took 48 s on
+  # Linux and 304 s on Windows, still shorter than ci.yml's Windows leg it runs
+  # beside (7 min). Only the Windows leg drops, on a documentation-only pull
+  # request (CI-013).
   test:
     name: test (${{ matrix.os }})
     needs: changes
