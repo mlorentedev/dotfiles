@@ -57,10 +57,10 @@ Run on Windows 11, 2026-11-16, from this worktree.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-173-converge-step-dependencies/` -> `specs/archive/BUG-173-converge-step-dependencies/`
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-173-converge-step-dependencies/` -> `specs/archive/BUG-173-converge-step-dependencies/`
 - [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] Promotions above executed (if any)
 
 ## Review dispositions
 
