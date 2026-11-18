@@ -445,3 +445,35 @@ func TestSecretsSyncCi_RefusalFromACheckoutAtDotfilesDirIsNotTheCopy(t *testing.
 		t.Fatalf("want the checkout form naming %s, got:\n%v", path, err)
 	}
 }
+
+// SEC-019 — a multi-line value (a GitHub App PEM key) keeps its line breaks on the
+// way to `gh secret set`. EnvFor strips every CR/LF for env injection; an upload is
+// not env injection, and a flattened PEM fails at the workflow, not at the sync.
+func TestSecretsSyncCi_MultiLineValueKeepsItsLineBreaks(t *testing.T) {
+	pem := "-----BEGIN RSA PRIVATE KEY-----\nAAAA\nBBBB\n-----END RSA PRIVATE KEY-----"
+	setter := fakeSetter{}
+	_, err := syncCiExec(t, ciRegistry, setter, fakeBW{"it/f": pem + "\n"},
+		map[string]string{"rel.src": "rel-val"}, "--repo", "mlorentedev/dotfiles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := setter["mlorentedev/dotfiles|BW_TOKEN"]; got != pem {
+		t.Errorf("uploaded %q, want %q (interior line breaks kept, trailing one trimmed)", got, pem)
+	}
+}
+
+// SEC-019 — a single-line token still uploads without the trailing newline that
+// `age -d` appends, LF or CRLF.
+func TestSecretsSyncCi_TrailingNewlineIsStillTrimmed(t *testing.T) {
+	for _, raw := range []string{"rel-val\n", "rel-val\r\n"} {
+		setter := fakeSetter{}
+		_, err := syncCiExec(t, ciRegistry, setter, fakeBW{"it/f": "bw-val"},
+			map[string]string{"rel.src": raw}, "--repo", "mlorentedev/dotfiles")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := setter["mlorentedev/dotfiles|RELEASE_TOKEN"]; got != "rel-val" {
+			t.Errorf("age value %q uploaded as %q, want %q", raw, got, "rel-val")
+		}
+	}
+}
