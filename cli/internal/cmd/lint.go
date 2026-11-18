@@ -46,22 +46,9 @@ func newLintDocPathsCmd() *cobra.Command {
 }
 
 func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []string) error {
-	repoExplicit := repo != ""
-	var prefix string
-	if !repoExplicit {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("resolve working directory: %w", err)
-		}
-		root, rootPrefix, err := docpaths.RepositoryLocation(cwd)
-		if err != nil {
-			return err
-		}
-		repo, prefix = root, rootPrefix
-	}
-	repo, err := filepath.Abs(repo)
+	repo, base, err := docPathsRoot(repo)
 	if err != nil {
-		return fmt.Errorf("resolve repository root: %w", err)
+		return err
 	}
 	if policyPath == "" {
 		policyPath = filepath.Join(repo, "harness", "doc-paths.json")
@@ -72,18 +59,11 @@ func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []
 	}
 	if len(files) == 0 {
 		files, err = docpaths.Discover(repo, policy)
-		if err != nil {
-			return err
-		}
 	} else {
-		base := repo
-		if prefix != "" {
-			base = filepath.Join(repo, filepath.FromSlash(prefix))
-		}
 		files, err = repoRelativeDocPaths(repo, base, files)
-		if err != nil {
-			return err
-		}
+	}
+	if err != nil {
+		return err
 	}
 	report, err := docpaths.CheckFiles(docpaths.CheckOptions{
 		RepoRoot: repo, VaultRoot: envpkg.ResolvePath("VAULT_PATH"), Policy: policy,
@@ -94,6 +74,31 @@ func runLintDocPaths(stdout, stderr io.Writer, repo, policyPath string, files []
 	return printDocPathReport(stdout, stderr, report)
 }
 
+// docPathsRoot is the repository the lint reads, as an absolute path, and the
+// directory a relative file argument is read from: the working directory when
+// Git found the repository from it, the root when --repo named it.
+func docPathsRoot(repo string) (root, base string, err error) {
+	prefix := ""
+	if repo == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", "", fmt.Errorf("resolve working directory: %w", err)
+		}
+		if repo, prefix, err = docpaths.RepositoryLocation(cwd); err != nil {
+			return "", "", err
+		}
+	}
+	if root, err = filepath.Abs(repo); err != nil {
+		return "", "", fmt.Errorf("resolve repository root: %w", err)
+	}
+	return root, filepath.Join(root, filepath.FromSlash(prefix)), nil
+}
+
+// repoRelativeDocPaths turns the file arguments into slash paths under repo.
+// A path that is not under repo by name may still be under it: Git answers
+// with the physical root, and a caller may hold another name for it (macOS's
+// /var for /private/var, a Windows short name, a junction, a linked
+// workspace). Such a path is placed by the directory it is in, not its name.
 func repoRelativeDocPaths(repo, base string, files []string) ([]string, error) {
 	out := make([]string, 0, len(files))
 	for _, file := range files {
@@ -102,16 +107,44 @@ func repoRelativeDocPaths(repo, base string, files []string) ([]string, error) {
 			path = filepath.Join(base, filepath.FromSlash(file))
 		}
 		rel, err := filepath.Rel(repo, path)
-		if err != nil {
-			return nil, fmt.Errorf("resolve explicit file %q: %w", file, err)
+		if err != nil || escapesRoot(rel) {
+			var under bool
+			if rel, under = relUnderSameDir(repo, path); !under {
+				return nil, fmt.Errorf("explicit file %q is outside repository root %s", file, repo)
+			}
 		}
-		slash := filepath.ToSlash(filepath.Clean(rel))
-		if slash == ".." || strings.HasPrefix(slash, "../") || filepath.IsAbs(rel) {
-			return nil, fmt.Errorf("explicit file %q is outside repository root %s", file, repo)
-		}
-		out = append(out, slash)
+		out = append(out, filepath.ToSlash(filepath.Clean(rel)))
 	}
 	return out, nil
+}
+
+// escapesRoot reports whether a relative path leaves the directory it is
+// relative to.
+func escapesRoot(rel string) bool {
+	slash := filepath.ToSlash(filepath.Clean(rel))
+	return slash == ".." || strings.HasPrefix(slash, "../") || filepath.IsAbs(rel)
+}
+
+// relUnderSameDir finds the ancestor of path that is the directory root names,
+// whatever it is called there, and answers with the path below it. Only the
+// file's ancestors are asked, never the file: a governed file that is a link
+// keeps its own name.
+func relUnderSameDir(root, path string) (string, bool) {
+	rootInfo, err := os.Stat(root)
+	if err != nil {
+		return "", false
+	}
+	rel := filepath.Base(path)
+	for dir := filepath.Dir(filepath.Clean(path)); ; {
+		if info, err := os.Stat(dir); err == nil && os.SameFile(info, rootInfo) {
+			return rel, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		rel, dir = filepath.Join(filepath.Base(dir), rel), parent
+	}
 }
 
 func printDocPathReport(stdout, stderr io.Writer, report docpaths.Report) error {

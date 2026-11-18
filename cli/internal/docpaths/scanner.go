@@ -127,7 +127,7 @@ func checkToken(opts CheckOptions, top map[string]bool, file, token string) (Fin
 	if hasParentSegment(token) {
 		return newFinding(file, token, "escape", "path escapes the repository root"), true, nil
 	}
-	if strings.ContainsAny(token, "*?[") {
+	if strings.ContainsAny(token, globChars) {
 		matched, err := globExists(opts.RepoRoot, token)
 		if err != nil {
 			return Finding{}, false, fmt.Errorf("expand glob %q: %w", token, err)
@@ -143,31 +143,27 @@ func checkToken(opts CheckOptions, top map[string]bool, file, token string) (Fin
 	return Finding{}, false, nil
 }
 
+// globChars are the characters that make a token a pattern, with the meaning
+// path/filepath.Match gives them. The retired shell guard expanded `*` only.
+const globChars = "*?["
+
+// globExists reports whether anything under root matches pattern. It asks
+// about existence only: the pattern is cleaned first, so a trailing slash does
+// not narrow the match to directories.
 func globExists(root, pattern string) (bool, error) {
 	parts := strings.Split(path.Clean(filepath.ToSlash(pattern)), "/")
 	return matchGlob(root, parts)
 }
 
-func matchGlob(path string, parts []string) (bool, error) {
+// matchGlob reports whether the pattern segments match something below dir.
+func matchGlob(dir string, parts []string) (bool, error) {
 	if len(parts) == 0 {
 		return true, nil
 	}
-	part := parts[0]
-	if !strings.ContainsAny(part, "*?[") {
-		next := filepath.Join(path, filepath.FromSlash(part))
-		info, err := os.Stat(next)
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		if len(parts) > 1 && !info.IsDir() {
-			return false, nil
-		}
-		return matchGlob(next, parts[1:])
+	if !strings.ContainsAny(parts[0], globChars) {
+		return descend(filepath.Join(dir, filepath.FromSlash(parts[0])), parts[1:])
 	}
-	entries, err := os.ReadDir(path)
+	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
@@ -176,36 +172,37 @@ func matchGlob(path string, parts []string) (bool, error) {
 	}
 	found := false
 	for _, entry := range entries {
-		matched, matchErr := filepath.Match(part, entry.Name())
-		if errors.Is(matchErr, filepath.ErrBadPattern) {
-			return false, nil
-		}
-		if matchErr != nil {
-			return false, matchErr
-		}
-		if !matched {
+		// A malformed pattern is the only error Match has, and it matches nothing.
+		if ok, _ := filepath.Match(parts[0], entry.Name()); !ok {
 			continue
 		}
-		child := filepath.Join(path, entry.Name())
-		if len(parts) > 1 {
-			info, statErr := os.Stat(child)
-			if errors.Is(statErr, os.ErrNotExist) {
-				continue
-			}
-			if statErr != nil {
-				return false, statErr
-			}
-			if !info.IsDir() {
-				continue
-			}
+		if len(parts) == 1 {
+			found = true
+			continue
 		}
-		childFound, childErr := matchGlob(child, parts[1:])
-		if childErr != nil {
-			return false, childErr
+		below, err := descend(filepath.Join(dir, entry.Name()), parts[1:])
+		if err != nil {
+			return false, err
 		}
-		found = found || childFound
+		found = found || below
 	}
 	return found, nil
+}
+
+// descend matches the rest of a pattern below next, which must exist and,
+// when segments remain, be a directory.
+func descend(next string, rest []string) (bool, error) {
+	info, err := os.Stat(next)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if len(rest) > 0 && !info.IsDir() {
+		return false, nil
+	}
+	return matchGlob(next, rest)
 }
 
 func checkVaultToken(opts CheckOptions, file, token string) (Finding, bool) {
