@@ -26,6 +26,7 @@ import (
 
 	"github.com/mlorentedev/dotfiles/cli/internal/diskfree"
 	"github.com/mlorentedev/dotfiles/cli/internal/env"
+	"github.com/mlorentedev/dotfiles/cli/internal/lane"
 	"github.com/mlorentedev/dotfiles/cli/internal/schedule"
 	"github.com/mlorentedev/dotfiles/cli/internal/secrets"
 	"github.com/mlorentedev/dotfiles/cli/internal/sshtarget"
@@ -50,6 +51,10 @@ type System struct {
 	// LookPath reports whether an executable is resolvable on PATH
 	// (exec.LookPath in production); err != nil means "not found".
 	LookPath func(string) (string, error)
+	// NativeBehind is the native executable the tool manager holds for a
+	// command name, "" for none (lane.MiseNative in production). Nil reads as
+	// none, so a test System never asks the machine's mise.
+	NativeBehind func(string) string
 	// CommandOutput runs name with args and returns combined stdout+stderr.
 	// Used for the `<tool> --version` probes; faked in tests.
 	CommandOutput func(name string, args ...string) (string, error)
@@ -261,9 +266,10 @@ func onceSync(sync func() error) func() error {
 
 func realSystem() *System {
 	return &System{
-		Getenv:      os.Getenv,
-		ResolvePath: env.ResolvePath,
-		LookPath:    exec.LookPath,
+		Getenv:       os.Getenv,
+		ResolvePath:  env.ResolvePath,
+		LookPath:     exec.LookPath,
+		NativeBehind: lane.MiseNative,
 		CommandOutput: func(name string, args ...string) (string, error) {
 			out, err := exec.Command(name, args...).CombinedOutput()
 			return string(out), err
