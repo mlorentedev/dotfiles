@@ -248,6 +248,45 @@ func (s step) Reconcile(converge.Env, bool) (converge.Result, error) {
 	return converge.Result{Detail: s.detail}, s.err
 }
 
+// needing is a step that declares what it needs, so a failure holds back only
+// the steps that name it.
+type needing struct {
+	step
+	needs []string
+}
+
+func (n needing) Needs() []string { return n.needs }
+
+// A step a failed need holds back prints on its own line of the run, between
+// the steps that ran before and after it, once (CLI-142).
+func TestConvergeConsole_PrintsAnUnreachedStepInPlace(t *testing.T) {
+	for _, terminal := range []bool{true, false} {
+		var out bytes.Buffer
+		reg := []converge.Reconciler{
+			needing{step: step{name: "tools", err: errors.New("mise install: exit status 1")}},
+			needing{step: step{name: "workstation-target", detail: "converged"}, needs: []string{"tools"}},
+			needing{step: step{name: "cache-gc", detail: "nothing to collect"}},
+		}
+		pr := newConvergePrinter(&out, reg, console.Painter{}, terminal)
+		pr.header(false, "linux")
+		rep, err := converge.RunObserved(reg, converge.Env{GOOS: "linux"}, false, fixedDurations{pr})
+		if err == nil {
+			t.Fatal("want the tools step's error")
+		}
+		pr.finish(rep)
+		got := out.String()
+		failed := strings.Index(got, "mise install: exit status 1")
+		held := strings.Index(got, "not reached: tools failed")
+		ran := strings.Index(got, "nothing to collect")
+		if failed < 0 || held < failed || ran < held {
+			t.Errorf("terminal=%v: want the failed, the unreached and the independent step in that order:\n%s", terminal, got)
+		}
+		if n := strings.Count(got, "workstation-target"); n != 1 {
+			t.Errorf("terminal=%v: the unreached step printed %d times, want once:\n%s", terminal, n, got)
+		}
+	}
+}
+
 // fixedDurations holds every step's duration at one value, so the golden file
 // holds no real time.
 type fixedDurations struct{ *convergePrinter }
