@@ -90,19 +90,21 @@ func (r systemUpgrade) Probe(env Env) error {
 	if err != nil || len(targets) == 0 || !r.has(managerBin[env.GOOS]) {
 		return err
 	}
-	behind, err := r.outdated(env.GOOS, targets)
-	if err != nil {
-		return err
-	}
-	due, _ := r.splitPrivilege(behind)
 	if env.GOOS == "windows" && !r.isRoot() {
 		// What is still behind is what Reconcile left waiting for elevation:
 		// a machine-wide install it did not attempt, or an id whose upgrade
 		// failed. The step keeps no state between the two calls, so the rule
 		// is the one both can read: the token. An id Reconcile upgraded and
-		// winget left behind has already failed the step there.
-		due = nil
+		// winget left behind has already failed the step there. Nothing a
+		// listing could say changes that, so none is made: one that failed
+		// here would fail a step that succeeded (#3573).
+		return nil
 	}
+	behind, err := r.outdated(env.GOOS, targets)
+	if err != nil {
+		return err
+	}
+	due, _ := r.splitPrivilege(behind)
 	if len(due) > 0 {
 		return fmt.Errorf("still outdated after the upgrade: %s", pkgNames(due))
 	}
@@ -189,7 +191,7 @@ func (r systemUpgrade) windows(dryRun bool, targets []sysTarget) (Result, error)
 		due, waiting = r.splitMachineWide(due)
 	}
 	if dryRun {
-		return Result{Changes: len(due), Detail: upgradeDetail(true, "winget source update", due, due, nil) + elevationNote(waiting)}, nil
+		return Result{Changes: len(due), Detail: upgradeSummary(true, wingetRefresh, due, due, len(waiting) > 0) + elevationNote(waiting)}, nil
 	}
 	var failed []error
 	var done []sysTarget
@@ -208,16 +210,29 @@ func (r systemUpgrade) windows(dryRun bool, targets []sysTarget) (Result, error)
 	if !elevated {
 		// The probe cannot tell an id left waiting from one this run claims
 		// to have upgraded, so the claim is checked here, where it is made.
-		var unmoved []sysTarget
-		if done, unmoved, err = r.confirmUpgraded(done); err != nil {
-			return Result{}, err
+		moved, unmoved, cerr := r.confirmUpgraded(done)
+		if cerr != nil {
+			return unconfirmed(done, waiting), fmt.Errorf("confirming the upgrades: %w", cerr)
 		}
+		done = moved
 		for _, t := range unmoved {
 			failed = append(failed, fmt.Errorf("%s: winget reported the upgrade done and it is still outdated", t.pkg))
 		}
 	}
-	res := Result{Changes: len(done), Detail: upgradeDetail(false, "winget source update", due, done, nil) + elevationNote(waiting)}
+	res := Result{Changes: len(done), Detail: upgradeSummary(false, wingetRefresh, due, done, len(waiting) > 0) + elevationNote(waiting)}
 	return res, errors.Join(failed...)
+}
+
+// wingetRefresh is the refresh the Windows detail names.
+const wingetRefresh = "winget source update"
+
+// unconfirmed is the result of a run whose confirming listing failed: what
+// winget reported upgraded, named as not confirmed, and what was left waiting.
+// The ids count as changes: winget did run their upgrades, and a failed step
+// keeps its line only when it changed something (BUG-136).
+func unconfirmed(done []sysTarget, waiting []string) Result {
+	detail := "index refreshed (" + wingetRefresh + "); winget reported upgraded, not confirmed: " + pkgNames(done)
+	return Result{Changes: len(done), Detail: detail + elevationNote(waiting)}
 }
 
 // confirmUpgraded lists again and separates the ids winget upgraded from the
@@ -619,17 +634,26 @@ func pkgNames(list []sysTarget) string { return strings.Join(pkgList(list), ", "
 // password. A package whose upgrade failed is never named as upgraded: the
 // step's error names it.
 func upgradeDetail(dryRun bool, refresh string, due, done []sysTarget, waiting []string) string {
+	detail := upgradeSummary(dryRun, refresh, due, done, len(waiting) > 0)
+	if len(waiting) > 0 {
+		detail += "; left, needs sudo: " + strings.Join(waiting, ", ") + " (run `dotf converge --only system-upgrade` from a terminal)"
+	}
+	return detail
+}
+
+// upgradeSummary is the detail before its account of what waits. held says
+// that something does: a catalog with entries left waiting is not up to date,
+// and the line does not say it is (#3573).
+func upgradeSummary(dryRun bool, refresh string, due, done []sysTarget, held bool) string {
 	parts := []string{"index refreshed (" + refresh + ")"}
 	switch {
-	case len(due) == 0:
+	case len(due) == 0 && !held:
 		parts = append(parts, "catalog entries up to date")
+	case len(due) == 0:
 	case dryRun:
 		parts = append(parts, "to upgrade: "+pkgNames(due))
 	case len(done) > 0:
 		parts = append(parts, "upgraded: "+pkgNames(done))
-	}
-	if len(waiting) > 0 {
-		parts = append(parts, "left, needs sudo: "+strings.Join(waiting, ", ")+" (run `dotf converge --only system-upgrade` from a terminal)")
 	}
 	return strings.Join(parts, "; ")
 }

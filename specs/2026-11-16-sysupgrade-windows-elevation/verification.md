@@ -77,7 +77,7 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 Independent review of 2026-11-16 (`review.md`, verdict PASS, four Minor findings):
 
-- The confirming listing's error discards the partial result: ticketed (#3573).
-- `splitMachineWide` with `wingetNoneFound` untested, and the probe's third listing: ticketed (#3573).
-- Detail wording when every id waits: ticketed (#3573).
+- The confirming listing's error discards the partial result: applied (#3573). The step fails and its line names what winget reported upgraded as not confirmed, with the ids left waiting: `TestSystemUpgradeWindowsKeepsWhatItDidWhenTheConfirmingListingFails`.
+- `splitMachineWide` with `wingetNoneFound` untested, and the probe's third listing: applied (#3573). `TestSystemUpgradeWindowsWithoutElevationReadsNoMachineWideInstallAsNone` covers the code; without elevation the probe no longer lists, since it let every id through whatever the listing said (`TestSystemUpgradeWindowsProbeDoesNotListWithoutElevation`).
+- Detail wording when every id waits: applied (#3573). A catalog with entries left waiting is no longer called up to date, on Windows or for a cask that needs sudo (`TestSystemUpgradeWindowsDoesNotCallTheCatalogUpToDateWhenEveryIdWaits`).
 - `systemUpgrade.windows` is 44 lines against a 40-line guideline: declined. Splitting it for four lines would separate the three outcomes that are read together.
