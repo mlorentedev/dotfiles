@@ -3,8 +3,14 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -12,8 +18,10 @@ import (
 )
 
 // launcherSys is a Windows System whose PATH resolves each agent to the given
-// file and whose tool manager answers with behind. Nothing may be started: the
-// check reads where a launch would go, it does not make one.
+// file and whose tool manager answers with behind. A process started through
+// the System fails the test. That does not cover lane.MiseNative, which starts
+// mise by itself: what keeps a test off the machine's mise is that the check
+// only asks the seam, which TestCheckAgentLaunchers_AsksOnlyTheSeam holds.
 func launcherSys(t *testing.T, onPath, behind map[string]string) *System {
 	t.Helper()
 	sys := newSys(nil, nil, nil)
@@ -119,9 +127,72 @@ func TestCheckAgentLaunchers_SkipsOffWindows(t *testing.T) {
 	}
 }
 
+// The tool manager is asked through the seam, once for each agent whose
+// launcher is a batch file and for no other: a check that asked mise itself
+// would leave the seam uncalled, and pi's native executable unreported.
+func TestCheckAgentLaunchers_AsksOnlyTheSeam(t *testing.T) {
+	sys := launcherSys(t, map[string]string{
+		"claude":   `C:\bin\claude.exe`,
+		"pi":       `C:\npm\pi.cmd`,
+		"opencode": `C:\npm\opencode.cmd`,
+	}, nil)
+	var asked []string
+	sys.NativeBehind = func(name string) string {
+		asked = append(asked, name)
+		return ""
+	}
+	var buf bytes.Buffer
+	checkAgentLaunchers(sys, capture(&buf))
+	sort.Strings(asked)
+	if want := []string{"opencode", "pi"}; !reflect.DeepEqual(asked, want) {
+		t.Errorf("the tool manager was asked about %v, want %v", asked, want)
+	}
+}
+
+// The review launcher's runners are a switch, not a list the check can read.
+// Each runner it accepts must be in the lane launch table, the one the check
+// walks, or doctor would say nothing about a runner a review starts.
+func TestCheckAgentLaunchers_CoversTheReviewRunners(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join("..", "spec", "review_launch.go"), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runners []string
+	ast.Inspect(file, func(n ast.Node) bool {
+		sw, ok := n.(*ast.SwitchStmt)
+		if !ok {
+			return true
+		}
+		if tag, ok := sw.Tag.(*ast.SelectorExpr); !ok || tag.Sel.Name != "Runner" {
+			return true
+		}
+		for _, stmt := range sw.Body.List {
+			for _, expr := range stmt.(*ast.CaseClause).List {
+				if lit, ok := expr.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					if name, err := strconv.Unquote(lit.Value); err == nil {
+						runners = append(runners, name)
+					}
+				}
+			}
+		}
+		return true
+	})
+	if len(runners) == 0 {
+		t.Fatal("no runner found in the review launcher's switch: the test reads nothing")
+	}
+	known := map[string]bool{}
+	for _, agent := range lane.Agents() {
+		known[agent] = true
+	}
+	for _, runner := range runners {
+		if !known[runner] {
+			t.Errorf("review runner %q is not in the lane launch table, so doctor does not report its launcher", runner)
+		}
+	}
+}
+
 // A System with no tool-manager seam (every other test's) reads as a machine
-// whose tool manager has nothing: the batch launcher is reported, and the
-// machine's own mise is never reached.
+// whose tool manager has nothing: the batch launcher is reported.
 func TestCheckAgentLaunchers_WithoutAToolManagerAnswer(t *testing.T) {
 	sys := launcherSys(t, map[string]string{"pi": `C:\npm\pi.cmd`}, nil)
 	sys.NativeBehind = nil

@@ -33,7 +33,7 @@ On Windows `dotf` refuses to start an agent whose launcher is a batch file, beca
 
 - The check asks mise once per agent whose launcher is a batch file (`mise which`, bounded at 15 s each by `lane.MiseNative`). Measured on this machine: one question, for pi. An agent with a native launcher on PATH costs nothing.
 - A warning on every run for an agent that has no native build (opencode today). Accepted: it is true, it names why a lane will not start it, and it is a warning, so doctor's exit status does not change.
-- The review launcher's runners are not read from `internal/spec`: its table is a `switch`, not a list. They are pi and agy, both in the lane table. A runner added there and not to the lane table would not be reported.
+- The review launcher's runners are not read from `internal/spec`: its table is a `switch`, not a list. They are pi and agy, both in the lane table. `TestCheckAgentLaunchers_CoversTheReviewRunners` parses that switch and fails when a runner is added there and not to the lane table.
 
 ## Acceptance criteria
 
@@ -44,7 +44,7 @@ Observable outcomes. Each must be testable.
 - [x] AC3: an agent whose only launcher is a batch file is a warning that names the file and `mise use -g <agent>`; what the tool manager answers is never named as a target unless `lane.NativeTarget` accepts it.
 - [x] AC4: an agent that is not installed is skipped, and every agent of the lane launch table has a line.
 - [x] AC5: off Windows the section is one skipped line, and neither PATH nor the tool manager is asked.
-- [x] AC6: the check starts no process, and a System without the tool-manager seam never reaches the machine's mise.
+- [x] AC6: the check starts no process through the System and asks the tool manager only through the seam, once per agent whose launcher is a batch file; a System without the seam reads as a tool manager with nothing.
 
 ## References
 

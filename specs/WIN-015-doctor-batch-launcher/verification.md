@@ -14,7 +14,8 @@ owner: manu
 - [x] AC1, AC2, AC3, AC4 -> `TestCheckAgentLaunchers_ReportsWhatALaunchStarts`: a native launcher, a batch file with a real `.exe` behind it, a batch file with npm's extensionless stub behind it, a `.bat`, and an agent not on PATH.
 - [x] AC4 -> `TestCheckAgentLaunchers_CoversTheLaunchTable`: a line for every name of `lane.Agents()`.
 - [x] AC5 -> `TestCheckAgentLaunchers_SkipsOffWindows`: linux and darwin; the lookups fail the test if called.
-- [x] AC6 -> `launcherSys` fails the test on any `CommandOutput`; `TestCheckAgentLaunchers_WithoutAToolManagerAnswer` runs with a nil seam.
+- [x] AC6 -> `TestCheckAgentLaunchers_AsksOnlyTheSeam`: the seam is asked about the two batch launchers and nothing else. `launcherSys` fails the test on any `CommandOutput`, which does not cover `lane.MiseNative` (it starts mise by itself); the seam test is what does. `TestCheckAgentLaunchers_WithoutAToolManagerAnswer` runs with a nil seam.
+- [x] Both launch tables -> `TestCheckAgentLaunchers_CoversTheReviewRunners` parses the `switch e.Runner` of `cli/internal/spec/review_launch.go` and requires each runner in `lane.Agents()`.
 - [x] On this machine (Windows 11, 2026-11-17), `go run ./cmd/dotf doctor`:
 
   ```
