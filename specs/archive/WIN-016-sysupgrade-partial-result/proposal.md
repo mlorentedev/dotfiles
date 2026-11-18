@@ -1,7 +1,7 @@
 ---
 id: "WIN-016-sysupgrade-partial-result"
 type: spec
-status: implementing # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-17"
 issue: "mlorentedev/dotfiles#3573"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
