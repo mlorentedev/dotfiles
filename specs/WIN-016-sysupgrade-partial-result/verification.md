@@ -29,11 +29,24 @@ owner: manu
 - The probe returns before the listing instead of ignoring its error: the answer was never used, so there was nothing to tolerate.
 - The wording is fixed in the shared summary, so a macOS run that leaves a cask waiting for sudo stops saying `up to date` too. No test asserted the old text with something waiting (`grep -rn "catalog entries up to date"`: one fixture in `update_skip_test.go`, with nothing waiting); the darwin case is now in the AC3 test.
 
+## Review dispositions
+
+Independent review: `review.md`, PASS WITH GAPS, `agy/gemini-4-hydrogen-high` on `382ad32a`.
+
+- Minor, REAL, archive-gate (the promotion lines were a plain bullet): applied below.
+- Minor, THEORETICAL, test-coverage (no dedicated case for a macOS dry run with a cask waiting for sudo, nor for a failed id in `waiting` when the confirmation fails too): declined. Both go through `upgradeSummary` and `unconfirmed`, whose branches the four tests cover and the reviewer's mutation probes confirmed; `dryRun` only changes the verb, and a failed id reaches `waiting` on a path the confirmation does not touch.
+- Minor, SPECULATIVE, defensive-parsing (`splitMachineWide` parses the output on `0x8A150014` instead of returning early): declined. winget's "no installed package found" text holds no package id, so the parse returns none, which `TestSystemUpgradeWindowsWithoutElevationReadsNoMachineWideInstallAsNone` holds.
+- Not run by the reviewer either: a real winget failing between two listings.
+
 ## Promotion candidates
 
-- None. The rule "a post-condition does not take a reading it will ignore" is specific to this probe.
+Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
+
+- [x] Lesson for the repo's `docs/lessons/`? no: the finding is specific to this probe, and the spec and its four tests record it.
+- [x] ADR-worthy decision for the repo's `docs/adr/adr-XXX.md`? no: no decision changes; the step keeps its contract.
+- [x] New pattern candidate for `00_meta/patterns/`? no: "a post-condition does not take a reading it will ignore" has one instance.
 
 ## Archive checklist
 
-- [ ] Independent adversarial review recorded in `review.md`
-- [ ] Issue #3573 closed by the archiving change
+- [x] Independent adversarial review recorded in `review.md`
+- [x] Issue #3573 closed by the archiving change
