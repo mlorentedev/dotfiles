@@ -31,7 +31,7 @@ owner: manu
 - [ ] Lint passes (CI's `lint` job; a CRLF checkout fails `gofmt` locally on every Go file)
 - [x] No unrelated changes in the diff
 - [x] `verification.md` filled in
-- [ ] PR opened referencing this spec folder
+- [x] PR opened referencing this spec folder (#3580)
 
 ## Machine-readable features
 

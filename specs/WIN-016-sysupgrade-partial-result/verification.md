@@ -14,7 +14,7 @@ owner: manu
 - [x] AC1 -> `TestSystemUpgradeWindowsKeepsWhatItDidWhenTheConfirmingListingFails`. Before the change: `err = winget upgrade: exit status 1: boom, want the failed confirmation named`, with an empty result.
 - [x] AC2 -> `TestSystemUpgradeWindowsProbeDoesNotListWithoutElevation`. Before: `Probe = winget upgrade: exit status 1: transient, want nil`, and three listings in the log.
 - [x] AC3 -> `TestSystemUpgradeWindowsDoesNotCallTheCatalogUpToDateWhenEveryIdWaits`. Before: `catalog entries up to date; left, needs elevation: GitHub.cli (machine-wide install)`, for plan and apply.
-- [x] AC4 -> `TestSystemUpgradeWindowsWithoutElevationReadsNoMachineWideInstallAsNone`. It passed before the change; the behaviour had no test.
+- [x] AC4 -> `TestSystemUpgradeWindowsWithoutElevationReadsNoMachineWideInstallAsNone`. It passed before the change; the behaviour had no test. With the fake answering `0x8A15002B` instead it fails: `left, needs elevation: Git.Git (install scope unknown: winget list: exit status 2316632107)`.
 
 ## Test status
 
@@ -27,7 +27,7 @@ owner: manu
 
 - The ids of a failed confirmation count as changes. Counting them as zero would drop the step's line (`runStep`, BUG-136), which is the loss the finding is about.
 - The probe returns before the listing instead of ignoring its error: the answer was never used, so there was nothing to tolerate.
-- The wording is fixed in the shared summary, so a macOS run that leaves a cask waiting for sudo stops saying `up to date` too. No darwin test asserted the old text.
+- The wording is fixed in the shared summary, so a macOS run that leaves a cask waiting for sudo stops saying `up to date` too. No test asserted the old text with something waiting (`grep -rn "catalog entries up to date"`: one fixture in `update_skip_test.go`, with nothing waiting); the darwin case is now in the AC3 test.
 
 ## Promotion candidates
 

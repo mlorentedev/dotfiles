@@ -765,6 +765,9 @@ func TestSystemUpgradeWindowsWithoutElevationReadsNoMachineWideInstallAsNone(t *
 	if res.Changes != 1 || !strings.Contains(res.Detail, "upgraded: Git.Git") || strings.Contains(res.Detail, NeedsElevationNote) {
 		t.Errorf("res = %+v, want Git.Git upgraded and nothing left waiting", res)
 	}
+	if len(f.ran(wingetMachineList)) != 1 {
+		t.Errorf("the machine scope was not asked once: %q", f.log)
+	}
 }
 
 // Without elevation the probe lets every outdated id through, so it has no
@@ -801,8 +804,14 @@ func TestSystemUpgradeWindowsDoesNotCallTheCatalogUpToDateWhenEveryIdWaits(t *te
 			t.Errorf("dryRun=%v: Detail = %q, want the waiting id named and no claim of being up to date", dryRun, res.Detail)
 		}
 	}
-	f := newPkgFake(map[string][]string{"winget": nil})
-	res, err := upgradeStep(f).Reconcile(env, false)
+	// The same line on macOS, where a cask waits for sudo.
+	f := newPkgFake(map[string][]string{"brew-cask": {"veracrypt"}})
+	res, err := upgradeStep(f).Reconcile(upgradeEnv(t, "darwin"), false)
+	if err != nil || strings.Contains(res.Detail, "up to date") || !strings.Contains(res.Detail, "left, needs sudo: veracrypt") {
+		t.Errorf("darwin: res = %+v, %v: want the cask named and no claim of being up to date", res, err)
+	}
+	f = newPkgFake(map[string][]string{"winget": nil})
+	res, err = upgradeStep(f).Reconcile(env, false)
 	if err != nil || !strings.Contains(res.Detail, "catalog entries up to date") {
 		t.Errorf("res = %+v, %v: want a catalog with nothing outdated still called up to date", res, err)
 	}
