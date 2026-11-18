@@ -202,3 +202,11 @@ func TestCheckAgentLaunchers_WithoutAToolManagerAnswer(t *testing.T) {
 		t.Errorf("line %q, want the batch launcher reported\n%s", line, buf.String())
 	}
 }
+
+// The production System carries the seam: without it every batch launcher
+// would be reported as having nothing native behind it.
+func TestRealSystemAsksTheToolManager(t *testing.T) {
+	if realSystem().NativeBehind == nil {
+		t.Fatal("realSystem has no NativeBehind: doctor would never find a native executable behind a shim")
+	}
+}
