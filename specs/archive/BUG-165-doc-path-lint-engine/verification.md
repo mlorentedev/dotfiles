@@ -33,7 +33,7 @@ Map every acceptance criterion from `proposal.md` to concrete proof (commit hash
 - Fresh-build startup observation: endpoint security inspects each newly built unsigned EXE on first execution. `install.ps1` deliberately pays that one-time cost in its executable probe before placement, and its standalone path then runs the installed target through `converge`; hook use occurs after inspection rather than on the commit path.
 - Lesson hygiene: `go run ./cmd/dotf lessons fmt --check --dir ../docs/lessons` -> `[OK] lessons are in their canonical form`.
 - CI on `3ce302cc`: Linux/Windows tests passed; `cli-lint` found `filepath.Glob` and a dead helper, and hygiene found duplicate lesson 553. All three causes were removed in `17d943af`.
-- Hosted CI on `17d943af`: Windows exposed an 8.3 working-directory alias (`RUNNER~1`) and macOS exposed `/var` versus `/private/var`; string-relative path resolution rejected files inside the checkout. `RepositoryLocation` now gets both Git's physical root and its working-directory prefix in one invocation, while tests compare checkout identity with `os.SameFile`. Focused Windows tests pass locally; replacement-head CI is pending push.
+- Hosted CI on `17d943af`: Windows exposed an 8.3 working-directory alias (`RUNNER~1`) and macOS exposed `/var` versus `/private/var`; string-relative path resolution rejected files inside the checkout. `RepositoryLocation` now gets both Git's physical root and its working-directory prefix in one invocation, while tests compare checkout identity with `os.SameFile`. Focused Windows tests pass locally; the replacement head's CI passed before #3201 merged.
 - Commit hook: historical bypasses are not counted as evidence. #3199 now permits one final reviewer/CI-fix commit after the evidence above; PR 1 makes no permanent hook configuration change.
 
 ## Decisions made during implementation
@@ -55,10 +55,10 @@ Answer each line `yes: <path>`, naming the file you promoted, or `no: <reason>`.
 
 ## Archive checklist
 
-- [ ] `proposal.md` frontmatter set to `status: archived`
-- [ ] Folder moved: `specs/BUG-165-doc-path-lint-engine/` -> `specs/archive/BUG-165-doc-path-lint-engine/`
-- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018)
-- [ ] Promotions above executed (if any)
+- [x] `proposal.md` frontmatter set to `status: archived`
+- [x] Folder moved: `specs/BUG-165-doc-path-lint-engine/` -> `specs/archive/BUG-165-doc-path-lint-engine/`
+- [ ] Bitácora board ticket for this spec moved to Done / closed with PR link (ADR-018): #3266 stays open until the owner decides, because three of its acceptance items are outside this spec and are tracked in #3597
+- [x] Promotions above executed (if any)
 
 ## Review dispositions
 
@@ -73,9 +73,18 @@ onexistent-vault-dir' go run ./cmd/dotf lint doc-paths` exits 0. The pre-commit 
 - Minor, function size: applied (#3574). `matchGlob` is split with `descend`, `runLintDocPaths` with `docPathsRoot`.
 - Minor, the substring-matched retirement guard: applied (#3574). `TestShellGuardIsRetiredAfterCutover` parses the pre-commit configuration and reads the one doc-path hook's entry, `pass_filenames` and stages; `TestCutOverReadsTheHookNotTheText` holds six configurations it refuses; the substring check accepted four of them (a commented-out hook, `pass_filenames` true or absent, another stage).
 
-Independent review, round 2, of 2026-11-18 (`review.md`, verdict FAIL, one Major and three Minor findings; round 1 kept as `review-round1.md`):
+Independent review, round 2, of 2026-11-17 (`review.md`, verdict FAIL, one Major and three Minor findings; round 1 kept as `review-round1.md`):
 
 - Major, the repository scan can pass from Go's test cache: applied through #3590. Go never keys a cached test result on a file outside the module root, which is `cli/`. Locally the finding reproduces as written. CI reran every package in 7 measured runs (0 cached of 120), but only because a fresh checkout changes in-module mtimes. #3590 makes the rerun explicit with `go test -count=1 ./...` in both Go test steps and corrects the `cli.yml` comment, so the AC5 gate no longer depends on that side effect (#3588).
 - Minor, the shipped hook still has the round-1 Blocker: deferred to the next release, #3522, which the owner cuts. The fix is on main (`713af95b`); `versions.conf` pins `DOTF_VERSION=0.81.0` until then.
 - Minor, `TestCurrentRepository` read `VAULT_PATH` raw while the command resolves it: applied. The test resolves it through `envpkg.ResolvePath`, as `lint.go` does. It passes with the vault checked out and with `VAULT_PATH=/nonexistent-vault-dir` (`go test -count=1 ./internal/docpaths -run '^TestCurrentRepository$'`).
 - Minor, the retirement guard matches by substring: applied by #3585, which parses the hook entry instead (see the round-1 line above).
+
+Independent review, round 3, of 2026-11-17 (`review.md`, verdict PASS-WITH-GAPS, six Minor findings; rounds 1 and 2 kept as `review-round1.md` and `review-round2.md`):
+
+- Minor, the pinned release predates the vault fix: deferred to release #3522, which the owner cuts, as in round 2.
+- Minor, f3's diff guard is vacuous on the merged tree: ticketed (#3596). `features.json` is in the contract set, so it is not edited before the archive.
+- Minor, f5's command runs without `-count=1`: ticketed (#3596), for the same reason.
+- Minor, the stale "replacement-head CI is pending push" sentence: applied. It now says the replacement head's CI passed before #3201 merged.
+- Minor, the draft-tag pre-flight might trip on the tag literals quoted in the earlier reviews: checked. `dotf spec archive` ran without an override and passed every pre-flight.
+- Minor, round 2's record was uncommitted: applied. `review-round2.md` and `review-request-round2.json` are committed with this review.

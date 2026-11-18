@@ -1,7 +1,7 @@
 ---
 id: "BUG-165-doc-path-lint-engine"
 type: spec
-status: verifying # draft | implementing | verifying | archived
+status: archived # draft | implementing | verifying | archived
 created: "2026-11-05"
 issue: "mlorentedev/dotfiles#3266"   # repo#NNN — GitHub issue / Project item that tracks this spec
 tags: [spec, proposal]
