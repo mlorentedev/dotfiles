@@ -439,6 +439,16 @@ The catalog's mise for Windows imports `vcruntime140.dll`, which a clean Windows
   - The kept guest was a session (`--keep`, #3462) and `exec` read it, which was the real-guest check #3462's triage owed
 - Not done here: the winget source error itself (option A of #3489) waits for a recurrence
 
+### Pin source drift (#3532, 2026-11-17)
+
+- Measured on the Mac 2026-11-15 (`mise ls --current`): a hand-written `~/.config/mise/config.toml` outranked the `conf.d/dotfiles.toml` the sync renders, so go ran 1.27.4 and golangci-lint 2.15.0 against pins 1.26.10 and 2.12.2. A newer shadow passes the sync's post-condition and #3524's `ShadowNote` only looks at tools the sync reports missing, so nothing said so; the doctor's pass line read "at their pin"
+- [x] `tools.MiseSync.SourceDrift` asks `mise ls --current --json` once and lists every pin whose active entry comes from a foreign config, whichever way the version differs; the sync's own file is recognised through symlinks and case, a tool with no active entry or no source path is not claimed, and the key the sync writes (`npm:bats`, `github:direnv/direnv`, an npm alias) is looked up beside the short name
+- [x] A failed or unreadable `mise ls` answer is an error, never "no drift" (`TestSourceDrift_AFailedOrUnreadableAnswerIsAnErrorNotAClean`)
+- [x] `dotf doctor` replaces the "at their pin" pass line with one WARN naming each file, the tool, the version it runs and the pin, and the fix; where mise cannot say it WARNs that it could not check instead of passing; one line per file, never a second line for a tool another check already reported
+- [x] Only `# mise: cli` pins are claimed: this Mac's `go` in `config.toml` is a negative fixture, so it does not warn while `go` is not a pin (`TestCheckMiseTools_OnlyPinnedToolsAreClaimedAndAnUnreadableAnswerIsNotAPass`)
+- [x] `--fix` never edits the user's `config.toml` (`TestCheckMiseTools_FixNeverEditsTheForeignConfig`)
+- Not done here, owner's under #2013 Wave 3: whether `go` moves to a `# mise: cli` pin so the global file carries nothing a pin owns. The drift on the Mac was cleared by hand on 2026-11-15; this is the check that keeps it from returning in silence
+
 ## Closing
 
 - [ ] Every acceptance criterion from `proposal.md` is covered by at least one test

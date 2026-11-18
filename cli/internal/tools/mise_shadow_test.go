@@ -209,3 +209,112 @@ func TestShadowNote_NamesAFileOnlyWhenItResolvesBelowThePin(t *testing.T) {
 		})
 	}
 }
+
+// miseLsCurrent is `mise ls --current --json` as mise 2026.11.6 prints it: one
+// object, a tool's name to its entries.
+func miseLsCurrent(entries map[string]string) string {
+	var parts []string
+	for tool, entry := range entries {
+		parts = append(parts, `"`+tool+`":[`+entry+`]`)
+	}
+	return "{" + strings.Join(parts, ",") + "}"
+}
+
+// A pin another config holds is a drift whichever way the version differs: a
+// shadow that is newer than the pin passes the sync's post-condition and
+// nothing else reports it, so the Go 1.27.4 and golangci-lint 2.15.0 that no
+// reviewed commit chose ran unseen (#3532). One call asks mise about every
+// pin, and only a foreign file is named.
+func TestSourceDrift_NamesEveryPinAnotherConfigHoldsWhicheverWayTheVersionDiffers(t *testing.T) {
+	cfgDir := t.TempDir()
+	foreign := filepath.Join(t.TempDir(), "config.toml")
+	s := MiseSync{ConfigDir: cfgDir}
+	own := s.ConfigPath()
+	var asked []string
+	s.Stdout = func(name string, args ...string) ([]byte, error) {
+		asked = append(asked, name+" "+strings.Join(args, " "))
+		return []byte(miseLsCurrent(map[string]string{
+			"golangci-lint": miseLsEntry("2.15.0", "2.15.0", foreign, true),   // newer than the pin
+			"node":          miseLsEntry("24.19.0", "24.19.0", foreign, true), // older than the pin
+			"bats":          miseLsEntry("1.13.0", "1.13.0", foreign, true),   // the same version, still foreign
+			"age":           miseLsEntry("1.2.1", "1.2.1", own, true),         // the sync's own file
+			"jq":            miseLsEntry("1.7.1", "1.7.1", foreign, false),    // inactive: not what runs
+			"stray":         miseLsEntry("9.9.9", "9.9.9", foreign, true),     // no pin asks for it
+		})), nil
+	}
+	pins := []MiseTool{{"age", "1.2.1"}, {"bats", "1.13.0"}, {"golangci-lint", "2.12.2"}, {"jq", "1.7.1"}, {"node", "24.22.1"}}
+
+	drifts, err := s.SourceDrift(pins)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"mise ls --current --json"}; len(asked) != 1 || asked[0] != want[0] {
+		t.Errorf("asked mise %v, want one call %v", asked, want)
+	}
+	got := map[string]string{}
+	for _, d := range drifts {
+		if d.Path != foreign {
+			t.Errorf("%s: source %q, want %q", d.Tool, d.Path, foreign)
+		}
+		got[d.Tool] = d.Version + " vs pin " + d.Pin
+	}
+	want := map[string]string{
+		"bats":          "1.13.0 vs pin 1.13.0",
+		"golangci-lint": "2.15.0 vs pin 2.12.2",
+		"node":          "24.19.0 vs pin 24.22.1",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("drifts = %v, want %v", got, want)
+	}
+	for tool, w := range want {
+		if got[tool] != w {
+			t.Errorf("%s = %q, want %q", tool, got[tool], w)
+		}
+	}
+}
+
+// mise failing or answering in a shape this does not read is "could not check",
+// never "no drift": the caller must be able to say so.
+func TestSourceDrift_AFailedOrUnreadableAnswerIsAnErrorNotAClean(t *testing.T) {
+	for name, run := range map[string]Runner{
+		"mise fails":   func(string, ...string) ([]byte, error) { return []byte("boom"), errors.New("exit status 1") },
+		"not json":     func(string, ...string) ([]byte, error) { return []byte("not json"), nil },
+		"an array":     func(string, ...string) ([]byte, error) { return []byte("[]"), nil },
+		"empty output": func(string, ...string) ([]byte, error) { return nil, nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := MiseSync{ConfigDir: t.TempDir(), Stdout: run}
+			if drifts, err := s.SourceDrift([]MiseTool{{"age", "1.2.1"}}); err == nil {
+				t.Errorf("want an error, got drifts %v", drifts)
+			}
+		})
+	}
+}
+
+// The sync's own file is recognised through a symlinked prefix (macOS /var is
+// /private/var), and an entry with no source path claims nothing.
+func TestSourceDrift_OwnFileThroughASymlinkAndAnEntryWithoutASourceAreNotDrift(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip("symlinks unavailable: " + err.Error())
+	}
+	s := MiseSync{ConfigDir: link}
+	if err := os.MkdirAll(filepath.Join(real, "conf.d"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	physical := filepath.Join(real, "conf.d", "dotfiles.toml")
+	if err := os.WriteFile(physical, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s.Stdout = func(string, ...string) ([]byte, error) {
+		return []byte(miseLsCurrent(map[string]string{
+			"age": miseLsEntry("1.2.1", "1.2.1", physical, true),
+			"jq":  miseLsEntry("1.7.1", "1.7.1", "", true),
+		})), nil
+	}
+	drifts, err := s.SourceDrift([]MiseTool{{"age", "1.2.1"}, {"jq", "1.7.1"}})
+	if err != nil || len(drifts) != 0 {
+		t.Errorf("got %v, %v; want no drift", drifts, err)
+	}
+}

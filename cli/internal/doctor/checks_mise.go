@@ -88,7 +88,15 @@ func checkMiseTools(sys *System, cfg *Config, rep *Report, fix bool) {
 		rep.Fail("python packages missing from mise's python at their pin: " + strings.Join(p.MissingPackages, ", ") + " (run: dotf tools sync)")
 		return
 	}
-	rep.Pass(fmt.Sprintf("%d CLI(s) at their pin through mise", len(pins)))
+	// A pin that runs from another config passes the sync's post-condition when
+	// that file's version is newer, so the pass line has to ask who resolved
+	// each pin before it claims anything (#3532). It is a WARN, not a FAIL: the
+	// tool runs, at a version nobody reviewed, and the file is the user's.
+	if msg := pinSourceNote(s, pins); msg != "" {
+		rep.Warn(msg)
+	} else {
+		rep.Pass(fmt.Sprintf("%d CLI(s) at their pin through mise", len(pins)))
+	}
 	// Reported, never removed here: removal is the converge's, which shows it
 	// in its plan first (#2375), and doctor --fix stays non-destructive.
 	if orphans, err := s.Orphans(pins); err != nil {
@@ -380,4 +388,31 @@ func shadowNote(s tools.MiseSync, p tools.SyncPlan, pins []tools.MiseTool) (caus
 		return "", ""
 	}
 	return s.ShadowNote(pins, p.Missing)
+}
+
+// pinSourceNote is the WARN for the pins mise runs from a config other than the
+// sync's file, one clause per file naming each tool, the version it runs and
+// the pin, then the fix. It is empty when every pin runs from the sync's file.
+// When mise cannot say, it says so: an unanswered question is not a pass.
+func pinSourceNote(s tools.MiseSync, pins []tools.MiseTool) string {
+	drifts, err := s.SourceDrift(pins)
+	if err != nil {
+		return "cannot tell which config mise runs the pinned CLIs from: " + err.Error()
+	}
+	if len(drifts) == 0 {
+		return ""
+	}
+	var files []string
+	byFile := map[string][]string{}
+	for _, d := range drifts {
+		if _, seen := byFile[d.Path]; !seen {
+			files = append(files, d.Path)
+		}
+		byFile[d.Path] = append(byFile[d.Path], fmt.Sprintf("%s %s (pin %s)", d.Tool, d.Version, d.Pin))
+	}
+	parts := make([]string, len(files))
+	for i, path := range files {
+		parts[i] = path + " runs " + strings.Join(byFile[path], ", ") + " and outranks " + s.ConfigPath()
+	}
+	return "pinned CLIs that mise runs from another config: " + strings.Join(parts, "; ") + "\n    FIX: " + tools.ShadowFix
 }
