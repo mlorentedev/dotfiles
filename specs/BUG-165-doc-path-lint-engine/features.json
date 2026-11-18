@@ -54,5 +54,26 @@
     "verification": "cd cli && go test ./internal/docpaths -run 'Test(CheckFiles|DiscoverGovernedFiles|DiscoverFails|DiscoverFromLinkedWorktree|CurrentRepositoryReadOnly)'",
     "state": "verified",
     "evidence": "Windows 2026-11-05: synthetic/read-only selector -> exit 0. Every synthetic fixture write asserts it remains under its testing temp root; linked-worktree fixtures use a temp root; TestCurrentRepositoryReadOnly proves the only live-repository scan does not mutate Git state."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f9",
+    "behavior": "An absolute file argument that reaches the checkout through an alias of its directory is linted, not refused as outside the repository.",
+    "verification": "cd cli && go test ./internal/cmd -count=1 -run '^TestLintDocPaths(AcceptsAnAbsoluteFileThroughAnAlias|KeepsTheRepositoryBoundary)$'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-17: exit 0, the alias a junction. Before the change the first test failed with 'is outside repository root'."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f10",
+    "behavior": "A token holding *, ? or [ is a pattern with path/filepath.Match's meaning, and a trailing slash does not narrow the match to directories.",
+    "verification": "cd cli && go test ./internal/docpaths -count=1 -run '^TestCheckFilesGlobContract$'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-17: exit 0, seven cases."
+  },
+  {
+    "id": "BUG-165-doc-path-lint-engine-f11",
+    "behavior": "The retirement guard reads the doc-path hook's entry, pass_filenames and stages from the parsed pre-commit configuration.",
+    "verification": "cd cli && go test ./internal/docpaths -count=1 -run '^Test(ShellGuardIsRetiredAfterCutover|CutOverReadsTheHookNotTheText)$'",
+    "state": "verified",
+    "evidence": "Windows 2026-11-17: exit 0; six configurations are refused, four of which the substring check accepted."
   }
 ]
