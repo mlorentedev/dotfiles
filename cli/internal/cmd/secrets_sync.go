@@ -146,7 +146,7 @@ func pushCI(out io.Writer, sel secrets.CISelection, repo string, dryRun, skipVer
 	// One Loader path resolves both age and bw entries — the backend-agnostic
 	// boundary ADR-029 introduces. Fail-fast: a resolution error aborts before any
 	// upload, so the repo is never left with a partial secret set.
-	env, err := secretLoader().EnvFor(sel.Upload, nil)
+	env, err := secretLoader().UploadFor(sel.Upload)
 	if err != nil {
 		return err
 	}

@@ -181,6 +181,32 @@ func (l *Loader) RawResolve(e Entry) ([]byte, error) {
 	return r.Resolve(e)
 }
 
+// UploadFor resolves entries for an upload to a remote secret store (`sync ci`) and
+// returns "KEY=VALUE" strings in entry order. Unlike EnvFor it keeps interior line
+// breaks: stripping them is an env-injection convention, and a multi-line secret such
+// as a GitHub App PEM key arrives flattened and unparseable otherwise (SEC-019, the
+// same class #612 B6 fixed for migrate). Only the trailing CR/LF is trimmed, so a
+// single-line token uploads exactly as before. File entries are refused: an upload
+// carries a value, never a path on this disk.
+func (l *Loader) UploadFor(entries []Entry) ([]string, error) {
+	kv := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsFile {
+			return nil, fmt.Errorf("secret %q is a file secret — refusing to upload its path as a value", e.Var)
+		}
+		plaintext, err := l.RawResolve(e)
+		if err != nil {
+			return nil, err
+		}
+		value := strings.TrimRight(string(plaintext), "\r\n")
+		if value == "" {
+			return nil, fmt.Errorf("secret %q resolved to an empty value (backend %q) — refusing to upload", e.Var, e.Backend)
+		}
+		kv = append(kv, e.Var+"="+value)
+	}
+	return kv, nil
+}
+
 // Verify resolves one entry through its backend resolver as a read-only health check:
 // it confirms the secret produces a non-empty value, applying run's empty-value
 // rejection, but it never materializes a file secret and never returns the value
