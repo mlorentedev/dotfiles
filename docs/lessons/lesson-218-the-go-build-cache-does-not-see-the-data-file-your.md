@@ -50,8 +50,16 @@ a cached run reprints `--- PASS: <Name> (0.00s)` verbatim, so the lesson-217 pre
 `grep -q -- '--- PASS: <Name> '` — succeeds against a run that predates the edit under test. That
 predicate is non-vacuous against a *missing* test and was never non-vacuous against a *stale* one.
 
-CI is unaffected: it starts with a cold cache. This is a local-verification hazard, which is worse,
-because local is where the claim "I ran it and it passed" is produced.
+This is first a local-verification hazard, which is worse, because local is where the claim "I ran
+it and it passed" is produced.
+
+**Correction (2026-11-18, #3588).** This lesson first said CI was unaffected because "it starts with
+a cold cache". That reason is wrong. setup-go restores `GOCACHE`, test results included. The root
+cause is in `cmd/go`: `computeTestInputsID` never keys a result on a file outside the module root,
+and the module root is `cli/`. The conclusion still held in practice: 7 measured runs reran every
+package, 0 cached of 120. That was a side effect, though. `hashOpen` keys each opened in-module
+file on its mtime, and every fresh checkout gives them a new one. CI now runs `go test -count=1`,
+so the rerun is guaranteed and no longer depends on that side effect.
 
 ## The lesson
 
