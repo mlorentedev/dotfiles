@@ -318,3 +318,40 @@ func TestSourceDrift_OwnFileThroughASymlinkAndAnEntryWithoutASourceAreNotDrift(t
 		t.Errorf("got %v, %v; want no drift", drifts, err)
 	}
 }
+
+// The fix names the line to remove, not only the file (#3532): the foreign
+// file is read for the tool's key, short or as the sync writes it. A file that
+// cannot be read, or holds no such key (a project file, an env override), is
+// still named, with no line.
+func TestSourceDrift_NamesTheLineToRemove(t *testing.T) {
+	foreign := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(foreign, []byte("# mine\n[tools]\nnode = \"24.19.0\"\n  golangci-lint = \"2.15.0\"\n\"npm:bats\" = \"1.14.0\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gone := filepath.Join(t.TempDir(), "gone.toml")
+	s := MiseSync{ConfigDir: t.TempDir()}
+	s.Stdout = func(string, ...string) ([]byte, error) {
+		return []byte(miseLsCurrent(map[string]string{
+			"node":          miseLsEntry("24.19.0", "24.19.0", foreign, true),
+			"golangci-lint": miseLsEntry("2.15.0", "2.15.0", foreign, true),
+			"npm:bats":      miseLsEntry("1.14.0", "1.14.0", foreign, true),
+			"jq":            miseLsEntry("1.7.1", "1.7.1", foreign, true), // active, but not written in the file
+			"age":           miseLsEntry("1.2.1", "1.2.1", gone, true),    // unreadable
+		})), nil
+	}
+	pins := []MiseTool{{"age", "1.2.1"}, {"bats", "1.13.0"}, {"golangci-lint", "2.12.2"}, {"jq", "1.7.1"}, {"node", "24.22.1"}}
+	drifts, err := s.SourceDrift(pins)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := map[string]int{}
+	for _, d := range drifts {
+		lines[d.Tool] = d.Line
+	}
+	want := map[string]int{"node": 3, "golangci-lint": 4, "bats": 5, "jq": 0, "age": 0}
+	for tool, w := range want {
+		if got, ok := lines[tool]; !ok || got != w {
+			t.Errorf("%s line = %d (listed %v), want %d", tool, got, ok, w)
+		}
+	}
+}

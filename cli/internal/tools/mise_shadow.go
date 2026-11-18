@@ -3,7 +3,9 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -138,9 +140,11 @@ func (s MiseSync) shadowSuffix(pins []MiseTool, missing []string) string {
 
 // SourceDrift is a pinned tool that mise runs from a config other than the one
 // the sync owns: Tool at Version, requested by the file at Path, where
-// versions.conf says Pin.
+// versions.conf says Pin. Line is where Path declares the tool, 0 when the file
+// cannot be read or does not write the tool (a project file, an env override).
 type SourceDrift struct {
 	Tool, Version, Pin, Path string
+	Line                     int
 }
 
 // SourceDrift lists every pin whose active entry comes from a foreign config,
@@ -172,7 +176,10 @@ func (s MiseSync) SourceDrift(pins []MiseTool) ([]SourceDrift, error) {
 				continue
 			}
 			if !samePath(e.Source.Path, s.ConfigPath()) {
-				drifts = append(drifts, SourceDrift{Tool: pin.Name, Version: e.Version, Pin: pin.Version, Path: e.Source.Path})
+				drifts = append(drifts, SourceDrift{
+					Tool: pin.Name, Version: e.Version, Pin: pin.Version, Path: e.Source.Path,
+					Line: declaredAt(e.Source.Path, lsKeys(pin.Name)),
+				})
 			}
 			break
 		}
@@ -205,4 +212,28 @@ func lsKeys(name string) []string {
 		keys = append(keys, backend)
 	}
 	return keys
+}
+
+// declaredAt is the 1-based line where the config at path declares one of keys,
+// as `key = ...` or as a `[tools.key]` table, bare or quoted; 0 when the file
+// cannot be read or has none. Best effort: it names a line to remove, it
+// claims nothing.
+func declaredAt(path string, keys []string) int {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	quoted := make([]string, len(keys))
+	for i, k := range keys {
+		quoted[i] = regexp.QuoteMeta(k)
+	}
+	alt := `(?:` + strings.Join(quoted, "|") + `)`
+	key := `(?:"` + alt + `"|'` + alt + `'|` + alt + `)`
+	re := regexp.MustCompile(`^\s*(?:` + key + `\s*=|\[tools\.` + key + `\])`)
+	for i, line := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
+		if re.MatchString(line) {
+			return i + 1
+		}
+	}
+	return 0
 }

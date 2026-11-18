@@ -408,7 +408,11 @@ func pinSourceNote(s tools.MiseSync, pins []tools.MiseTool) string {
 		if _, seen := byFile[d.Path]; !seen {
 			files = append(files, d.Path)
 		}
-		byFile[d.Path] = append(byFile[d.Path], fmt.Sprintf("%s %s (pin %s)", d.Tool, d.Version, d.Pin))
+		at := ""
+		if d.Line > 0 {
+			at = fmt.Sprintf(", line %d", d.Line)
+		}
+		byFile[d.Path] = append(byFile[d.Path], fmt.Sprintf("%s %s (pin %s%s)", d.Tool, d.Version, d.Pin, at))
 	}
 	parts := make([]string, len(files))
 	for i, path := range files {

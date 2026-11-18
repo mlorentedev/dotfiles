@@ -671,6 +671,7 @@ func TestCheckMiseTools_WindowsBatsProbeRunsWithGitBashFirst(t *testing.T) {
 		"mise bin-paths --bin-names bats@1.13.0": "bats\n",
 		"mise install":                           "",
 		"mise ls --prunable --json":              "{}",
+		"mise ls --current --json":               "{}",
 	})
 	s.GOOS = "windows"
 	var scoped, unscoped []string
@@ -845,7 +846,28 @@ func TestCheckMiseTools_FixNeverEditsTheForeignConfig(t *testing.T) {
 	if err != nil || string(got) != body {
 		t.Errorf("the foreign config changed: %q, %v", got, err)
 	}
-	if !strings.Contains(b.String(), foreign) {
-		t.Errorf("--fix must still name the file\n%s", b.String())
+	if !strings.Contains(b.String(), foreign) || !strings.Contains(b.String(), "line 2") {
+		t.Errorf("--fix must still name the file and the line to remove\n%s", b.String())
+	}
+}
+
+// The source lookup runs from HOME, so a project's own mise.toml, which mise
+// reads from the working directory, is never reported as the user shadowing a
+// pin (reviewer finding on #3587).
+func TestCheckMiseTools_TheSourceLookupRunsFromHome(t *testing.T) {
+	s, cfg := miseFixture(t, "darwin", "1.2.1", true)
+	var home, ranIn string
+	plain := s.CommandStdoutDir
+	s.CommandStdoutDir = func(dir, name string, args ...string) (string, error) {
+		if name == "mise" && strings.Join(args, " ") == "ls --current --json" {
+			ranIn = dir
+		}
+		return plain(dir, name, args...)
+	}
+	home = s.Getenv("HOME")
+	rep := capture(&bytes.Buffer{})
+	checkMiseTools(s, cfg, rep, false)
+	if ranIn == "" || ranIn != home {
+		t.Errorf("mise ls --current --json ran from %q, want HOME %q", ranIn, home)
 	}
 }
