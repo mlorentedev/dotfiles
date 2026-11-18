@@ -1,0 +1,30 @@
+[
+  {
+    "id": "WIN-016-sysupgrade-partial-result-f1",
+    "behavior": "a failed confirming listing keeps what winget reported and what waits",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestSystemUpgradeWindowsKeepsWhatItDidWhenTheConfirmingListingFails$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-016-sysupgrade-partial-result-f2",
+    "behavior": "without elevation the probe makes no listing",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestSystemUpgradeWindowsProbeDoesNotListWithoutElevation$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-016-sysupgrade-partial-result-f3",
+    "behavior": "a catalog with ids left waiting is not called up to date",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestSystemUpgradeWindowsDoesNotCallTheCatalogUpToDateWhenEveryIdWaits$'",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "WIN-016-sysupgrade-partial-result-f4",
+    "behavior": "no machine-wide install reads as none and the ids are attempted",
+    "verification": "cd cli && go test ./internal/converge/ -count=1 -run '^TestSystemUpgradeWindowsWithoutElevationReadsNoMachineWideInstallAsNone$'",
+    "state": "pending",
+    "evidence": ""
+  }
+]
