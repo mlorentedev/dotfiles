@@ -95,8 +95,8 @@ func (g *guard) run(s string, depth int) PushVerdict {
 		return refuse("shell nesting deeper than %d levels cannot be checked for a force push", maxShellDepth)
 	}
 	cmds, ok := splitCommands(s, g.shell)
-	if !ok && strings.Contains(s, "git") && strings.Contains(s, "push") {
-		return refuse("cannot parse this command (open quote or substitution) and it mentions a git push; refusing in case it forces")
+	if !ok && ((strings.Contains(s, "git") && strings.Contains(s, "push")) || strings.Contains(s, "land:push")) {
+		return refuse("cannot parse this command (open quote or substitution) and it mentions a push; refusing in case it forces")
 	}
 	for _, c := range cmds {
 		if v := g.simple(stripRedirects(c), depth); v.Refused {
@@ -126,13 +126,16 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 			cmd = cmd[1:]
 		case prefixWords[t]:
 			cmd = cmd[1:]
-		case wrappers[t]:
+		case wrappers[programName(t)]:
 			var dir bool
 			cmd, dir = skipOptions(cmd[1:])
 			envDir = envDir || dir
 		default:
 			return g.byProgram(cmd, envDir, depth)
 		}
+	}
+	if envDir {
+		g.dirKnown = false // `GIT_DIR=x` on its own line sticks to the shell
 	}
 	return PushVerdict{}
 }
@@ -158,6 +161,7 @@ func skipOptions(cmd command) (command, bool) {
 		switch {
 		case strings.HasPrefix(t, "-"):
 			afterOpt = true
+			envDir = envDir || t == "-C" || strings.HasPrefix(t, "--chdir")
 		case envAssign.MatchString(t):
 			envDir = envDir || movesRepo(t)
 			afterOpt = false
@@ -190,16 +194,28 @@ func (g *guard) byProgram(cmd command, envDir bool, depth int) PushVerdict {
 	if cmd[0].dynamic && hasText(args, "push") {
 		return refuse("the program name is a variable and the arguments push; cannot check it for a force")
 	}
+	if envDir {
+		// The repository is not the working directory: nothing a nested shell
+		// reads from the directory can be trusted either.
+		saved := g.dirKnown
+		g.dirKnown = false
+		defer func() { g.dirKnown = saved }()
+	}
 	switch programName(cmd[0].text) {
 	case "git":
 		return g.git(args, envDir)
 	case "cd", "pushd", "chdir", "set-location", "sl":
-		g.chdir(args)
+		g.cd(cmd)
+	case "export", "declare", "typeset", "readonly":
+		g.exported(args)
 	case "bash", "sh", "zsh", "dash", "ksh":
 		return g.shellString(args, depth, ShellPOSIX)
 	case "pwsh", "powershell":
 		return g.shellString(args, depth, ShellPowerShell)
 	case "eval":
+		for len(args) > 0 && args[0].text == "--" {
+			args = args[1:]
+		}
 		return g.nested(joinTexts(args), depth, g.shell)
 	case "npm", "pnpm", "yarn", "bun":
 		if hasText(args, "land:push") {
@@ -207,6 +223,26 @@ func (g *guard) byProgram(cmd command, envDir bool, depth int) PushVerdict {
 		}
 	}
 	return PushVerdict{}
+}
+
+// cd tracks a directory change, except inside a subshell or a substitution,
+// where it does not carry out to the commands after it.
+func (g *guard) cd(cmd command) {
+	if cmd[0].sub {
+		g.dirKnown = false
+		return
+	}
+	g.chdir(cmd[1:])
+}
+
+// exported notes `export GIT_DIR=...` and friends, which move the repository for
+// every later command of the shell.
+func (g *guard) exported(args command) {
+	for _, a := range args {
+		if strings.Contains(a.text, "=") && movesRepo(a.text) {
+			g.dirKnown = false
+		}
+	}
 }
 
 func hasText(args command, want string) bool {
@@ -237,6 +273,10 @@ func (g *guard) shellString(args command, depth int, sh Shell) PushVerdict {
 		j := i + 1
 		for j < len(args) && args[j].text == "--" {
 			j++
+		}
+		if j < len(args) && sh == ShellPowerShell {
+			// PowerShell takes every word after -Command as the script.
+			return g.nested(joinTexts(args[j:]), depth, sh)
 		}
 		if j < len(args) {
 			return g.nested(args[j].text, depth, sh)

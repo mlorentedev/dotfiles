@@ -115,6 +115,13 @@ owner's list does not mention it. The stricter reading applies. Relaxing it is a
 - **Text, not behaviour.** The hook reads the command string. Git aliases, `push.*` and `remote.*.push`
   from config on disk, scripts and `make` targets that run git, and other tools that push (API clients)
   are outside what a string can show. `-c remote.<n>.push=+...` on the command line is refused.
+- **A parser, not a sandbox.** The guard reads shell text with its own lexer. Two independent review
+  rounds each found further spellings that reached a forced push (heredoc forms, wrapper options,
+  subshell scope, attached git options, `$'...'`); every one was fixed test-first, and the next round
+  will probably find another. It is a guard against an agent that mistypes or reaches for the wrong
+  form, not against one that obfuscates on purpose. Anything a shell can express that the lexer cannot
+  follow should fail closed (an unparseable text that mentions a push is refused); a new bypass is a bug
+  to fix with a row in `TestGuardCommand_*`, not a reason to widen the allowed form.
 - **Plain pushes are out of scope.** A non-forced `git push origin HEAD:refs/heads/main` stays as it is;
   branch protection on the forge is the barrier for it.
 - **No forge lookup.** The default branch is read from `refs/remotes/<remote>/HEAD` and backstopped by

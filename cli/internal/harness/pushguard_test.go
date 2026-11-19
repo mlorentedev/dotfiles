@@ -366,3 +366,62 @@ func TestGuardCommand_ReviewBypasses(t *testing.T) {
 		})
 	}
 }
+
+// Second review round: more spellings of the same families.
+func TestGuardCommand_SecondRoundBypasses(t *testing.T) {
+	sha := strings.Repeat("a", 40)
+	lease := "--force-with-lease=feat/x:" + sha
+	cases := []struct {
+		name   string
+		cmd    string
+		refuse bool
+		shell  Shell
+	}{
+		{"heredoc operator in a multi-line quote", "echo \"first line\n<<EOF\"\ngit push --force origin main", true, ShellPOSIX},
+		{"heredoc delimiter with a dash", "cat <<END-OF-MSG\ntext\nEND-OF-MSG\ngit push --force origin main", true, ShellPOSIX},
+		{"heredoc operator in a comment", "# <<EOF\ngit push --force origin main", true, ShellPOSIX},
+		{"no space between the shell and the operator", "bash<<EOF\ngit push --force origin main\nEOF", true, ShellPOSIX},
+		{"heredoc piped to bash then more", "cat <<EOF | bash; echo done\ngit push --force origin main\nEOF", true, ShellPOSIX},
+		{"heredoc piped to a parenthesised shell", "cat <<EOF | (bash)\ngit push --force origin main\nEOF", true, ShellPOSIX},
+		{"heredoc with a dashed delimiter stays text", "cat <<END-OF-MSG\ngit push --force\nEND-OF-MSG\ngit status", false, ShellPOSIX},
+		{"wrapper by path", "/usr/bin/env git push --force origin main", true, ShellPOSIX},
+		{"env -C moves the repository", "env -C /onmain git push origin " + lease + " feat/x", true, ShellPOSIX},
+		{"env --chdir moves the repository", "env --chdir=/onmain git push origin " + lease + " feat/x", true, ShellPOSIX},
+		{"GIT_DIR before a nested shell", "GIT_DIR=/x/.git bash -c 'git push origin " + lease + " feat/x'", true, ShellPOSIX},
+		{"export GIT_DIR then a lease push", "export GIT_DIR=/x/.git && git push origin " + lease + " feat/x", true, ShellPOSIX},
+		{"GIT_DIR assigned alone then a lease push", "GIT_DIR=/x/.git; git push origin " + lease + " feat/x", true, ShellPOSIX},
+		{"a cd outside any subshell still works", "cd /onmain && git push origin " + lease + " feat/x", true, ShellPOSIX},
+		{"eval after --", "eval -- \"git push --force origin main\"", true, ShellPOSIX},
+		{"powershell -Command with loose words", "pwsh -Command git push --force origin main", true, ShellPOSIX},
+		{"powershell tool -Command with loose words", "powershell -Command git push -f origin x", true, ShellPowerShell},
+		{"ANSI-C quote then land:push", `echo $'hello\'' ; npm run land:push`, true, ShellPOSIX},
+		{"ANSI-C quote alone", `echo $'it\'s fine'`, false, ShellPOSIX},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := GuardCommand(c.cmd, c.shell, fakeEnv(nil)); got.Refused != c.refuse {
+				t.Fatalf("refused=%v (%q), want %v for %q", got.Refused, got.Reason, c.refuse, c.cmd)
+			}
+		})
+	}
+}
+
+// A cd inside a subshell or a substitution does not change the directory of the
+// commands after it, so the branch must not be read from there. The session is
+// on main here; the subshell visits a feature branch.
+func TestGuardCommand_CdInsideASubshellDoesNotCarryOut(t *testing.T) {
+	lease := "--force-with-lease=feat/x:" + strings.Repeat("a", 40)
+	env := fakeEnv(nil)
+	env.Dir = "/onmain"
+	for _, cmd := range []string{
+		"(cd /repo) && git push origin " + lease + " feat/x",
+		"echo $(cd /repo) && git push origin " + lease + " feat/x",
+	} {
+		if got := GuardCommand(cmd, ShellPOSIX, env); !got.Refused {
+			t.Errorf("not refused: %q", cmd)
+		}
+	}
+	if got := GuardCommand("cd /repo && git push origin "+lease+" feat/x", ShellPOSIX, env); got.Refused {
+		t.Errorf("a plain cd must still move the directory: %q", got.Reason)
+	}
+}
