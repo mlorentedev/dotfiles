@@ -1,0 +1,51 @@
+[
+  {
+    "id": "HARNESS-201-force-with-lease-own-branch-f1",
+    "behavior": "AC1: the command table gives the allow/refuse verdict for every listed form and every spelling",
+    "verification": "cd cli && go test ./internal/harness -run 'TestGuardCommand' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-201-force-with-lease-own-branch-f2",
+    "behavior": "AC2: push-guard exits 2 with a reason for a refused push, 0 otherwise, never 1",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestPushGuard_NeverExitsOne|TestPushGuard_AgainstARealRepository' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-201-force-with-lease-own-branch-f3",
+    "behavior": "AC3: checked-out and default branches come from a real repository, origin/HEAD set and unset, with Windows directory spellings converted",
+    "verification": "cd cli && go test ./internal/cmd -run 'TestPushGuard_DefaultBranchResolution|TestNativeDir' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-201-force-with-lease-own-branch-f4",
+    "behavior": "AC4: bind emits push-guard beside the gate without eviction and the manifest command is a registered subcommand",
+    "verification": "cd cli && go test ./internal/harness -run 'TestPushGuardAndGateCoexistOnPreToolUse' -count=1 && go test ./internal/cmd -run 'TestBoundHarnessHooksResolveToRealSubcommands' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-201-force-with-lease-own-branch-f5",
+    "behavior": "AC5: deny and allow lists of the claude template are pinned and matched against the command table",
+    "verification": "cd cli && go test ./internal/claude -run 'TestClaudeTemplate' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-201-force-with-lease-own-branch-f6",
+    "behavior": "AC6: the old broad glob is retired through the deploy record, and stays without one",
+    "verification": "cd cli && go test ./internal/deploy -run 'TestClaudeTemplate' -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-201-force-with-lease-own-branch-f7",
+    "behavior": "AC7: ADR-065 names the allowed form, the refused forms and the hook",
+    "verification": "test -f docs/adr/adr-065-agents-may-force-with-lease-their-own-branch.md && grep -q 'dotf harness push-guard' docs/adr/adr-065-agents-may-force-with-lease-their-own-branch.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
