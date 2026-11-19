@@ -25,6 +25,7 @@ type command []word
 type frame struct {
 	quote    byte
 	backtick bool
+	parens   int // open `(` subshells inside this `$(`
 }
 
 type lexer struct {
@@ -155,16 +156,25 @@ func (lx *lexer) backslash(rs []rune, i int) int {
 func (lx *lexer) unquoted(rs []rune, i int) int {
 	c := rs[i]
 	switch {
-	case c == '\'':
-		lx.q, lx.has, lx.quote = '\'', true, true
-	case c == '"':
-		lx.q, lx.has, lx.quote = '"', true, true
+	case c == '\'' || c == '"':
+		lx.q, lx.has, lx.quote = byte(c), true, true
 	case c == ' ' || c == '\t' || c == '\r':
 		lx.endWord()
 	case c == '#' && !lx.has:
 		for i+1 < len(rs) && rs[i+1] != '\n' {
 			i++
 		}
+	default:
+		lx.operator(rs, i)
+	}
+	return i
+}
+
+// operator handles what is left once quotes, blanks and comments are out: a
+// command boundary, a redirection's `&`, or an ordinary character.
+func (lx *lexer) operator(rs []rune, i int) {
+	c := rs[i]
+	switch {
 	case c == '&' && lx.redirectAmp(rs, i):
 		lx.put(c)
 	case strings.ContainsRune(";&|\n()", c), lx.shell == ShellPowerShell && (c == '{' || c == '}'):
@@ -172,17 +182,22 @@ func (lx *lexer) unquoted(rs []rune, i int) int {
 	default:
 		lx.put(c)
 	}
-	return i
 }
 
 // boundary ends the current command. A `)` that closes a `$(` also restores
 // the quote state the substitution was opened in.
 func (lx *lexer) boundary(c rune) {
 	lx.endCommand()
-	if c != ')' {
+	n := len(lx.stack)
+	if n == 0 || lx.stack[n-1].backtick {
 		return
 	}
-	if n := len(lx.stack); n > 0 && !lx.stack[n-1].backtick {
+	switch {
+	case c == '(':
+		lx.stack[n-1].parens++
+	case c == ')' && lx.stack[n-1].parens > 0:
+		lx.stack[n-1].parens--
+	case c == ')':
 		lx.q = lx.stack[n-1].quote
 		lx.stack = lx.stack[:n-1]
 	}
@@ -236,7 +251,7 @@ func redirectRest(t string) (string, bool) {
 
 var (
 	heredocStart = regexp.MustCompile(`<<(-?)\s*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))`)
-	shellFeeder  = regexp.MustCompile(`(^|[;&|(\s])(?:ba|z|da|k)?sh(\s|$)|(^|[;&|(\s])eval(\s|$)`)
+	shellFeeder  = regexp.MustCompile(`(?i)(^|[;&|(\s/\\])(?:(?:ba|z|da|k)?sh|pwsh|powershell|eval)(\.exe)?(\s|$)`)
 )
 
 // stripHeredocs removes heredoc bodies. A commit message written as a heredoc is
@@ -251,7 +266,7 @@ func stripHeredocs(s string) string {
 	for i := 0; i < len(lines); i++ {
 		out = append(out, lines[i])
 		m := heredocStart.FindStringSubmatchIndex(lines[i])
-		if m == nil || shellFeeder.MatchString(lines[i][:m[0]]) {
+		if m == nil || shellFeeder.MatchString(lines[i]) || inQuotes(lines[i][:m[0]]) {
 			continue
 		}
 		delim := firstNonEmpty(lines[i], m[4:])
@@ -280,4 +295,43 @@ func firstNonEmpty(line string, idx []int) string {
 		}
 	}
 	return ""
+}
+
+// inQuotes reports whether the end of prefix sits inside a quote that no
+// `$(...)` has reopened, so a `<<` there is text, not a heredoc.
+func inQuotes(prefix string) bool {
+	var q byte
+	var stack []byte
+	for i := 0; i < len(prefix); i++ {
+		c := prefix[i]
+		switch {
+		case c == '\\' && q != '\'':
+			i++
+		case q == '\'':
+			if c == '\'' {
+				q = 0
+			}
+		case c == '$' && i+1 < len(prefix) && prefix[i+1] == '(':
+			stack = append(stack, q)
+			q = 0
+			i++
+		case c == ')' && len(stack) > 0:
+			q = stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+		default:
+			q = quoteAfter(q, c)
+		}
+	}
+	return q != 0
+}
+
+// quoteAfter is the quote state once c has been read outside a single quote.
+func quoteAfter(q, c byte) byte {
+	switch {
+	case c == '"' && q == '"':
+		return 0
+	case (c == '"' || c == '\'') && q == 0:
+		return c
+	}
+	return q
 }

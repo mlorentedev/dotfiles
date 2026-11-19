@@ -111,8 +111,8 @@ var envAssign = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
 // prefixWords run another command and change nothing the guard reads.
 var prefixWords = map[string]bool{
 	"!": true, "if": true, "then": true, "do": true, "else": true, "elif": true,
-	"while": true, "until": true, "time": true, "command": true, "builtin": true,
-	"exec": true, "nohup": true, "{": true, "&": true,
+	"while": true, "until": true, "time": true, "builtin": true,
+	"nohup": true, "{": true, "&": true,
 }
 
 // simple examines one simple command.
@@ -122,13 +122,14 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 		t := cmd[0].text
 		switch {
 		case envAssign.MatchString(t):
-			name := strings.ToUpper(t[:strings.IndexByte(t, '=')])
-			envDir = envDir || name == "GIT_DIR" || name == "GIT_WORK_TREE" || name == "GIT_COMMON_DIR"
+			envDir = envDir || movesRepo(t)
 			cmd = cmd[1:]
 		case prefixWords[t]:
 			cmd = cmd[1:]
-		case t == "env" || t == "sudo":
-			cmd = skipOptions(cmd[1:])
+		case wrappers[t]:
+			var dir bool
+			cmd, dir = skipOptions(cmd[1:])
+			envDir = envDir || dir
 		default:
 			return g.byProgram(cmd, envDir, depth)
 		}
@@ -136,12 +137,46 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 	return PushVerdict{}
 }
 
-// skipOptions drops leading `-x` options and `VAR=v` assignments (env, sudo).
-func skipOptions(cmd command) command {
-	for len(cmd) > 0 && (strings.HasPrefix(cmd[0].text, "-") || envAssign.MatchString(cmd[0].text)) {
+// wrappers run the command that follows them and take options of their own.
+var wrappers = map[string]bool{"env": true, "sudo": true, "command": true, "exec": true}
+
+// wrapped is a program the guard reads; an option's argument is never one of
+// these in practice, which is what tells `sudo -u root git` from `sudo -E git`.
+var wrapped = map[string]bool{
+	"git": true, "bash": true, "sh": true, "zsh": true, "dash": true, "ksh": true,
+	"pwsh": true, "powershell": true, "eval": true, "cd": true, "npm": true,
+	"pnpm": true, "yarn": true, "bun": true,
+}
+
+// skipOptions drops what a wrapper takes before its command: `-x` options, the
+// word after one (`-u root`, `-a name`), and `VAR=v` assignments. It reports
+// whether an assignment moved the repository (GIT_DIR and friends).
+func skipOptions(cmd command) (command, bool) {
+	envDir, afterOpt := false, false
+	for len(cmd) > 0 {
+		t := cmd[0].text
+		switch {
+		case strings.HasPrefix(t, "-"):
+			afterOpt = true
+		case envAssign.MatchString(t):
+			envDir = envDir || movesRepo(t)
+			afterOpt = false
+		case afterOpt && !wrapped[programName(t)]:
+			afterOpt = false
+		default:
+			return cmd, envDir
+		}
 		cmd = cmd[1:]
 	}
-	return cmd
+	return cmd, envDir
+}
+
+func movesRepo(assign string) bool {
+	switch strings.ToUpper(assign[:strings.IndexByte(assign, '=')]) {
+	case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR":
+		return true
+	}
+	return false
 }
 
 func programName(t string) string {
@@ -196,8 +231,15 @@ func (g *guard) shellString(args command, depth int, sh Shell) PushVerdict {
 	for i, a := range args {
 		isFlag := strings.HasPrefix(a.text, "-") && !strings.HasPrefix(a.text, "--")
 		isCmd := strings.EqualFold(a.text, "-command") || (isFlag && strings.ContainsRune(a.text, 'c'))
-		if isCmd && i+1 < len(args) {
-			return g.nested(args[i+1].text, depth, sh)
+		if !isCmd {
+			continue
+		}
+		j := i + 1
+		for j < len(args) && args[j].text == "--" {
+			j++
+		}
+		if j < len(args) {
+			return g.nested(args[j].text, depth, sh)
 		}
 	}
 	return PushVerdict{}
@@ -283,30 +325,68 @@ func (g *guard) git(args command, envDir bool) PushVerdict {
 
 func (g *guard) gitGlobals(args command, envDir bool) gitPrefix {
 	p := gitPrefix{dir: g.dir, known: g.dirKnown && !envDir}
-	i := 0
-	for i < len(args) {
-		t := args[i].text
-		switch {
-		case t == "-C" && i+1 < len(args):
-			p.known = p.known && !args[i+1].dynamic
-			p.dir = joinDir(p.dir, dirText(args[i+1]))
-			i += 2
-		case t == "-c" && i+1 < len(args):
-			p.cfgForce = p.cfgForce || forcingConfig(args[i+1].text)
-			i += 2
-		case strings.HasPrefix(t, "--git-dir") || strings.HasPrefix(t, "--work-tree"):
-			p.known = false
-			i += 1 + btoi(!strings.Contains(t, "="))
-		case t == "--namespace" || t == "--super-prefix" || t == "--config-env" || t == "--exec-path":
-			i += 2
-		case strings.HasPrefix(t, "-"):
-			i++
-		default:
+	for i := 0; i < len(args); {
+		n := p.option(args, i)
+		if n == 0 {
 			p.rest = args[i:]
 			return p
 		}
+		i += n
 	}
 	return p
+}
+
+// option reads the git global option at args[i] and returns how many words it
+// took; 0 means args[i] is the subcommand. Attached forms (`-C/dir`,
+// `-ckey=v`) are as valid as separate ones.
+func (p *gitPrefix) option(args command, i int) int {
+	w := args[i]
+	t := w.text
+	switch {
+	case t == "-C" && i+1 < len(args):
+		p.setDir(args[i+1])
+		return 2
+	case t == "-c" && i+1 < len(args):
+		p.cfgForce = p.cfgForce || forcingConfig(args[i+1].text)
+		return 2
+	case len(t) > 2 && (t[:2] == "-C" || t[:2] == "-c"):
+		p.attached(w)
+		return 1
+	case strings.HasPrefix(t, "-"):
+		return p.longOption(t)
+	}
+	return 0
+}
+
+// longOption reads a `-`-prefixed global that is not -C or -c.
+func (p *gitPrefix) longOption(t string) int {
+	switch {
+	case strings.HasPrefix(t, "--git-dir") || strings.HasPrefix(t, "--work-tree"):
+		p.known = false
+		return 1 + btoi(!strings.Contains(t, "="))
+	case t == "--namespace" || t == "--super-prefix" || t == "--config-env" || t == "--exec-path":
+		return 2
+	}
+	return 1
+}
+
+func (p *gitPrefix) setDir(w word) {
+	p.known = p.known && !w.dynamic
+	p.dir = joinDir(p.dir, dirText(w))
+}
+
+// attached handles `-C<dir>` and `-c<key=value>` written without a space.
+func (p *gitPrefix) attached(w word) {
+	rest := w
+	rest.text = w.text[2:]
+	if len(w.raw) >= 2 {
+		rest.raw = w.raw[2:]
+	}
+	if w.text[1] == 'C' {
+		p.setDir(rest)
+		return
+	}
+	p.cfgForce = p.cfgForce || forcingConfig(rest.text)
 }
 
 func btoi(b bool) int {

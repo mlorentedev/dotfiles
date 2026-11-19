@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -69,11 +70,9 @@ func runPushGuardCmd(t *testing.T, payload string) (int, string) {
 	c.SetErr(&errb)
 	c.SetArgs(nil)
 	err := c.Execute()
-	msg := errb.String()
-	if err != nil {
-		msg += err.Error()
-	}
-	return ExitCode(err), msg
+	// stderr only: the binary silences the returned error, so the reason must
+	// already be on the stream (a refusal with an empty stderr shows the model nothing).
+	return ExitCode(err), errb.String()
 }
 
 func TestPushGuard_AgainstARealRepository(t *testing.T) {
@@ -237,5 +236,34 @@ func TestBoundHarnessHooksResolveToRealSubcommands(t *testing.T) {
 	}
 	if seen == 0 {
 		t.Fatal("no harness hook was checked: the manifest moved")
+	}
+}
+
+// A POSIX shell on Windows sends /c/... for a drive path; the guard must read the
+// branch from that directory through the real git, not only through a unit.
+func TestPushGuard_MsysDriveDirectoryAgainstARealRepository(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("drive-letter spellings exist only on Windows")
+	}
+	dir, sha := pushGuardRepo(t)
+	if len(dir) < 3 || dir[1] != ':' {
+		t.Skipf("repository path %q has no drive letter", dir)
+	}
+	msys := "/" + strings.ToLower(dir[:1]) + filepath.ToSlash(dir[2:])
+	lease := "--force-with-lease=feat/x:" + sha
+	for _, c := range []struct {
+		name, cmd string
+		want      int
+	}{
+		{"lease after cd", "cd " + msys + " && git push origin " + lease + " feat/x", 0},
+		{"lease through -C", "git -C " + msys + " push origin " + lease + " feat/x", 0},
+		{"force after cd", "cd " + msys + " && git push -f origin feat/x", 2},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			code, msg := runPushGuardCmd(t, pushGuardPayloadFor("Bash", "/nowhere", c.cmd))
+			if code != c.want {
+				t.Fatalf("exit %d, want %d (%s)", code, c.want, msg)
+			}
+		})
 	}
 }

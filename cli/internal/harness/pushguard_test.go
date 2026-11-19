@@ -328,3 +328,41 @@ func TestGuardCommand_Heredocs(t *testing.T) {
 		})
 	}
 }
+
+// Bypasses found by the independent review: each of these reached a forced push
+// (or a lease push read from the wrong directory) with the guard silent.
+func TestGuardCommand_ReviewBypasses(t *testing.T) {
+	sha := strings.Repeat("a", 40)
+	lease := "--force-with-lease=feat/x:" + sha
+	cases := []struct {
+		name   string
+		cmd    string
+		refuse bool
+	}{
+		{"heredoc operator inside quotes", "echo \"<<EOF\"\ngit push --force origin main", true},
+		{"heredoc piped to bash", "cat <<EOF | bash\ngit push --force origin main\nEOF", true},
+		{"heredoc to a path-qualified shell", "/bin/bash <<EOF\ngit push --force origin main\nEOF", true},
+		{"heredoc to a windows-style shell path", "C:/Git/bin/bash.exe <<EOF\ngit push -f origin x\nEOF", true},
+		{"env with an option argument", "env -u FOO git push --force origin main", true},
+		{"sudo with a user", "sudo -u root git push --force origin main", true},
+		{"command with an option", "command -p git push --force origin main", true},
+		{"exec with an option argument", "exec -a foo git push -f origin main", true},
+		{"env sets GIT_DIR for a lease push", "env GIT_DIR=/x/.git git push origin " + lease + " feat/x", true},
+		{"env with a plain assignment and a lease", "env FOO=1 git push origin " + lease + " feat/x", false},
+		{"sudo -E keeps the program", "sudo -E git push origin " + lease + " feat/x", false},
+		{"subshell inside a double-quoted substitution", "echo \"$( (true); git push --force origin main)\"", true},
+		{"subshell inside a substitution, then a harmless command", "echo \"$( (true); echo ok)\"", false},
+		{"attached -C directory", "git -C/onmain push origin " + lease + " feat/x", true},
+		{"attached -c forcing config", "git -cremote.origin.push=+refs/heads/main:refs/heads/main push origin", true},
+		{"attached -c harmless config", "git -cuser.name=x push origin feat/x", false},
+		{"bash -c after --", "bash -c -- 'git push --force origin main'", true},
+		{"bash -c after -- harmless", "bash -c -- 'git status'", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := GuardCommand(c.cmd, ShellPOSIX, fakeEnv(nil)); got.Refused != c.refuse {
+				t.Fatalf("refused=%v (%q), want %v for %q", got.Refused, got.Reason, c.refuse, c.cmd)
+			}
+		})
+	}
+}

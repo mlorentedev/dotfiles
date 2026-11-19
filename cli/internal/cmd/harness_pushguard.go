@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
 	"errors"
@@ -93,7 +94,9 @@ func runPushGuard(cmd *cobra.Command, mkEnv func(cwd string) harness.PushEnv) er
 	if !v.Refused {
 		return nil
 	}
-	return withExitCode(gateExitBlock, errors.New("push-guard: "+v.Reason))
+	msg := "push-guard: " + v.Reason
+	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), msg)
+	return withExitCode(gateExitBlock, errors.New(msg))
 }
 
 // newGitPushEnv answers the guard's two questions by asking git.
