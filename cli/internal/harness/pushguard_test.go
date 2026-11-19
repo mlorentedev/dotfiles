@@ -526,3 +526,57 @@ func TestGuardCommand_OptionMovesTheDirectory(t *testing.T) {
 		}
 	}
 }
+
+// Fifth review round: the spellings an agent writes without meaning to hide anything.
+func TestGuardCommand_FifthRoundBypasses(t *testing.T) {
+	lease := "--force-with-lease=feat/x:" + strings.Repeat("a", 40)
+	cases := []struct {
+		name   string
+		cmd    string
+		refuse bool
+		shell  Shell
+	}{
+		{"line continuation between words", "git \\\n  push --force origin main", true, ShellPOSIX},
+		{"line continuation straight into the word", "git \\\npush --force origin main", true, ShellPOSIX},
+		{"line continuation inside an option", "git push --for\\\nce origin main", true, ShellPOSIX},
+		{"line continuation inside double quotes", "git push \"--for\\\nce\" origin main", true, ShellPOSIX},
+		{"arithmetic shift is not a heredoc", "x=$(( 1 << 2 ))\ngit push --force origin main", true, ShellPOSIX},
+		{"arithmetic shift in a test", "if (( 1 << 2 )); then\n  git push --force origin main\nfi", true, ShellPOSIX},
+		{"powershell has no heredoc", "<# <<EOF #>\ngit push --force origin main", true, ShellPowerShell},
+		{"redirect to a spaced target", ">& /dev/null git push --force origin main", true, ShellPOSIX},
+		{"fd duplication with a space", "2>& 1 git push --force origin main", true, ShellPOSIX},
+		{"read-write redirect", "<> /dev/null git push --force origin main", true, ShellPOSIX},
+		{"ordinary fd duplication", "git push --force origin main 2>&1", true, ShellPOSIX},
+		{"time with an option", "time -p git push --force origin main", true, ShellPOSIX},
+		{"time keeps a plain push", "time git push origin feat/x", false, ShellPOSIX},
+		{"sudo -D moves the directory", "sudo -D /onmain git push origin " + lease + " feat/x", true, ShellPOSIX},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := GuardCommand(c.cmd, c.shell, fakeEnv(nil)); got.Refused != c.refuse {
+				t.Fatalf("refused=%v (%q), want %v for %q", got.Refused, got.Reason, c.refuse, c.cmd)
+			}
+		})
+	}
+}
+
+// A cd on the left of a pipe or an & runs in a subshell: it does not move the
+// commands after it.
+func TestGuardCommand_CdBeforeAPipeOrAmpersand(t *testing.T) {
+	lease := "--force-with-lease=feat/x:" + strings.Repeat("a", 40)
+	env := fakeEnv(nil)
+	env.Dir = "/onmain"
+	for _, cmd := range []string{
+		"cd /repo | git push origin " + lease + " feat/x",
+		"cd /repo & git push origin " + lease + " feat/x",
+	} {
+		if got := GuardCommand(cmd, ShellPOSIX, env); !got.Refused {
+			t.Errorf("not refused: %q", cmd)
+		}
+	}
+	for _, cmd := range []string{"cd /repo && git push origin " + lease + " feat/x", "cd /repo || git push origin " + lease + " feat/x"} {
+		if got := GuardCommand(cmd, ShellPOSIX, env); got.Refused {
+			t.Errorf("a cd joined by && or || carries out: %q (%s)", cmd, got.Reason)
+		}
+	}
+}

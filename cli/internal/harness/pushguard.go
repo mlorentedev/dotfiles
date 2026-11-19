@@ -111,7 +111,7 @@ var envAssign = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
 // prefixWords run another command and change nothing the guard reads.
 var prefixWords = map[string]bool{
 	"!": true, "if": true, "then": true, "do": true, "else": true, "elif": true,
-	"while": true, "until": true, "time": true, "builtin": true,
+	"while": true, "until": true, "builtin": true,
 	"nohup": true, "{": true, "&": true,
 }
 
@@ -145,7 +145,7 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 }
 
 // wrappers run the command that follows them and take options of their own.
-var wrappers = map[string]bool{"env": true, "sudo": true, "command": true, "exec": true}
+var wrappers = map[string]bool{"env": true, "sudo": true, "command": true, "exec": true, "time": true}
 
 // wrapped is a program the guard reads; an option's argument is never one of
 // these in practice, which is what tells `sudo -u root git` from `sudo -E git`.
@@ -178,7 +178,7 @@ type opt struct {
 func readOption(name string, cmd command) opt {
 	t := cmd[0].text
 	o := opt{
-		moves:     strings.HasPrefix(t, "-C") || strings.HasPrefix(t, "--chdir"),
+		moves:     strings.HasPrefix(t, "-C") || strings.HasPrefix(t, "--chdir") || (name == "sudo" && strings.HasPrefix(t, "-D")),
 		takesNext: argOptions[name][t],
 	}
 	if name == "env" {

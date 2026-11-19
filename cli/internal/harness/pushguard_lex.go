@@ -55,7 +55,11 @@ type lexer struct {
 // substitution is left open: the commands are then best-effort.
 func splitCommands(s string, shell Shell) (cmds []command, ok bool) {
 	lx := &lexer{shell: shell}
-	rs := []rune(stripHeredocs(s))
+	text := s
+	if shell == ShellPOSIX {
+		text = stripHeredocs(s)
+	}
+	rs := []rune(text)
 	for i := 0; i < len(rs); i++ {
 		i = lx.step(rs, i)
 	}
@@ -176,6 +180,12 @@ func (lx *lexer) backslash(rs []rune, i int) int {
 		return i
 	}
 	n := rs[i+1]
+	if n == '\n' { // a line continuation joins the two lines
+		return i + 1
+	}
+	if n == '\r' && i+2 < len(rs) && rs[i+2] == '\n' {
+		return i + 2
+	}
 	if lx.q == '"' && !strings.ContainsRune("\"\\$`", n) {
 		lx.put('\\')
 		return i
@@ -218,6 +228,18 @@ func blockCommentEnd(rs []rune, i int) int {
 	return len(rs) - 1
 }
 
+// doubled reports whether the `|` or `&` at i is half of `||` or `&&`.
+func doubled(rs []rune, i int) bool {
+	return (i+1 < len(rs) && rs[i+1] == rs[i]) || (i > 0 && rs[i-1] == rs[i])
+}
+
+// markSub marks the words of the command being read as run in a subshell.
+func (lx *lexer) markSub() {
+	for k := range lx.cur {
+		lx.cur[k].sub = true
+	}
+}
+
 // operator handles what is left once quotes, blanks and comments are out: a
 // command boundary, a redirection's `&`, or an ordinary character.
 func (lx *lexer) operator(rs []rune, i int) {
@@ -225,6 +247,10 @@ func (lx *lexer) operator(rs []rune, i int) {
 	switch {
 	case c == '&' && lx.redirectAmp(rs, i):
 		lx.put(c)
+	case (c == '|' || c == '&') && !doubled(rs, i):
+		lx.endWord()
+		lx.markSub() // the left side of a pipe or an & runs in a subshell
+		lx.boundary(c)
 	case strings.ContainsRune(";&|\n()", c), lx.shell == ShellPowerShell && (c == '{' || c == '}'):
 		lx.boundary(c)
 	default:
@@ -291,9 +317,9 @@ func stripRedirects(cmd command) command {
 // what follows it in the same word ("" means the target is the next word).
 func redirectRest(t string) (string, bool) {
 	s := strings.TrimLeft(t, "0123456789")
-	for _, op := range []string{"&>>", "&>", ">>", ">&", ">|", "<<<", "<<", "<&", ">", "<"} {
+	for _, op := range []string{"&>>", "&>", ">>", ">&", ">|", "<<<", "<<", "<&", "<>", ">", "<"} {
 		if rest, ok := strings.CutPrefix(s, op); ok {
-			if op == ">&" || op == "<&" {
+			if (op == ">&" || op == "<&") && rest != "" {
 				return "x", true // `2>&1`: the target is part of the word
 			}
 			return rest, true
@@ -324,6 +350,9 @@ func stripHeredocs(s string) string {
 			continue
 		}
 		delim := firstNonEmpty(lines[i], m[4:])
+		if isNumber(delim) {
+			continue // `1 << 2` is arithmetic, not a heredoc
+		}
 		trim := m[3] > m[2] // "<<-" strips leading tabs from the terminator
 		for i+1 < len(lines) {
 			i++
@@ -338,6 +367,18 @@ func stripHeredocs(s string) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+func isNumber(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // midWordQuote reports a quote or backslash right after the delimiter the regexp
