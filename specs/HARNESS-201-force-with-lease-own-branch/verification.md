@@ -24,6 +24,9 @@ owner: manu
 - Mutation checks on the guard, all killed: drop main/master backstop, ignore abbreviations, ignore unknown dir, ignore checked-out branch, ignore +refspec, allow unknown lease options, accept short sha.
 - `GOOS=windows go vet ./...`: exit 0. `bats tests/claude-settings-template.bats`: 33 ok.
 - Known unrelated failures on this Windows box: symlink-creation tests (no privilege) in doctor and evals; gofmt reports on files this change does not touch.
+- First review (agy, FAIL at 9b3504d8): one Blocker (refusal reason never reached stderr in the compiled binary) and four Majors (heredoc forms, wrapper options, subshell inside a quoted substitution, attached -C and -c). Each was reproduced as a red test first (`TestGuardCommand_ReviewBypasses`, and the cmd helper now reads stderr only), then fixed in 952d443c. The /c/ spelling now also runs against a real repository (`TestPushGuard_MsysDriveDirectoryAgainstARealRepository`).
+- Complexity: every new function is at 14 or below (was 17); the rest are above the ideal 10 and left as they are because splitting further hides the single switch each one is.
+- Declined (theoretical): `git * push` glob variants for --mirror and main/master leases, and default-branch lookup for a URL remote. The hook is the control; the globs are the fallback while it is down, and main/master stay refused by name for a URL remote.
 - TDD caveat: the cmd-layer file harness_pushguard.go was written before its tests; the guard table was red first.
 
 ## Decisions made during implementation
