@@ -22,6 +22,7 @@ owner: manu
 ## Test status
 
 - Mutation checks on the guard, all killed: drop main/master backstop, ignore abbreviations, ignore unknown dir, ignore checked-out branch, ignore +refspec, allow unknown lease options, accept short sha.
+- Final run at 952d443c, `go test -count=1` of internal/cmd, harness, deploy and claude: all ok (cmd 1056 s).
 - `GOOS=windows go vet ./...`: exit 0. `bats tests/claude-settings-template.bats`: 33 ok.
 - Known unrelated failures on this Windows box: symlink-creation tests (no privilege) in doctor and evals; gofmt reports on files this change does not touch.
 - First review (agy, FAIL at 9b3504d8): one Blocker (refusal reason never reached stderr in the compiled binary) and four Majors (heredoc forms, wrapper options, subshell inside a quoted substitution, attached -C and -c). Each was reproduced as a red test first (`TestGuardCommand_ReviewBypasses`, and the cmd helper now reads stderr only), then fixed in 952d443c. The /c/ spelling now also runs against a real repository (`TestPushGuard_MsysDriveDirectoryAgainstARealRepository`).
