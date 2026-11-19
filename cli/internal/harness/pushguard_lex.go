@@ -57,7 +57,7 @@ func splitCommands(s string, shell Shell) (cmds []command, ok bool) {
 	lx := &lexer{shell: shell}
 	text := s
 	if shell == ShellPOSIX {
-		text = stripHeredocs(s)
+		text, _ = stripHeredocs(s)
 	}
 	rs := []rune(text)
 	for i := 0; i < len(rs); i++ {
@@ -336,12 +336,13 @@ var (
 // stripHeredocs removes heredoc bodies. A commit message written as a heredoc is
 // text, and its apostrophes would otherwise read as an open quote; the body of a
 // heredoc fed to a shell is code, so that one is kept and read as commands.
-func stripHeredocs(s string) string {
+func stripHeredocs(s string) (string, []string) {
 	if !strings.Contains(s, "<<") {
-		return s
+		return s, nil
 	}
 	lines := strings.Split(s, "\n")
 	out := make([]string, 0, len(lines))
+	var bodies []string
 	for i := 0; i < len(lines); i++ {
 		out = append(out, lines[i])
 		m := heredocStart.FindStringSubmatchIndex(lines[i])
@@ -364,9 +365,39 @@ func stripHeredocs(s string) string {
 				out = append(out, lines[i])
 				break
 			}
+			bodies = append(bodies, l)
 		}
 	}
-	return strings.Join(out, "\n")
+	return strings.Join(out, "\n"), bodies
+}
+
+var (
+	// forceLike is any spelling of a forced push that can sit in text: a force or
+	// mirror option, a short option cluster holding f, or a +refspec.
+	forceLike = regexp.MustCompile(`(^|\s)(--force\S*|--mirror|-[A-Za-z]*f[A-Za-z]*|\+\S)`)
+	// anyShell finds a shell or eval name once quotes and backslashes are gone,
+	// so b''ash and "ba"sh read as bash.
+	anyShell = regexp.MustCompile(`(?i)(^|[^A-Za-z0-9_-])(?:(?:ba|z|da|k)?sh|pwsh|powershell|eval)(\.exe)?([^A-Za-z0-9_-]|$)`)
+	unquoter = strings.NewReplacer("'", "", "\"", "", "\\", "")
+)
+
+// heredocFeedsAShell is the fail-closed backstop for stripHeredocs. A body is
+// dropped as text unless the feeder is recognised, so a feeder the lexer cannot
+// see (a split name, a pipe then a newline) would hide code from the guard. When a
+// dropped body mentions a push with something force-like and a shell is named
+// anywhere in the command, the body may be code: refuse. A body with no force, or
+// a command that names no shell, is untouched.
+func heredocFeedsAShell(s string) bool {
+	text, bodies := stripHeredocs(s)
+	if len(bodies) == 0 || !anyShell.MatchString(unquoter.Replace(text)) {
+		return false
+	}
+	for _, b := range bodies {
+		if strings.Contains(b, "push") && forceLike.MatchString(b) {
+			return true
+		}
+	}
+	return false
 }
 
 func isNumber(s string) bool {

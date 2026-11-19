@@ -98,6 +98,9 @@ func (g *guard) run(s string, depth int) PushVerdict {
 	if !ok && ((strings.Contains(s, "git") && strings.Contains(s, "push")) || strings.Contains(s, "land:push")) {
 		return refuse("cannot parse this command (open quote or substitution) and it mentions a push; refusing in case it forces")
 	}
+	if g.shell == ShellPOSIX && heredocFeedsAShell(s) {
+		return refuse("a heredoc body mentions a force push and the command names a shell; it may be read as code, refusing")
+	}
 	for _, c := range cmds {
 		if v := g.simple(stripRedirects(c), depth); v.Refused {
 			return v

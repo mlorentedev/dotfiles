@@ -580,3 +580,42 @@ func TestGuardCommand_CdBeforeAPipeOrAmpersand(t *testing.T) {
 		}
 	}
 }
+
+// The lexer cannot always tell which heredoc body a shell reads as code. When it
+// cannot account for the whole text and the text mentions a push with something
+// force-like, the guard refuses; a plain push, or a heredoc with no force in it,
+// stays untouched.
+func TestGuardCommand_HeredocFeederBackstop(t *testing.T) {
+	env := fakeEnv(nil)
+	body := "git push --force origin main\nEOF\n"
+	refused := []string{
+		"bash \\\n<<EOF\n" + body,
+		"b''ash <<EOF\n" + body,
+		"cat <<EOF |\n" + body + "bash",
+		"cat <<EOF | b\"\"ash\n" + body,
+		"cat <<EOF\ngit push -f origin main\nEOF\n| bash",
+		"cat <<EOF\ngit push origin +main\nEOF\nbash",
+		"cat <<EOF\ngit push --mirror origin\nEOF\nbash",
+	}
+	for _, cmd := range refused {
+		if got := GuardCommand(cmd, ShellPOSIX, env); !got.Refused {
+			t.Errorf("not refused: %q", cmd)
+		}
+	}
+	allowed := []string{
+		"git push origin feat/x",
+		"git push -u origin feat/x",
+		"git commit -F - <<EOF\nfix: push the queue, do not force it\nEOF\ngit push origin feat/x",
+		"git commit -m \"$(cat <<'EOF'\nfix: handle a push that was rejected\n\nIt used to retry with a force.\nEOF\n)\"\ngit push",
+		"git commit -F - <<EOF\ndocs: never run git push --force on main\nEOF\ngit push origin feat/x",
+		"set -e\ngit fetch origin\ngit rebase origin/main\ngit push origin feat/x\necho done",
+		"cat <<EOF > notes.txt\npush notes\nEOF\ngrep -f patterns.txt notes.txt",
+		"echo \"push\" && ls -f",
+		"git push --force-with-lease=feat/x:" + strings.Repeat("a", 40) + " origin feat/x",
+	}
+	for _, cmd := range allowed {
+		if got := GuardCommand(cmd, ShellPOSIX, env); got.Refused {
+			t.Errorf("refused: %q (%s)", cmd, got.Reason)
+		}
+	}
+}
