@@ -317,7 +317,9 @@ setup() {
 # destructive command is listed in its common forms (long flag, short flag,
 # reordered flags). A spelling not listed here is not denied.
 @test "the deny list keeps the destructive git and rm rules as wildcards" {
-    for rule in 'Bash(rm -rf ~/*)' 'Bash(rm -fr ~/*)' 'Bash(git push *--force*)' \
+    # `git push *--force*` also matched --force-with-lease=<branch>:<sha>; it was replaced by exact
+    # globs (pinned in cli/internal/claude/push_rules_test.go) and push-guard, HARNESS-201.
+    for rule in 'Bash(rm -rf ~/*)' 'Bash(rm -fr ~/*)' 'Bash(git push *--force *)' 'Bash(git push *--force)' \
         'Bash(git push -f*)' 'Bash(git push * -f*)' 'Bash(git reset --hard*)' \
         'Bash(git clean -f*)' 'Bash(git clean -*f*)'; do
         jq -e --arg r "$rule" '.permissions.deny | index($r)' "$SETTINGS_TEMPLATE" >/dev/null || { echo "missing: $rule"; false; }

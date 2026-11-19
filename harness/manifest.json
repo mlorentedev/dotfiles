@@ -280,6 +280,12 @@
             "timeout": 5
           },
           {
+            "id": "push-guard",
+            "event": "PreToolUse",
+            "command": "harness push-guard",
+            "timeout": 5
+          },
+          {
             "id": "suggest-role",
             "event": "UserPromptSubmit",
             "command": "harness suggest --from-hook",
