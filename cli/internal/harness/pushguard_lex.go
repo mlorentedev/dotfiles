@@ -35,18 +35,19 @@ type frame struct {
 }
 
 type lexer struct {
-	shell Shell
-	cmds  []command
-	cur   command
-	text  strings.Builder
-	raw   strings.Builder
-	has   bool
-	dyn   bool
-	quote bool
-	stack []frame
-	redir bool
-	paren int  // open `(` subshells outside any `$(`
-	q     byte // 0, '\'', '"' or 'A' for $'...' (backslash escapes the next rune)
+	shell  Shell
+	cmds   []command
+	cur    command
+	text   strings.Builder
+	raw    strings.Builder
+	has    bool
+	dyn    bool
+	quote  bool
+	stack  []frame
+	redir  bool
+	pipeIn bool // the command being read is a stage after a `|`
+	paren  int  // open `(` subshells outside any `$(`
+	q      byte // 0, '\'', '"' or 'A' for $'...' (backslash escapes the next rune)
 }
 
 // splitCommands breaks a shell string into simple commands. It reads `&&`, `||`,
@@ -81,8 +82,12 @@ func (lx *lexer) endWord() {
 
 func (lx *lexer) endCommand() {
 	lx.endWord()
+	if lx.pipeIn {
+		lx.markSub()
+	}
 	if len(lx.cur) > 0 {
 		lx.cmds = append(lx.cmds, lx.cur)
+		lx.pipeIn = false
 	}
 	lx.cur = nil
 }
@@ -134,6 +139,9 @@ func (lx *lexer) escapeOrSubst(rs []rune, i int) (int, bool) {
 		return i, true
 	case c == '\\' && lx.shell == ShellPOSIX:
 		return lx.backslash(rs, i), true
+	case c == '`' && lx.shell == ShellPowerShell && i+1 < len(rs) && rs[i+1] == '\n':
+		lx.endWord() // a backtick before a newline continues the line, as a blank
+		return i + 1, true
 	case c == '`' && lx.shell == ShellPowerShell && i+1 < len(rs):
 		lx.put(rs[i+1])
 		return i + 1, true
@@ -251,6 +259,7 @@ func (lx *lexer) operator(rs []rune, i int) {
 		lx.endWord()
 		lx.markSub() // the left side of a pipe or an & runs in a subshell
 		lx.boundary(c)
+		lx.pipeIn = c == '|' // and so does every stage after a pipe
 	case strings.ContainsRune(";&|\n()", c), lx.shell == ShellPowerShell && (c == '{' || c == '}'):
 		lx.boundary(c)
 	default:
@@ -372,9 +381,10 @@ func stripHeredocs(s string) (string, []string) {
 }
 
 var (
-	// forceLike is any spelling of a forced push that can sit in text: a force or
-	// mirror option, a short option cluster holding f, or a +refspec.
-	forceLike = regexp.MustCompile(`(^|\s)(--force\S*|--mirror|-[A-Za-z]*f[A-Za-z]*|\+\S)`)
+	// forceLike is any spelling of a forced push that can sit in text: an option
+	// starting --f or --m (git accepts any unambiguous prefix of --force and
+	// --mirror), a short option cluster holding f, or a +refspec.
+	forceLike = regexp.MustCompile(`(^|\s)(--[fm]\S*|-[A-Za-z]*f[A-Za-z]*|\+\S)`)
 	// anyShell finds a shell or eval name once quotes and backslashes are gone,
 	// so b''ash and "ba"sh read as bash.
 	anyShell = regexp.MustCompile(`(?i)(^|[^A-Za-z0-9_-])(?:(?:ba|z|da|k)?sh|pwsh|powershell|eval)(\.exe)?([^A-Za-z0-9_-]|$)`)
@@ -392,12 +402,9 @@ func heredocFeedsAShell(s string) bool {
 	if len(bodies) == 0 || !anyShell.MatchString(unquoter.Replace(text)) {
 		return false
 	}
-	for _, b := range bodies {
-		if strings.Contains(b, "push") && forceLike.MatchString(b) {
-			return true
-		}
-	}
-	return false
+	// Read the body as one text: a force may sit on a continuation line of the push.
+	body := strings.ReplaceAll(strings.Join(bodies, "\n"), "\\\n", " ")
+	return strings.Contains(body, "push") && forceLike.MatchString(body)
 }
 
 func isNumber(s string) bool {

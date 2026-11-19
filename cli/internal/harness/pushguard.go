@@ -130,13 +130,16 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 		case prefixWords[t]:
 			cmd = cmd[1:]
 		case wrappers[programName(t)]:
-			var dir bool
-			var script string
-			cmd, dir, script = skipOptions(programName(t), cmd[1:])
+			rest, dir, script := skipOptions(programName(t), cmd[1:])
 			envDir = envDir || dir
-			if v := g.splitScript(script, envDir, depth); v.Refused {
-				return v
+			if programName(t) == "timeout" && len(rest) > 0 {
+				rest = rest[1:] // the duration is not the command
 			}
+			if strings.TrimSpace(script) != "" {
+				// env -S hands its words, then the ones after them, to one command.
+				return g.splitScript(script+" "+joinTexts(rest), envDir, depth)
+			}
+			cmd = rest
 		default:
 			return g.byProgram(cmd, envDir, depth)
 		}
@@ -148,7 +151,7 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 }
 
 // wrappers run the command that follows them and take options of their own.
-var wrappers = map[string]bool{"env": true, "sudo": true, "command": true, "exec": true, "time": true}
+var wrappers = map[string]bool{"env": true, "sudo": true, "command": true, "exec": true, "time": true, "timeout": true, "nice": true}
 
 // wrapped is a program the guard reads; an option's argument is never one of
 // these in practice, which is what tells `sudo -u root git` from `sudo -E git`.
@@ -168,7 +171,9 @@ var argOptions = map[string]map[string]bool{
 		"-T": true, "-U": true, "-r": true, "-t": true, "--user": true, "--group": true,
 		"--host": true, "--prompt": true, "--chdir": true,
 	},
-	"exec": {"-a": true},
+	"exec":    {"-a": true},
+	"timeout": {"-s": true, "-k": true, "--signal": true, "--kill-after": true},
+	"nice":    {"-n": true, "--adjustment": true},
 }
 
 // opt is what one `-x` option of a wrapper does to the command after it.
@@ -231,6 +236,10 @@ func skipOptions(name string, cmd command) (rest command, envDir bool, script st
 			o := readOption(name, cmd)
 			envDir = envDir || o.moves
 			script += " " + o.script
+			if o.script != "" {
+				// The script is the command; what follows is its arguments, options included.
+				return cmd[min(len(cmd), 1+btoi(o.takesNext)):], envDir, script
+			}
 			skip, afterOpt = o.takesNext, !o.takesNext
 		case envAssign.MatchString(t):
 			envDir = envDir || movesRepo(t)
@@ -290,7 +299,7 @@ func (g *guard) byProgram(cmd command, envDir bool, depth int) PushVerdict {
 	switch programName(cmd[0].text) {
 	case "git":
 		return g.git(args, envDir)
-	case "cd", "pushd", "chdir", "set-location", "sl":
+	case "cd", "pushd", "chdir", "set-location", "sl", "push-location":
 		g.cd(cmd)
 	case "export", "declare", "typeset", "readonly":
 		g.exported(args)
@@ -298,7 +307,7 @@ func (g *guard) byProgram(cmd command, envDir bool, depth int) PushVerdict {
 		return g.shellString(args, depth, ShellPOSIX)
 	case "pwsh", "powershell":
 		return g.shellString(args, depth, ShellPowerShell)
-	case "eval":
+	case "eval", "iex", "invoke-expression":
 		for len(args) > 0 && args[0].text == "--" {
 			args = args[1:]
 		}

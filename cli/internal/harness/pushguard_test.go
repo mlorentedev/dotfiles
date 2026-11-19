@@ -581,6 +581,61 @@ func TestGuardCommand_CdBeforeAPipeOrAmpersand(t *testing.T) {
 	}
 }
 
+// Round 6 of the independent review: the backstop read one line at a time and
+// missed git's option abbreviations; timeout and nice run a command; env -S takes
+// the words after it as arguments; the right of a pipe is a subshell; PowerShell
+// has a backtick continuation, Push-Location and iex.
+func TestGuardCommand_SixthRoundBypasses(t *testing.T) {
+	lease := "--force-with-lease=feat/x:" + strings.Repeat("a", 40)
+	posix := []string{
+		"cat <<EOF |\ngit push \\\n  --force origin main\nEOF\nbash",
+		"cat <<EOF |\ngit push --mir origin\nEOF\nbash",
+		"b''ash <<EOF\ngit push --mir origin\nEOF",
+		"timeout 30 git push --force origin main",
+		"timeout -s KILL 30 git push --force origin main",
+		"nice git push --force origin main",
+		"nice -n 5 git push --force origin main",
+		`env -S "git push" --force origin main`,
+		`env -S "git" push --force origin main`,
+		`/usr/bin/env -S "git push origin" +main`,
+	}
+	for _, cmd := range posix {
+		if got := GuardCommand(cmd, ShellPOSIX, fakeEnv(nil)); !got.Refused {
+			t.Errorf("not refused: %q", cmd)
+		}
+	}
+	onMain := fakeEnv(nil)
+	onMain.Dir = "/onmain"
+	for _, cmd := range []string{
+		"echo hi | cd /repo && git push origin " + lease + " feat/x",
+		"echo hi | cd /repo; git push origin " + lease + " feat/x",
+	} {
+		if got := GuardCommand(cmd, ShellPOSIX, onMain); !got.Refused {
+			t.Errorf("a cd on the right of a pipe does not carry out: %q", cmd)
+		}
+	}
+	for _, cmd := range []string{
+		"git `\npush --force origin main",
+		`iex "git push --force origin main"`,
+		`Invoke-Expression "git push --force origin main"`,
+		"Push-Location /onmain; git push origin " + lease + " feat/x",
+	} {
+		if got := GuardCommand(cmd, ShellPowerShell, fakeEnv(nil)); !got.Refused {
+			t.Errorf("not refused under PowerShell: %q", cmd)
+		}
+	}
+	for _, cmd := range []string{
+		"timeout 30 git push origin feat/x",
+		"nice -n 5 git status",
+		`env -S "git push" origin feat/x`,
+		"echo hi | cat && git push origin feat/x",
+	} {
+		if got := GuardCommand(cmd, ShellPOSIX, fakeEnv(nil)); got.Refused {
+			t.Errorf("refused: %q (%s)", cmd, got.Reason)
+		}
+	}
+}
+
 // The lexer cannot always tell which heredoc body a shell reads as code. When it
 // cannot account for the whole text and the text mentions a push with something
 // force-like, the guard refuses; a plain push, or a heredoc with no force in it,
