@@ -475,3 +475,54 @@ func TestGuardCommand_ChildShellCdDoesNotCarryBack(t *testing.T) {
 		t.Errorf("eval's cd runs in this shell and must carry: %q", got.Reason)
 	}
 }
+
+// Fourth review round.
+func TestGuardCommand_FourthRoundBypasses(t *testing.T) {
+	env := fakeEnv(nil)
+	env.Dir = "/onmain"
+	cases := []struct {
+		name   string
+		cmd    string
+		refuse bool
+		shell  Shell
+	}{
+		{"bundled env -vS", "env -vS \"git push --force origin main\"", true, ShellPOSIX},
+		{"bundled env -iS attached", "env -iS\"git push -f origin x\"", true, ShellPOSIX},
+		{"env -C names a directory called git", "/usr/bin/env -C /tmp/git git push --force origin main", true, ShellPOSIX},
+		{"sudo -u names a user called git", "sudo -u git git push --force origin main", true, ShellPOSIX},
+		{"exec -a names a name called git", "exec -a git git push -f origin x", true, ShellPOSIX},
+		{"command -p keeps git as the program", "command -p git push --force origin main", true, ShellPOSIX},
+		{"sudo -E keeps git as the program", "sudo -E git status", false, ShellPOSIX},
+		{"powershell block comment before the command", "<# note #> git push --force origin main", true, ShellPowerShell},
+		{"powershell block comment alone", "<# git push --force origin main #> git status", false, ShellPowerShell},
+		{"escaped heredoc operator", "echo \\<<EOF\ngit push --force origin main", true, ShellPOSIX},
+		{"quoted shell name fed a heredoc", "\"bash\" <<EOF\ngit push --force origin main\nEOF", true, ShellPOSIX},
+		{"heredoc piped to a quoted shell name", "cat <<EOF | \"bash\"\ngit push --force origin main\nEOF", true, ShellPOSIX},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := GuardCommand(c.cmd, c.shell, env); got.Refused != c.refuse {
+				t.Fatalf("refused=%v (%q), want %v for %q", got.Refused, got.Reason, c.refuse, c.cmd)
+			}
+		})
+	}
+}
+
+// The session is on a feature branch; an option moves the command to main. Reading
+// the branch from the session's own directory would let the lease through.
+func TestGuardCommand_OptionMovesTheDirectory(t *testing.T) {
+	lease := "--force-with-lease=feat/x:" + strings.Repeat("a", 40)
+	push := "git push origin " + lease + " feat/x"
+	for _, c := range []struct {
+		cmd   string
+		shell Shell
+	}{
+		{"env -C /onmain -S \"" + push + "\"", ShellPOSIX},
+		{"pwsh -WorkingDirectory /onmain -C \"" + push + "\"", ShellPowerShell},
+		{"pwsh -wd /onmain -C \"" + push + "\"", ShellPowerShell},
+	} {
+		if got := GuardCommand(c.cmd, c.shell, fakeEnv(nil)); !got.Refused {
+			t.Errorf("not refused: %q", c.cmd)
+		}
+	}
+}

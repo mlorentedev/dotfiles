@@ -129,9 +129,9 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 		case wrappers[programName(t)]:
 			var dir bool
 			var script string
-			cmd, dir, script = skipOptions(cmd[1:])
+			cmd, dir, script = skipOptions(programName(t), cmd[1:])
 			envDir = envDir || dir
-			if v := g.splitScript(script, depth); v.Refused {
+			if v := g.splitScript(script, envDir, depth); v.Refused {
 				return v
 			}
 		default:
@@ -155,21 +155,80 @@ var wrapped = map[string]bool{
 	"pnpm": true, "yarn": true, "bun": true,
 }
 
+// argOptions are the options of each wrapper that take the next word as their
+// argument (`sudo -u root`, `env -C dir`, `exec -a name`): that word is not the
+// command, even when it is spelled like one.
+var argOptions = map[string]map[string]bool{
+	"env": {"-u": true, "-C": true, "--unset": true, "--chdir": true},
+	"sudo": {
+		"-u": true, "-g": true, "-h": true, "-p": true, "-C": true, "-D": true, "-R": true,
+		"-T": true, "-U": true, "-r": true, "-t": true, "--user": true, "--group": true,
+		"--host": true, "--prompt": true, "--chdir": true,
+	},
+	"exec": {"-a": true},
+}
+
+// opt is what one `-x` option of a wrapper does to the command after it.
+type opt struct {
+	moves     bool   // names another directory (`-C`, `--chdir`)
+	takesNext bool   // the next word is its argument
+	script    string // a command line env runs (`-S`)
+}
+
+func readOption(name string, cmd command) opt {
+	t := cmd[0].text
+	o := opt{
+		moves:     strings.HasPrefix(t, "-C") || strings.HasPrefix(t, "--chdir"),
+		takesNext: argOptions[name][t],
+	}
+	if name == "env" {
+		o.script, o.takesNext = envScript(cmd, o.takesNext)
+	}
+	return o
+}
+
+// envScript reads the script of `env -S <script>`, `-vS <script>`, `-S<script>` and
+// `--split-string[=<script>]`, which env runs as a command line of its own.
+func envScript(cmd command, takesNext bool) (string, bool) {
+	t := cmd[0].text
+	rest := ""
+	switch {
+	case strings.HasPrefix(t, "--split-string="):
+		return t[len("--split-string="):], takesNext
+	case t == "--split-string":
+	case strings.HasPrefix(t, "--"):
+		return "", takesNext
+	default:
+		i := strings.IndexByte(t, 'S')
+		if i < 0 {
+			return "", takesNext
+		}
+		rest = t[i+1:]
+	}
+	if rest != "" {
+		return rest, takesNext
+	}
+	if len(cmd) > 1 {
+		return cmd[1].text, true
+	}
+	return "", takesNext
+}
+
 // skipOptions drops what a wrapper takes before its command: `-x` options, the
-// word after one (`-u root`, `-a name`), and `VAR=v` assignments. It reports
-// whether an assignment moved the repository (GIT_DIR and friends).
-// `env -S` also hands back the script it runs.
-func skipOptions(cmd command) (rest command, envDir bool, script string) {
-	afterOpt := false
+// argument of those that take one, and `VAR=v` assignments. It reports whether the
+// wrapper moved the repository (GIT_DIR, `env -C`) and the script `env -S` runs.
+func skipOptions(name string, cmd command) (rest command, envDir bool, script string) {
+	skip, afterOpt := false, false
 	for len(cmd) > 0 {
 		t := cmd[0].text
 		switch {
+		case skip:
+			skip = false
 		case strings.HasPrefix(t, "-"):
-			afterOpt = true
-			envDir = envDir || strings.HasPrefix(t, "-C") || strings.HasPrefix(t, "--chdir")
-			if s, ok := splitStringOption(cmd); ok {
-				script += " " + s
-			}
+			o := readOption(name, cmd)
+			envDir = envDir || o.moves
+			script += " " + o.script
+			skip, afterOpt = o.takesNext, !o.takesNext
 		case envAssign.MatchString(t):
 			envDir = envDir || movesRepo(t)
 			afterOpt = false
@@ -183,29 +242,22 @@ func skipOptions(cmd command) (rest command, envDir bool, script string) {
 	return cmd, envDir, script
 }
 
-// splitStringOption reads the script of `env -S <script>`, `-S<script>` and
-// `--split-string[=<script>]`, which env runs as a command line of its own.
-func splitStringOption(cmd command) (string, bool) {
-	t := cmd[0].text
-	switch {
-	case t == "-S" || t == "--split-string":
-		if len(cmd) > 1 {
-			return cmd[1].text, true
-		}
-	case strings.HasPrefix(t, "--split-string="):
-		return t[len("--split-string="):], true
-	case strings.HasPrefix(t, "-S") && !strings.HasPrefix(t, "--"):
-		return t[2:], true
-	}
-	return "", false
-}
-
-// splitScript checks what `env -S` runs.
-func (g *guard) splitScript(script string, depth int) PushVerdict {
+// splitScript checks what `env -S` runs, from the directory it was moved to.
+func (g *guard) splitScript(script string, envDir bool, depth int) PushVerdict {
 	if strings.TrimSpace(script) == "" {
 		return PushVerdict{}
 	}
+	if envDir {
+		defer g.unknownDir()()
+	}
 	return g.nested(script, depth, ShellPOSIX, false)
+}
+
+// unknownDir makes the working directory unknown until the returned func runs.
+func (g *guard) unknownDir() func() {
+	saved := g.dirKnown
+	g.dirKnown = false
+	return func() { g.dirKnown = saved }
 }
 
 func movesRepo(assign string) bool {
@@ -230,9 +282,7 @@ func (g *guard) byProgram(cmd command, envDir bool, depth int) PushVerdict {
 	if envDir {
 		// The repository is not the working directory: nothing a nested shell
 		// reads from the directory can be trusted either.
-		saved := g.dirKnown
-		g.dirKnown = false
-		defer func() { g.dirKnown = saved }()
+		defer g.unknownDir()()
 	}
 	switch programName(cmd[0].text) {
 	case "git":
@@ -297,6 +347,9 @@ func joinTexts(args command) string {
 
 // shellString finds the `-c <string>` of a nested shell and checks the string.
 func (g *guard) shellString(args command, depth int, sh Shell) PushVerdict {
+	if sh == ShellPowerShell && movesPowerShell(args) {
+		defer g.unknownDir()()
+	}
 	for i, a := range args {
 		if !isCommandFlag(a.text, sh) {
 			continue
@@ -314,6 +367,18 @@ func (g *guard) shellString(args command, depth int, sh Shell) PushVerdict {
 		}
 	}
 	return PushVerdict{}
+}
+
+// movesPowerShell reports a -WorkingDirectory (-wd) option, which starts the
+// script somewhere other than the directory the guard tracks.
+func movesPowerShell(args command) bool {
+	for _, a := range args {
+		l := strings.ToLower(a.text)
+		if l == "-wd" || (len(l) >= 3 && strings.HasPrefix("-workingdirectory", l)) {
+			return true
+		}
+	}
+	return false
 }
 
 // isCommandFlag reports whether a word is the option that takes a script: -c

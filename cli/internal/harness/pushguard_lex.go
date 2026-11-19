@@ -198,10 +198,24 @@ func (lx *lexer) unquoted(rs []rune, i int) int {
 		for i+1 < len(rs) && rs[i+1] != '\n' {
 			i++
 		}
+	case c == '<' && lx.shell == ShellPowerShell && i+1 < len(rs) && rs[i+1] == '#':
+		lx.endWord()
+		i = blockCommentEnd(rs, i)
 	default:
 		lx.operator(rs, i)
 	}
 	return i
+}
+
+// blockCommentEnd returns the index of the `>` that closes the PowerShell
+// `<# ... #>` opened at i, or the last rune when it is never closed.
+func blockCommentEnd(rs []rune, i int) int {
+	for j := i + 2; j+1 < len(rs); j++ {
+		if rs[j] == '#' && rs[j+1] == '>' {
+			return j + 1
+		}
+	}
+	return len(rs) - 1
 }
 
 // operator handles what is left once quotes, blanks and comments are out: a
@@ -290,7 +304,7 @@ func redirectRest(t string) (string, bool) {
 
 var (
 	heredocStart = regexp.MustCompile(`<<(-?)\s*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([^\s;&|()<>'"\\]+))`)
-	shellFeeder  = regexp.MustCompile(`(?i)(^|[;&|(\s/\\])(?:(?:ba|z|da|k)?sh|pwsh|powershell|eval)(\.exe)?(\s|$|[<;&|)])`)
+	shellFeeder  = regexp.MustCompile(`(?i)(^|[;&|(\s/\\'"])(?:(?:ba|z|da|k)?sh|pwsh|powershell|eval)(\.exe)?['"]?(\s|$|[<;&|)])`)
 )
 
 // stripHeredocs removes heredoc bodies. A commit message written as a heredoc is
@@ -305,7 +319,7 @@ func stripHeredocs(s string) string {
 	for i := 0; i < len(lines); i++ {
 		out = append(out, lines[i])
 		m := heredocStart.FindStringSubmatchIndex(lines[i])
-		if m == nil || (m[0] > 0 && lines[i][m[0]-1] == '<') || midWordQuote(lines[i], m[1]) || shellFeeder.MatchString(lines[i]) ||
+		if m == nil || (m[0] > 0 && strings.IndexByte("<\\", lines[i][m[0]-1]) >= 0) || midWordQuote(lines[i], m[1]) || shellFeeder.MatchString(lines[i]) ||
 			inQuotes(priorText(out)+lines[i][:m[0]]) {
 			continue
 		}
