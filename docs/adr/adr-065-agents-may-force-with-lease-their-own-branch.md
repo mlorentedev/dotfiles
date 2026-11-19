@@ -121,7 +121,8 @@ owner's list does not mention it. The stricter reading applies. Relaxing it is a
   will probably find another. It is a guard against an agent that mistypes or reaches for the wrong
   form, not against one that obfuscates on purpose. Anything a shell can express that the lexer cannot
   follow should fail closed (an unparseable text that mentions a push is refused); a new bypass is a bug
-  to fix with a row in `TestGuardCommand_*`, not a reason to widen the allowed form.
+  to fix with a row in `TestGuardCommand_*`, not a reason to widen the allowed form. Five rounds in,
+  three heredoc-feeder spellings stay open; #3611 tracks a fail-closed text backstop for them.
 - **Plain pushes are out of scope.** A non-forced `git push origin HEAD:refs/heads/main` stays as it is;
   branch protection on the forge is the barrier for it.
 - **No forge lookup.** The default branch is read from `refs/remotes/<remote>/HEAD` and backstopped by
