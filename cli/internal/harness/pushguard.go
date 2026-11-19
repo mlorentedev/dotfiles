@@ -128,8 +128,12 @@ func (g *guard) simple(cmd command, depth int) PushVerdict {
 			cmd = cmd[1:]
 		case wrappers[programName(t)]:
 			var dir bool
-			cmd, dir = skipOptions(cmd[1:])
+			var script string
+			cmd, dir, script = skipOptions(cmd[1:])
 			envDir = envDir || dir
+			if v := g.splitScript(script, depth); v.Refused {
+				return v
+			}
 		default:
 			return g.byProgram(cmd, envDir, depth)
 		}
@@ -154,25 +158,54 @@ var wrapped = map[string]bool{
 // skipOptions drops what a wrapper takes before its command: `-x` options, the
 // word after one (`-u root`, `-a name`), and `VAR=v` assignments. It reports
 // whether an assignment moved the repository (GIT_DIR and friends).
-func skipOptions(cmd command) (command, bool) {
-	envDir, afterOpt := false, false
+// `env -S` also hands back the script it runs.
+func skipOptions(cmd command) (rest command, envDir bool, script string) {
+	afterOpt := false
 	for len(cmd) > 0 {
 		t := cmd[0].text
 		switch {
 		case strings.HasPrefix(t, "-"):
 			afterOpt = true
-			envDir = envDir || t == "-C" || strings.HasPrefix(t, "--chdir")
+			envDir = envDir || strings.HasPrefix(t, "-C") || strings.HasPrefix(t, "--chdir")
+			if s, ok := splitStringOption(cmd); ok {
+				script += " " + s
+			}
 		case envAssign.MatchString(t):
 			envDir = envDir || movesRepo(t)
 			afterOpt = false
 		case afterOpt && !wrapped[programName(t)]:
 			afterOpt = false
 		default:
-			return cmd, envDir
+			return cmd, envDir, script
 		}
 		cmd = cmd[1:]
 	}
-	return cmd, envDir
+	return cmd, envDir, script
+}
+
+// splitStringOption reads the script of `env -S <script>`, `-S<script>` and
+// `--split-string[=<script>]`, which env runs as a command line of its own.
+func splitStringOption(cmd command) (string, bool) {
+	t := cmd[0].text
+	switch {
+	case t == "-S" || t == "--split-string":
+		if len(cmd) > 1 {
+			return cmd[1].text, true
+		}
+	case strings.HasPrefix(t, "--split-string="):
+		return t[len("--split-string="):], true
+	case strings.HasPrefix(t, "-S") && !strings.HasPrefix(t, "--"):
+		return t[2:], true
+	}
+	return "", false
+}
+
+// splitScript checks what `env -S` runs.
+func (g *guard) splitScript(script string, depth int) PushVerdict {
+	if strings.TrimSpace(script) == "" {
+		return PushVerdict{}
+	}
+	return g.nested(script, depth, ShellPOSIX, false)
 }
 
 func movesRepo(assign string) bool {
@@ -216,7 +249,7 @@ func (g *guard) byProgram(cmd command, envDir bool, depth int) PushVerdict {
 		for len(args) > 0 && args[0].text == "--" {
 			args = args[1:]
 		}
-		return g.nested(joinTexts(args), depth, g.shell)
+		return g.nested(joinTexts(args), depth, g.shell, true)
 	case "npm", "pnpm", "yarn", "bun":
 		if hasText(args, "land:push") {
 			return refuse("land:push is the owner's landing mode; it is not run by an agent")
@@ -265,9 +298,7 @@ func joinTexts(args command) string {
 // shellString finds the `-c <string>` of a nested shell and checks the string.
 func (g *guard) shellString(args command, depth int, sh Shell) PushVerdict {
 	for i, a := range args {
-		isFlag := strings.HasPrefix(a.text, "-") && !strings.HasPrefix(a.text, "--")
-		isCmd := strings.EqualFold(a.text, "-command") || (isFlag && strings.ContainsRune(a.text, 'c'))
-		if !isCmd {
+		if !isCommandFlag(a.text, sh) {
 			continue
 		}
 		j := i + 1
@@ -276,20 +307,36 @@ func (g *guard) shellString(args command, depth int, sh Shell) PushVerdict {
 		}
 		if j < len(args) && sh == ShellPowerShell {
 			// PowerShell takes every word after -Command as the script.
-			return g.nested(joinTexts(args[j:]), depth, sh)
+			return g.nested(joinTexts(args[j:]), depth, sh, false)
 		}
 		if j < len(args) {
-			return g.nested(args[j].text, depth, sh)
+			return g.nested(args[j].text, depth, sh, false)
 		}
 	}
 	return PushVerdict{}
 }
 
-func (g *guard) nested(s string, depth int, sh Shell) PushVerdict {
+// isCommandFlag reports whether a word is the option that takes a script: -c
+// (any cluster holding c) for a POSIX shell, -Command or an abbreviation of it
+// (-c, -co, ...) for PowerShell.
+func isCommandFlag(t string, sh Shell) bool {
+	if sh == ShellPowerShell {
+		l := strings.ToLower(t)
+		return len(l) >= 2 && l[0] == '-' && strings.HasPrefix("-command", l)
+	}
+	return strings.HasPrefix(t, "-") && !strings.HasPrefix(t, "--") && strings.ContainsRune(t, 'c')
+}
+
+// nested checks a script run by this command. Only `eval` runs in the same
+// shell, so only it carries a `cd` back (carry); a child shell's `cd` is gone
+// when it exits.
+func (g *guard) nested(s string, depth int, sh Shell, carry bool) PushVerdict {
 	inner := *g
 	inner.shell = sh
 	v := inner.run(s, depth+1)
-	g.dir, g.dirKnown = inner.dir, inner.dirKnown
+	if carry {
+		g.dir, g.dirKnown = inner.dir, inner.dirKnown
+	}
 	return v
 }
 

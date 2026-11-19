@@ -16,6 +16,9 @@ type word struct {
 	dynamic bool
 	// quoted marks a word that held any quoting, which a redirection never does.
 	quoted bool
+	// redir marks a word that holds an unquoted `<` or `>`: a redirection,
+	// whatever else in it is quoted (`>"out.txt"`).
+	redir bool
 	// sub marks a word read inside a subshell or a substitution, where a `cd`
 	// does not carry out to the commands after it.
 	sub bool
@@ -41,6 +44,7 @@ type lexer struct {
 	dyn   bool
 	quote bool
 	stack []frame
+	redir bool
 	paren int  // open `(` subshells outside any `$(`
 	q     byte // 0, '\'', '"' or 'A' for $'...' (backslash escapes the next rune)
 }
@@ -62,13 +66,13 @@ func splitCommands(s string, shell Shell) (cmds []command, ok bool) {
 func (lx *lexer) endWord() {
 	if lx.has {
 		lx.cur = append(lx.cur, word{
-			text: lx.text.String(), raw: lx.raw.String(), dynamic: lx.dyn, quoted: lx.quote,
+			text: lx.text.String(), raw: lx.raw.String(), dynamic: lx.dyn, quoted: lx.quote, redir: lx.redir,
 			sub: len(lx.stack) > 0 || lx.paren > 0,
 		})
 	}
 	lx.text.Reset()
 	lx.raw.Reset()
-	lx.has, lx.dyn, lx.quote = false, false, false
+	lx.has, lx.dyn, lx.quote, lx.redir = false, false, false, false
 }
 
 func (lx *lexer) endCommand() {
@@ -210,6 +214,7 @@ func (lx *lexer) operator(rs []rune, i int) {
 	case strings.ContainsRune(";&|\n()", c), lx.shell == ShellPowerShell && (c == '{' || c == '}'):
 		lx.boundary(c)
 	default:
+		lx.redir = lx.redir || c == '<' || c == '>'
 		lx.put(c)
 	}
 }
@@ -253,7 +258,7 @@ func stripRedirects(cmd command) command {
 	out := make(command, 0, len(cmd))
 	for i := 0; i < len(cmd); i++ {
 		w := cmd[i]
-		if w.quoted {
+		if w.quoted && !w.redir {
 			out = append(out, w)
 			continue
 		}
@@ -300,7 +305,7 @@ func stripHeredocs(s string) string {
 	for i := 0; i < len(lines); i++ {
 		out = append(out, lines[i])
 		m := heredocStart.FindStringSubmatchIndex(lines[i])
-		if m == nil || (m[0] > 0 && lines[i][m[0]-1] == '<') || shellFeeder.MatchString(lines[i]) ||
+		if m == nil || (m[0] > 0 && lines[i][m[0]-1] == '<') || midWordQuote(lines[i], m[1]) || shellFeeder.MatchString(lines[i]) ||
 			inQuotes(priorText(out)+lines[i][:m[0]]) {
 			continue
 		}
@@ -319,6 +324,13 @@ func stripHeredocs(s string) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+// midWordQuote reports a quote or backslash right after the delimiter the regexp
+// read, as in `<<E\OF`: the shell unquotes it to a delimiter this code did not
+// capture, so the body cannot be told apart from code and is left in.
+func midWordQuote(line string, end int) bool {
+	return end < len(line) && strings.IndexByte("\\'\"", line[end]) >= 0
 }
 
 // priorText is every line before the last one in out, each ended by a newline,

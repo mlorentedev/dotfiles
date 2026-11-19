@@ -425,3 +425,53 @@ func TestGuardCommand_CdInsideASubshellDoesNotCarryOut(t *testing.T) {
 		t.Errorf("a plain cd must still move the directory: %q", got.Reason)
 	}
 }
+
+// Third review round.
+func TestGuardCommand_ThirdRoundBypasses(t *testing.T) {
+	lease := "--force-with-lease=feat/x:" + strings.Repeat("a", 40)
+	cases := []struct {
+		name   string
+		cmd    string
+		refuse bool
+		shell  Shell
+	}{
+		{"pwsh -C is -Command", "pwsh -C \"git push --force origin main\"", true, ShellPOSIX},
+		{"pwsh -Co is -Command", "pwsh -Co \"git push --force origin main\"", true, ShellPOSIX},
+		{"powershell -C in the PowerShell tool", "powershell -C \"git push -f origin x\"", true, ShellPowerShell},
+		{"pwsh -C harmless", "pwsh -C \"git status\"", false, ShellPOSIX},
+		{"quoted redirect target before the command", "> \"out.txt\" git push --force origin main", true, ShellPOSIX},
+		{"attached quoted redirect target", ">\"out.txt\" git push --force origin main", true, ShellPOSIX},
+		{"stderr redirect with a quoted target", "2>\"err.txt\" git push --force origin main", true, ShellPOSIX},
+		{"a quoted redirect around a harmless command", ">\"out.txt\" echo hi", false, ShellPOSIX},
+		{"env -S runs a script", "env -S \"git push --force origin main\"", true, ShellPOSIX},
+		{"env --split-string runs a script", "env --split-string=\"git push -f origin x\"", true, ShellPOSIX},
+		{"env -S harmless", "env -S \"git status\"", false, ShellPOSIX},
+		{"env attached -C moves the repository", "env -C/onmain git push origin " + lease + " feat/x", true, ShellPOSIX},
+		{"heredoc delimiter with a mid-word backslash", "cat <<E\\OF\nhi\nEOF\ngit push --force origin main", true, ShellPOSIX},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := GuardCommand(c.cmd, c.shell, fakeEnv(nil)); got.Refused != c.refuse {
+				t.Fatalf("refused=%v (%q), want %v for %q", got.Refused, got.Reason, c.refuse, c.cmd)
+			}
+		})
+	}
+}
+
+// A child shell's cd is gone when it exits; eval runs in this shell, so its cd stays.
+func TestGuardCommand_ChildShellCdDoesNotCarryBack(t *testing.T) {
+	lease := "--force-with-lease=feat/x:" + strings.Repeat("a", 40)
+	env := fakeEnv(nil)
+	env.Dir = "/onmain"
+	for _, cmd := range []string{
+		"bash -c 'cd /repo' && git push origin " + lease + " feat/x",
+		"sh -c \"cd /repo\" ; git push origin " + lease + " feat/x",
+	} {
+		if got := GuardCommand(cmd, ShellPOSIX, env); !got.Refused {
+			t.Errorf("not refused: %q", cmd)
+		}
+	}
+	if got := GuardCommand("eval 'cd /repo' && git push origin "+lease+" feat/x", ShellPOSIX, env); got.Refused {
+		t.Errorf("eval's cd runs in this shell and must carry: %q", got.Reason)
+	}
+}
