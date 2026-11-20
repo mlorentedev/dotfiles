@@ -37,7 +37,7 @@ Test commands run from `cli/`. Expected outputs are the go test verdict lines.
 - [x] [P] [AC4] `cli/internal/claude/push_lease_rules_test.go`: reads `ai/claude/settings.json`; asserts `Bash(git push *--force*)` is in deny, and that no deny, allow or ask rule matches `dotf pr push-lease --expect <sha>` under an emulated matcher named `leaseRuleMatches` (a distinct name: #3608's branch adds `bashRuleMatches` to the same package). Run `go test ./internal/claude -run TestPushLeaseRules -count=1`. Expected: PASS against today's template (it pins what must not change).
 - [x] [AC4] `AGENTS.md`, outside the generated block, under "Change Management & Engineering": one line naming `dotf pr push-lease --expect <sha>` as the way an agent force-updates its own branch after a rebase, and that a raw forced push stays denied.
 - [x] [AC4] `docs/adr/adr-066-agents-force-update-their-branch-through-dotf-pr-push-lease.md`: decision, the refusals, and an alternatives section (narrowed globs plus a parsing hook, #3608, six FAIL rounds and the measured 28 to 40 rows; a raw-text rule, measured 50 false refusals of 362 push commands from 23 transcripts; this command).
-- [ ] Refactor for clarity: functions under the repository's complexity bar, names, comments only where the why is not obvious.
+- [x] Refactor for clarity: functions under the repository's complexity bar, names, comments only where the why is not obvious.
 
 ## Closing
 
