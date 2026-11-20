@@ -35,7 +35,7 @@ owner: manu
 - `go test ./internal/pushlease ./internal/cmd ./internal/claude -count=1`: PASS (pushlease 26 subtests and tests, about 50 s on Windows).
 - `go build ./...`, `go vet ./...`, `GOOS=windows|linux|darwin go vet` on the changed packages: clean.
 - `golangci-lint run` 2.12.2 (the pinned version), host, `GOOS=windows` and `GOOS=linux`, on the changed packages: no finding other than `gofmt` on working copies checked out with CRLF (`core.autocrlf`); the committed blobs of every changed Go file pass `gofmt -l`.
-- Full suite `go test ./...` on Windows, run while three lint passes ran alongside: every package passed except `internal/worktree`, which hit go test's 10-minute timeout (637 s) inside a git process start in `TestListAsksTheLandedHeadsTheCallerHandsIt`. This branch touches nothing under `internal/worktree`; the package's own rerun is recorded below, and Linux CI is the authority.
+- Full suite `go test ./...` on Windows, run while three lint passes ran alongside: every package passed except `internal/worktree`, which hit go test's 10-minute timeout (637 s) inside a git process start in `TestListAsksTheLandedHeadsTheCallerHandsIt`. This branch touches nothing under `internal/worktree`; rerun alone with `go test ./internal/worktree -count=1 -timeout 40m`, it passed (`ok ... 945.615s`). On the PR (#3614, head `775f9f6b`) every CI job passed: `test (ubuntu-latest)`, `test (windows-latest)`, `test-windows`, `test-macos`, `integration`, `cli-lint`, `knowledge-gate`, `hygiene`.
 - Manual smoke test: none beyond the tests, which run the real git binary against local bare repositories; the command was not run against GitHub.
 
 ## Decisions made during implementation
