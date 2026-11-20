@@ -21,8 +21,8 @@ After rebasing its own feature branch an agent must force-with-lease it, and tod
 
 ## What
 
-- `dotf pr push-lease --expect <sha> [--remote <name>]` pushes the branch checked out in the current directory to the same name on the remote: `git push --force-with-lease=refs/heads/<b>:<sha> <remote> HEAD:refs/heads/<b>`, built as argv, no shell.
-- Refused before git runs, with a reason and exit 1: detached HEAD; branch `main` or `master`; branch equal to the remote's default (`refs/remotes/<remote>/HEAD`, else `git ls-remote --symref <remote> HEAD`; unresolvable is a refusal); `--expect` missing or not 40/64 hex; unknown remote.
+- `dotf pr push-lease --expect <sha> [--remote <name>]` pushes the branch checked out in the current directory to the same name on the remote: `git push --force-with-lease=refs/heads/<b>:<sha> <remote> <head sha>:refs/heads/<b>`, built as argv, no shell. HEAD is read once, so the push and the printed line name the same commit.
+- Refused before git pushes, with a stable code, a reason and exit 1: detached HEAD; branch `main` or `master` (any case); `--expect` missing or not 40/64 hex; `--remote` not a configured remote name (a URL, a path or a leading `-` is refused); the remote unreadable; the branch equal to the remote's default by either account, what `git ls-remote --symref <remote> HEAD` reports now or what `refs/remotes/<remote>/HEAD` recorded (neither known is a refusal). Local checks run before any network call; one `ls-remote` reads the default and the branch together.
 - `--remote` defaults to the branch's push remote (`branch.<b>.pushRemote`, then `remote.pushDefault`), else its upstream remote (`branch.<b>.remote`), else `origin`.
 - An `--expect` that differs from the remote's current sha for the branch (`git ls-remote`) is refused before pushing, also when the remote already equals the local HEAD; the lease still covers a change between that read and the push.
 - Pre-push hooks run (no `--no-verify`). A stale lease is git's rejection, passed through with a non-zero exit.
@@ -39,7 +39,7 @@ After rebasing its own feature branch an agent must force-with-lease it, and tod
 
 - A lease protects only against changes made after the agent read `--expect`. An agent that fetches, reads the remote sha and pushes without integrating someone else's commits overwrites them. Accepted: the branch is the agent's own; the command cannot know who else pushed.
 - Rollout: the command ships in a released binary, the `AGENTS.md` line from the repo. Deployed before the release, an agent calls a missing subcommand: a loud error, no push. Deploy after the release.
-- The default-branch lookup may need the network (`ls-remote` when `<remote>/HEAD` is unset); a failure is a refusal, never a push. The `main`/`master` backstop holds regardless.
+- Every push reads the remote first (`ls-remote`, for the default branch and the stale-lease check); a failure is a refusal, never a push. The `main`/`master` backstop holds regardless.
 - Checked: no deny, allow or ask rule in `ai/claude/settings.json` matches `dotf pr push-lease` (emulated matcher), so the normal prompt applies.
 
 ## Acceptance criteria
@@ -47,7 +47,7 @@ After rebasing its own feature branch an agent must force-with-lease it, and tod
 Observable outcomes. Each must be testable.
 
 - [ ] AC1 Against a real temporary repository with a bare remote: after a rebase, `dotf pr push-lease --expect <remote sha>` moves the remote branch to the local HEAD and prints `<branch> <old>..<new>`; with a stale `--expect` the remote ref is unchanged and the exit is non-zero.
-- [ ] AC2 A table test refuses with exit 1 and a reason on stderr, the remote ref unchanged: detached HEAD; `main`; `master`; the remote default (`origin/HEAD` set, unset and found by `ls-remote`, unresolvable); `--expect` missing, short, symbolic; unknown remote.
+- [ ] AC2 A table test refuses with exit 1 and a reason on stderr, the remote refs unchanged: detached HEAD; `main`; `master`; the remote default (`origin/HEAD` set; unset and found by `ls-remote`; changed on the remote since `origin/HEAD` was recorded; known by neither); the remote unreadable; `--expect` missing, short, symbolic; `--remote` unknown, a URL or path, option-like.
 - [ ] AC3 A pre-push hook in the temporary repository runs on a lease push, and its refusal stops the push.
 - [ ] AC4 A test pins `ai/claude/settings.json`: deny still holds `Bash(git push *--force*)`, no rule matches `dotf pr push-lease`. `AGENTS.md` names the command; an ADR records the decision with an alternatives section (glob plus hook, raw text, this command); the repository's full gates pass.
 

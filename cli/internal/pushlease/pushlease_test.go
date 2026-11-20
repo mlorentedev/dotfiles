@@ -2,6 +2,7 @@ package pushlease
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -142,6 +143,162 @@ func TestPush_StaleExpectLeavesTheRemote(t *testing.T) {
 			}
 			if after := f.remoteSHA(t, "feat/x"); after != before {
 				t.Errorf("remote feat/x moved from %s to %s", before, after)
+			}
+		})
+	}
+}
+
+// remoteRefs is every ref the bare repository holds, to prove a refusal
+// touched none of them.
+func (f fixture) remoteRefs(t *testing.T) string {
+	t.Helper()
+	return git(t, f.remote, "for-each-ref", "--format=%(refname) %(objectname)")
+}
+
+// pushedBranch creates name from the current HEAD with one commit, pushes it
+// and leaves it checked out.
+func (f fixture) pushedBranch(t *testing.T, name string) string {
+	t.Helper()
+	git(t, f.clone, "switch", "-q", "-c", name)
+	git(t, f.clone, "commit", "-q", "--allow-empty", "-m", "on "+name)
+	git(t, f.clone, "push", "-q", "origin", name)
+	return f.remoteSHA(t, name)
+}
+
+func TestPrepare_Refuses(t *testing.T) {
+	tests := []struct {
+		name    string
+		code    string
+		arrange func(t *testing.T, f fixture) Request
+	}{
+		{"detached HEAD", CodeDetachedHead, func(t *testing.T, f fixture) Request {
+			git(t, f.clone, "switch", "-q", "--detach")
+			return Request{Dir: f.clone, Expect: f.remoteSHA(t, "feat/x")}
+		}},
+		{"main", CodeProtectedBranch, func(t *testing.T, f fixture) Request {
+			git(t, f.clone, "switch", "-q", "main")
+			return Request{Dir: f.clone, Expect: f.remoteSHA(t, "main")}
+		}},
+		{"master", CodeProtectedBranch, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Expect: f.pushedBranch(t, "master")}
+		}},
+		{"the remote default, read from origin/HEAD", CodeDefaultBranch, func(t *testing.T, f fixture) Request {
+			expect := f.pushedBranch(t, "develop")
+			git(t, f.clone, "remote", "set-head", "origin", "develop")
+			return Request{Dir: f.clone, Expect: expect}
+		}},
+		{"the remote default, origin/HEAD unset, read from the remote", CodeDefaultBranch, func(t *testing.T, f fixture) Request {
+			expect := f.pushedBranch(t, "develop")
+			git(t, f.remote, "symbolic-ref", "HEAD", "refs/heads/develop")
+			git(t, f.clone, "remote", "set-head", "origin", "--delete")
+			return Request{Dir: f.clone, Expect: expect}
+		}},
+		{"the remote default changed since origin/HEAD was recorded", CodeDefaultBranch, func(t *testing.T, f fixture) Request {
+			expect := f.pushedBranch(t, "develop")
+			git(t, f.remote, "symbolic-ref", "HEAD", "refs/heads/develop")
+			return Request{Dir: f.clone, Expect: expect}
+		}},
+		{"the remote reports no default and origin/HEAD is unset", CodeDefaultUnresolved, func(t *testing.T, f fixture) Request {
+			git(t, f.remote, "symbolic-ref", "HEAD", "refs/heads/unborn")
+			git(t, f.clone, "remote", "set-head", "origin", "--delete")
+			return Request{Dir: f.clone, Expect: f.remoteSHA(t, "feat/x")}
+		}},
+		{"the remote cannot be read", CodeRemoteUnreadable, func(t *testing.T, f fixture) Request {
+			git(t, f.clone, "remote", "set-url", "origin", filepath.Join(t.TempDir(), "missing.git"))
+			return Request{Dir: f.clone, Expect: f.remoteSHA(t, "feat/x")}
+		}},
+		{"--remote looks like an option", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Remote: "--mirror", Expect: f.remoteSHA(t, "feat/x")}
+		}},
+		{"--expect missing", CodeBadExpect, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone}
+		}},
+		{"--expect abbreviated", CodeBadExpect, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Expect: f.remoteSHA(t, "feat/x")[:7]}
+		}},
+		{"--expect one short of a full sha", CodeBadExpect, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Expect: f.remoteSHA(t, "feat/x")[:39]}
+		}},
+		{"--expect symbolic", CodeBadExpect, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Expect: "origin/feat/x"}
+		}},
+		{"--remote not configured", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Remote: "nosuch", Expect: f.remoteSHA(t, "feat/x")}
+		}},
+		{"--remote given as a URL", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Remote: f.remote, Expect: f.remoteSHA(t, "feat/x")}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixture(t)
+			req := tt.arrange(t, f)
+			git(t, f.clone, "commit", "-q", "--allow-empty", "-m", "unpushed")
+			before := f.remoteRefs(t)
+
+			out, stderr, err := pushLease(req)
+
+			var refusal *Refusal
+			if !errors.As(err, &refusal) {
+				t.Fatalf("err = %v, want a *Refusal %s; output %q, stderr:\n%s", err, tt.code, out, stderr)
+			}
+			if refusal.Code != tt.code {
+				t.Errorf("code = %s (%s), want %s", refusal.Code, refusal.Reason, tt.code)
+			}
+			if after := f.remoteRefs(t); after != before {
+				t.Errorf("remote refs changed:\nbefore:\n%s\nafter:\n%s", before, after)
+			}
+		})
+	}
+}
+
+func TestPrepare_RemoteResolutionOrder(t *testing.T) {
+	tests := []struct {
+		name     string
+		explicit string
+		config   map[string]string // "" unsets the key
+		want     string
+	}{
+		{"--remote beats the configuration", "byflag", map[string]string{
+			"branch.feat/x.pushRemote": "bypushremote",
+		}, "byflag"},
+		{"branch pushRemote beats remote.pushDefault", "", map[string]string{
+			"branch.feat/x.pushRemote": "bypushremote", "remote.pushDefault": "bypushdefault", "branch.feat/x.remote": "byupstream",
+		}, "bypushremote"},
+		{"remote.pushDefault beats the upstream remote", "", map[string]string{
+			"remote.pushDefault": "bypushdefault", "branch.feat/x.remote": "byupstream",
+		}, "bypushdefault"},
+		{"the upstream remote beats origin", "", map[string]string{
+			"branch.feat/x.remote": "byupstream",
+		}, "byupstream"},
+		{"origin when nothing is configured", "", map[string]string{
+			"branch.feat/x.remote": "",
+		}, "origin"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixture(t)
+			// Every candidate names the same bare repository, so only the
+			// choice differs and each would pass every other check.
+			for _, name := range []string{"byflag", "bypushremote", "bypushdefault", "byupstream"} {
+				git(t, f.clone, "remote", "add", name, f.remote)
+			}
+			for key, value := range tt.config {
+				if value == "" {
+					git(t, f.clone, "config", "--unset", key)
+					continue
+				}
+				git(t, f.clone, "config", key, value)
+			}
+
+			plan, err := Prepare(Request{Dir: f.clone, Remote: tt.explicit, Expect: f.remoteSHA(t, "feat/x")})
+			if err != nil {
+				t.Fatalf("Prepare: %v", err)
+			}
+			if plan.Remote != tt.want {
+				t.Errorf("remote = %s, want %s", plan.Remote, tt.want)
 			}
 		})
 	}
