@@ -45,7 +45,7 @@ owner: manu
 
 ## Review dispositions
 
-First signature: `review.md`, `nan/deepseek-v4-flash`, verdict PASS at `43292f73`. Four earlier launches ended without a verdict and are kept as `review-round1..3.md` plus the timed-out round: two with Bitwarden locked, one with the runner inheriting Claude Code's `BUN_INSPECT` (#3615), one stopped at the 45-minute deadline.
+First signature: `review-round5.md` (kept under that name once F1 changed the contract), `nan/deepseek-v4-flash`, verdict PASS at `43292f73`. Four earlier launches ended without a verdict and are kept as `review-round1..4.md`: two with Bitwarden locked, one with the runner inheriting Claude Code's `BUN_INSPECT` (#3615), one stopped at the 45-minute deadline.
 
 | Finding | Disposition |
 |---|---|
@@ -55,7 +55,7 @@ First signature: `review.md`, `nan/deepseek-v4-flash`, verdict PASS at `43292f73
 | M4: AC4's "full gates pass" holds only after the archive commit | Accepted as structural: `spec-gate` turns green with the archive commit, `review-attestation` once the PR leaves draft and a reviewer answers. |
 | Q: `leaseRuleMatches` is an emulation | No action, as the review concluded: the command text contains no literal any deny rule names. |
 
-Second signature: `review-second.md`, `anthropic-review/claude-sonnet-5-5`, verdict PASS-WITH-GAPS at `22709ec4`. F1 changed the contract (a new refusal in `proposal.md`), so both signatures are relaunched on the head that carries the fix; the round at `22709ec4` is kept as the record of what F1 was found against.
+Second signature: `review-second-round1.md`, `anthropic-review/claude-sonnet-5-5`, verdict PASS-WITH-GAPS at `22709ec4`. F1 changed the contract (a new refusal in `proposal.md`), so both signatures are relaunched on the head that carries the fix; both rounds are kept under numbered names as the record of what was found against which head.
 
 | Finding | Disposition |
 |---|---|
