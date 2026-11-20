@@ -225,8 +225,14 @@ func TestPrepare_Refuses(t *testing.T) {
 		{"--remote not configured", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
 			return Request{Dir: f.clone, Remote: "nosuch", Expect: f.remoteSHA(t, "feat/x")}
 		}},
-		{"--remote given as a URL", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
+		{"--remote given as a path", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
 			return Request{Dir: f.clone, Remote: f.remote, Expect: f.remoteSHA(t, "feat/x")}
+		}},
+		{"--remote given as an https URL", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Remote: "https://example.invalid/x.git", Expect: f.remoteSHA(t, "feat/x")}
+		}},
+		{"--remote given as an scp-style URL", CodeUnknownRemote, func(t *testing.T, f fixture) Request {
+			return Request{Dir: f.clone, Remote: "git@example.invalid:x.git", Expect: f.remoteSHA(t, "feat/x")}
 		}},
 	}
 	for _, tt := range tests {
