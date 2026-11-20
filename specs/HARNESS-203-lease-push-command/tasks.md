@@ -41,10 +41,10 @@ Test commands run from `cli/`. Expected outputs are the go test verdict lines.
 
 ## Closing
 
-- [ ] Every acceptance criterion from `proposal.md` is covered by at least one test
-- [ ] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
-- [ ] `go build ./... && go vet ./... && go test ./...` from `cli/`, plus `GOOS=windows go vet ./...` and `GOOS=linux go vet ./...`
-- [ ] Pinned `golangci-lint run`, and `GOOS=windows golangci-lint run ./...`
-- [ ] No unrelated changes in the diff (no scope creep)
-- [ ] `verification.md` filled in, with the `--no-verify` mutation result
+- [x] Every acceptance criterion from `proposal.md` is covered by at least one test
+- [x] Every acceptance criterion has a matching entry in `features.json` with a non-vacuous verification command
+- [x] `go build ./... && go vet ./... && go test ./...` from `cli/`, plus `GOOS=windows go vet ./...` and `GOOS=linux go vet ./...`
+- [x] Pinned `golangci-lint run`, and `GOOS=windows golangci-lint run ./...`
+- [x] No unrelated changes in the diff (no scope creep)
+- [x] `verification.md` filled in, with the `--no-verify` mutation result
 - [ ] PR opened as a draft referencing this spec folder; `## Knowledge` section; adversarial review by another vendor first, then a second signature (`risk: high`)
