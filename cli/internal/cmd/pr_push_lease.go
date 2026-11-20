@@ -39,6 +39,8 @@ Refused before git pushes, with exit 1 and the reason on stderr:
   - main or master, in any case;
   - --expect missing, abbreviated or not a sha;
   - --remote that is not a configured remote name (a URL or a path);
+  - a remote whose push URL differs from its fetch URL (pushurl, or
+    url.<base>.pushInsteadOf): every check reads the fetch URL;
   - a remote that cannot be read;
   - the remote's default branch, by what the remote reports or what
     refs/remotes/<remote>/HEAD recorded; neither known is a refusal too.
@@ -46,8 +48,9 @@ Refused before git pushes, with exit 1 and the reason on stderr:
 --remote defaults to the branch's push remote (branch.<b>.pushRemote, then
 remote.pushDefault), else its upstream remote (branch.<b>.remote), else origin.
 
-Pre-push hooks run. git's own output goes to stderr; on success stdout gets
-one line, "<branch> <old>..<new>".
+Pre-push hooks run. git never prompts on the terminal (GIT_TERMINAL_PROMPT=0),
+so a remote asking for credentials fails instead of waiting. git's own output
+goes to stderr; on success stdout gets one line, "<branch> <old>..<new>".
 
 Exit status is 0 when pushed, 1 when refused or git rejected the push, and 2
 for a usage error.`,

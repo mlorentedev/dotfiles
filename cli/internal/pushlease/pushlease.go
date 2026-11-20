@@ -49,6 +49,7 @@ const (
 	CodeDefaultBranch     = "default-branch"
 	CodeDefaultUnresolved = "default-unresolved"
 	CodeStaleLease        = "stale-lease"
+	CodeSplitRemote       = "split-remote"
 )
 
 // Refusal is a request refused before git push ran: the remote is untouched.
@@ -86,23 +87,8 @@ func Prepare(req Request) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	view, err := readRemote(req.Dir, remote, branch)
-	if err != nil {
+	if err := checkRemote(req.Dir, remote, branch, expect); err != nil {
 		return Plan{}, err
-	}
-	if err := checkDefault(req.Dir, remote, branch, view.defaultBranch); err != nil {
-		return Plan{}, err
-	}
-	// git checks the lease only for a ref it is about to change: a remote that
-	// already equals HEAD is "up to date" and exits 0 whatever the lease says.
-	// Comparing first makes a wrong --expect a refusal in that case too; the
-	// lease still covers a push landing between this read and ours.
-	if view.branchSHA != expect {
-		current := view.branchSHA
-		if current == "" {
-			current = "absent"
-		}
-		return Plan{}, refuse(CodeStaleLease, "stale lease: %s/%s is %s, --expect is %s", remote, branch, current, expect)
 	}
 	head, err := gitOutput(req.Dir, "rev-parse", "--verify", "HEAD^{commit}")
 	if err != nil {
@@ -146,10 +132,43 @@ func resolveRemote(dir, explicit, branch string) (string, error) {
 	if strings.HasPrefix(remote, "-") {
 		return "", refuse(CodeUnknownRemote, "%q is not a remote name", remote)
 	}
-	if _, err := gitOutput(dir, "remote", "get-url", remote); err != nil {
+	fetch, err := gitOutput(dir, "remote", "get-url", "--all", remote)
+	if err != nil {
 		return "", refuse(CodeUnknownRemote, "%q is not a configured remote: %v", remote, err)
 	}
+	// The remote is read through its fetch URL. A push URL that differs, by
+	// pushurl or by url.<base>.pushInsteadOf (get-url expands both), would let
+	// the default-branch and lease checks describe one repository while the
+	// push writes another. The reason names the remote, never a URL, which may
+	// carry credentials.
+	if push, err := gitOutput(dir, "remote", "get-url", "--push", "--all", remote); err != nil || push != fetch {
+		return "", refuse(CodeSplitRemote, "%s pushes to a different URL than it fetches from, so its default branch and lease cannot be checked against the push target", remote)
+	}
 	return remote, nil
+}
+
+// checkRemote reads the remote once and refuses the push when the branch is
+// its default or the lease is stale.
+func checkRemote(dir, remote, branch, expect string) error {
+	view, err := readRemote(dir, remote, branch)
+	if err != nil {
+		return err
+	}
+	if err := checkDefault(dir, remote, branch, view.defaultBranch); err != nil {
+		return err
+	}
+	// git checks the lease only for a ref it is about to change: a remote that
+	// already equals HEAD is "up to date" and exits 0 whatever the lease says.
+	// Comparing first makes a wrong --expect a refusal in that case too; the
+	// lease still covers a push landing between this read and ours.
+	if view.branchSHA == expect {
+		return nil
+	}
+	current := view.branchSHA
+	if current == "" {
+		current = "absent"
+	}
+	return refuse(CodeStaleLease, "stale lease: %s/%s is %s, --expect is %s", remote, branch, current, expect)
 }
 
 // remoteView is what the remote itself reports, never the remote-tracking refs.
@@ -211,7 +230,7 @@ func (p Plan) pushArgs() []string {
 // gets one line, "<branch> <old>..<new>".
 func Push(p Plan, out, errOut io.Writer) error {
 	cmd := exec.Command("git", p.pushArgs()...) //nolint:gosec // argv built by pushArgs from a Plan, no shell
-	cmd.Env = gitenv.WithoutRepository(os.Environ())
+	cmd.Env = gitEnv()
 	cmd.Stdout = errOut
 	cmd.Stderr = errOut
 	if err := cmd.Run(); err != nil {
@@ -221,11 +240,19 @@ func Push(p Plan, out, errOut io.Writer) error {
 	return err
 }
 
+// gitEnv is the environment of every git child: the repository variables
+// removed, so an inherited GIT_DIR cannot choose which repository is read, and
+// no terminal prompt, so a remote asking for credentials fails instead of
+// hanging an agent's turn (precedent: worktree.list).
+func gitEnv() []string {
+	return append(gitenv.WithoutRepository(os.Environ()), "GIT_TERMINAL_PROMPT=0")
+}
+
 // gitOutput runs git in dir with the repository variables removed, so an
 // inherited GIT_DIR cannot choose which repository is read.
 func gitOutput(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...) //nolint:gosec // fixed git subcommands, no shell
-	cmd.Env = gitenv.WithoutRepository(os.Environ())
+	cmd.Env = gitEnv()
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

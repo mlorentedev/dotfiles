@@ -358,3 +358,82 @@ func TestPush_MovesTheRemoteAfterARebase(t *testing.T) {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
 }
+
+// refsOf lists every ref of a bare repository with its target, and its HEAD.
+func refsOf(t *testing.T, dir string) string {
+	t.Helper()
+	return git(t, dir, "for-each-ref", "--format=%(refname) %(objectname)") + "\nHEAD " + git(t, dir, "symbolic-ref", "HEAD")
+}
+
+// TestPrepare_RefusesASplitRemote: a remote that pushes somewhere other than it
+// fetches from would have its default branch and its lease read from one
+// repository while the push lands in another (second-signature finding F1).
+func TestPrepare_RefusesASplitRemote(t *testing.T) {
+	tests := []struct {
+		name  string
+		split func(t *testing.T, f fixture, other string)
+	}{
+		{"pushurl names another repository", func(t *testing.T, f fixture, other string) {
+			git(t, f.clone, "config", "remote.origin.pushurl", other)
+		}},
+		{"pushInsteadOf rewrites the push", func(t *testing.T, f fixture, other string) {
+			git(t, f.clone, "config", "url."+other+".pushInsteadOf", f.remote)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixture(t)
+			// other is a copy of the remote whose default branch is feat/x: the
+			// push target, where feat/x must never be force-updated.
+			other := filepath.Join(filepath.Dir(f.remote), "other.git")
+			git(t, filepath.Dir(f.remote), "clone", "-q", "--bare", f.remote, other)
+			git(t, other, "symbolic-ref", "HEAD", "refs/heads/feat/x")
+			tt.split(t, f, other)
+			git(t, f.clone, "commit", "-q", "--amend", "--allow-empty", "-m", "rewritten")
+			before := refsOf(t, other)
+
+			_, _, err := pushLease(Request{Dir: f.clone, Expect: f.remoteSHA(t, "feat/x")})
+
+			var refusal *Refusal
+			if !errors.As(err, &refusal) || refusal.Code != CodeSplitRemote {
+				t.Errorf("err = %v, want a %s refusal", err, CodeSplitRemote)
+			}
+			if after := refsOf(t, other); after != before {
+				t.Errorf("the push target changed:\nbefore %s\nafter  %s", before, after)
+			}
+		})
+	}
+}
+
+// TestPush_PushURLEqualToURLStillPushes: a pushurl naming the fetch URL is no
+// split, so the split guard must let it through.
+func TestPush_PushURLEqualToURLStillPushes(t *testing.T) {
+	f := newFixture(t)
+	git(t, f.clone, "config", "remote.origin.pushurl", f.remote)
+	read := f.remoteSHA(t, "feat/x")
+	f.rebaseOntoNewMain(t)
+
+	if _, errOut, err := pushLease(Request{Dir: f.clone, Expect: read}); err != nil {
+		t.Fatalf("push: %v\n%s", err, errOut)
+	}
+	if got, want := f.remoteSHA(t, "feat/x"), git(t, f.clone, "rev-parse", "HEAD"); got != want {
+		t.Errorf("remote feat/x = %s, want %s", got, want)
+	}
+}
+
+// TestGitEnv_NeverPromptsOnTheTerminal: a credential prompt would hang an
+// agent's turn, so every git child gets GIT_TERMINAL_PROMPT=0, whatever the
+// caller's environment says (precedent: worktree.list).
+func TestGitEnv_NeverPromptsOnTheTerminal(t *testing.T) {
+	t.Setenv("GIT_TERMINAL_PROMPT", "1")
+	last := ""
+	for _, kv := range gitEnv() {
+		if strings.HasPrefix(kv, "GIT_TERMINAL_PROMPT=") {
+			last = kv
+		}
+	}
+	if last != "GIT_TERMINAL_PROMPT=0" {
+		t.Errorf("the last GIT_TERMINAL_PROMPT in the child environment is %q, want GIT_TERMINAL_PROMPT=0", last)
+	}
+}
