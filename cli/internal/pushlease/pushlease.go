@@ -37,6 +37,17 @@ type Plan struct {
 	New string
 }
 
+// Refusal is a request refused before git push ran: the remote is untouched.
+type Refusal struct {
+	Reason string
+}
+
+func (r *Refusal) Error() string { return r.Reason }
+
+func refuse(format string, args ...any) *Refusal {
+	return &Refusal{Reason: fmt.Sprintf(format, args...)}
+}
+
 // Prepare resolves the request against the repository.
 func Prepare(req Request) (Plan, error) {
 	branch, err := gitOutput(req.Dir, "symbolic-ref", "--quiet", "--short", "HEAD")
@@ -51,7 +62,40 @@ func Prepare(req Request) (Plan, error) {
 	if remote == "" {
 		remote = "origin"
 	}
-	return Plan{Dir: req.Dir, Branch: branch, Remote: remote, Expect: req.Expect, New: head}, nil
+	expect := strings.ToLower(req.Expect)
+	// git checks the lease only for a ref it is about to change: a remote that
+	// already equals HEAD is "up to date" and exits 0 whatever the lease says.
+	// Comparing first makes a wrong --expect a refusal in that case too; the
+	// lease still covers a push landing between this read and ours.
+	current, err := remoteBranchSHA(req.Dir, remote, branch)
+	if err != nil {
+		return Plan{}, err
+	}
+	if current != expect {
+		if current == "" {
+			return Plan{}, refuse("stale lease: %s has no branch %s, --expect is %s", remote, branch, expect)
+		}
+		return Plan{}, refuse("stale lease: %s/%s is %s, --expect is %s", remote, branch, current, expect)
+	}
+	return Plan{Dir: req.Dir, Branch: branch, Remote: remote, Expect: expect, New: head}, nil
+}
+
+// remoteBranchSHA asks the remote itself for the branch, never the
+// remote-tracking ref. It returns "" when the remote has no such branch.
+func remoteBranchSHA(dir, remote, branch string) (string, error) {
+	ref := "refs/heads/" + branch
+	out, err := gitOutput(dir, "ls-remote", remote, ref)
+	if err != nil {
+		return "", fmt.Errorf("read %s on %s: %w", ref, remote, err)
+	}
+	// ls-remote matches patterns by their tail, so take the exact ref only.
+	for line := range strings.SplitSeq(out, "\n") {
+		sha, name, ok := strings.Cut(strings.TrimSpace(line), "\t")
+		if ok && name == ref {
+			return strings.ToLower(sha), nil
+		}
+	}
+	return "", nil
 }
 
 // pushArgs is the whole git command line: one refspec, the branch to its own

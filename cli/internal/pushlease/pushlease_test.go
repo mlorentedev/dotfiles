@@ -88,6 +88,65 @@ func (f fixture) rebaseOntoNewMain(t *testing.T) {
 	git(t, f.clone, "rebase", "-q", "main")
 }
 
+// pushLease is the whole command: Prepare, then Push when nothing refused.
+func pushLease(req Request) (string, string, error) {
+	plan, err := Prepare(req)
+	if err != nil {
+		return "", "", err
+	}
+	var out, errOut bytes.Buffer
+	err = Push(plan, &out, &errOut)
+	return out.String(), errOut.String(), err
+}
+
+func TestPush_StaleExpectLeavesTheRemote(t *testing.T) {
+	tests := []struct {
+		name string
+		// arrange returns the --expect to pass; the remote sha must not change.
+		arrange func(t *testing.T, f fixture) string
+	}{
+		{
+			name: "someone else pushed after the read",
+			arrange: func(t *testing.T, f fixture) string {
+				read := f.remoteSHA(t, "feat/x")
+				git(t, f.clone, "switch", "-q", "-c", "someone-else")
+				git(t, f.clone, "commit", "-q", "--allow-empty", "-m", "theirs")
+				git(t, f.clone, "push", "-q", "origin", "someone-else:feat/x")
+				git(t, f.clone, "switch", "-q", "feat/x")
+				f.rebaseOntoNewMain(t)
+				return read
+			},
+		},
+		{
+			// git reports a ref that already equals the pushed commit as up to
+			// date before it consults the lease (see lane.Claimer.Acquire).
+			name: "the remote already equals HEAD and the expected sha is another",
+			arrange: func(t *testing.T, f fixture) string {
+				return git(t, f.clone, "rev-parse", "main")
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			expect := tt.arrange(t, f)
+			before := f.remoteSHA(t, "feat/x")
+
+			out, stderr, err := pushLease(Request{Dir: f.clone, Expect: expect})
+
+			if err == nil {
+				t.Fatalf("pushLease with a stale --expect succeeded; output %q, stderr:\n%s", out, stderr)
+			}
+			if out != "" {
+				t.Errorf("output = %q, want nothing on a refusal", out)
+			}
+			if after := f.remoteSHA(t, "feat/x"); after != before {
+				t.Errorf("remote feat/x moved from %s to %s", before, after)
+			}
+		})
+	}
+}
+
 func TestPush_MovesTheRemoteAfterARebase(t *testing.T) {
 	f := newFixture(t)
 	old := f.remoteSHA(t, "feat/x")
