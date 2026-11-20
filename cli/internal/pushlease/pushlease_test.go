@@ -304,6 +304,32 @@ func TestPrepare_RemoteResolutionOrder(t *testing.T) {
 	}
 }
 
+func TestPush_PrePushHookRuns(t *testing.T) {
+	f := newFixture(t)
+	old := f.remoteSHA(t, "feat/x")
+	f.rebaseOntoNewMain(t)
+	marker := filepath.Join(t.TempDir(), "pre-push-ran")
+	hook := "#!/bin/sh\necho ran > '" + filepath.ToSlash(marker) + "'\nexit 1\n"
+	if err := os.WriteFile(filepath.Join(f.hooks, "pre-push"), []byte(hook), 0o755); err != nil { //nolint:gosec // a hook must be executable
+		t.Fatal(err)
+	}
+
+	out, stderr, err := pushLease(Request{Dir: f.clone, Expect: old})
+
+	if err == nil {
+		t.Fatalf("push succeeded past a refusing pre-push hook; output %q", out)
+	}
+	if _, statErr := os.Stat(marker); statErr != nil {
+		t.Errorf("pre-push hook did not run (%v); stderr:\n%s", statErr, stderr)
+	}
+	if got := f.remoteSHA(t, "feat/x"); got != old {
+		t.Errorf("remote feat/x = %s, want it left at %s", got, old)
+	}
+	if out != "" {
+		t.Errorf("output = %q, want nothing when the push failed", out)
+	}
+}
+
 func TestPush_MovesTheRemoteAfterARebase(t *testing.T) {
 	f := newFixture(t)
 	old := f.remoteSHA(t, "feat/x")
