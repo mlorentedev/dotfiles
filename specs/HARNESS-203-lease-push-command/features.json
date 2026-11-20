@@ -1,0 +1,30 @@
+[
+  {
+    "id": "HARNESS-203-lease-push-command-f1",
+    "behavior": "AC1 After a rebase, dotf pr push-lease --expect <remote sha> moves the remote branch to the local HEAD and prints <branch> <old>..<new>; a stale --expect leaves the remote ref unchanged and exits non-zero.",
+    "verification": "cd cli && go test ./internal/pushlease -run 'TestPush_MovesTheRemoteAfterARebase|TestPush_StaleExpectLeavesTheRemote' -count=1 && go test ./internal/cmd -run TestPrPushLease -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-203-lease-push-command-f2",
+    "behavior": "AC2 Refused with exit 1 and a reason, the remote ref unchanged: detached HEAD, main, master, the remote default (set, unset and found by ls-remote, unresolvable), --expect missing, short or symbolic, unknown remote.",
+    "verification": "cd cli && go test ./internal/pushlease -run 'TestPrepare_' -count=1 && go test ./internal/cmd -run TestPrPushLease -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-203-lease-push-command-f3",
+    "behavior": "AC3 A pre-push hook runs on a lease push and its refusal stops the push.",
+    "verification": "cd cli && go test ./internal/pushlease -run TestPush_PrePushHookRuns -count=1",
+    "state": "pending",
+    "evidence": ""
+  },
+  {
+    "id": "HARNESS-203-lease-push-command-f4",
+    "behavior": "AC4 ai/claude/settings.json still denies git push *--force* and no deny, allow or ask rule matches dotf pr push-lease; AGENTS.md names the command; ADR-066 records the decision with alternatives.",
+    "verification": "cd cli && go test ./internal/claude -run TestPushLeaseRules -count=1 && cd .. && grep -q 'dotf pr push-lease' AGENTS.md && ls docs/adr/adr-066-*.md",
+    "state": "pending",
+    "evidence": ""
+  }
+]
