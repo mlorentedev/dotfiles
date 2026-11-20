@@ -42,6 +42,7 @@ func newPrCmd() *cobra.Command {
 	pr.AddCommand(newPrGateCmd())
 	pr.AddCommand(newPrReviewableCmd())
 	pr.AddCommand(newPrDeclareUnreviewedCmd())
+	pr.AddCommand(newPrPushLeaseCmd())
 	return pr
 }
 
