@@ -39,6 +39,13 @@ Test commands run from `cli/`. Expected outputs are the go test verdict lines.
 - [x] [AC4] `docs/adr/adr-066-agents-force-update-their-branch-through-dotf-pr-push-lease.md`: decision, the refusals, and an alternatives section (narrowed globs plus a parsing hook, #3608, six FAIL rounds and the measured 28 to 40 rows; a raw-text rule, measured 50 false refusals of 362 push commands from 23 transcripts; this command).
 - [x] Refactor for clarity: functions under the repository's complexity bar, names, comments only where the why is not obvious.
 
+Added after the second signature (finding F1, reproduced by the reviewer), so both signatures are relaunched on the result:
+
+- [x] [AC2] `TestPrepare_RefusesASplitRemote`, two rows: `remote.origin.pushurl` and `url.<other>.pushInsteadOf` point the push at a second bare repository whose `HEAD` is `feat/x`; each asserts a `split-remote` refusal and that repository's refs unchanged. `TestPush_PushURLEqualToURLStillPushes` guards against refusing a `pushurl` equal to the `url`. Recorded 2026-11-20: both split rows failed first, no refusal, and the push force-updated `feat/x`, the default branch of the push target; the equal-URL test passed.
+- [x] [AC2] Implement: `resolveRemote` compares `git remote get-url --all` with `get-url --push --all` (both expand `insteadOf`/`pushInsteadOf`) and refuses with `split-remote` when they differ, before any network call; the reason names the remote, never a URL. Result: PASS; mutants "guard off" (both split rows fail) and "always split" (`TestPush_PushURLEqualToURLStillPushes` fails) killed.
+- [x] `TestGitEnv_NeverPromptsOnTheTerminal`, then `gitEnv()` adds `GIT_TERMINAL_PROMPT=0` to every git child (precedent: `worktree.list`). Recorded: failed first (`GIT_TERMINAL_PROMPT=1` inherited), then PASS.
+- [x] Refactor: `checkRemote` takes the read, default-branch and lease checks out of `Prepare`. Measured with the pinned linter's `gocyclo`: `Prepare` 8 (the review counted about 11 before), every function in the package at most 8, under `AGENTS.md`'s bar of 10.
+
 ## Closing
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test

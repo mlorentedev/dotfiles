@@ -52,7 +52,9 @@ narrowed. (Another 68 to 112 rows are holes main already has; they are not this 
 2. It refuses before git pushes, each with a stable code: a detached HEAD (`detached-head`); `main` or
    `master` in any case (`protected-branch`); an `--expect` that is not a full 40 or 64 hex sha
    (`bad-expect`); a `--remote` that is not a configured remote name, such as a URL, a path or a
-   leading `-` (`unknown-remote`); a remote that cannot be read (`remote-unreadable`); the remote's
+   leading `-` (`unknown-remote`); a remote whose push URL differs from its fetch URL, by `pushurl` or
+   `pushInsteadOf`, since every check reads the fetch URL (`split-remote`); a remote that cannot be
+   read (`remote-unreadable`); the remote's
    default branch, by what `ls-remote --symref` reports or what `refs/remotes/<remote>/HEAD` recorded
    (`default-branch`), and neither known (`default-unresolved`); a branch whose remote sha is not
    `--expect` (`stale-lease`).
@@ -61,7 +63,7 @@ narrowed. (Another 68 to 112 rows are holes main already has; they are not this 
 4. The stale-lease check reads the remote before pushing because git does not check a lease on a ref
    that already equals the pushed commit: measured 2026-11-20, a wrong lease against such a ref printed
    `Everything up-to-date` and exited 0. The lease itself still covers a push landing after that read.
-5. Pre-push hooks run; there is no `--no-verify`.
+5. Pre-push hooks run; there is no `--no-verify`. Every git child runs with `GIT_TERMINAL_PROMPT=0`.
 6. The deny rules stay as on main, and no allow or ask rule names the command, so it runs under the
    ordinary permission prompt. `cli/internal/claude/push_lease_rules_test.go` pins both.
 7. `AGENTS.md` names the command as the way an agent force-updates its own branch.
@@ -73,7 +75,14 @@ narrowed. (Another 68 to 112 rows are holes main already has; they are not this 
 - A lease protects only against changes made after `--expect` was read. An agent that reads the remote
   sha fresh and pushes without integrating what it finds overwrites those commits. Accepted: the branch
   is the agent's own, and the command cannot know who else pushed.
-- Every push reads the remote first; offline, the command refuses instead of pushing.
+- Only `main`, `master` and the remote's default are refused. Other long-lived shared branches
+  (`release/*`, `develop`, `gh-pages`) can be force-updated by a caller who passes their current sha
+  and rely on the forge's branch protection. Proposed as accepted; pending the owner's confirmation.
+- Every push reads the remote first; offline, the command refuses instead of pushing. There is no
+  timeout: a remote that accepts the connection and then stalls holds the turn (#3617).
+- A remote that fetches over one URL and pushes over another (https fetch, ssh push) is refused, a
+  false refusal for the same repository reached two ways. Reading the push URL instead would admit it,
+  at the cost of handling several push URLs; refusing keeps every check about the push target.
 - The command ships in a released binary, the `AGENTS.md` line with the repository. Before the release
   an agent that follows the line gets an unknown-command error: loud, and nothing is pushed.
 - The `AGENTS.md` line reaches other repositories only where they fall back to this file. Carrying it

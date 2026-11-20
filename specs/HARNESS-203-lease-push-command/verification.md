@@ -29,6 +29,8 @@ owner: manu
 | `Bash(git push *--force*)` removed from the template's deny | killed: `TestPushLeaseRules_RawForcedPushStaysDenied` |
 | `Bash(dotf pr:*)` added to the template's allow | killed: `TestPushLeaseRules_NoRuleNamesTheCommand` |
 | `git remote get-url` check disabled (after review finding M2 added URL rows) | killed: 4 rows (`not configured`, `path`, `https URL`, `scp-style URL`) refuse as `remote-unreadable` instead of `unknown-remote`; `--mirror` stays refused by the leading-`-` guard |
+| split guard off (`pushurl` / `pushInsteadOf` admitted; after second-signature finding F1) | killed: both rows of `TestPrepare_RefusesASplitRemote`, the push target's `feat/x` force-updated |
+| split guard always on | killed: `TestPush_PushURLEqualToURLStillPushes` |
 | leading-`-` remote guard disabled | survived, equivalent: `git remote get-url` already rejects an option-like name, so the row is still refused as `unknown-remote`. The guard stays as defence for the later `ls-remote` and `push` calls |
 
 ## Test status
@@ -52,6 +54,17 @@ First signature: `review.md`, `nan/deepseek-v4-flash`, verdict PASS at `43292f73
 | M3: `tasks.md` Closing unticked | Applied: ticked what holds. The review said ticking would invalidate it; it does not, because the contract digest folds checkbox state (`normaliseContract`, #998). The last box waits for the second signature. |
 | M4: AC4's "full gates pass" holds only after the archive commit | Accepted as structural: `spec-gate` turns green with the archive commit, `review-attestation` once the PR leaves draft and a reviewer answers. |
 | Q: `leaseRuleMatches` is an emulation | No action, as the review concluded: the command text contains no literal any deny rule names. |
+
+Second signature: `review-second.md`, `anthropic-review/claude-sonnet-5-5`, verdict PASS-WITH-GAPS at `22709ec4`. F1 changed the contract (a new refusal in `proposal.md`), so both signatures are relaunched on the head that carries the fix; the round at `22709ec4` is kept as the record of what F1 was found against.
+
+| Finding | Disposition |
+|---|---|
+| F1 (REAL): `ls-remote` reads the fetch URL while the push writes `pushurl`; reproduced as a force-update of the push target's default branch | Applied: `split-remote` refusal when `get-url --push --all` differs from `get-url --all`, before any network call. The rows reproduce the reviewer's case and a `pushInsteadOf` variant it did not name; both failed first with the push landing. Contract updated (What, Risks, AC2), ADR-066 §2 and Consequences, `--help`. |
+| F2: long-lived branches other than the default are not protected | Recorded as a risk in `proposal.md` and ADR-066 Consequences: they rely on the forge's branch protection. Proposed as accepted, pending the owner's confirmation on the PR. |
+| F3: no timeout and no `GIT_TERMINAL_PROMPT=0` | Prompt applied: `gitEnv()` sets `GIT_TERMINAL_PROMPT=0` for every git child, following `worktree.list`, with `TestGitEnv_NeverPromptsOnTheTerminal`. Timeout ticketed: #3617 (HARNESS-205). |
+| F4 (REAL): `Prepare` about 11, above `AGENTS.md`'s bar of 10 | Applied: `checkRemote` extracted; measured with the pinned linter's `gocyclo`: `Prepare` 8, no function in the package above 8. |
+| F5: `--expect` read fresh just before pushing defeats the lease | No action: an accepted risk already in `proposal.md` and ADR-066. |
+| Q: no run against a hosted remote | See the smoke test line under Test status. |
 
 ## Decisions made during implementation
 
