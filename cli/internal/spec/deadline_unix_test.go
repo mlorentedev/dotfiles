@@ -165,11 +165,15 @@ func TestRunWithLimitsStartsTheRunnerInItsDirectory(t *testing.T) {
 // explicit Env taken from os.Environ() keeps the launcher's PWD, so a runner
 // that reads PWD would see the wrong tree. The filtered environment is built
 // from the command's own Environ() for that reason (#3615 review).
+//
+// printenv, not `sh -c 'echo $PWD'`: a POSIX shell replaces an inherited PWD
+// that does not name its directory, so a shell child hides exactly the stale
+// value this test exists to catch (it passed against the bug when written so).
 func TestRunWithLimitsGivesTheRunnerItsDirectoryAsPWD(t *testing.T) {
 	dir := ResolveExisting(t.TempDir())
 	var out bytes.Buffer
-	res, err := RunWithLimits(Limits{Deadline: time.Minute, Dir: dir}, []string{"sh", "-c", `printf %s "$PWD"`}, nil, &out, &bytes.Buffer{})
-	if err != nil || res.Code != 0 || out.String() != dir {
-		t.Errorf("PWD %q (code %d, err %v), want %s", out.String(), res.Code, err, dir)
+	res, err := RunWithLimits(Limits{Deadline: time.Minute, Dir: dir}, []string{"printenv", "PWD"}, nil, &out, &bytes.Buffer{})
+	if got := strings.TrimSpace(out.String()); err != nil || res.Code != 0 || got != dir {
+		t.Errorf("PWD %q (code %d, err %v), want %s", got, res.Code, err, dir)
 	}
 }
