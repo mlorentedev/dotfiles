@@ -69,6 +69,17 @@ Second signature: `review-second-round1.md`, `anthropic-review/claude-sonnet-5-5
 | F5: `--expect` read fresh just before pushing defeats the lease | No action: an accepted risk already in `proposal.md` and ADR-066. |
 | Q: no run against a hosted remote | See the smoke test line under Test status. |
 
+First signature on the head carrying F1 and F2: `review.md`, `nan/mimo-v2.6-flash`, verdict PASS-WITH-GAPS at `2cae9c07`, launched from the owner's terminal (not a Claude Code shell, so #3615 did not apply). No Blocker, no REAL Major; it re-ran the suites and killed the split-remote, stale-lease and `--no-verify` mutants itself.
+
+| Finding | Disposition |
+|---|---|
+| Session-start banner flags the spec from review-state files (REAL, pre-existing) | Already ticketed: #3616. Outside this diff. |
+| No timeout on `ls-remote` or `push` | Already ticketed: #3617. |
+| Long-lived non-default branches unprotected | Owner-accepted (F2 above); the review records it as closed. |
+| The 64-hex (SHA-256) `--expect` shape is never exercised | Applied: `TestFullSHA_AcceptsBothObjectFormatsAndNothingElse` pins 40 and 64 hex and the off-by-one lengths around both. Mutant: dropping the `{64}` alternative fails its `sha256` row. Test-only, outside the contract files. |
+| A push rejected after `Push` starts is not driven end to end at the command level | Declined: the command returns `withExitCode(1)` on the same line the tested `Prepare` refusals take, and `TestPush_PrePushHookRuns` covers a refused push at package level. An end-to-end row would add a second slow real-git fixture for no new branch. |
+| Q: `leaseRuleMatches` is an emulation | No action, dispositioned in the first round above. |
+
 ## Decisions made during implementation
 
 - The stale-lease pre-check (`ls-remote` before pushing) was added after row (b) of the stale test failed: git does not consult a lease on a ref that already equals the pushed commit.
