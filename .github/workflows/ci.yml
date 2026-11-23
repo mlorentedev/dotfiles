@@ -329,7 +329,7 @@ jobs:
 
           sudo apt-get install -y --no-install-recommends zsh
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
         with:
           go-version-file: cli/go.mod
@@ -506,7 +506,7 @@ jobs:
             echo "$v=$val" >> "$GITHUB_OUTPUT"
           done
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
@@ -691,7 +691,7 @@ jobs:
       # over a red box. Build dotf from THIS PR (the released binary lags the
       # tree; the integration container builds from source for the same
       # reason) and make it reachable by effect before setup runs.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: cli/go.mod
           cache-dependency-path: cli/go.sum
@@ -1014,7 +1014,7 @@ jobs:
       # evict the setup-go caches from the repository's budget.
       - name: Build integration test container
         if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
-        uses: mlorentedev/ci-workflows/.github/actions/docker-build@9b34f5b2815a3090d77d7589ef8bcc5087045544 # v0.8.0
+        uses: mlorentedev/ci-workflows/.github/actions/docker-build@fb5c58afa4249e5a0dd911bd443be1f361415d80 # v0.9.0
         with:
           image: dotfiles-integration-test
           file: tests/Dockerfile.integration
@@ -1046,6 +1046,6 @@ jobs:
     timeout-minutes: 2
     permissions: {}
     steps:
-      - uses: mlorentedev/ci-workflows/.github/actions/gate@2355330358344bb08c0b7a305be4ed6488f23d0c # v0.6.0
+      - uses: mlorentedev/ci-workflows/.github/actions/gate@fb5c58afa4249e5a0dd911bd443be1f361415d80 # v0.9.0
         with:
           needs: ${{ toJSON(needs) }}
