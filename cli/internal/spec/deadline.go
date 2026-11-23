@@ -116,7 +116,9 @@ func RunWithLimits(l Limits, argv []string, stdin io.Reader, stdout, stderr io.W
 	c.Dir = l.Dir
 	// A launch from a Claude Code shell carries its BUN_INSPECT; a Bun runner
 	// that inherits it binds the same port and dies before reviewing (#3615).
-	c.Env = bunenv.WithoutInspector(os.Environ())
+	// Built from c.Environ() after Dir is set, so the runner's PWD names Dir as
+	// it would had Env been left nil.
+	c.Env = bunenv.WithoutInspector(c.Environ())
 	startInOwnGroup(c)
 	if err := c.Start(); err != nil {
 		return RunResult{Code: -1}, err
