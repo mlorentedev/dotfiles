@@ -136,6 +136,15 @@ func resolveRemote(dir, explicit, branch string) (string, error) {
 	if err != nil {
 		return "", refuse(CodeUnknownRemote, "%q is not a configured remote: %v", remote, err)
 	}
+	if err := checkSplit(dir, remote, fetch); err != nil {
+		return "", err
+	}
+	return remote, nil
+}
+
+// checkSplit refuses a remote whose push could write a repository other than
+// the one ls-remote reads for the checks. fetch is its get-url --all output.
+func checkSplit(dir, remote, fetch string) error {
 	// The checks read one repository and the push must write only that one.
 	// ls-remote reads a remote's first URL while git pushes to every URL it
 	// has, so a second remote.<r>.url is a split too, though its fetch and push
@@ -144,12 +153,21 @@ func resolveRemote(dir, explicit, branch string) (string, error) {
 	// checks describe one repository while the push writes another. Reasons
 	// name the remote, never a URL, which may carry credentials.
 	if strings.Contains(fetch, "\n") {
-		return "", refuse(CodeSplitRemote, "%s has more than one URL: its default branch and lease are read from the first, and the push would write to every one", remote)
+		return refuse(CodeSplitRemote, "%s has more than one URL: its default branch and lease are read from the first, and the push would write to every one", remote)
 	}
 	if push, err := gitOutput(dir, "remote", "get-url", "--push", "--all", remote); err != nil || push != fetch {
-		return "", refuse(CodeSplitRemote, "%s pushes to a different URL than it fetches from, so its default branch and lease cannot be checked against the push target", remote)
+		return refuse(CodeSplitRemote, "%s pushes to a different URL than it fetches from, so its default branch and lease cannot be checked against the push target", remote)
 	}
-	return remote, nil
+	// receivepack and uploadpack name the program git runs on the remote for a
+	// push and for a read, one per direction, so a wrapper can send the two to
+	// different repositories while every URL agrees. git config exits 1 when a
+	// key is unset; any value, the empty one included, is refused.
+	for _, key := range []string{"receivepack", "uploadpack"} {
+		if _, err := gitOutput(dir, "config", "--get-all", "remote."+remote+"."+key); err == nil {
+			return refuse(CodeSplitRemote, "%s sets remote.%s.%s, which can read and push different repositories whatever its URL says", remote, remote, key)
+		}
+	}
+	return nil
 }
 
 // checkRemote reads the remote once and refuses the push when the branch is
@@ -232,7 +250,7 @@ func (p Plan) pushArgs() []string {
 }
 
 // Push runs the planned push. git's own output goes to errOut; on success out
-// gets one line, "<branch> <old>..<new>".
+// gets one line, "<branch> <old>..<new>", marked when nothing was pushed.
 func Push(p Plan, out, errOut io.Writer) error {
 	cmd := exec.Command("git", p.pushArgs()...) //nolint:gosec // argv built by pushArgs from a Plan, no shell
 	cmd.Env = gitEnv()

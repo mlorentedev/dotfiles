@@ -405,6 +405,16 @@ func TestPrepare_RefusesASplitRemote(t *testing.T) {
 		{"a second url pushes to another repository too", func(t *testing.T, f fixture, other string) {
 			git(t, f.clone, "config", "--add", "remote.origin.url", other)
 		}},
+		// receivepack and uploadpack name the program git runs on the remote
+		// for a push and for a read; no URL shows where a wrapper sends them
+		// (found probing the class after the second signature).
+		{"receivepack sends the push to another repository", func(t *testing.T, f fixture, other string) {
+			git(t, f.clone, "config", "remote.origin.receivepack", packWrapper(t, "git-receive-pack", other))
+		}},
+		{"uploadpack reads the checks from another repository", func(t *testing.T, f fixture, other string) {
+			git(t, f.clone, "config", "remote.origin.url", other)
+			git(t, f.clone, "config", "remote.origin.uploadpack", packWrapper(t, "git-upload-pack", f.remote))
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -430,6 +440,18 @@ func TestPrepare_RefusesASplitRemote(t *testing.T) {
 			}
 		})
 	}
+}
+
+// packWrapper writes a script that runs program against repo whatever
+// repository git asks for, and returns its path in the form git's shell runs.
+func packWrapper(t *testing.T, program, repo string) string {
+	t.Helper()
+	script := filepath.Join(t.TempDir(), program+"-wrapper.sh")
+	body := "#!/bin/sh\nexec " + program + " '" + filepath.ToSlash(repo) + "'\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil { //nolint:gosec // a test script that must be executable
+		t.Fatal(err)
+	}
+	return filepath.ToSlash(script)
 }
 
 // TestPush_PushURLEqualToURLStillPushes: a pushurl naming the fetch URL is no
