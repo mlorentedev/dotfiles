@@ -160,3 +160,16 @@ func TestRunWithLimitsStartsTheRunnerInItsDirectory(t *testing.T) {
 		t.Errorf("ran in %q (code %d, err %v), want %s", strings.TrimSpace(out.String()), res.Code, err, dir)
 	}
 }
+
+// os/exec sets PWD to Dir only when it builds the environment itself; an
+// explicit Env taken from os.Environ() keeps the launcher's PWD, so a runner
+// that reads PWD would see the wrong tree. The filtered environment is built
+// from the command's own Environ() for that reason (#3615 review).
+func TestRunWithLimitsGivesTheRunnerItsDirectoryAsPWD(t *testing.T) {
+	dir := ResolveExisting(t.TempDir())
+	var out bytes.Buffer
+	res, err := RunWithLimits(Limits{Deadline: time.Minute, Dir: dir}, []string{"sh", "-c", `printf %s "$PWD"`}, nil, &out, &bytes.Buffer{})
+	if err != nil || res.Code != 0 || out.String() != dir {
+		t.Errorf("PWD %q (code %d, err %v), want %s", out.String(), res.Code, err, dir)
+	}
+}

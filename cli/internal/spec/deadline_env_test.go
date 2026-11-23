@@ -34,6 +34,7 @@ func TestRunWithLimitsDropsBunInspectorVariables(t *testing.T) {
 	t.Setenv("BUN_INSPECT_CONNECT_TO", "ws://127.0.0.1:9221/connect")
 	t.Setenv("Bun_Inspect_Notify", "unix:///tmp/notify")
 	t.Setenv("DOTF_SPEC_TEST_KEEP", "kept")
+	t.Setenv("BUN_INSPECTOR", "kept") // shares the prefix, not the name: it must arrive
 	t.Setenv(printEnvChild, "1")
 
 	var out, errOut bytes.Buffer
@@ -43,17 +44,20 @@ func TestRunWithLimitsDropsBunInspectorVariables(t *testing.T) {
 		t.Fatalf("runner: code %d, err %v, stderr %q", res.Code, err, errOut.String())
 	}
 
-	var kept bool
+	kept := map[string]bool{"DOTF_SPEC_TEST_KEEP=kept": false, "BUN_INSPECTOR=kept": false}
 	for _, line := range strings.Split(strings.ReplaceAll(out.String(), "\r\n", "\n"), "\n") {
 		key, _, _ := strings.Cut(line, "=")
-		if strings.HasPrefix(strings.ToUpper(key), "BUN_INSPECT") {
+		upper := strings.ToUpper(key)
+		if upper == "BUN_INSPECT" || strings.HasPrefix(upper, "BUN_INSPECT_") {
 			t.Errorf("the runner inherited %s", line)
 		}
-		if line == "DOTF_SPEC_TEST_KEEP=kept" {
-			kept = true
+		if _, ok := kept[line]; ok {
+			kept[line] = true
 		}
 	}
-	if !kept {
-		t.Errorf("the runner lost an unrelated variable; its environment was:\n%s", out.String())
+	for entry, arrived := range kept {
+		if !arrived {
+			t.Errorf("the runner lost %s; its environment was:\n%s", entry, out.String())
+		}
 	}
 }
