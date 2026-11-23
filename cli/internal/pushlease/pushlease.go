@@ -136,11 +136,16 @@ func resolveRemote(dir, explicit, branch string) (string, error) {
 	if err != nil {
 		return "", refuse(CodeUnknownRemote, "%q is not a configured remote: %v", remote, err)
 	}
-	// The remote is read through its fetch URL. A push URL that differs, by
-	// pushurl or by url.<base>.pushInsteadOf (get-url expands both), would let
-	// the default-branch and lease checks describe one repository while the
-	// push writes another. The reason names the remote, never a URL, which may
-	// carry credentials.
+	// The checks read one repository and the push must write only that one.
+	// ls-remote reads a remote's first URL while git pushes to every URL it
+	// has, so a second remote.<r>.url is a split too, though its fetch and push
+	// lists are equal. A push URL that differs, by pushurl or by
+	// url.<base>.pushInsteadOf (get-url expands both), is the other way the
+	// checks describe one repository while the push writes another. Reasons
+	// name the remote, never a URL, which may carry credentials.
+	if strings.Contains(fetch, "\n") {
+		return "", refuse(CodeSplitRemote, "%s has more than one URL: its default branch and lease are read from the first, and the push would write to every one", remote)
+	}
 	if push, err := gitOutput(dir, "remote", "get-url", "--push", "--all", remote); err != nil || push != fetch {
 		return "", refuse(CodeSplitRemote, "%s pushes to a different URL than it fetches from, so its default branch and lease cannot be checked against the push target", remote)
 	}
@@ -236,7 +241,14 @@ func Push(p Plan, out, errOut io.Writer) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("git push %s to %s: %w", p.Branch, p.Remote, err)
 	}
-	_, err := fmt.Fprintf(out, "%s %s..%s\n", p.Branch, p.Expect, p.New)
+	// The stale-lease check has already proved the remote held Expect, so an
+	// Expect equal to New is a push git found up to date: say so, or the line
+	// reads as evidence of a push that did not happen.
+	suffix := ""
+	if p.Expect == p.New {
+		suffix = " (already there, nothing pushed)"
+	}
+	_, err := fmt.Fprintf(out, "%s %s..%s%s\n", p.Branch, p.Expect, p.New, suffix)
 	return err
 }
 

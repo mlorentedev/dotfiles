@@ -359,6 +359,26 @@ func TestPush_MovesTheRemoteAfterARebase(t *testing.T) {
 	}
 }
 
+// A remote that already holds HEAD makes git report "Everything up-to-date"
+// and exit 0. The evidence line must not read as a push that happened
+// (HARNESS-203 second signature).
+func TestPush_AlreadyThereSaysNothingWasPushed(t *testing.T) {
+	f := newFixture(t)
+	head := git(t, f.clone, "rev-parse", "HEAD")
+	if got := f.remoteSHA(t, "feat/x"); got != head {
+		t.Fatalf("fixture: remote feat/x = %s, want it equal to HEAD %s", got, head)
+	}
+
+	out, errOut, err := pushLease(Request{Dir: f.clone, Expect: head})
+
+	if err != nil {
+		t.Fatalf("Push: %v\nstderr:\n%s", err, errOut)
+	}
+	if want := "feat/x " + head + ".." + head + " (already there, nothing pushed)\n"; out != want {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+}
+
 // refsOf lists every ref of a bare repository with its target, and its HEAD.
 func refsOf(t *testing.T, dir string) string {
 	t.Helper()
@@ -378,6 +398,12 @@ func TestPrepare_RefusesASplitRemote(t *testing.T) {
 		}},
 		{"pushInsteadOf rewrites the push", func(t *testing.T, f fixture, other string) {
 			git(t, f.clone, "config", "url."+other+".pushInsteadOf", f.remote)
+		}},
+		// A second url makes fetch and push lists equal, so comparing them
+		// passes; ls-remote reads only the first URL and git pushes to both
+		// (HARNESS-203 second signature).
+		{"a second url pushes to another repository too", func(t *testing.T, f fixture, other string) {
+			git(t, f.clone, "config", "--add", "remote.origin.url", other)
 		}},
 	}
 	for _, tt := range tests {
