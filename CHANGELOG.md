@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.82.1](https://github.com/mlorentedev/dotfiles/compare/v0.82.0...v0.82.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* **spec:** keep Bun's inspector variables out of the review runner ([#3623](https://github.com/mlorentedev/dotfiles/issues/3623)) ([e3000a6](https://github.com/mlorentedev/dotfiles/commit/e3000a6440f0ccfa3b6718108fdb46996d63f034)), closes [#3615](https://github.com/mlorentedev/dotfiles/issues/3615)
+
 ## [0.82.0](https://github.com/mlorentedev/dotfiles/compare/v0.81.0...v0.82.0) (2026-11-18)
 
 
