@@ -31,3 +31,10 @@ the test binary as the child so it holds on Windows, where the failure was measu
 through `RunWithLimits`, so deleting the `c.Env` line turns it red. Before starting any Bun-based
 tool from code an agent runs, filter the environment the same way; the remaining launch paths are
 #3622.
+
+Filter `c.Environ()`, called after `c.Dir` is set, not `os.Environ()`. `os/exec` adds
+`PWD=<Dir>` only when it builds the environment itself; an `Env` taken from `os.Environ()` hands
+the child the launcher's `PWD`. The test that pins this reads the variable with `printenv`: the
+first version ran `sh -c 'printf %s "$PWD"'` and passed against the bug, because a POSIX shell
+replaces an inherited `PWD` that does not name its directory. A shell child hides exactly the
+stale value the test exists to catch.
