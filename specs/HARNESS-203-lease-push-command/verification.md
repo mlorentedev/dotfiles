@@ -32,6 +32,10 @@ owner: manu
 | split guard off (`pushurl` / `pushInsteadOf` admitted; after second-signature finding F1) | killed: both rows of `TestPrepare_RefusesASplitRemote`, the push target's `feat/x` force-updated |
 | split guard always on | killed: `TestPush_PushURLEqualToURLStillPushes` |
 | leading-`-` remote guard disabled | survived, equivalent: `git remote get-url` already rejects an option-like name, so the row is still refused as `unknown-remote`. The guard stays as defence for the later `ls-remote` and `push` calls |
+| multi-URL check off (after the second signature on `2734d2ed`; 2026-11-23, in a temp copy of the tree) | killed: the `a second url` row of `TestPrepare_RefusesASplitRemote`, no refusal and the push target's `feat/x` force-updated |
+| `receivepack` dropped from the checked keys (2026-11-23, temp copy) | killed: the `receivepack` row only |
+| `uploadpack` dropped from the checked keys (2026-11-23, temp copy) | killed: the `uploadpack` row only |
+| no-op suffix off (2026-11-23, temp copy) | killed: `TestPush_AlreadyThereSaysNothingWasPushed` |
 
 ## Test status
 
@@ -79,6 +83,17 @@ First signature on the head carrying F1 and F2: `review.md`, `nan/mimo-v2.6-flas
 | The 64-hex (SHA-256) `--expect` shape is never exercised | Applied: `TestFullSHA_AcceptsBothObjectFormatsAndNothingElse` pins 40 and 64 hex and the off-by-one lengths around both. Mutant: dropping the `{64}` alternative fails its `sha256` row. Test-only, outside the contract files. |
 | A push rejected after `Push` starts is not driven end to end at the command level | Declined: the command returns `withExitCode(1)` on the same line the tested `Prepare` refusals take, and `TestPush_PrePushHookRuns` covers a refused push at package level. An end-to-end row would add a second slow real-git fixture for no new branch. |
 | Q: `leaseRuleMatches` is an emulation | No action, dispositioned in the first round above. |
+
+
+Second signature on that head: `review-second.md`, `anthropic-review/claude-sonnet-5-5`, verdict **FAIL** at `2734d2ed`, launched from the owner's terminal. The launch before it died on a locked vault and is kept as `review-second-round2.md` (verdict ERROR, nothing reviewed). One REAL Major, reproduced. A FAIL needs a fix and a re-review, and the fix changes the contract, so both signatures are relaunched on the head that carries it.
+
+| Finding | Disposition |
+|---|---|
+| Major (REAL): a remote with a second `url` passes the split guard; `ls-remote` reads the first URL, git pushes to both, and the second repository's default branch was force-updated | Applied: `checkSplit` refuses with `split-remote` when `get-url --all` lists more than one URL. Third row of `TestPrepare_RefusesASplitRemote`, seen failing first; mutant killed (table above). Named in `proposal.md` What and AC2, `features.json` AC2, ADR-066 §2 and `--help`. |
+| Class sweep after the Major (an independent probe, asked only whether the push can write a repository the checks did not read) | `remote.<r>.receivepack` reproduced as a second bypass: a wrapper sent the push to another repository while both URL lists agreed, and the code printed a move on a repository it never checked. `uploadpack` is its mirror. Applied: both refused with `split-remote`; two rows, seen failing first. Held under probe: a legacy `.git/remotes/` file with two `URL:` lines (refused by the multi-URL check), a `.git/branches/` file (push and checks agree), `pushRemote`/`pushDefault` resolution (the push names the resolved remote on argv). Recorded as accepted in `proposal.md` Risks: transport-wide configured code (`core.sshCommand`, `GIT_SSH_COMMAND`, `core.gitProxy`, `remote.<r>.vcs`), and `push.recurseSubmodules`, which fails closed only because the refspec source is a sha. |
+| Minor (REAL): a push git finds up to date prints `<branch> <sha>..<sha>` as if it moved | Applied: the line ends `(already there, nothing pushed)`; `TestPush_AlreadyThereSaysNothingWasPushed`, seen failing first; mutant killed. Named in `proposal.md` What and AC1, `features.json` AC1, ADR-066 §4 and `--help`. |
+| Minor (THEORETICAL): the branch is read before `HEAD` is resolved, so a checkout in between pushes another branch's commit under the first name | Accepted: the lease still guards the remote ref, and the agent that would race the checkout is the caller itself. |
+| Question: refuse a multi-URL remote, or check every URL? | Refuse: fail closed, the same choice as `split-remote`, and one `ls-remote` per push stays true. Named to the owner before the relaunch so it can be overruled. |
 
 ## Decisions made during implementation
 

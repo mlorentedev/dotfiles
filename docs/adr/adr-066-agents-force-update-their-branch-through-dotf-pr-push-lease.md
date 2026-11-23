@@ -53,7 +53,10 @@ narrowed. (Another 68 to 112 rows are holes main already has; they are not this 
    `master` in any case (`protected-branch`); an `--expect` that is not a full 40 or 64 hex sha
    (`bad-expect`); a `--remote` that is not a configured remote name, such as a URL, a path or a
    leading `-` (`unknown-remote`); a remote whose push URL differs from its fetch URL, by `pushurl` or
-   `pushInsteadOf`, since every check reads the fetch URL (`split-remote`); a remote that cannot be
+   `pushInsteadOf`, that has more than one URL, or that sets `receivepack` or `uploadpack`, since
+   every check reads one repository (`ls-remote` takes the first URL), git pushes to every URL a
+   remote has, and those two keys name the program run on the remote per direction, which no URL
+   shows (`split-remote`); a remote that cannot be
    read (`remote-unreadable`); the remote's
    default branch, by what `ls-remote --symref` reports or what `refs/remotes/<remote>/HEAD` recorded
    (`default-branch`), and neither known (`default-unresolved`); a branch whose remote sha is not
@@ -63,6 +66,8 @@ narrowed. (Another 68 to 112 rows are holes main already has; they are not this 
 4. The stale-lease check reads the remote before pushing because git does not check a lease on a ref
    that already equals the pushed commit: measured 2026-11-20, a wrong lease against such a ref printed
    `Everything up-to-date` and exited 0. The lease itself still covers a push landing after that read.
+   A push that passes the check against such a ref changes nothing, and its printed line ends
+   `(already there, nothing pushed)` so it is not read as evidence of a move.
 5. Pre-push hooks run; there is no `--no-verify`. Every git child runs with `GIT_TERMINAL_PROMPT=0`.
 6. The deny rules stay as on main, and no allow or ask rule names the command, so it runs under the
    ordinary permission prompt. `cli/internal/claude/push_lease_rules_test.go` pins both.

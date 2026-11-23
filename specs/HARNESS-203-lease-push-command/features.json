@@ -1,15 +1,15 @@
 [
   {
     "id": "HARNESS-203-lease-push-command-f1",
-    "behavior": "AC1 After a rebase, dotf pr push-lease --expect <remote sha> moves the remote branch to the local HEAD and prints <branch> <old>..<new>; a stale --expect leaves the remote ref unchanged and exits non-zero.",
-    "verification": "cd cli && go test ./internal/pushlease -run 'TestPush_MovesTheRemoteAfterARebase|TestPush_StaleExpectLeavesTheRemote' -count=1 && go test ./internal/cmd -run TestPrPushLease -count=1",
+    "behavior": "AC1 After a rebase, dotf pr push-lease --expect <remote sha> moves the remote branch to the local HEAD and prints <branch> <old>..<new>; a stale --expect leaves the remote ref unchanged and exits non-zero; a remote already at HEAD gets the line ending (already there, nothing pushed).",
+    "verification": "cd cli && go test ./internal/pushlease -run 'TestPush_MovesTheRemoteAfterARebase|TestPush_AlreadyThereSaysNothingWasPushed|TestPush_StaleExpectLeavesTheRemote' -count=1 && go test ./internal/cmd -run TestPrPushLease -count=1",
     "state": "pending",
     "evidence": ""
   },
   {
     "id": "HARNESS-203-lease-push-command-f2",
-    "behavior": "AC2 Refused with exit 1 and a reason, the remote ref unchanged: detached HEAD, main, master, the remote default (set, unset and found by ls-remote, unresolvable), --expect missing, short or symbolic, unknown remote.",
-    "verification": "cd cli && go test ./internal/pushlease -run 'TestPrepare_' -count=1 && go test ./internal/cmd -run TestPrPushLease -count=1",
+    "behavior": "AC2 Refused with exit 1 and a reason, the remote ref unchanged: detached HEAD, main, master, the remote default (set, unset and found by ls-remote, unresolvable), --expect missing, short or symbolic, unknown remote, a remote whose push target differs from what is read (pushurl, pushInsteadOf, a second url, receivepack, uploadpack).",
+    "verification": "cd cli && go test ./internal/pushlease -run 'TestPrepare_|TestPush_PushURLEqualToURLStillPushes' -count=1 && go test ./internal/cmd -run TestPrPushLease -count=1",
     "state": "pending",
     "evidence": ""
   },

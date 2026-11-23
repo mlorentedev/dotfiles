@@ -46,6 +46,14 @@ Added after the second signature (finding F1, reproduced by the reviewer), so bo
 - [x] `TestGitEnv_NeverPromptsOnTheTerminal`, then `gitEnv()` adds `GIT_TERMINAL_PROMPT=0` to every git child (precedent: `worktree.list`). Recorded: failed first (`GIT_TERMINAL_PROMPT=1` inherited), then PASS.
 - [x] Refactor: `checkRemote` takes the read, default-branch and lease checks out of `Prepare`. Measured with the pinned linter's `gocyclo`: `Prepare` 8 (the review counted about 11 before), every function in the package at most 8, under `AGENTS.md`'s bar of 10.
 
+Added after the second signature on `2734d2ed` (FAIL: a remote with a second `url`, reproduced by the reviewer), so both signatures are relaunched on the result. The class was then probed independently for every other way the push could write a repository the checks did not read:
+
+- [x] [AC2] `TestPrepare_RefusesASplitRemote`, third row: `git config --add remote.origin.url <other>`. Recorded 2026-11-23: failed first, no refusal and the push force-updated `feat/x`, the default branch of `<other>`.
+- [x] [AC2] Rows four and five: `remote.origin.receivepack` and `remote.origin.uploadpack` set to a wrapper that runs the pack program against another repository (`packWrapper`). Recorded: both failed first, no refusal and the push target changed.
+- [x] [AC2] Implement in `checkSplit`, called by `resolveRemote` before any network call: refuse with `split-remote` when `get-url --all` lists more than one URL, and when `receivepack` or `uploadpack` is set for the remote. Result: PASS; mutant "multi-URL check off" fails the third row; dropping either key from the checked list fails exactly its own row. `gocyclo` max in the package still 8.
+- [x] [AC1] `TestPush_AlreadyThereSaysNothingWasPushed`: a remote already at HEAD gets the line ending `(already there, nothing pushed)`. Recorded: failed first (`feat/x <sha>..<sha>` alone), then PASS; mutant "suffix off" fails it.
+- [x] `--help`, ADR-066 §2 and §4, `proposal.md` What, Risks, AC1 and AC2, and `features.json` AC1 and AC2 name the new refusals and the no-op line.
+
 ## Closing
 
 - [x] Every acceptance criterion from `proposal.md` is covered by at least one test
