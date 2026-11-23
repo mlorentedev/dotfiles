@@ -76,8 +76,11 @@ narrowed. (Another 68 to 112 rows are holes main already has; they are not this 
   sha fresh and pushes without integrating what it finds overwrites those commits. Accepted: the branch
   is the agent's own, and the command cannot know who else pushed.
 - Only `main`, `master` and the remote's default are refused. Other long-lived shared branches
-  (`release/*`, `develop`, `gh-pages`) can be force-updated by a caller who passes their current sha
-  and rely on the forge's branch protection. Proposed as accepted; pending the owner's confirmation.
+  (`release/*`, `develop`, `gh-pages`) can be force-updated by a caller who passes their current sha.
+  `dotf` does not protect them; they are covered only where the forge has a rule for them. Accepted by
+  the owner (2026-11-23) without a configurable list, which would duplicate what the forge owns; if one
+  is ever built it only refuses, never grants by branch name. Revisit when a repository where agents
+  push gains a shared `release/*` or `develop`.
 - Every push reads the remote first; offline, the command refuses instead of pushing. There is no
   timeout: a remote that accepts the connection and then stalls holds the turn (#3617).
 - A remote that fetches over one URL and pushes over another (https fetch, ssh push) is refused, a
