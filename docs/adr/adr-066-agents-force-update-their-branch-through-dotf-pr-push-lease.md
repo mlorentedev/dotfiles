@@ -91,6 +91,12 @@ narrowed. (Another 68 to 112 rows are holes main already has; they are not this 
 - A remote that fetches over one URL and pushes over another (https fetch, ssh push) is refused, a
   false refusal for the same repository reached two ways. Reading the push URL instead would admit it,
   at the cost of handling several push URLs; refusing keeps every check about the push target.
+- Configured code that serves both directions alike is not refused: any transport program git runs for
+  a read and a push the same way, for example `core.sshCommand`, `GIT_SSH_COMMAND`, `core.gitProxy`, a
+  `remote.<r>.vcs` helper or a helper URL (`<helper>::<address>`, `ext::`). It could route a read and a
+  push apart, but whoever sets it already runs code at push time, as a pre-push hook does, and refusing
+  `core.sshCommand` would refuse ordinary key setups. `receivepack` and `uploadpack` are refused
+  because each serves one direction only. Accepted by the owner (2026-11-23).
 - The command ships in a released binary, the `AGENTS.md` line with the repository. Before the release
   an agent that follows the line gets an unknown-command error: loud, and nothing is pushed.
 - The `AGENTS.md` line reaches other repositories only where they fall back to this file. Carrying it

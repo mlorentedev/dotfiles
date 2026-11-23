@@ -52,7 +52,8 @@ Added after the second signature on `2734d2ed` (FAIL: a remote with a second `ur
 - [x] [AC2] Rows four and five: `remote.origin.receivepack` and `remote.origin.uploadpack` set to a wrapper that runs the pack program against another repository (`packWrapper`). Recorded: both failed first, no refusal and the push target changed.
 - [x] [AC2] Implement in `checkSplit`, called by `resolveRemote` before any network call: refuse with `split-remote` when `get-url --all` lists more than one URL, and when `receivepack` or `uploadpack` is set for the remote. Result: PASS; mutant "multi-URL check off" fails the third row; dropping either key from the checked list fails exactly its own row. `gocyclo` max in the package still 8.
 - [x] [AC1] `TestPush_AlreadyThereSaysNothingWasPushed`: a remote already at HEAD gets the line ending `(already there, nothing pushed)`. Recorded: failed first (`feat/x <sha>..<sha>` alone), then PASS; mutant "suffix off" fails it.
-- [x] `--help`, ADR-066 §2 and §4, `proposal.md` What, Risks, AC1 and AC2, and `features.json` AC1 and AC2 name the new refusals and the no-op line.
+- [x] `--help`, ADR-066 §2 and §4, `proposal.md` What, Risks, AC1 and AC2, and `features.json` AC1 and AC2 name the new refusals and the no-op line. The owner accepted the unrefused configured code that serves both directions (2026-11-23), recorded in Risks and ADR-066 Consequences.
+- [x] Lesson `docs/lessons/lesson-617-a-guard-that-reads-one-repository-must-prove-the-push-writes-only-that-one.md`: three bypasses of one invariant, each fixed as its own case.
 
 ## Closing
 
