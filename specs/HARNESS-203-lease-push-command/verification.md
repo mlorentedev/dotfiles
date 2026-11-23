@@ -48,7 +48,7 @@ owner: manu
 
 ## Review dispositions
 
-First signature: `review-round5.md` (kept under that name once F1 changed the contract), `nan/deepseek-v4-flash`, verdict PASS at `43292f73`. Four earlier launches ended without a verdict and are kept as `review-round1..4.md`: two with Bitwarden locked, one with the runner inheriting Claude Code's `BUN_INSPECT` (#3615), one stopped at the 45-minute deadline.
+First signature: `review-round5.md` (kept under that name once F1 changed the contract), `nan/deepseek-v4-flash`, verdict PASS at `43292f73`. Four earlier launches ended without a verdict and are kept as `review-round1..4.md`: two with Bitwarden locked, one with the runner inheriting Claude Code's `BUN_INSPECT` (#3615), one stopped at the 45-minute deadline. The first relaunch on `a611769c` (`nan/mimo-v2.6-flash`) is kept as `review-round6.md`: the launching session ended before the reviewer wrote anything past the placeholder, so it holds no verdict and no transcript.
 
 | Finding | Disposition |
 |---|---|
