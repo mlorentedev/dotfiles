@@ -1,0 +1,13 @@
+{
+  "reviewed_sha": "22709ec48af6165a79fe1537ce751ce7ee81cba5",
+  "reviewer": "anthropic-review/claude-sonnet-5-5",
+  "requested_at": "2026-11-20T21:32:29Z",
+  "review_digest_before": "",
+  "base_sha": "31360ae33a738ab309af04a302cb8c71084d3e4d",
+  "contract_digests": {
+    "features.json": "f231c73ec5b4068900f22309f6f8d50e101d7f456b6e150a564a9af809d5ecf8",
+    "proposal.md": "cd9159dcad194bf347464a8d640d6a80be2b79d2a19b32d802f0234cb15cb435",
+    "spec.md": "",
+    "tasks.md": "85ef71c53a0560eafd007ff3c52de27f7753f07441dd31db8f7ea8c202518411"
+  }
+}

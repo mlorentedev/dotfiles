@@ -288,5 +288,6 @@ Wire `dotf pr triage-queue` into any session-start hook the harness offers.
 - **TDD & Discipline:** Failing test first, then fix. Read existing code and changelogs first. One issue at a time. Backward compatibility on refactors.
 - **No sycophancy:** Challenge assumptions, give counterarguments before validating.
 - **Feature flags:** Use feature flags for decouple / external-gating — never blank config or delete code to hide work.
+- **Force-updating your own branch:** After a rebase, push with `dotf pr push-lease --expect <sha>`, where `<sha>` is the remote branch as you last integrated it (usually the commit you pushed before rebasing). It refuses `main`, `master` and the remote's default branch; a raw forced `git push` stays denied. Do not route around it with a second branch or pull request (ADR-066).
 - **POSIX by default:** Scripts must run under bash + zsh (ShellCheck enforced). Hardware debugging follows evidence first (`debug-hardware` skill).
 - **Endpoint security wins:** If endpoint security blocks a tool, do not retry, install, rebuild, wrap, or invoke an equivalent execution path (`go run`, another binary path) without explicit owner approval. Use CI as authoritative and run only permitted local checks. The owner had to repeat this three times in two weeks because it lived only in session journals.
